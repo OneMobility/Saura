@@ -79,9 +79,14 @@ const LatestToursSection = () => {
           <div className="relative">
             <div className="embla" ref={emblaRef}>
               <div className="embla__container flex -ml-4"> {/* Negative margin to offset slide padding */}
-                {latestTours.map((tour) => (
+                {latestTours.map((tour, index) => (
                   <div key={tour.id} className="embla__slide flex-none w-full pl-4"> {/* Padding for spacing */}
-                    <Card className="overflow-hidden shadow-lg hover:shadow-xl hover:ring-2 hover:ring-rosa-mexicano hover:ring-offset-2 transition-all duration-300 h-full flex flex-col">
+                    <Card className={cn(
+                      "overflow-hidden shadow-lg hover:shadow-xl hover:ring-2 hover:ring-rosa-mexicano hover:ring-offset-2 transition-all duration-300 h-full flex flex-col bg-white", // Added bg-white
+                      index === 0 && "transform rotate-1", // Example rotation
+                      index === 1 && "transform -rotate-1", // Example rotation
+                      index === 2 && "transform rotate-2" // Example rotation
+                    )}>
                       <div className="relative h-48 w-full overflow-hidden">
                         <img
                           src={tour.imageUrl}
@@ -111,8 +116,13 @@ const LatestToursSection = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {latestTours.map((tour) => (
-              <Card key={tour.id} className="overflow-hidden shadow-lg hover:shadow-xl hover:ring-2 hover:ring-rosa-mexicano hover:ring-offset-2 transition-all duration-300 group">
+            {latestTours.map((tour, index) => (
+              <Card key={tour.id} className={cn(
+                "overflow-hidden shadow-lg hover:shadow-xl hover:ring-2 hover:ring-rosa-mexicano hover:ring-offset-2 transition-all duration-300 group bg-white", // Added bg-white
+                index === 0 && "transform rotate-1", // Example rotation
+                index === 1 && "transform -rotate-1", // Example rotation
+                index === 2 && "transform rotate-2" // Example rotation
+              )}>
                 <div className="relative h-48 w-full overflow-hidden">
                   <img
                     src={tour.imageUrl}
