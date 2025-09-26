@@ -15,14 +15,9 @@ const Navbar = () => {
         </div>
       </div>
 
-      {/* Enlaces de navegación */}
+      {/* Enlaces de navegación (ahora vacíos) */}
       <div className="flex-grow flex items-center justify-end pr-4">
-        <ul className="flex space-x-4">
-          <li><a href="#" className="text-gray-600 hover:text-gray-900">Inicio</a></li>
-          <li><a href="#" className="text-gray-600 hover:text-gray-900">Acerca de</a></li>
-          <li><a href="#" className="text-gray-600 hover:text-gray-900">Servicios</a></li>
-          <li><a href="#" className="text-gray-600 hover:text-gray-900">Contacto</a></li>
-        </ul>
+        {/* Aquí construiremos el menú poco a poco */}
       </div>
     </nav>
   );
