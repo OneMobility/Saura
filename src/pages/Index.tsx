@@ -1,4 +1,3 @@
-import { MadeWithDyad } from "@/components/made-with-dyad";
 import Navbar from "@/components/Navbar"; // Importa el nuevo componente Navbar
 
 const Index = () => {
@@ -13,7 +12,6 @@ const Index = () => {
           </p>
         </div>
       </div>
-      <MadeWithDyad />
     </div>
   );
 };
