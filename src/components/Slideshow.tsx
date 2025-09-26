@@ -3,7 +3,6 @@ import useEmblaCarousel from 'embla-carousel-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-// Eliminado: import SocialMediaBox from './SocialMediaBox';
 
 interface Slide {
   id: number;
@@ -33,9 +32,19 @@ const slides: Slide[] = [
   },
 ];
 
+const animationClasses = [
+  'animate-fade-in-up',
+  'animate-fade-in-left',
+  'animate-fade-in-right',
+];
+
 const Slideshow = () => {
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true });
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [currentTitleAnimation, setCurrentTitleAnimation] = useState('');
+  const [currentDescriptionAnimation, setCurrentDescriptionAnimation] = useState('');
+
+  const getRandomAnimation = () => animationClasses[Math.floor(Math.random() * animationClasses.length)];
 
   const scrollPrev = useCallback(() => {
     if (emblaApi) emblaApi.scrollPrev();
@@ -47,7 +56,11 @@ const Slideshow = () => {
 
   const onSelect = useCallback(() => {
     if (!emblaApi) return;
-    setSelectedIndex(emblaApi.selectedScrollSnap());
+    const newIndex = emblaApi.selectedScrollSnap();
+    setSelectedIndex(newIndex);
+    // Generar nuevas animaciones aleatorias cuando se selecciona una nueva diapositiva
+    setCurrentTitleAnimation(getRandomAnimation());
+    setCurrentDescriptionAnimation(getRandomAnimation());
   }, [emblaApi, setSelectedIndex]);
 
   useEffect(() => {
@@ -55,9 +68,9 @@ const Slideshow = () => {
 
     const autoplay = setInterval(() => {
       emblaApi.scrollNext();
-    }, 5000); // Cambia de slide cada 5 segundos
+    }, 10000); // Cambiado a 10 segundos
 
-    onSelect();
+    onSelect(); // Configuración inicial de la animación
     emblaApi.on('select', onSelect);
     emblaApi.on('reInit', onSelect);
 
@@ -80,13 +93,21 @@ const Slideshow = () => {
               />
               <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
                 <div className={cn(
-                  "text-center text-white transition-opacity duration-1000 ease-in-out",
+                  "text-center text-white",
+                  // La opacidad del contenedor principal controla la visibilidad de la diapositiva
                   selectedIndex === index ? "opacity-100" : "opacity-0"
                 )}>
-                  <h2 className="text-3xl md:text-5xl font-bold mb-4 animate-fade-in-up">
+                  <h2 className={cn(
+                    "text-3xl md:text-5xl font-bold mb-4",
+                    selectedIndex === index && currentTitleAnimation // Aplica animación solo si está seleccionada
+                  )}>
                     {slide.title}
                   </h2>
-                  <p className="text-lg md:text-2xl animate-fade-in-up delay-200">
+                  <p className={cn(
+                    "text-lg md:text-2xl",
+                    selectedIndex === index && currentDescriptionAnimation, // Aplica animación solo si está seleccionada
+                    selectedIndex === index && "delay-200" // Aplica un pequeño retraso a la descripción
+                  )}>
                     {slide.description}
                   </p>
                 </div>
