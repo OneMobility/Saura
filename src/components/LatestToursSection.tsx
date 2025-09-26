@@ -40,32 +40,33 @@ const latestTours: Tour[] = [
 const LatestToursSection = () => {
   const isMobile = useIsMobile();
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true, align: 'start' });
-  const [canScrollPrev, setCanScrollPrev] = useState(false);
-  const [canScrollNext, setCanScrollNext] = useState(false);
+  // No necesitamos canScrollPrev/Next ni scrollPrev/Next si no hay botones de navegación
+  // const [canScrollPrev, setCanScrollPrev] = useState(false);
+  // const [canScrollNext, setCanScrollNext] = useState(false);
 
-  const scrollPrev = useCallback(() => {
-    if (emblaApi) emblaApi.scrollPrev();
-  }, [emblaApi]);
+  // const scrollPrev = useCallback(() => {
+  //   if (emblaApi) emblaApi.scrollPrev();
+  // }, [emblaApi]);
 
-  const scrollNext = useCallback(() => {
-    if (emblaApi) emblaApi.scrollNext();
-  }, [emblaApi]);
+  // const scrollNext = useCallback(() => {
+  //   if (emblaApi) emblaApi.scrollNext();
+  // }, [emblaApi]);
 
-  const onSelect = useCallback(() => {
-    if (!emblaApi) return;
-    setCanScrollPrev(emblaApi.canScrollPrev());
-    setCanScrollNext(emblaApi.canScrollNext());
-  }, [emblaApi]);
+  // const onSelect = useCallback(() => {
+  //   if (!emblaApi) return;
+  //   setCanScrollPrev(emblaApi.canScrollPrev());
+  //   setCanScrollNext(emblaApi.canScrollNext());
+  // }, [emblaApi]);
 
   useEffect(() => {
     if (!emblaApi) return;
-    emblaApi.on('select', onSelect);
-    emblaApi.on('reInit', onSelect);
-    onSelect(); // Initial check
+    // emblaApi.on('select', onSelect); // Ya no es necesario si no hay botones
+    // emblaApi.on('reInit', onSelect); // Ya no es necesario si no hay botones
+    // onSelect(); // Initial check
     return () => {
-      emblaApi.off('select', onSelect);
+      // emblaApi.off('select', onSelect); // Limpiar listeners si se usaran
     };
-  }, [emblaApi, onSelect]);
+  }, [emblaApi]); // onSelect ya no es una dependencia
 
   return (
     <section className="py-12 px-4 md:px-8 lg:px-16 bg-gray-50">
@@ -106,26 +107,7 @@ const LatestToursSection = () => {
                 ))}
               </div>
             </div>
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex space-x-4 z-10">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={scrollPrev}
-                disabled={!canScrollPrev}
-                className="bg-white/70 hover:bg-white text-gray-800 hover:text-gray-900 rounded-full"
-              >
-                <ChevronLeft className="h-6 w-6" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={scrollNext}
-                disabled={!canScrollNext}
-                className="bg-white/70 hover:bg-white text-gray-800 hover:text-gray-900 rounded-full"
-              >
-                <ChevronRight className="h-6 w-6" />
-              </Button>
-            </div>
+            {/* Se eliminan los botones de navegación para permitir el arrastre */}
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
