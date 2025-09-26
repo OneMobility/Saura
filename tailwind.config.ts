@@ -62,6 +62,7 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
+        "rosa-mexicano": "#E4007C", // Nuevo color Rosa Mexicano
       },
       borderRadius: {
         lg: "var(--radius)",
