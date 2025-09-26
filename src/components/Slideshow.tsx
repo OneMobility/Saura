@@ -3,6 +3,7 @@ import useEmblaCarousel from 'embla-carousel-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
+import SocialMediaBox from './SocialMediaBox'; // Importa el nuevo componente
 
 interface Slide {
   id: number;
@@ -93,6 +94,11 @@ const Slideshow = () => {
             </div>
           ))}
         </div>
+      </div>
+
+      {/* SocialMediaBox posicionado al centro y por encima */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20">
+        <SocialMediaBox />
       </div>
 
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex space-x-4 z-10">
