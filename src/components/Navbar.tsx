@@ -1,5 +1,5 @@
 import React from 'react';
-import { PalmTree } from 'lucide-react'; // Importa el icono de palmera
+import { TreePalm } from 'lucide-react'; // Importa el icono correcto de palmera
 
 const Navbar = () => {
   return (
@@ -10,7 +10,7 @@ const Navbar = () => {
         style={{ clipPath: 'polygon(0 0, 100% 0, 85% 100%, 0 100%)', minWidth: '200px' }}
       >
         <div className="flex items-center space-x-2"> {/* Contenedor para el icono y el texto */}
-          <PalmTree className="text-white h-6 w-6" /> {/* Icono de palmera */}
+          <TreePalm className="text-white h-6 w-6" /> {/* Icono de palmera */}
           <div className="text-lg font-bold text-white">Saura Tours</div>
         </div>
       </div>
