@@ -43,6 +43,7 @@ const Slideshow = () => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [currentTitleAnimation, setCurrentTitleAnimation] = useState('');
   const [currentDescriptionAnimation, setCurrentDescriptionAnimation] = useState('');
+  const autoplayRef = useRef<ReturnType<typeof setInterval> | null>(null); // Ref para almacenar el ID del intervalo
 
   const getRandomAnimation = () => animationClasses[Math.floor(Math.random() * animationClasses.length)];
 
@@ -63,25 +64,53 @@ const Slideshow = () => {
     setCurrentDescriptionAnimation(getRandomAnimation());
   }, [emblaApi, setSelectedIndex]);
 
+  // Función para iniciar la reproducción automática
+  const startAutoplay = useCallback(() => {
+    if (emblaApi) {
+      autoplayRef.current = setInterval(() => {
+        emblaApi.scrollNext();
+      }, 10000);
+    }
+  }, [emblaApi]);
+
+  // Función para detener la reproducción automática
+  const stopAutoplay = useCallback(() => {
+    if (autoplayRef.current) {
+      clearInterval(autoplayRef.current);
+      autoplayRef.current = null;
+    }
+  }, []);
+
   useEffect(() => {
     if (!emblaApi) return;
-
-    const autoplay = setInterval(() => {
-      emblaApi.scrollNext();
-    }, 10000); // Cambiado a 10 segundos
 
     onSelect(); // Configuración inicial de la animación
     emblaApi.on('select', onSelect);
     emblaApi.on('reInit', onSelect);
 
+    startAutoplay(); // Iniciar la reproducción automática al montar el componente
+
     return () => {
-      clearInterval(autoplay); // Limpia el intervalo al desmontar el componente
+      stopAutoplay(); // Limpiar el intervalo al desmontar el componente
       emblaApi.off('select', onSelect);
     };
-  }, [emblaApi, onSelect]);
+  }, [emblaApi, onSelect, startAutoplay, stopAutoplay]);
+
+  // Manejadores de eventos para el mouse
+  const handleMouseEnter = () => {
+    stopAutoplay();
+  };
+
+  const handleMouseLeave = () => {
+    startAutoplay();
+  };
 
   return (
-    <div className="relative w-full overflow-hidden">
+    <div
+      className="relative w-full overflow-hidden"
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
+    >
       <div className="embla" ref={emblaRef}>
         <div className="embla__container flex">
           {slides.map((slide, index) => (
