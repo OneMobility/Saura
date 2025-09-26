@@ -1,7 +1,8 @@
 import Navbar from "@/components/Navbar";
 import Slideshow from "@/components/Slideshow";
 import SocialMediaBox from "@/components/SocialMediaBox";
-import PromotionalStrip from "@/components/PromotionalStrip"; // Importa el nuevo componente
+import PromotionalStrip from "@/components/PromotionalStrip";
+import LatestToursSection from "@/components/LatestToursSection"; // Importa el nuevo componente
 
 const Index = () => {
   return (
@@ -11,6 +12,9 @@ const Index = () => {
       
       {/* Franja promocional debajo del slideshow */}
       <PromotionalStrip />
+
+      {/* Sección de los últimos tours */}
+      <LatestToursSection />
 
       {/* SocialMediaBox posicionado a la derecha y centrado verticalmente */}
       <div className="absolute right-0 top-1/2 -translate-y-1/2 z-20">
