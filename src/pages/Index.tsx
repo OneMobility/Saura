@@ -3,6 +3,7 @@ import Slideshow from "@/components/Slideshow";
 import SocialMediaBox from "@/components/SocialMediaBox";
 import PromotionalStrip from "@/components/PromotionalStrip";
 import LatestToursSection from "@/components/LatestToursSection";
+import BlogSection from "@/components/BlogSection"; // Import the new BlogSection
 
 const Index = () => {
   return (
@@ -23,6 +24,9 @@ const Index = () => {
 
       {/* Sección de los últimos tours */}
       <LatestToursSection />
+
+      {/* Nueva sección de blog */}
+      <BlogSection />
     </div>
   );
 };
