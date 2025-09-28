@@ -8,7 +8,7 @@ interface BlogPost {
   imageUrl: string;
   title: string;
   description: string;
-  link: string;
+  link: string; // Mantener 'link' aquí para los datos, pero pasar 'id' como 'blogId'
 }
 
 const latestBlogs: BlogPost[] = [
@@ -17,7 +17,7 @@ const latestBlogs: BlogPost[] = [
     imageUrl: 'https://images.unsplash.com/photo-1501785888041-af3ba6f602d8?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
     title: 'Guía Completa para tu Primer Viaje a la Riviera Maya',
     description: 'Descubre los secretos mejor guardados de la Riviera Maya, desde las playas paradisíacas hasta las antiguas ruinas mayas. Prepárate para una aventura inolvidable con nuestros consejos de expertos.',
-    link: '#',
+    link: '#', // Este 'link' ya no se usará directamente en BlogCard
   },
   {
     id: 'blog-2',
@@ -56,7 +56,7 @@ const BlogSection = () => {
               imageUrl={post.imageUrl}
               title={post.title}
               description={post.description}
-              link={post.link}
+              blogId={post.id} // Pasar el ID del blog como blogId
             />
           ))}
         </div>

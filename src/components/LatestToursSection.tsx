@@ -6,8 +6,8 @@ import { Button } from '@/components/ui/button';
 import useEmblaCarousel from 'embla-carousel-react';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useIsMobile } from '@/hooks/use-mobile'; // Importamos el hook para detectar si es móvil
-import ParallaxCard from './ParallaxCard'; // Importamos el nuevo componente ParallaxCard
+import { useIsMobile } from '@/hooks/use-mobile';
+import ParallaxCard from './ParallaxCard';
 
 interface Tour {
   id: string;
@@ -56,7 +56,7 @@ const LatestToursSection = () => {
   ];
 
   return (
-    <section className="py-12 px-4 md:px-8 lg:px-16 bg-white"> {/* Changed bg-gray-50 to bg-white */}
+    <section className="py-12 px-4 md:px-8 lg:px-16 bg-white">
       <div className="max-w-6xl mx-auto">
         <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-800 mb-10">
           Nuestros Últimos Tours
@@ -65,15 +65,16 @@ const LatestToursSection = () => {
         {isMobile ? (
           <div className="relative">
             <div className="embla" ref={emblaRef}>
-              <div className="embla__container flex -ml-4"> {/* Negative margin to offset slide padding */}
+              <div className="embla__container flex -ml-4">
                 {latestTours.map((tour, index) => (
-                  <div key={tour.id} className="embla__slide flex-none w-full pl-4"> {/* Padding for spacing */}
+                  <div key={tour.id} className="embla__slide flex-none w-full pl-4">
                     <ParallaxCard
                       imageUrl={tour.imageUrl}
                       title={tour.title}
                       description={tour.description}
                       rotationClass={rotationClasses[index % rotationClasses.length]}
-                      isMobile={true} // Indicate it's in mobile/carousel mode
+                      isMobile={true}
+                      tourId={tour.id} // Pasar el ID del tour
                     />
                   </div>
                 ))}
@@ -89,7 +90,8 @@ const LatestToursSection = () => {
                 title={tour.title}
                 description={tour.description}
                 rotationClass={rotationClasses[index % rotationClasses.length]}
-                isMobile={false} // Indicate it's in desktop/grid mode
+                isMobile={false}
+                tourId={tour.id} // Pasar el ID del tour
               />
             ))}
           </div>

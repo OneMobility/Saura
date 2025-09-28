@@ -4,13 +4,15 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { Link } from 'react-router-dom'; // Importar Link
 
 interface ParallaxCardProps {
   imageUrl: string;
   title: string;
   description: string;
   rotationClass?: string;
-  isMobile?: boolean; // Para saber si estamos en modo carrusel
+  isMobile?: boolean;
+  tourId: string; // Nueva prop para el ID del tour
 }
 
 const ParallaxCard: React.FC<ParallaxCardProps> = ({
@@ -19,6 +21,7 @@ const ParallaxCard: React.FC<ParallaxCardProps> = ({
   description,
   rotationClass,
   isMobile = false,
+  tourId, // Usar la nueva prop
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [translateY, setTranslateY] = useState(0);
@@ -28,24 +31,19 @@ const ParallaxCard: React.FC<ParallaxCardProps> = ({
       const rect = cardRef.current.getBoundingClientRect();
       const viewportHeight = window.innerHeight;
 
-      // Calculate how much the card is in the viewport
       const cardCenterY = rect.top + rect.height / 2;
       const viewportCenterY = viewportHeight / 2;
 
-      // Adjust parallax strength as needed
-      const parallaxStrength = 0.15; // Controls how much the image moves
-
-      // Calculate translateY based on the card's position relative to the viewport center
-      // Image moves less than the scroll, creating the parallax effect
+      const parallaxStrength = 0.15;
       const newTranslateY = (cardCenterY - viewportCenterY) * parallaxStrength;
       setTranslateY(newTranslateY);
     }
   }, []);
 
   useEffect(() => {
-    if (!isMobile) { // Apply parallax only for desktop view (not in carousel)
+    if (!isMobile) {
       window.addEventListener('scroll', handleScroll);
-      handleScroll(); // Set initial position
+      handleScroll();
       return () => {
         window.removeEventListener('scroll', handleScroll);
       };
@@ -57,8 +55,8 @@ const ParallaxCard: React.FC<ParallaxCardProps> = ({
       ref={cardRef}
       className={cn(
         "overflow-hidden shadow-lg hover:shadow-xl hover:ring-2 hover:ring-rosa-mexicano hover:ring-offset-2 transition-all duration-300 group bg-white",
-        rotationClass, // Apply rotation for photocard effect
-        "flex flex-col" // Ensure card takes full height in flex container
+        rotationClass,
+        "flex flex-col"
       )}
     >
       <div className="relative h-48 w-full overflow-hidden">
@@ -66,7 +64,7 @@ const ParallaxCard: React.FC<ParallaxCardProps> = ({
           src={imageUrl}
           alt={title}
           className="absolute inset-0 w-full h-full object-cover transform transition-transform duration-300 group-hover:scale-105"
-          style={{ transform: `translateY(${translateY}px) scale(1.1)` }} // Apply parallax translateY and slightly scale up
+          style={{ transform: `translateY(${translateY}px) scale(1.1)` }}
         />
       </div>
       <CardHeader>
@@ -78,8 +76,8 @@ const ParallaxCard: React.FC<ParallaxCardProps> = ({
         </CardDescription>
       </CardContent>
       <CardFooter className="flex justify-end">
-        <Button className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white">
-          Ver Detalles
+        <Button asChild className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white">
+          <Link to={`/tours/${tourId}`}>Ver Detalles</Link> {/* Enlace a la página de detalles del tour */}
         </Button>
       </CardFooter>
     </Card>
