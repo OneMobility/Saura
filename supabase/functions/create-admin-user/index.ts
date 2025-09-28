@@ -7,8 +7,11 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log('Edge Function: create-admin-user invoked.');
+
   // Handle CORS OPTIONS request
   if (req.method === 'OPTIONS') {
+    console.log('Edge Function: OPTIONS request received.');
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -21,6 +24,7 @@ serve(async (req) => {
   // Verify JWT token to ensure request comes from an authenticated user (admin)
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) {
+    console.error('Edge Function: Unauthorized: Missing Authorization header.');
     return jsonResponse({ error: 'Unauthorized: Missing Authorization header' }, 401);
   }
 
@@ -35,14 +39,17 @@ serve(async (req) => {
     }
   );
 
+  console.log('Edge Function: Verifying user token...');
   const { data: { user: authUser }, error: authError } = await supabaseClient.auth.getUser(token);
 
   if (authError || !authUser) {
-    console.error('Auth error:', authError);
+    console.error('Edge Function: Auth error:', authError?.message || 'User not found.');
     return jsonResponse({ error: 'Unauthorized: Invalid token or user not found' }, 401);
   }
+  console.log('Edge Function: User authenticated:', authUser.id);
 
   // Check if the authenticated user is an admin
+  console.log('Edge Function: Checking user role...');
   const { data: profile, error: profileError } = await supabaseClient
     .from('profiles')
     .select('role')
@@ -50,9 +57,10 @@ serve(async (req) => {
     .single();
 
   if (profileError || profile?.role !== 'admin') {
-    console.error('Profile error or not admin:', profileError, profile?.role);
+    console.error('Edge Function: Profile error or not admin. Profile error:', profileError?.message, 'User role:', profile?.role);
     return jsonResponse({ error: 'Forbidden: Only administrators can perform this action' }, 403);
   }
+  console.log('Edge Function: User is an administrator.');
 
   // Initialize Supabase client with service role key for admin operations
   const supabaseAdmin = createClient(
@@ -64,26 +72,33 @@ serve(async (req) => {
       },
     }
   );
+  console.log('Edge Function: Supabase admin client initialized.');
 
   try {
     const { email, password, first_name, last_name, username, role } = await req.json();
+    console.log('Edge Function: Received data for new user:', { email, first_name, last_name, username, role });
 
     if (!email || !password) {
+      console.error('Edge Function: Missing email or password in request body.');
       return jsonResponse({ error: 'Missing email or password' }, 400);
     }
 
     // Check if user with this email already exists
+    console.log('Edge Function: Checking for existing user by email...');
     const { data: existingUser, error: existingUserError } = await supabaseAdmin.auth.admin.getUserByEmail(email);
 
     if (existingUser && !existingUserError) {
+      console.error('Edge Function: User with this email already exists:', email);
       return jsonResponse({ error: 'User with this email already exists.' }, 409); // Conflict
     }
     if (existingUserError && existingUserError.message !== 'User not found') {
-      console.error('Error checking for existing user:', existingUserError);
+      console.error('Edge Function: Error checking for existing user:', existingUserError.message);
       return jsonResponse({ error: 'Failed to check for existing user.' }, 500);
     }
+    console.log('Edge Function: No existing user found with this email.');
 
     // Create user in Supabase Auth
+    console.log('Edge Function: Creating user in Supabase Auth...');
     const { data: newUser, error: createUserError } = await supabaseAdmin.auth.admin.createUser({
       email,
       password,
@@ -92,12 +107,14 @@ serve(async (req) => {
     });
 
     if (createUserError) {
-      console.error('Error creating user:', createUserError);
+      console.error('Edge Function: Error creating user:', createUserError.message);
       return jsonResponse({ error: createUserError.message }, 400);
     }
+    console.log('Edge Function: User created in Auth:', newUser.user?.id);
 
     // Update the profile with the specified role and username
     // The handle_new_user trigger will create a basic profile, so we update it.
+    console.log('Edge Function: Updating user profile in public.profiles...');
     const { error: updateProfileError } = await supabaseAdmin
       .from('profiles')
       .update({
@@ -109,15 +126,16 @@ serve(async (req) => {
       .eq('id', newUser.user?.id);
 
     if (updateProfileError) {
-      console.error('Error updating user profile:', updateProfileError);
+      console.error('Edge Function: Error updating user profile:', updateProfileError.message);
       // Optionally delete the user if profile update fails
       await supabaseAdmin.auth.admin.deleteUser(newUser.user?.id as string);
       return jsonResponse({ error: 'Failed to update user profile after creation.' }, 500);
     }
+    console.log('Edge Function: User profile updated successfully.');
 
     return jsonResponse({ message: 'User created successfully', userId: newUser.user?.id }, 201);
   } catch (error: any) {
-    console.error('Unexpected error:', error);
+    console.error('Edge Function: Unexpected error:', error.message);
     return jsonResponse({ error: error.message }, 500);
   }
 });
