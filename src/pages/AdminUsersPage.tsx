@@ -1,0 +1,192 @@
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import AdminSidebar from '@/components/AdminSidebar';
+import { Button } from '@/components/ui/button';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { Edit, KeyRound, Loader2 } from 'lucide-react';
+import UserEditDialog from '@/components/admin/users/UserEditDialog'; // Import the new dialog
+
+interface UserProfile {
+  id: string;
+  email: string; // Email from auth.users
+  first_name: string | null;
+  last_name: string | null;
+  username: string | null;
+  role: string | null;
+  created_at: string;
+}
+
+const AdminUsersPage = () => {
+  const [users, setUsers] = useState<UserProfile[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
+
+  useEffect(() => {
+    fetchUsers();
+  }, []);
+
+  const fetchUsers = async () => {
+    setLoading(true);
+    // Fetch users from auth.users and join with public.profiles
+    const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+
+    if (authError) {
+      console.error('Error fetching auth users:', authError);
+      toast.error('Error al cargar los usuarios de autenticación.');
+      setLoading(false);
+      return;
+    }
+
+    const userIds = authUsers.users.map(u => u.id);
+
+    const { data: profiles, error: profileError } = await supabase
+      .from('profiles')
+      .select('id, first_name, last_name, username, role, created_at')
+      .in('id', userIds);
+
+    if (profileError) {
+      console.error('Error fetching user profiles:', profileError);
+      toast.error('Error al cargar los perfiles de usuario.');
+      setLoading(false);
+      return;
+    }
+
+    const mergedUsers: UserProfile[] = authUsers.users.map(authUser => {
+      const profile = profiles?.find(p => p.id === authUser.id);
+      return {
+        id: authUser.id,
+        email: authUser.email || 'N/A',
+        first_name: profile?.first_name || null,
+        last_name: profile?.last_name || null,
+        username: profile?.username || null,
+        role: profile?.role || 'user', // Default role to 'user' if not set
+        created_at: profile?.created_at || authUser.created_at,
+      };
+    });
+
+    setUsers(mergedUsers);
+    setLoading(false);
+  };
+
+  const handleEditUser = (user: UserProfile) => {
+    setSelectedUser(user);
+    setIsDialogOpen(true);
+  };
+
+  const handleUserSave = (updatedUser: UserProfile) => {
+    setUsers((prev) =>
+      prev.map((user) => (user.id === updatedUser.id ? { ...user, ...updatedUser } : user))
+    );
+  };
+
+  const handlePasswordReset = async (email: string) => {
+    if (!email || email === 'N/A') {
+      toast.error('No se puede restablecer la contraseña para este usuario (correo no disponible).');
+      return;
+    }
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: `${window.location.origin}/login?reset=true`, // Redirect to login with a flag
+    });
+
+    if (error) {
+      console.error('Error sending password reset email:', error);
+      toast.error('Error al enviar el correo de restablecimiento de contraseña.');
+    } else {
+      toast.success(`Se ha enviado un correo de restablecimiento de contraseña a ${email}.`);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex min-h-screen bg-gray-100">
+        <AdminSidebar />
+        <div className="flex flex-col flex-grow items-center justify-center">
+          <Loader2 className="h-12 w-12 animate-spin text-rosa-mexicano" />
+          <p className="mt-4 text-gray-700">Cargando usuarios...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex min-h-screen bg-gray-100">
+      <AdminSidebar />
+      <div className="flex flex-col flex-grow">
+        <header className="bg-white shadow-sm p-4">
+          <h1 className="text-2xl font-bold text-gray-800">Gestión de Usuarios</h1>
+        </header>
+        <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
+          <div className="bg-white rounded-lg shadow-lg p-6">
+            <h2 className="text-xl font-semibold mb-4">Usuarios Registrados</h2>
+            {users.length === 0 ? (
+              <p className="text-gray-600">No hay usuarios registrados.</p>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Nombre</TableHead>
+                      <TableHead>Apellido</TableHead>
+                      <TableHead>Usuario</TableHead>
+                      <TableHead>Rol</TableHead>
+                      <TableHead>Acciones</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {users.map((user) => (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">{user.email}</TableCell>
+                        <TableCell>{user.first_name || 'N/A'}</TableCell>
+                        <TableCell>{user.last_name || 'N/A'}</TableCell>
+                        <TableCell>{user.username || 'N/A'}</TableCell>
+                        <TableCell>{user.role || 'user'}</TableCell>
+                        <TableCell className="flex space-x-2">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handleEditUser(user)}
+                            className="text-blue-600 hover:bg-blue-50"
+                          >
+                            <Edit className="h-4 w-4" />
+                            <span className="sr-only">Editar</span>
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            onClick={() => handlePasswordReset(user.email)}
+                            className="text-yellow-600 hover:bg-yellow-50"
+                          >
+                            <KeyRound className="h-4 w-4" />
+                            <span className="sr-only">Restablecer Contraseña</span>
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </div>
+        </main>
+        <footer className="bg-gray-800 text-white py-4 text-center text-sm">
+          <p>&copy; {new Date().getFullYear()} Saura Tours Admin. Todos los derechos reservados.</p>
+        </footer>
+      </div>
+      {selectedUser && (
+        <UserEditDialog
+          isOpen={isDialogOpen}
+          onClose={() => setIsDialogOpen(false)}
+          user={selectedUser}
+          onSave={handleUserSave}
+        />
+      )}
+    </div>
+  );
+};
+
+export default AdminUsersPage;

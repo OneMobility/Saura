@@ -44,7 +44,6 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
           setIsAdmin(false);
           setFirstName(null);
         } else if (profile) {
-          console.log('SessionContextProvider: Fetched profile:', profile); // Log the fetched profile
           if (profile.role === 'admin') {
             console.log('SessionContextProvider: User is admin.');
             setIsAdmin(true);
@@ -54,7 +53,6 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
           }
           setFirstName(profile.first_name || null); // Set firstName
         } else {
-          console.log('SessionContextProvider: No profile found for user.'); // Log if no profile
           setIsAdmin(false);
           setFirstName(null);
         }
@@ -96,7 +94,6 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
               setIsAdmin(false);
               setFirstName(null);
             } else if (profile) {
-              console.log('SessionContextProvider: Initial check: Fetched profile:', profile); // Log the fetched profile
               if (profile.role === 'admin') {
                 console.log('SessionContextProvider: Initial check: User is admin.');
                 setIsAdmin(true);
@@ -106,7 +103,6 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
               }
               setFirstName(profile.first_name || null); // Set firstName
             } else {
-              console.log('SessionContextProvider: Initial check: No profile found for user.'); // Log if no profile
               setIsAdmin(false);
               setFirstName(null);
             }

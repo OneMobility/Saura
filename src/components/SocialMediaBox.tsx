@@ -1,5 +1,6 @@
 import React from 'react';
 import { Facebook, Instagram } from 'lucide-react';
+import TikTokIcon from '@/components/icons/TikTokIcon'; // Import the new TikTokIcon
 
 const SocialMediaBox = () => {
   return (
@@ -10,11 +11,8 @@ const SocialMediaBox = () => {
       <a href="https://www.instagram.com" target="_blank" rel="noopener noreferrer" className="text-white hover:text-gray-200 transition-colors">
         <Instagram className="h-8 w-8" />
       </a>
-      {/* El icono de TikTok no está disponible directamente en lucide-react.
-          Por ahora, se usa un enlace de texto. Si se necesita un icono, se puede
-          añadir un SVG personalizado o integrar otra librería de iconos. */}
-      <a href="https://www.tiktok.com" target="_blank" rel="noopener noreferrer" className="text-white hover:text-gray-200 transition-colors flex items-center justify-center h-8 w-8 text-sm font-bold">
-        TikTok
+      <a href="https://www.tiktok.com" target="_blank" rel="noopener noreferrer" className="text-white hover:text-gray-200 transition-colors">
+        <TikTokIcon className="h-8 w-8" /> {/* Use TikTokIcon here */}
       </a>
     </div>
   );
