@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { PlusCircle, Trash2, Loader2 } from 'lucide-react';
+import { PlusCircle, Trash2, Loader2, Upload } from 'lucide-react'; // Added Upload icon
+import { v4 as uuidv4 } from 'uuid'; // For unique file names
 
 interface Slide {
   id: string;
@@ -20,9 +21,10 @@ interface Slide {
 
 const SlideshowSettings = () => {
   const [slides, setSlides] = useState<Slide[]>([]);
-  const [newSlide, setNewSlide] = useState({ image_url: '', title: '', description: '' });
+  const [newSlide, setNewSlide] = useState({ imageFile: null as File | null, imageUrlPreview: '', title: '', description: '' });
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
 
   useEffect(() => {
     fetchSlides();
@@ -49,16 +51,62 @@ const SlideshowSettings = () => {
     setNewSlide((prev) => ({ ...prev, [id]: value }));
   };
 
+  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setNewSlide((prev) => ({ ...prev, imageFile: file, imageUrlPreview: URL.createObjectURL(file) }));
+    } else {
+      setNewSlide((prev) => ({ ...prev, imageFile: null, imageUrlPreview: '' }));
+    }
+  };
+
+  const uploadImage = async (file: File): Promise<string | null> => {
+    setIsUploadingImage(true);
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${uuidv4()}.${fileExt}`;
+    const filePath = `public/${fileName}`; // Store in a 'public' folder within the bucket
+
+    const { data, error } = await supabase.storage
+      .from('slideshow-images') // Use the new bucket name
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    setIsUploadingImage(false);
+
+    if (error) {
+      console.error('Error uploading image:', error);
+      toast.error('Error al subir la imagen.');
+      return null;
+    }
+
+    // Get the public URL of the uploaded image
+    const { data: publicUrlData } = supabase.storage
+      .from('slideshow-images')
+      .getPublicUrl(filePath);
+
+    return publicUrlData.publicUrl;
+  };
+
   const addSlide = async () => {
-    if (!newSlide.image_url || !newSlide.title || !newSlide.description) {
-      toast.error('Por favor, rellena todos los campos para la nueva diapositiva.');
+    if (!newSlide.imageFile || !newSlide.title || !newSlide.description) {
+      toast.error('Por favor, selecciona una imagen y rellena todos los campos para la nueva diapositiva.');
       return;
     }
     setIsSubmitting(true);
+
+    const imageUrl = await uploadImage(newSlide.imageFile);
+
+    if (!imageUrl) {
+      setIsSubmitting(false);
+      return; // Image upload failed
+    }
+
     const { data, error } = await supabase
       .from('slides')
       .insert({
-        image_url: newSlide.image_url,
+        image_url: imageUrl,
         title: newSlide.title,
         description: newSlide.description,
         order_index: slides.length, // Assign a new order index
@@ -71,7 +119,7 @@ const SlideshowSettings = () => {
       toast.error('Error al añadir la diapositiva.');
     } else if (data) {
       setSlides((prev) => [...prev, data]);
-      setNewSlide({ image_url: '', title: '', description: '' });
+      setNewSlide({ imageFile: null, imageUrlPreview: '', title: '', description: '' });
       toast.success('Diapositiva añadida con éxito.');
     }
     setIsSubmitting(false);
@@ -115,13 +163,19 @@ const SlideshowSettings = () => {
           <h3 className="text-xl font-semibold">Añadir Nueva Diapositiva</h3>
           <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="image_url">URL de la Imagen</Label>
+              <Label htmlFor="image_file">Subir Imagen</Label>
               <Input
-                id="image_url"
-                value={newSlide.image_url}
-                onChange={handleNewSlideChange}
-                placeholder="https://ejemplo.com/imagen.jpg"
+                id="image_file"
+                type="file"
+                accept="image/*"
+                onChange={handleImageFileChange}
+                className="file:text-rosa-mexicano file:font-semibold file:border-0 file:bg-transparent file:mr-4"
               />
+              {newSlide.imageUrlPreview && (
+                <div className="mt-2">
+                  <img src={newSlide.imageUrlPreview} alt="Vista previa" className="w-32 h-20 object-cover rounded-md" />
+                </div>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="title">Título</Label>
@@ -142,9 +196,9 @@ const SlideshowSettings = () => {
               placeholder="Descripción breve de la diapositiva"
             />
           </div>
-          <Button onClick={addSlide} disabled={isSubmitting}>
-            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
-            Añadir Diapositiva
+          <Button onClick={addSlide} disabled={isSubmitting || isUploadingImage}>
+            {isSubmitting || isUploadingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <PlusCircle className="mr-2 h-4 w-4" />}
+            {isUploadingImage ? 'Subiendo imagen...' : 'Añadir Diapositiva'}
           </Button>
         </div>
 
