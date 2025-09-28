@@ -76,13 +76,12 @@ serve(async (req) => {
     }
     console.log(`Edge Function: Found ${authUsers.users.length} auth users.`);
 
-    const userIds = authUsers.users.map(u => u.id);
-
     // Fetch profiles from public.profiles
     console.log('Edge Function: Fetching user profiles from public.profiles...');
+    // Removed 'created_at' from select as it's not in public.profiles, using authUser.created_at instead.
     const { data: profiles, error: fetchProfilesError } = await supabaseAdmin
       .from('profiles')
-      .select('id, first_name, last_name, username, role, created_at'); // Removed .in('id', userIds) to fetch all profiles and then merge
+      .select('id, first_name, last_name, username, role'); 
 
     if (fetchProfilesError) {
       console.error('Edge Function: Error fetching user profiles:', fetchProfilesError.message);
@@ -100,7 +99,7 @@ serve(async (req) => {
         last_name: profile?.last_name || null,
         username: profile?.username || null,
         role: profile?.role || 'user',
-        created_at: profile?.created_at || authUser.created_at,
+        created_at: authUser.created_at, // Use created_at from auth.users
       };
     });
 
