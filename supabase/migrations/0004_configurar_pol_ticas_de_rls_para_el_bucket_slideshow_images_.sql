@@ -1,0 +1,5 @@
+-- Enable RLS on the storage bucket
+    -- In Supabase UI, go to Storage -> slideshow-images -> Policies
+    -- Add a policy for "SELECT" (read access) for "anon" role (public access)
+    -- Add a policy for "INSERT", "UPDATE", "DELETE" for "authenticated" role,
+    -- restricted to users with 'admin' role in public.profiles.
