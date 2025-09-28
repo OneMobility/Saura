@@ -8,7 +8,9 @@ import NotFound from "./pages/NotFound";
 import TourDetailsPage from "./pages/TourDetailsPage";
 import BlogPage from "./pages/BlogPage";
 import BlogPostPage from "./pages/BlogPostPage";
-import ScrollToTop from "./components/ScrollToTop"; // Import the new ScrollToTop component
+import ToursPage from "./pages/ToursPage"; // Import the new ToursPage
+import ContactPage from "./pages/ContactPage"; // Import the new ContactPage
+import ScrollToTop from "./components/ScrollToTop";
 
 const queryClient = new QueryClient();
 
@@ -18,12 +20,14 @@ const App = () => (
       <Toaster />
       <Sonner />
       <BrowserRouter>
-        <ScrollToTop /> {/* Render ScrollToTop inside BrowserRouter */}
+        <ScrollToTop />
         <Routes>
           <Route path="/" element={<Index />} />
+          <Route path="/tours" element={<ToursPage />} /> {/* New route for all tours */}
           <Route path="/tours/:id" element={<TourDetailsPage />} />
           <Route path="/blog" element={<BlogPage />} />
           <Route path="/blog/:id" element={<BlogPostPage />} />
+          <Route path="/contact" element={<ContactPage />} /> {/* New route for contact page */}
           {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
           <Route path="*" element={<NotFound />} />
         </Routes>
