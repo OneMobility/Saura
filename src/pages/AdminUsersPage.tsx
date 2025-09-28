@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Edit, KeyRound, Loader2, UserPlus } from 'lucide-react';
 import UserEditDialog from '@/components/admin/users/UserEditDialog';
-import AdminUserCreateDialog from '@/components/admin/users/AdminUserCreateDialog'; // Import the new create dialog
+import AdminUserCreateDialog from '@/components/admin/users/AdminUserCreateDialog';
 
 interface UserProfile {
   id: string;
@@ -24,7 +24,7 @@ const AdminUsersPage = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false); // State for create dialog
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
 
   useEffect(() => {
@@ -33,45 +33,23 @@ const AdminUsersPage = () => {
 
   const fetchUsers = async () => {
     setLoading(true);
-    // Fetch users from auth.users and join with public.profiles
-    const { data: authUsers, error: authError } = await supabase.auth.admin.listUsers();
+    try {
+      const { data, error } = await supabase.functions.invoke('list-admin-users');
 
-    if (authError) {
-      console.error('Error fetching auth users:', authError);
-      toast.error('Error al cargar los usuarios de autenticación.');
+      if (error) {
+        console.error('Error invoking list-admin-users function:', error);
+        toast.error(`Error al cargar los usuarios: ${data?.error || error.message || 'Error desconocido.'}`);
+      } else if (data && data.users) {
+        setUsers(data.users);
+      } else {
+        toast.error('Respuesta inesperada al cargar usuarios.');
+      }
+    } catch (error: any) {
+      console.error('Unexpected error fetching users:', error);
+      toast.error(`Error inesperado al cargar usuarios: ${error.message}`);
+    } finally {
       setLoading(false);
-      return;
     }
-
-    const userIds = authUsers.users.map(u => u.id);
-
-    const { data: profiles, error: profileError } = await supabase
-      .from('profiles')
-      .select('id, first_name, last_name, username, role, created_at')
-      .in('id', userIds);
-
-    if (profileError) {
-      console.error('Error fetching user profiles:', profileError);
-      toast.error('Error al cargar los perfiles de usuario.');
-      setLoading(false);
-      return;
-    }
-
-    const mergedUsers: UserProfile[] = authUsers.users.map(authUser => {
-      const profile = profiles?.find(p => p.id === authUser.id);
-      return {
-        id: authUser.id,
-        email: authUser.email || 'N/A',
-        first_name: profile?.first_name || null,
-        last_name: profile?.last_name || null,
-        username: profile?.username || null,
-        role: profile?.role || 'user', // Default role to 'user' if not set
-        created_at: profile?.created_at || authUser.created_at,
-      };
-    });
-
-    setUsers(mergedUsers);
-    setLoading(false);
   };
 
   const handleEditUser = (user: UserProfile) => {
@@ -91,7 +69,7 @@ const AdminUsersPage = () => {
       return;
     }
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/login?reset=true`, // Redirect to login with a flag
+      redirectTo: `${window.location.origin}/login?reset=true`,
     });
 
     if (error) {
@@ -193,7 +171,7 @@ const AdminUsersPage = () => {
       <AdminUserCreateDialog
         isOpen={isCreateDialogOpen}
         onClose={() => setIsCreateDialogOpen(false)}
-        onUserCreated={fetchUsers} // Refresh users after creation
+        onUserCreated={fetchUsers}
       />
     </div>
   );
