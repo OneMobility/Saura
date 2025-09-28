@@ -29,40 +29,10 @@ serve(async (req) => {
   }
 
   const token = authHeader.replace('Bearer ', '');
-  const supabaseClient = createClient(
-    Deno.env.get('SUPABASE_URL') ?? '',
-    Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    {
-      auth: {
-        persistSession: false,
-      },
-    }
-  );
-
-  console.log('Edge Function: Verifying user token...');
-  const { data: { user: authUser }, error: authError } = await supabaseClient.auth.getUser(token);
-
-  if (authError || !authUser) {
-    console.error('Edge Function: Auth error:', authError?.message || 'User not found.');
-    return jsonResponse({ error: 'Unauthorized: Invalid token or user not found' }, 401);
-  }
-  console.log('Edge Function: User authenticated:', authUser.id);
-
-  // Check if the authenticated user is an admin
-  console.log('Edge Function: Checking user role...');
-  const { data: profile, error: profileError } = await supabaseClient
-    .from('profiles')
-    .select('role')
-    .eq('id', authUser.id)
-    .single();
-
-  if (profileError || profile?.role !== 'admin') {
-    console.error('Edge Function: Profile error or not admin. Profile error:', profileError?.message, 'User role:', profile?.role);
-    return jsonResponse({ error: 'Forbidden: Only administrators can perform this action' }, 403);
-  }
-  console.log('Edge Function: User is an administrator.');
-
+  
   // Initialize Supabase client with service role key for admin operations
+  // This client will be used for all operations that require bypassing RLS,
+  // including checking the role of the invoking user.
   const supabaseAdmin = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -73,6 +43,29 @@ serve(async (req) => {
     }
   );
   console.log('Edge Function: Supabase admin client initialized.');
+
+  console.log('Edge Function: Verifying user token with admin client...');
+  const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+  if (authError || !authUser) {
+    console.error('Edge Function: Auth error:', authError?.message || 'User not found.');
+    return jsonResponse({ error: 'Unauthorized: Invalid token or user not found' }, 401);
+  }
+  console.log('Edge Function: User authenticated:', authUser.id);
+
+  // Check if the authenticated user is an admin using the supabaseAdmin client
+  console.log('Edge Function: Checking invoking user role with admin client...');
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select('role')
+    .eq('id', authUser.id)
+    .single();
+
+  if (profileError || profile?.role !== 'admin') {
+    console.error('Edge Function: Profile error or not admin. Profile error:', profileError?.message, 'User role:', profile?.role);
+    return jsonResponse({ error: 'Forbidden: Only administrators can perform this action' }, 403);
+  }
+  console.log('Edge Function: Invoking user is an administrator.');
 
   try {
     const { email, password, first_name, last_name, username, role } = await req.json();
