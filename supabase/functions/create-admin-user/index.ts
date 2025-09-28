@@ -12,13 +12,16 @@ serve(async (req) => {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Helper function to standardize JSON error responses
+  const jsonResponse = (body: any, status: number) => new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+
   // Verify JWT token to ensure request comes from an authenticated user (admin)
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) {
-    return new Response('Unauthorized: Missing Authorization header', {
-      status: 401,
-      headers: corsHeaders,
-    });
+    return jsonResponse({ error: 'Unauthorized: Missing Authorization header' }, 401);
   }
 
   const token = authHeader.replace('Bearer ', '');
@@ -36,10 +39,7 @@ serve(async (req) => {
 
   if (authError || !authUser) {
     console.error('Auth error:', authError);
-    return new Response('Unauthorized: Invalid token or user not found', {
-      status: 401,
-      headers: corsHeaders,
-    });
+    return jsonResponse({ error: 'Unauthorized: Invalid token or user not found' }, 401);
   }
 
   // Check if the authenticated user is an admin
@@ -51,10 +51,7 @@ serve(async (req) => {
 
   if (profileError || profile?.role !== 'admin') {
     console.error('Profile error or not admin:', profileError, profile?.role);
-    return new Response('Forbidden: Only administrators can perform this action', {
-      status: 403,
-      headers: corsHeaders,
-    });
+    return jsonResponse({ error: 'Forbidden: Only administrators can perform this action' }, 403);
   }
 
   // Initialize Supabase client with service role key for admin operations
@@ -72,7 +69,18 @@ serve(async (req) => {
     const { email, password, first_name, last_name, username, role } = await req.json();
 
     if (!email || !password) {
-      return new Response('Missing email or password', { status: 400, headers: corsHeaders });
+      return jsonResponse({ error: 'Missing email or password' }, 400);
+    }
+
+    // Check if user with this email already exists
+    const { data: existingUser, error: existingUserError } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+
+    if (existingUser && !existingUserError) {
+      return jsonResponse({ error: 'User with this email already exists.' }, 409); // Conflict
+    }
+    if (existingUserError && existingUserError.message !== 'User not found') {
+      console.error('Error checking for existing user:', existingUserError);
+      return jsonResponse({ error: 'Failed to check for existing user.' }, 500);
     }
 
     // Create user in Supabase Auth
@@ -85,10 +93,7 @@ serve(async (req) => {
 
     if (createUserError) {
       console.error('Error creating user:', createUserError);
-      return new Response(JSON.stringify({ error: createUserError.message }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonResponse({ error: createUserError.message }, 400);
     }
 
     // Update the profile with the specified role and username
@@ -107,21 +112,12 @@ serve(async (req) => {
       console.error('Error updating user profile:', updateProfileError);
       // Optionally delete the user if profile update fails
       await supabaseAdmin.auth.admin.deleteUser(newUser.user?.id as string);
-      return new Response(JSON.stringify({ error: 'Failed to update user profile after creation.' }), {
-        status: 500,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+      return jsonResponse({ error: 'Failed to update user profile after creation.' }, 500);
     }
 
-    return new Response(JSON.stringify({ message: 'User created successfully', userId: newUser.user?.id }), {
-      status: 201,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
-  } catch (error) {
+    return jsonResponse({ message: 'User created successfully', userId: newUser.user?.id }, 201);
+  } catch (error: any) {
     console.error('Unexpected error:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return jsonResponse({ error: error.message }, 500);
   }
 });

@@ -55,7 +55,8 @@ const AdminUserCreateDialog: React.FC<AdminUserCreateDialogProps> = ({ isOpen, o
 
       if (error) {
         console.error('Error invoking create-admin-user function:', error);
-        toast.error(`Error al crear el usuario: ${data?.error || error.message}`);
+        // 'data' should now reliably contain the JSON error from the Edge Function
+        toast.error(`Error al crear el usuario: ${data?.error || error.message || 'Error desconocido.'}`);
       } else {
         toast.success('Usuario creado con éxito.');
         onUserCreated(); // Refresh the user list
