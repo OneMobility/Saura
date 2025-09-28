@@ -4,8 +4,11 @@ import React from 'react';
 import { Facebook, Instagram, Twitter } from 'lucide-react'; // Using Twitter as a placeholder for TikTok if needed
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom'; // Import Link from react-router-dom
+import { useSession } from '@/components/SessionContextProvider'; // Import useSession
 
 const Footer = () => {
+  const { user, isAdmin, isLoading } = useSession(); // Get session info
+
   return (
     <footer className="bg-rosa-mexicano text-white py-10 px-4 md:px-8 lg:px-16">
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8 text-center md:text-left">
@@ -49,8 +52,10 @@ const Footer = () => {
         {/* Columna 4: Botón de Admin */}
         <div className="flex flex-col items-center md:items-end justify-start">
           <h3 className="text-lg font-semibold mb-4">Administración</h3>
-          <Button variant="outline" className="bg-white text-rosa-mexicano hover:bg-gray-100 font-semibold">
-            Acceso Admin
+          <Button asChild variant="outline" className="bg-white text-rosa-mexicano hover:bg-gray-100 font-semibold">
+            <Link to={user && isAdmin ? "/admin/dashboard" : "/login"}>
+              Acceso Admin
+            </Link>
           </Button>
         </div>
       </div>
