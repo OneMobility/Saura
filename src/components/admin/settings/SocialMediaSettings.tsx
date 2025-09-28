@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Facebook, Instagram, Twitter, Save, Loader2 } from 'lucide-react'; // Using Twitter for TikTok placeholder
+import { Facebook, Instagram, Save, Loader2 } from 'lucide-react';
+import TikTokIcon from '@/components/icons/TikTokIcon'; // Import the new TikTokIcon
 
 interface SocialLink {
   id?: string;
@@ -23,7 +24,7 @@ const SocialMediaSettings = () => {
   const defaultPlatforms = [
     { platform: 'facebook', icon: Facebook, label: 'Facebook' },
     { platform: 'instagram', icon: Instagram, label: 'Instagram' },
-    { platform: 'tiktok', icon: Twitter, label: 'TikTok (usando icono de Twitter)' }, // Placeholder for TikTok
+    { platform: 'tiktok', icon: TikTokIcon, label: 'TikTok' }, // Use TikTokIcon here
   ];
 
   useEffect(() => {
