@@ -14,5 +14,5 @@ export const getGreeting = (name: string | null) => {
     icon = 'Moon';
   }
 
-  return { text: `${greeting}, ${name || 'Administrador'}`, icon };
+  return { greetingPart: greeting, namePart: name || 'Administrador', icon };
 };

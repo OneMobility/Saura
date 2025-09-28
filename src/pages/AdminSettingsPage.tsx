@@ -8,6 +8,7 @@ import SeoSettings from '@/components/admin/settings/SeoSettings';
 import SocialMediaSettings from '@/components/admin/settings/SocialMediaSettings';
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate } from 'react-router-dom';
+import AdminHeader from '@/components/admin/AdminHeader'; // Import the new AdminHeader
 
 const AdminSettingsPage = () => {
   const { user, isAdmin, isLoading } = useSession();
@@ -30,9 +31,7 @@ const AdminSettingsPage = () => {
     <div className="flex min-h-screen bg-gray-100">
       <AdminSidebar />
       <div className="flex flex-col flex-grow">
-        <header className="bg-white shadow-sm p-4">
-          <h1 className="text-2xl font-bold text-gray-800">Configuración del Sitio</h1>
-        </header>
+        <AdminHeader pageTitle="Configuración del Sitio" /> {/* Usando el nuevo AdminHeader */}
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <Tabs defaultValue="slideshow" className="w-full">
             <TabsList className="grid w-full grid-cols-3">

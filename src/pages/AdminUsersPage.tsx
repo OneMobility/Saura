@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Edit, KeyRound, Loader2, UserPlus } from 'lucide-react';
 import UserEditDialog from '@/components/admin/users/UserEditDialog';
 import AdminUserCreateDialog from '@/components/admin/users/AdminUserCreateDialog';
+import AdminHeader from '@/components/admin/AdminHeader'; // Import the new AdminHeader
 
 interface UserProfile {
   id: string;
@@ -96,12 +97,11 @@ const AdminUsersPage = () => {
     <div className="flex min-h-screen bg-gray-100">
       <AdminSidebar />
       <div className="flex flex-col flex-grow">
-        <header className="bg-white shadow-sm p-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">Gestión de Usuarios</h1>
+        <AdminHeader pageTitle="Gestión de Usuarios"> {/* Usando el nuevo AdminHeader */}
           <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white">
             <UserPlus className="mr-2 h-4 w-4" /> Crear Nuevo Usuario
           </Button>
-        </header>
+        </AdminHeader>
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <div className="bg-white rounded-lg shadow-lg p-6">
             <h2 className="text-xl font-semibold mb-4">Usuarios Registrados</h2>
