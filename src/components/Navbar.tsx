@@ -29,21 +29,8 @@ const Navbar = () => {
         </Link>
       </div>
 
-      {/* Desktop Navigation Links */}
-      <div className="hidden md:flex flex-grow items-center justify-end pr-4 space-x-6">
-        {navLinks.map((link) => (
-          <Link
-            key={link.name}
-            to={link.href}
-            className="text-gray-700 hover:text-rosa-mexicano font-medium transition-colors"
-          >
-            {link.name}
-          </Link>
-        ))}
-      </div>
-
-      {/* Mobile Hamburger Menu */}
-      <div className="md:hidden flex items-center justify-end flex-grow pr-4">
+      {/* Hamburger Menu (always visible) */}
+      <div className="flex items-center justify-end flex-grow pr-4">
         <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="text-gray-700 hover:bg-gray-100">
