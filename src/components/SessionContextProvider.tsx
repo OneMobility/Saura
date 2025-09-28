@@ -24,12 +24,13 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
+      console.log('SessionContextProvider: Auth state change event:', event, 'Session:', currentSession);
       setSession(currentSession);
       setUser(currentSession?.user || null);
       setIsLoading(false);
 
       if (currentSession?.user) {
-        // Fetch user role from profiles table
+        console.log('SessionContextProvider: User is logged in, fetching profile role...');
         const { data: profile, error } = await supabase
           .from('profiles')
           .select('role')
@@ -37,22 +38,27 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
           .single();
 
         if (error) {
-          console.error('Error fetching user profile:', error);
+          console.error('SessionContextProvider: Error fetching user profile:', error);
           setIsAdmin(false);
         } else if (profile && profile.role === 'admin') {
+          console.log('SessionContextProvider: User is admin.');
           setIsAdmin(true);
         } else {
+          console.log('SessionContextProvider: User is NOT admin (role:', profile?.role || 'undefined', ').');
           setIsAdmin(false);
         }
 
         // Redirect authenticated users from login page
         if (location.pathname === '/login') {
+          console.log('SessionContextProvider: User is authenticated and on /login, redirecting to /admin/dashboard.');
           navigate('/admin/dashboard'); // Redirect to admin dashboard or a default page
         }
       } else {
+        console.log('SessionContextProvider: User is NOT logged in.');
         setIsAdmin(false);
         // Redirect unauthenticated users from protected routes
         if (location.pathname.startsWith('/admin')) {
+          console.log('SessionContextProvider: User is unauthenticated and on /admin route, redirecting to /login.');
           navigate('/login');
         }
       }
@@ -60,11 +66,13 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
 
     // Initial session check
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      console.log('SessionContextProvider: Initial session check. Session:', initialSession);
       setSession(initialSession);
       setUser(initialSession?.user || null);
       setIsLoading(false);
 
       if (initialSession?.user) {
+        console.log('SessionContextProvider: Initial check: User is logged in, fetching profile role...');
         supabase
           .from('profiles')
           .select('role')
@@ -72,11 +80,13 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
           .single()
           .then(({ data: profile, error }) => {
             if (error) {
-              console.error('Error fetching initial user profile:', error);
+              console.error('SessionContextProvider: Initial check: Error fetching user profile:', error);
               setIsAdmin(false);
             } else if (profile && profile.role === 'admin') {
+              console.log('SessionContextProvider: Initial check: User is admin.');
               setIsAdmin(true);
             } else {
+              console.log('SessionContextProvider: Initial check: User is NOT admin (role:', profile?.role || 'undefined', ').');
               setIsAdmin(false);
             }
           });
