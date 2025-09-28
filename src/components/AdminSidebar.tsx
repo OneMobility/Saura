@@ -17,15 +17,16 @@ const navItems: NavItem[] = [
   { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/admin/tours', icon: Package, label: 'Tours' },
   { href: '/admin/blog', icon: Newspaper, label: 'Blog' },
-  { href: '/admin/users', icon: Users, label: 'Usuarios' }, // New link for user management
-  { href: '/admin/settings', icon: Settings, label: 'Configuración' },
+  { href: '/admin/users', icon: Users, label: 'Usuarios' },
+  { href: '/admin/settings', icon: Settings, label: 'Configuración' }, // Updated href
 ];
 
 const AdminSidebar = () => {
-  const [isPinned, setIsPinned] = useState(false);
-  const [isHovering, setIsHovering] = useState(false);
+  const [isPinned, setIsPinned] = useState(false); // Estado para fijar/desfijar la barra lateral
+  const [isHovering, setIsHovering] = useState(false); // Estado para detectar si el ratón está sobre la barra lateral
   const location = useLocation();
 
+  // La barra lateral estará expandida si está fijada O si el ratón está sobre ella
   const isExpanded = isPinned || isHovering;
 
   const togglePin = () => {
@@ -48,15 +49,16 @@ const AdminSidebar = () => {
           {isExpanded && (
             <>
               <span className="text-xl font-bold text-white">Admin Panel</span>
+              {/* Botón para fijar/desfijar la barra lateral, ahora dentro del Link */}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={(e) => {
-                  e.preventDefault();
-                  e.stopPropagation();
+                  e.preventDefault(); // Previene la navegación del Link
+                  e.stopPropagation(); // Detiene la propagación del evento para que no afecte al Link
                   togglePin();
                 }}
-                className="text-white hover:bg-gray-700 rounded-full h-8 w-8 ml-2"
+                className="text-white hover:bg-gray-700 rounded-full h-8 w-8 ml-2" // Añadido ml-2 para espaciado
               >
                 {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
                 <span className="sr-only">{isPinned ? "Desfijar barra lateral" : "Fijar barra lateral"}</span>
@@ -70,7 +72,7 @@ const AdminSidebar = () => {
       <nav className="flex-grow mt-4 space-y-2 px-2">
         {navItems.map((item) => (
           <div key={item.href}>
-            {!isExpanded ? (
+            {!isExpanded ? ( // Si está colapsada, muestra solo el icono y un tooltip
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -91,7 +93,7 @@ const AdminSidebar = () => {
                 </TooltipTrigger>
                 <TooltipContent side="right">{item.label}</TooltipContent>
               </Tooltip>
-            ) : (
+            ) : ( // Si está expandida, muestra el icono y el texto
               <Button
                 variant="ghost"
                 className={cn(

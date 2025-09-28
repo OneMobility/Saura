@@ -1,6 +1,6 @@
 "use client";
 
-import React, { createContext, useContext, useEffect, useState, ReactNode, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
@@ -9,7 +9,7 @@ interface SessionContextType {
   session: Session | null;
   user: User | null;
   isAdmin: boolean;
-  firstName: string | null;
+  firstName: string | null; // Added firstName
   isLoading: boolean;
 }
 
@@ -19,75 +19,99 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
-  const [firstName, setFirstName] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true); // Start as true
+  const [firstName, setFirstName] = useState<string | null>(null); // State for firstName
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const navigate = useNavigate();
   const location = useLocation();
-
-  // Function to fetch profile and set admin status
-  const fetchUserProfile = useCallback(async (userId: string) => {
-    console.log('SessionContextProvider: Fetching profile for user ID:', userId);
-    const { data: profile, error } = await supabase
-      .from('profiles')
-      .select('role, first_name')
-      .eq('id', userId)
-      .single();
-
-    if (error) {
-      console.error('SessionContextProvider: Error fetching user profile:', error);
-      setIsAdmin(false);
-      setFirstName(null);
-    } else if (profile) {
-      console.log('SessionContextProvider: Fetched profile:', profile);
-      setIsAdmin(profile.role === 'admin');
-      setFirstName(profile.first_name || null);
-    } else {
-      console.log('SessionContextProvider: No profile found for user ID:', userId);
-      setIsAdmin(false);
-      setFirstName(null);
-    }
-  }, []);
 
   useEffect(() => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
       console.log('SessionContextProvider: Auth state change event:', event, 'Session:', currentSession);
       setSession(currentSession);
       setUser(currentSession?.user || null);
+      setIsLoading(false);
 
       if (currentSession?.user) {
-        await fetchUserProfile(currentSession.user.id); // Wait for profile to be fetched
+        console.log('SessionContextProvider: User is logged in, fetching profile role and first name...');
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('role, first_name') // Fetch first_name
+          .eq('id', currentSession.user.id)
+          .single();
+
+        if (error) {
+          console.error('SessionContextProvider: Error fetching user profile:', error);
+          setIsAdmin(false);
+          setFirstName(null);
+        } else if (profile) {
+          if (profile.role === 'admin') {
+            console.log('SessionContextProvider: User is admin.');
+            setIsAdmin(true);
+          } else {
+            console.log('SessionContextProvider: User is NOT admin (role:', profile?.role || 'undefined', ').');
+            setIsAdmin(false);
+          }
+          setFirstName(profile.first_name || null); // Set firstName
+        } else {
+          setIsAdmin(false);
+          setFirstName(null);
+        }
+
         // Redirect authenticated users from login page
         if (location.pathname === '/login') {
           console.log('SessionContextProvider: User is authenticated and on /login, redirecting to /admin/dashboard.');
-          navigate('/admin/dashboard');
+          navigate('/admin/dashboard'); // Redirect to admin dashboard or a default page
         }
       } else {
         console.log('SessionContextProvider: User is NOT logged in.');
         setIsAdmin(false);
-        setFirstName(null);
+        setFirstName(null); // Clear firstName on logout
         // Redirect unauthenticated users from protected routes
         if (location.pathname.startsWith('/admin')) {
           console.log('SessionContextProvider: User is unauthenticated and on /admin route, redirecting to /login.');
           navigate('/login');
         }
       }
-      setIsLoading(false); // Set loading to false only after all checks are done
     });
 
     // Initial session check
-    supabase.auth.getSession().then(async ({ data: { session: initialSession } }) => {
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
       console.log('SessionContextProvider: Initial session check. Session:', initialSession);
       setSession(initialSession);
       setUser(initialSession?.user || null);
+      setIsLoading(false);
 
       if (initialSession?.user) {
-        await fetchUserProfile(initialSession.user.id); // Wait for profile to be fetched
+        console.log('SessionContextProvider: Initial check: User is logged in, fetching profile role and first name...');
+        supabase
+          .from('profiles')
+          .select('role, first_name') // Fetch first_name
+          .eq('id', initialSession.user.id)
+          .single()
+          .then(({ data: profile, error }) => {
+            if (error) {
+              console.error('SessionContextProvider: Initial check: Error fetching user profile:', error);
+              setIsAdmin(false);
+              setFirstName(null);
+            } else if (profile) {
+              if (profile.role === 'admin') {
+                console.log('SessionContextProvider: Initial check: User is admin.');
+                setIsAdmin(true);
+              } else {
+                console.log('SessionContextProvider: Initial check: User is NOT admin (role:', profile?.role || 'undefined', ').');
+                setIsAdmin(false);
+              }
+              setFirstName(profile.first_name || null); // Set firstName
+            } else {
+              setIsAdmin(false);
+              setFirstName(null);
+            }
+          });
       }
-      setIsLoading(false); // Set loading to false only after all checks are done
     });
 
     return () => subscription.unsubscribe();
-  }, [location.pathname, navigate, fetchUserProfile]);
+  }, [location.pathname, navigate]);
 
   return (
     <SessionContext.Provider value={{ session, user, isAdmin, firstName, isLoading }}>
