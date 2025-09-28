@@ -18,7 +18,7 @@ const navItems: NavItem[] = [
   { href: '/admin/tours', icon: Package, label: 'Tours' },
   { href: '/admin/blog', icon: Newspaper, label: 'Blog' },
   { href: '/admin/users', icon: Users, label: 'Usuarios' },
-  { href: '/admin/settings', icon: Settings, label: 'Configuración' },
+  { href: '/admin/settings', icon: Settings, label: 'Configuración' }, // Updated href
 ];
 
 const AdminSidebar = () => {

@@ -11,10 +11,11 @@ import BlogPostPage from "./pages/BlogPostPage";
 import ToursPage from "./pages/ToursPage";
 import ContactPage from "./pages/ContactPage";
 import ScrollToTop from "./components/ScrollToTop";
-import Login from "./pages/Login"; // Import Login page
-import AdminDashboard from "./pages/AdminDashboard"; // Import AdminDashboard page
-import { SessionContextProvider } from "./components/SessionContextProvider"; // Import SessionContextProvider
-import ProtectedRoute from "./components/ProtectedRoute"; // Import ProtectedRoute
+import Login from "./pages/Login";
+import AdminDashboard from "./pages/AdminDashboard";
+import AdminSettingsPage from "./pages/AdminSettingsPage"; // Import AdminSettingsPage
+import { SessionContextProvider } from "./components/SessionContextProvider";
+import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
@@ -25,7 +26,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <ScrollToTop />
-        <SessionContextProvider> {/* Wrap routes with SessionContextProvider */}
+        <SessionContextProvider>
           <Routes>
             <Route path="/" element={<Index />} />
             <Route path="/tours" element={<ToursPage />} />
@@ -33,12 +34,20 @@ const App = () => (
             <Route path="/blog" element={<BlogPage />} />
             <Route path="/blog/:id" element={<BlogPostPage />} />
             <Route path="/contact" element={<ContactPage />} />
-            <Route path="/login" element={<Login />} /> {/* New login route */}
+            <Route path="/login" element={<Login />} />
             <Route
               path="/admin/dashboard"
               element={
-                <ProtectedRoute adminOnly> {/* Protect admin dashboard */}
+                <ProtectedRoute adminOnly>
                   <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/settings" // New route for admin settings
+              element={
+                <ProtectedRoute adminOnly>
+                  <AdminSettingsPage />
                 </ProtectedRoute>
               }
             />
