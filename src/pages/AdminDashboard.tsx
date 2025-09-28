@@ -6,10 +6,17 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import AdminSidebar from '@/components/AdminSidebar';
-// Removed getGreeting and icon imports as greeting is now in Navbar
+import { getGreeting } from '@/utils/greetings'; // Import getGreeting
+import { Sun, CloudSun, Moon } from 'lucide-react'; // Import icons
+
+const iconMap: { [key: string]: React.ElementType } = {
+  Sun: Sun,
+  CloudSun: CloudSun,
+  Moon: Moon,
+};
 
 const AdminDashboard = () => {
-  const { user, isAdmin, isLoading } = useSession();
+  const { user, isAdmin, isLoading, firstName } = useSession(); // Get firstName again
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -30,18 +37,25 @@ const AdminDashboard = () => {
     return null;
   }
 
+  const { text: personalizedGreetingText, icon: greetingIconName } = getGreeting(firstName);
+  const GreetingIcon = iconMap[greetingIconName];
+
   return (
     <div className="flex min-h-screen bg-gray-100">
       <AdminSidebar />
 
       <div className="flex flex-col flex-grow">
-        <header className="bg-white shadow-sm p-4 flex justify-end items-center">
-          {/* Greeting removed from here, now in Navbar */}
+        <header className="bg-white shadow-sm p-4 flex justify-between items-center">
+          {user && (
+            <div className="flex items-center space-x-2 text-gray-700">
+              {GreetingIcon && <GreetingIcon className="h-5 w-5 text-rosa-mexicano" />}
+              <span className="font-medium">{personalizedGreetingText}</span>
+            </div>
+          )}
           <Button onClick={handleLogout} className="bg-red-600 hover:bg-red-700 text-white">
             Cerrar Sesión
           </Button>
         </header>
-        {/* Page title moved here, below the Navbar/Header */}
         <h1 className="text-3xl md:text-4xl font-bold text-gray-800 px-4 pt-8 pb-4">Dashboard de Administración</h1>
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <p className="text-lg text-gray-600 text-center mb-10">

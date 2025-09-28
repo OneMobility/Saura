@@ -8,11 +8,19 @@ import SeoSettings from '@/components/admin/settings/SeoSettings';
 import SocialMediaSettings from '@/components/admin/settings/SocialMediaSettings';
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate } from 'react-router-dom';
-import { Button } from '@/components/ui/button'; // Import Button for logout
-import { supabase } from '@/integrations/supabase/client'; // Import supabase for logout
+import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
+import { getGreeting } from '@/utils/greetings'; // Import getGreeting
+import { Sun, CloudSun, Moon } from 'lucide-react'; // Import icons
+
+const iconMap: { [key: string]: React.ElementType } = {
+  Sun: Sun,
+  CloudSun: CloudSun,
+  Moon: Moon,
+};
 
 const AdminSettingsPage = () => {
-  const { user, isAdmin, isLoading } = useSession();
+  const { user, isAdmin, isLoading, firstName } = useSession(); // Get firstName again
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -33,17 +41,24 @@ const AdminSettingsPage = () => {
     return null;
   }
 
+  const { text: personalizedGreetingText, icon: greetingIconName } = getGreeting(firstName);
+  const GreetingIcon = iconMap[greetingIconName];
+
   return (
     <div className="flex min-h-screen bg-gray-100">
       <AdminSidebar />
       <div className="flex flex-col flex-grow">
-        <header className="bg-white shadow-sm p-4 flex justify-end items-center">
-          {/* Title removed from here */}
+        <header className="bg-white shadow-sm p-4 flex justify-between items-center">
+          {user && (
+            <div className="flex items-center space-x-2 text-gray-700">
+              {GreetingIcon && <GreetingIcon className="h-5 w-5 text-rosa-mexicano" />}
+              <span className="font-medium">{personalizedGreetingText}</span>
+            </div>
+          )}
           <Button onClick={handleLogout} className="bg-red-600 hover:bg-red-700 text-white">
             Cerrar Sesión
           </Button>
         </header>
-        {/* Page title moved here, below the Navbar/Header */}
         <h1 className="text-3xl md:text-4xl font-bold text-gray-800 px-4 pt-8 pb-4">Configuración del Sitio</h1>
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <Tabs defaultValue="slideshow" className="w-full">

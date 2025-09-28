@@ -1,22 +1,16 @@
 "use client";
 
 import React, { useState } from 'react';
-import { TreePalm, Menu, Sun, CloudSun, Moon } from 'lucide-react'; // Import icons
+import { TreePalm, Menu } from 'lucide-react'; // Removed Sun, CloudSun, Moon
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { useSession } from '@/components/SessionContextProvider'; // Import useSession
-import { getGreeting } from '@/utils/greetings'; // Import getGreeting utility
-
-const iconMap: { [key: string]: React.ElementType } = {
-  Sun: Sun,
-  CloudSun: CloudSun,
-  Moon: Moon,
-};
+// Removed getGreeting utility
 
 const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const { user, isAdmin, isLoading, firstName } = useSession(); // Get session info
+  const { user, isAdmin } = useSession(); // Get session info, removed firstName
 
   const navLinks = [
     { name: 'Inicio', href: '/' },
@@ -24,9 +18,6 @@ const Navbar = () => {
     { name: 'Blog', href: '/blog' },
     { name: 'Contacto', href: '/contact' },
   ];
-
-  const { text: personalizedGreetingText, icon: greetingIconName } = getGreeting(firstName); // Get both text and icon name
-  const GreetingIcon = iconMap[greetingIconName]; // Get the actual icon component
 
   return (
     <nav className="bg-white shadow-sm w-full flex items-stretch min-h-[64px]">
@@ -41,7 +32,7 @@ const Navbar = () => {
         </Link>
       </div>
 
-      {/* Main navigation and greeting */}
+      {/* Main navigation and Admin Access */}
       <div className="flex items-center justify-between flex-grow px-4">
         {/* Desktop Nav Links (hidden on mobile, shown on larger screens) */}
         <div className="hidden md:flex space-x-6">
@@ -56,14 +47,8 @@ const Navbar = () => {
           ))}
         </div>
 
-        {/* Greeting and Admin Access (Desktop) */}
+        {/* Admin Access (Desktop) */}
         <div className="hidden md:flex items-center space-x-4">
-          {user && (
-            <div className="flex items-center space-x-2 text-gray-700">
-              {GreetingIcon && <GreetingIcon className="h-5 w-5 text-rosa-mexicano" />}
-              <span className="font-medium">{personalizedGreetingText}</span>
-            </div>
-          )}
           <Button asChild className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white">
             <Link to={user && isAdmin ? "/admin/dashboard" : "/login"}>
               {user && isAdmin ? "Panel Admin" : "Acceso Admin"}
@@ -100,12 +85,6 @@ const Navbar = () => {
                 >
                   {user && isAdmin ? "Panel Admin" : "Acceso Admin"}
                 </Link>
-                {user && (
-                  <div className="flex items-center space-x-2 text-gray-700 mt-4">
-                    {GreetingIcon && <GreetingIcon className="h-5 w-5 text-rosa-mexicano" />}
-                    <span className="font-medium">{personalizedGreetingText}</span>
-                  </div>
-                )}
               </div>
             </SheetContent>
           </Sheet>
