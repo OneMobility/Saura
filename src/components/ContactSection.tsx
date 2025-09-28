@@ -36,54 +36,69 @@ const ContactSection = () => {
 
   return (
     <section className="py-12 px-4 md:px-8 lg:px-16 bg-white text-gray-800">
-      <div className="max-w-2xl mx-auto">
-        <h2 className="text-3xl md:text-4xl font-bold text-center mb-8">
-          Contáctanos
-        </h2>
-        <p className="text-center text-lg mb-10">
-          ¿Tienes alguna pregunta o necesitas ayuda? Envíanos un mensaje.
-        </p>
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <Label htmlFor="name" className="text-lg">Nombre</Label>
-            <Input
-              type="text"
-              id="name"
-              placeholder="Tu Nombre"
-              className="mt-2 p-3 border border-gray-300 rounded-md focus-visible:ring-rosa-mexicano"
-              value={formData.name}
-              onChange={handleChange}
+      <div className="max-w-6xl mx-auto lg:grid lg:grid-cols-2 lg:gap-12 items-center">
+        {/* Columna del Formulario */}
+        <div>
+          <h2 className="text-3xl md:text-4xl font-bold text-center lg:text-left mb-8">
+            Contáctanos
+          </h2>
+          <p className="text-center lg:text-left text-lg mb-10">
+            ¿Tienes alguna pregunta o necesitas ayuda? Envíanos un mensaje.
+          </p>
+          <form onSubmit={handleSubmit} className="space-y-6">
+            <div>
+              <Label htmlFor="name" className="text-lg">Nombre</Label>
+              <Input
+                type="text"
+                id="name"
+                placeholder="Tu Nombre"
+                className="mt-2 p-3 border border-gray-300 rounded-md focus-visible:ring-rosa-mexicano"
+                value={formData.name}
+                onChange={handleChange}
+              />
+            </div>
+            <div>
+              <Label htmlFor="email" className="text-lg">Correo Electrónico</Label>
+              <Input
+                type="email"
+                id="email"
+                placeholder="tu.correo@ejemplo.com"
+                className="mt-2 p-3 border border-gray-300 rounded-md focus-visible:ring-rosa-mexicano"
+                value={formData.email}
+                onChange={handleChange}
+              />
+            </div>
+            <div>
+              <Label htmlFor="message" className="text-lg">Mensaje</Label>
+              <Textarea
+                id="message"
+                placeholder="Escribe tu mensaje aquí..."
+                rows={5}
+                className="mt-2 p-3 border border-gray-300 rounded-md focus-visible:ring-rosa-mexicano"
+                value={formData.message}
+                onChange={handleChange}
+              />
+            </div>
+            <Button
+              type="submit"
+              className="w-full bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white font-semibold py-3 text-lg"
+            >
+              Enviar Mensaje
+            </Button>
+          </form>
+        </div>
+
+        {/* Columna de la Imagen con Recorte Abstracto */}
+        <div className="mt-12 lg:mt-0 flex justify-center items-center">
+          <div className="relative w-full max-w-md h-80 lg:h-[450px] overflow-hidden rounded-lg shadow-xl">
+            <img
+              src="https://images.unsplash.com/photo-1501785888041-af3ba6f602d8?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" // Imagen de ejemplo
+              alt="Imagen abstracta de contacto"
+              className="absolute inset-0 w-full h-full object-cover"
+              style={{ clipPath: 'polygon(0 0, 100% 15%, 100% 100%, 0% 85%)' }} // Recorte abstracto
             />
           </div>
-          <div>
-            <Label htmlFor="email" className="text-lg">Correo Electrónico</Label>
-            <Input
-              type="email"
-              id="email"
-              placeholder="tu.correo@ejemplo.com"
-              className="mt-2 p-3 border border-gray-300 rounded-md focus-visible:ring-rosa-mexicano"
-              value={formData.email}
-              onChange={handleChange}
-            />
-          </div>
-          <div>
-            <Label htmlFor="message" className="text-lg">Mensaje</Label>
-            <Textarea
-              id="message"
-              placeholder="Escribe tu mensaje aquí..."
-              rows={5}
-              className="mt-2 p-3 border border-gray-300 rounded-md focus-visible:ring-rosa-mexicano"
-              value={formData.message}
-              onChange={handleChange}
-            />
-          </div>
-          <Button
-            type="submit"
-            className="w-full bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white font-semibold py-3 text-lg"
-          >
-            Enviar Mensaje
-          </Button>
-        </form>
+        </div>
       </div>
     </section>
   );
