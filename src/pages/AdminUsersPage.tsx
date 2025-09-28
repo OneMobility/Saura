@@ -9,15 +9,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Edit, KeyRound, Loader2, UserPlus } from 'lucide-react';
 import UserEditDialog from '@/components/admin/users/UserEditDialog';
 import AdminUserCreateDialog from '@/components/admin/users/AdminUserCreateDialog';
-import { useNavigate } from 'react-router-dom';
-import { getGreeting } from '@/utils/greetings'; // Import getGreeting
-import { Sun, CloudSun, Moon } from 'lucide-react'; // Import icons
-
-const iconMap: { [key: string]: React.ElementType } = {
-  Sun: Sun,
-  CloudSun: CloudSun,
-  Moon: Moon,
-};
 
 interface UserProfile {
   id: string;
@@ -35,8 +26,6 @@ const AdminUsersPage = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
-  const navigate = useNavigate();
-  const { user, isAdmin, firstName } = useSession(); // Get firstName again
 
   useEffect(() => {
     fetchUsers();
@@ -91,11 +80,6 @@ const AdminUsersPage = () => {
     }
   };
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/login');
-  };
-
   if (loading) {
     return (
       <div className="flex min-h-screen bg-gray-100">
@@ -108,36 +92,16 @@ const AdminUsersPage = () => {
     );
   }
 
-  // Check if user and isAdmin are available before rendering the page content
-  if (!user || !isAdmin) {
-    navigate('/login');
-    return null;
-  }
-
-  const { text: personalizedGreetingText, icon: greetingIconName } = getGreeting(firstName);
-  const GreetingIcon = iconMap[greetingIconName];
-
   return (
     <div className="flex min-h-screen bg-gray-100">
       <AdminSidebar />
       <div className="flex flex-col flex-grow">
         <header className="bg-white shadow-sm p-4 flex justify-between items-center">
-          {user && (
-            <div className="flex items-center space-x-2 text-gray-700">
-              {GreetingIcon && <GreetingIcon className="h-5 w-5 text-rosa-mexicano" />}
-              <span className="font-medium">{personalizedGreetingText}</span>
-            </div>
-          )}
-          <div className="flex items-center">
-            <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white">
-              <UserPlus className="mr-2 h-4 w-4" /> Crear Nuevo Usuario
-            </Button>
-            <Button onClick={handleLogout} className="bg-red-600 hover:bg-red-700 text-white ml-4">
-              Cerrar Sesión
-            </Button>
-          </div>
+          <h1 className="text-2xl font-bold text-gray-800">Gestión de Usuarios</h1>
+          <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white">
+            <UserPlus className="mr-2 h-4 w-4" /> Crear Nuevo Usuario
+          </Button>
         </header>
-        <h1 className="text-3xl md:text-4xl font-bold text-gray-800 px-4 pt-8 pb-4">Gestión de Usuarios</h1>
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <div className="bg-white rounded-lg shadow-lg p-6">
             <h2 className="text-xl font-semibold mb-4">Usuarios Registrados</h2>

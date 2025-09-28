@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import AdminSidebar from '@/components/AdminSidebar';
-import { getGreeting } from '@/utils/greetings'; // Import getGreeting
+import { getGreeting } from '@/utils/greetings'; // Import the new greeting utility
 import { Sun, CloudSun, Moon } from 'lucide-react'; // Import icons
 
 const iconMap: { [key: string]: React.ElementType } = {
@@ -16,7 +16,7 @@ const iconMap: { [key: string]: React.ElementType } = {
 };
 
 const AdminDashboard = () => {
-  const { user, isAdmin, isLoading, firstName } = useSession(); // Get firstName again
+  const { user, isAdmin, isLoading, firstName } = useSession();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -37,8 +37,8 @@ const AdminDashboard = () => {
     return null;
   }
 
-  const { text: personalizedGreetingText, icon: greetingIconName } = getGreeting(firstName);
-  const GreetingIcon = iconMap[greetingIconName];
+  const { text: personalizedGreetingText, icon: greetingIconName } = getGreeting(firstName); // Get both text and icon name
+  const GreetingIcon = iconMap[greetingIconName]; // Get the actual icon component
 
   return (
     <div className="flex min-h-screen bg-gray-100">
@@ -46,17 +46,14 @@ const AdminDashboard = () => {
 
       <div className="flex flex-col flex-grow">
         <header className="bg-white shadow-sm p-4 flex justify-between items-center">
-          {user && (
-            <div className="flex items-center space-x-2 text-gray-700">
-              {GreetingIcon && <GreetingIcon className="h-5 w-5 text-rosa-mexicano" />}
-              <span className="font-medium">{personalizedGreetingText}</span>
-            </div>
-          )}
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
+            {GreetingIcon && <GreetingIcon className="h-6 w-6 text-rosa-mexicano" />} {/* Display the icon */}
+            <span>{personalizedGreetingText}</span> {/* Display personalized greeting text */}
+          </h1>
           <Button onClick={handleLogout} className="bg-red-600 hover:bg-red-700 text-white">
             Cerrar Sesión
           </Button>
         </header>
-        <h1 className="text-3xl md:text-4xl font-bold text-gray-800 px-4 pt-8 pb-4">Dashboard de Administración</h1>
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <p className="text-lg text-gray-600 text-center mb-10">
             Aquí puedes gestionar el contenido de tu sitio.
