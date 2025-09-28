@@ -6,8 +6,9 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Edit, KeyRound, Loader2 } from 'lucide-react';
-import UserEditDialog from '@/components/admin/users/UserEditDialog'; // Import the new dialog
+import { Edit, KeyRound, Loader2, UserPlus } from 'lucide-react';
+import UserEditDialog from '@/components/admin/users/UserEditDialog';
+import AdminUserCreateDialog from '@/components/admin/users/AdminUserCreateDialog'; // Import the new create dialog
 
 interface UserProfile {
   id: string;
@@ -22,7 +23,8 @@ interface UserProfile {
 const AdminUsersPage = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false); // State for create dialog
   const [selectedUser, setSelectedUser] = useState<UserProfile | null>(null);
 
   useEffect(() => {
@@ -74,7 +76,7 @@ const AdminUsersPage = () => {
 
   const handleEditUser = (user: UserProfile) => {
     setSelectedUser(user);
-    setIsDialogOpen(true);
+    setIsEditDialogOpen(true);
   };
 
   const handleUserSave = (updatedUser: UserProfile) => {
@@ -116,8 +118,11 @@ const AdminUsersPage = () => {
     <div className="flex min-h-screen bg-gray-100">
       <AdminSidebar />
       <div className="flex flex-col flex-grow">
-        <header className="bg-white shadow-sm p-4">
+        <header className="bg-white shadow-sm p-4 flex justify-between items-center">
           <h1 className="text-2xl font-bold text-gray-800">Gestión de Usuarios</h1>
+          <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white">
+            <UserPlus className="mr-2 h-4 w-4" /> Crear Nuevo Usuario
+          </Button>
         </header>
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <div className="bg-white rounded-lg shadow-lg p-6">
@@ -179,12 +184,17 @@ const AdminUsersPage = () => {
       </div>
       {selectedUser && (
         <UserEditDialog
-          isOpen={isDialogOpen}
-          onClose={() => setIsDialogOpen(false)}
+          isOpen={isEditDialogOpen}
+          onClose={() => setIsEditDialogOpen(false)}
           user={selectedUser}
           onSave={handleUserSave}
         />
       )}
+      <AdminUserCreateDialog
+        isOpen={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        onUserCreated={fetchUsers} // Refresh users after creation
+      />
     </div>
   );
 };
