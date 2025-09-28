@@ -8,37 +8,37 @@ interface BlogPost {
   imageUrl: string;
   title: string;
   description: string;
-  link: string;
+  // link: string; // No longer needed, using id to construct link
 }
 
 const latestBlogs: BlogPost[] = [
   {
-    id: 'blog-1',
+    id: 'guia-riviera-maya', // Use a descriptive ID for the URL
     imageUrl: 'https://images.unsplash.com/photo-1501785888041-af3ba6f602d8?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
     title: 'Guía Completa para tu Primer Viaje a la Riviera Maya',
     description: 'Descubre los secretos mejor guardados de la Riviera Maya, desde las playas paradisíacas hasta las antiguas ruinas mayas. Prepárate para una aventura inolvidable con nuestros consejos de expertos.',
-    link: '#',
+    // link: '#',
   },
   {
-    id: 'blog-2',
+    id: 'sierra-madre-occidental',
     imageUrl: 'https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
     title: '10 Razones para Explorar la Sierra Madre Occidental',
     description: 'La Sierra Madre Occidental ofrece paisajes impresionantes, cascadas ocultas y una rica biodiversidad. Te damos 10 razones para que tu próxima aventura sea en este majestuoso lugar.',
-    link: '#',
+    // link: '#',
   },
   {
-    id: 'blog-3',
+    id: 'oaxaca-culinario-cultural',
     imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961dde?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
     title: 'Oaxaca: Un Viaje Culinario y Cultural Inolvidable',
     description: 'Sumérgete en la vibrante cultura y la exquisita gastronomía de Oaxaca. Desde sus mercados tradicionales hasta sus festivales coloridos, cada rincón es una experiencia para los sentidos.',
-    link: '#',
+    // link: '#',
   },
   {
-    id: 'blog-4',
+    id: 'viajar-con-ninos',
     imageUrl: 'https://images.unsplash.com/photo-1501785888041-af3ba6f602d8?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
     title: 'Consejos Esenciales para Viajar con Niños Pequeños',
     description: 'Viajar con niños puede ser un desafío, pero con la planificación adecuada, puede ser una experiencia maravillosa. Aquí te compartimos nuestros mejores consejos para unas vacaciones familiares sin estrés.',
-    link: '#',
+    // link: '#',
   },
 ];
 
@@ -56,7 +56,7 @@ const BlogSection = () => {
               imageUrl={post.imageUrl}
               title={post.title}
               description={post.description}
-              link={post.link}
+              blogId={post.id} // Pass the id as blogId
             />
           ))}
         </div>
