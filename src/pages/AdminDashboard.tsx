@@ -7,9 +7,16 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import AdminSidebar from '@/components/AdminSidebar';
 import { getGreeting } from '@/utils/greetings'; // Import the new greeting utility
+import { Sun, CloudSun, Moon } from 'lucide-react'; // Import icons
+
+const iconMap: { [key: string]: React.ElementType } = {
+  Sun: Sun,
+  CloudSun: CloudSun,
+  Moon: Moon,
+};
 
 const AdminDashboard = () => {
-  const { user, isAdmin, isLoading, firstName } = useSession(); // Get firstName from useSession
+  const { user, isAdmin, isLoading, firstName } = useSession();
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -30,7 +37,8 @@ const AdminDashboard = () => {
     return null;
   }
 
-  const personalizedGreeting = getGreeting(firstName); // Generate the greeting
+  const { text: personalizedGreetingText, icon: greetingIconName } = getGreeting(firstName); // Get both text and icon name
+  const GreetingIcon = iconMap[greetingIconName]; // Get the actual icon component
 
   return (
     <div className="flex min-h-screen bg-gray-100">
@@ -38,7 +46,10 @@ const AdminDashboard = () => {
 
       <div className="flex flex-col flex-grow">
         <header className="bg-white shadow-sm p-4 flex justify-between items-center">
-          <h1 className="text-2xl font-bold text-gray-800">{personalizedGreeting}</h1> {/* Display personalized greeting */}
+          <h1 className="text-2xl font-bold text-gray-800 flex items-center space-x-2">
+            {GreetingIcon && <GreetingIcon className="h-6 w-6 text-rosa-mexicano" />} {/* Display the icon */}
+            <span>{personalizedGreetingText}</span> {/* Display personalized greeting text */}
+          </h1>
           <Button onClick={handleLogout} className="bg-red-600 hover:bg-red-700 text-white">
             Cerrar Sesión
           </Button>
