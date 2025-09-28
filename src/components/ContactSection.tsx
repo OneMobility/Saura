@@ -92,7 +92,7 @@ const ContactSection = () => {
         <div className="mt-12 lg:mt-0 flex justify-center items-center">
           <div className="relative w-full max-w-md h-80 lg:h-[450px] overflow-hidden rounded-lg shadow-xl">
             <img
-              src="https://images.unsplash.com/photo-1501785888041-af3ba6f602d8?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" // Imagen de ejemplo
+              src="https://tse3.mm.bing.net/th/id/OIP.tB2ifJ5D_V1kcDQkRItOvAHaEK?rs=1&pid=ImgDetMain&o=7&rm=3" // Imagen actualizada
               alt="Imagen abstracta de contacto"
               className="absolute inset-0 w-full h-full object-cover"
               style={{ clipPath: 'polygon(0 0, 100% 15%, 100% 100%, 0% 85%)' }} // Recorte abstracto
