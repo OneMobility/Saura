@@ -6,65 +6,11 @@ import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-
-// Datos de ejemplo para los tours (esto se reemplazaría con una llamada a una API real)
-const tourData = [
-  {
-    id: 'tour-1',
-    imageUrl: 'https://images.unsplash.com/photo-1501785888041-af3ba6f602d8?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    title: 'Aventura en la Riviera Maya',
-    description: 'Explora las ruinas mayas y relájate en las playas de arena blanca. Este tour incluye transporte, alojamiento en hoteles boutique, visitas guiadas a Chichén Itzá, Tulum y Cobá, así como tiempo libre para disfrutar de las hermosas playas de Cancún y Playa del Carmen. Disfruta de la gastronomía local y actividades acuáticas.',
-    price: '$1,200 USD',
-    duration: '7 días / 6 noches',
-    includes: ['Transporte aéreo y terrestre', 'Alojamiento en hoteles 4 estrellas', 'Desayunos diarios', 'Guía bilingüe', 'Entradas a sitios arqueológicos'],
-    itinerary: [
-      { day: 1, activity: 'Llegada a Cancún, traslado al hotel y tarde libre.' },
-      { day: 2, activity: 'Visita a Chichén Itzá y cenote Ik Kil.' },
-      { day: 3, activity: 'Exploración de Tulum y Playa Paraíso.' },
-      { day: 4, activity: 'Aventura en Cobá y nado en cenotes.' },
-      { day: 5, activity: 'Día libre en Playa del Carmen.' },
-      { day: 6, activity: 'Actividades acuáticas en Xcaret o Xel-Há (opcional).' },
-      { day: 7, activity: 'Desayuno y traslado al aeropuerto.' },
-    ],
-  },
-  {
-    id: 'tour-2',
-    imageUrl: 'https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    title: 'Senderismo en la Sierra Madre',
-    description: 'Descubre paisajes montañosos impresionantes y cascadas ocultas. Este tour te lleva a través de senderos desafiantes y vistas panorámicas, ideal para amantes de la naturaleza y la aventura. Incluye equipo de seguridad, guías expertos y campamentos en zonas designadas.',
-    price: '$850 USD',
-    duration: '5 días / 4 noches',
-    includes: ['Transporte terrestre', 'Equipo de senderismo básico', 'Guía de montaña certificado', 'Comidas campestres', 'Permisos de acceso a parques naturales'],
-    itinerary: [
-      { day: 1, activity: 'Llegada al punto de encuentro, traslado a la base de la Sierra Madre y preparación para el campamento.' },
-      { day: 2, activity: 'Senderismo a la Cascada Escondida y exploración de flora y fauna.' },
-      { day: 3, activity: 'Ascenso al Pico del Águila con vistas panorámicas.' },
-      { day: 4, activity: 'Visita a un pueblo mágico cercano y tarde de relajación.' },
-      { day: 5, activity: 'Desayuno y regreso al punto de encuentro.' },
-    ],
-  },
-  {
-    id: 'tour-3',
-    imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961dde?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    title: 'Cultura y Sabor en Oaxaca',
-    description: 'Sumérgete en la rica gastronomía y tradiciones de Oaxaca. Un viaje cultural que te llevará por mercados vibrantes, talleres de artesanía y degustaciones de mezcal. Conoce la historia de Monte Albán y disfruta de la calidez de su gente.',
-    price: '$950 USD',
-    duration: '6 días / 5 noches',
-    includes: ['Transporte terrestre', 'Alojamiento en hoteles boutique', 'Desayunos y algunas comidas', 'Guía cultural', 'Visitas a mercados y talleres artesanales'],
-    itinerary: [
-      { day: 1, activity: 'Llegada a Oaxaca, traslado al hotel y cena de bienvenida.' },
-      { day: 2, activity: 'Tour por el centro histórico, Santo Domingo y mercados.' },
-      { day: 3, activity: 'Excursión a Monte Albán, Arbol del Tule y Teotitlán del Valle.' },
-      { day: 4, activity: 'Clase de cocina oaxaqueña y degustación de mezcal.' },
-      { day: 5, activity: 'Día libre para explorar o compras.' },
-      { day: 6, activity: 'Desayuno y traslado al aeropuerto.' },
-    ],
-  },
-];
+import { allTours } from '@/data/tours'; // Import allTours from the new data file
 
 const TourDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
-  const tour = tourData.find((t) => t.id === id);
+  const tour = allTours.find((t) => t.id === id); // Use allTours here
 
   if (!tour) {
     return (
@@ -86,7 +32,7 @@ const TourDetailsPage = () => {
       <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
         <div className="mb-8">
           <Button asChild variant="outline" className="bg-white text-rosa-mexicano hover:bg-gray-100 border-rosa-mexicano hover:border-rosa-mexicano/90">
-            <Link to="/">
+            <Link to="/tours"> {/* Link back to the /tours page */}
               <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Tours
             </Link>
           </Button>

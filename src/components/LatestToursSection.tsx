@@ -6,41 +6,16 @@ import { Button } from '@/components/ui/button';
 import useEmblaCarousel from 'embla-carousel-react';
 import { cn } from '@/lib/utils';
 import { ChevronLeft, ChevronRight } from 'lucide-react';
-import { useIsMobile } from '@/hooks/use-mobile'; // Importamos el hook para detectar si es móvil
-import ParallaxCard from './ParallaxCard'; // Importamos el nuevo componente ParallaxCard
-
-interface Tour {
-  id: string;
-  imageUrl: string;
-  title: string;
-  description: string;
-}
-
-// Placeholder data for the latest tours
-const latestTours: Tour[] = [
-  {
-    id: 'tour-1',
-    imageUrl: 'https://images.unsplash.com/photo-1501785888041-af3ba6f602d8?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    title: 'Aventura en la Riviera Maya',
-    description: 'Explora las ruinas mayas y relájate en las playas de arena blanca.',
-  },
-  {
-    id: 'tour-2',
-    imageUrl: 'https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    title: 'Senderismo en la Sierra Madre',
-    description: 'Descubre paisajes montañosos impresionantes y cascadas ocultas.',
-  },
-  {
-    id: 'tour-3',
-    imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961dde?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    title: 'Cultura y Sabor en Oaxaca',
-    description: 'Sumérgete en la rica gastronomía y tradiciones de Oaxaca.',
-  },
-];
+import { useIsMobile } from '@/hooks/use-mobile';
+import ParallaxCard from './ParallaxCard';
+import { allTours, Tour } from '@/data/tours'; // Import allTours from the new data file
 
 const LatestToursSection = () => {
   const isMobile = useIsMobile();
   const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true, align: 'start' });
+
+  // Display only the first 3 tours as "latest"
+  const latestToursSubset = allTours.slice(0, 3);
 
   useEffect(() => {
     if (!emblaApi) return;
@@ -56,7 +31,7 @@ const LatestToursSection = () => {
   ];
 
   return (
-    <section className="py-12 px-4 md:px-8 lg:px-16 bg-white"> {/* Changed bg-gray-50 to bg-white */}
+    <section className="py-12 px-4 md:px-8 lg:px-16 bg-white">
       <div className="max-w-6xl mx-auto">
         <h2 className="text-3xl md:text-4xl font-bold text-center text-gray-800 mb-10">
           Nuestros Últimos Tours
@@ -65,16 +40,16 @@ const LatestToursSection = () => {
         {isMobile ? (
           <div className="relative">
             <div className="embla" ref={emblaRef}>
-              <div className="embla__container flex -ml-4"> {/* Negative margin to offset slide padding */}
-                {latestTours.map((tour, index) => (
-                  <div key={tour.id} className="embla__slide flex-none w-full pl-4"> {/* Padding for spacing */}
+              <div className="embla__container flex -ml-4">
+                {latestToursSubset.map((tour, index) => (
+                  <div key={tour.id} className="embla__slide flex-none w-full pl-4">
                     <ParallaxCard
                       imageUrl={tour.imageUrl}
                       title={tour.title}
                       description={tour.description}
                       rotationClass={rotationClasses[index % rotationClasses.length]}
-                      isMobile={true} // Indicate it's in mobile/carousel mode
-                      tourId={tour.id} // Pass tourId
+                      isMobile={true}
+                      tourId={tour.id}
                     />
                   </div>
                 ))}
@@ -83,15 +58,15 @@ const LatestToursSection = () => {
           </div>
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {latestTours.map((tour, index) => (
+            {latestToursSubset.map((tour, index) => (
               <ParallaxCard
                 key={tour.id}
                 imageUrl={tour.imageUrl}
                 title={tour.title}
                 description={tour.description}
                 rotationClass={rotationClasses[index % rotationClasses.length]}
-                isMobile={false} // Indicate it's in desktop/grid mode
-                tourId={tour.id} // Pass tourId
+                isMobile={false}
+                tourId={tour.id}
               />
             ))}
           </div>
