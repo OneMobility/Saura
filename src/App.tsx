@@ -13,7 +13,8 @@ import ContactPage from "./pages/ContactPage";
 import ScrollToTop from "./components/ScrollToTop";
 import Login from "./pages/Login";
 import AdminDashboard from "./pages/AdminDashboard";
-import AdminSettingsPage from "./pages/AdminSettingsPage"; // Import AdminSettingsPage
+import AdminSettingsPage from "./pages/AdminSettingsPage";
+import AdminUsersPage from "./pages/AdminUsersPage"; // Import AdminUsersPage
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -44,10 +45,18 @@ const App = () => (
               }
             />
             <Route
-              path="/admin/settings" // New route for admin settings
+              path="/admin/settings"
               element={
                 <ProtectedRoute adminOnly>
                   <AdminSettingsPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin/users" {/* New route for admin user management */}
+              element={
+                <ProtectedRoute adminOnly>
+                  <AdminUsersPage />
                 </ProtectedRoute>
               }
             />
