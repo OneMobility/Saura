@@ -2,35 +2,16 @@ import React, { useCallback, useRef, useEffect, useState } from 'react';
 import useEmblaCarousel from 'embla-carousel-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react'; // Added Loader2 icon
+import { supabase } from '@/integrations/supabase/client'; // Import supabase client
 
 interface Slide {
-  id: number;
-  imageUrl: string;
+  id: string; // Changed to string to match Supabase UUID
+  image_url: string; // Changed to image_url to match Supabase column name
   title: string;
   description: string;
+  order_index: number; // Added order_index for sorting
 }
-
-const slides: Slide[] = [
-  {
-    id: 1,
-    imageUrl: 'https://images.unsplash.com/photo-1501785888041-af3ba6f602d8?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    title: 'Descubre Paraísos Escondidos',
-    description: 'Aventuras inolvidables te esperan en cada rincón del mundo.',
-  },
-  {
-    id: 2,
-    imageUrl: 'https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    title: 'Experiencias Únicas',
-    description: 'Sumérgete en culturas vibrantes y paisajes impresionantes.',
-  },
-  {
-    id: 3,
-    imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961dde?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    title: 'Tu Próxima Gran Aventura',
-    description: 'Planifica el viaje de tus sueños con nosotros.',
-  },
-];
 
 const animationClasses = [
   'animate-fade-in-up',
@@ -43,9 +24,32 @@ const Slideshow = () => {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [currentTitleAnimation, setCurrentTitleAnimation] = useState('');
   const [currentDescriptionAnimation, setCurrentDescriptionAnimation] = useState('');
-  const autoplayRef = useRef<ReturnType<typeof setInterval> | null>(null); // Ref para almacenar el ID del intervalo
+  const autoplayRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [slides, setSlides] = useState<Slide[]>([]); // State to hold fetched slides
+  const [loading, setLoading] = useState(true); // Loading state
 
   const getRandomAnimation = () => animationClasses[Math.floor(Math.random() * animationClasses.length)];
+
+  const fetchSlides = useCallback(async () => {
+    setLoading(true);
+    const { data, error } = await supabase
+      .from('slides')
+      .select('*')
+      .order('order_index', { ascending: true }); // Order by order_index
+
+    if (error) {
+      console.error('Error fetching slides for slideshow:', error);
+      // Fallback to a default slide or show an error message
+      setSlides([]);
+    } else {
+      setSlides(data || []);
+    }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    fetchSlides(); // Fetch slides on component mount
+  }, [fetchSlides]);
 
   const scrollPrev = useCallback(() => {
     if (emblaApi) emblaApi.scrollPrev();
@@ -59,12 +63,10 @@ const Slideshow = () => {
     if (!emblaApi) return;
     const newIndex = emblaApi.selectedScrollSnap();
     setSelectedIndex(newIndex);
-    // Generar nuevas animaciones aleatorias cuando se selecciona una nueva diapositiva
     setCurrentTitleAnimation(getRandomAnimation());
     setCurrentDescriptionAnimation(getRandomAnimation());
   }, [emblaApi, setSelectedIndex]);
 
-  // Función para iniciar la reproducción automática
   const startAutoplay = useCallback(() => {
     if (emblaApi) {
       autoplayRef.current = setInterval(() => {
@@ -73,7 +75,6 @@ const Slideshow = () => {
     }
   }, [emblaApi]);
 
-  // Función para detener la reproducción automática
   const stopAutoplay = useCallback(() => {
     if (autoplayRef.current) {
       clearInterval(autoplayRef.current);
@@ -84,26 +85,34 @@ const Slideshow = () => {
   useEffect(() => {
     if (!emblaApi) return;
 
-    onSelect(); // Configuración inicial de la animación
+    onSelect();
     emblaApi.on('select', onSelect);
     emblaApi.on('reInit', onSelect);
 
-    startAutoplay(); // Iniciar la reproducción automática al montar el componente
+    startAutoplay();
 
     return () => {
-      stopAutoplay(); // Limpiar el intervalo al desmontar el componente
+      stopAutoplay();
       emblaApi.off('select', onSelect);
     };
   }, [emblaApi, onSelect, startAutoplay, stopAutoplay]);
 
-  // Manejadores de eventos para el mouse
-  const handleMouseEnter = () => {
-    stopAutoplay();
-  };
+  if (loading) {
+    return (
+      <div className="relative w-full h-[500px] md:h-[600px] lg:h-[700px] flex items-center justify-center bg-gray-200">
+        <Loader2 className="h-12 w-12 animate-spin text-rosa-mexicano" />
+        <p className="ml-4 text-gray-700">Cargando diapositivas...</p>
+      </div>
+    );
+  }
 
-  const handleMouseLeave = () => {
-    startAutoplay();
-  };
+  if (slides.length === 0) {
+    return (
+      <div className="relative w-full h-[500px] md:h-[600px] lg:h-[700px] flex items-center justify-center bg-gray-200 text-gray-700">
+        <p>No hay diapositivas disponibles. Por favor, añádelas desde el panel de administración.</p>
+      </div>
+    );
+  }
 
   return (
     <div
@@ -116,26 +125,25 @@ const Slideshow = () => {
           {slides.map((slide, index) => (
             <div className="embla__slide relative flex-none w-full h-[500px] md:h-[600px] lg:h-[700px] overflow-hidden" key={slide.id}>
               <img
-                src={slide.imageUrl}
+                src={slide.image_url} // Use image_url from Supabase
                 alt={slide.title}
                 className="absolute inset-0 w-full h-full object-cover"
               />
               <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
                 <div className={cn(
                   "text-center text-white",
-                  // La opacidad del contenedor principal controla la visibilidad de la diapositiva
                   selectedIndex === index ? "opacity-100" : "opacity-0"
                 )}>
                   <h2 className={cn(
                     "text-3xl md:text-5xl font-bold mb-4",
-                    selectedIndex === index && currentTitleAnimation // Aplica animación solo si está seleccionada
+                    selectedIndex === index && currentTitleAnimation
                   )}>
                     {slide.title}
                   </h2>
                   <p className={cn(
                     "text-lg md:text-2xl",
-                    selectedIndex === index && currentDescriptionAnimation, // Aplica animación solo si está seleccionada
-                    selectedIndex === index && "delay-200" // Aplica un pequeño retraso a la descripción
+                    selectedIndex === index && currentDescriptionAnimation,
+                    selectedIndex === index && "delay-200"
                   )}>
                     {slide.description}
                   </p>
@@ -146,7 +154,6 @@ const Slideshow = () => {
         </div>
       </div>
 
-      {/* Los botones de navegación del slideshow */}
       <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex space-x-4 z-10">
         <Button
           variant="outline"
