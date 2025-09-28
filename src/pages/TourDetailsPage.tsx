@@ -89,8 +89,10 @@ const TourDetailsPage = () => {
         <div className="flex justify-start mb-8">
           <Button asChild variant="outline" className="bg-white text-rosa-mexicano hover:bg-gray-100 border-rosa-mexicano">
             <Link to="/">
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              Volver a Tours
+              <span> {/* Envuelve el icono y el texto en un span */}
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                Volver a Tours
+              </span>
             </Link>
           </Button>
         </div>

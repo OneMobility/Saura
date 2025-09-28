@@ -88,12 +88,12 @@ const blogPostsData = [
         <li><strong>Empaca con Inteligencia:</strong> Lleva suficientes pañales, toallitas, snacks, juguetes y ropa extra. No olvides un botiquín básico.</li>
         <li><strong>Horarios Flexibles:</strong> Intenta mantener las rutinas de sueño y alimentación de tus hijos, pero sé flexible.</li>
         <li><strong>Entretenimiento en el Viaje:</strong> Libros, tabletas con juegos o películas, y juguetes pequeños pueden ser salvadores durante los trayectos.</li>
+        <li><strong>Seguridad:</strong> Asegúrate de que los niños usen cinturones de seguridad o sillas de coche adecuadas. En destinos, supervisa siempre.</li>
       </ul>
       <h3 class="text-2xl font-semibold mt-6 mb-3">Durante el Viaje:</h3>
       <ul class="list-disc list-inside space-y-2">
         <li><strong>Descansos Frecuentes:</strong> Si viajas en coche, haz paradas regulares para que los niños puedan estirarse y jugar.</li>
         <li><strong>Snacks y Agua:</strong> Ten siempre a mano bebidas y aperitivos saludables para evitar el mal humor por hambre.</li>
-        <li><strong>Seguridad:</strong> Asegúrate de que los niños usen cinturones de seguridad o sillas de coche adecuadas. En destinos, supervisa siempre.</li>
       </ul>
       <p class="mt-6">Con un poco de preparación, viajar con tus pequeños puede ser una de las mejores experiencias familiares.</p>
     `,
@@ -135,8 +135,10 @@ const BlogEntryPage = () => {
         <div className="flex justify-start mb-8">
           <Button asChild variant="outline" className="bg-white text-rosa-mexicano hover:bg-gray-100 border-rosa-mexicano">
             <Link to="/">
-              <ChevronLeft className="h-4 w-4 mr-2" />
-              Volver al Blog
+              <span> {/* Envuelve el icono y el texto en un span */}
+                <ChevronLeft className="h-4 w-4 mr-2" />
+                Volver al Blog
+              </span>
             </Link>
           </Button>
         </div>
