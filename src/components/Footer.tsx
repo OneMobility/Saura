@@ -1,14 +1,13 @@
 "use client";
 
 import React from 'react';
-import { Facebook, Instagram } from 'lucide-react'; // Removed Twitter
-import TikTokIcon from '@/components/icons/TikTokIcon'; // Import the new TikTokIcon
+import { Facebook, Instagram, Twitter } from 'lucide-react'; // Using Twitter as a placeholder for TikTok if needed
 import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
-import { useSession } from '@/components/SessionContextProvider';
+import { Link } from 'react-router-dom'; // Import Link from react-router-dom
+import { useSession } from '@/components/SessionContextProvider'; // Import useSession
 
 const Footer = () => {
-  const { user, isAdmin, isLoading } = useSession();
+  const { user, isAdmin, isLoading } = useSession(); // Get session info
 
   return (
     <footer className="bg-rosa-mexicano text-white py-10 px-4 md:px-8 lg:px-16">
@@ -27,9 +26,9 @@ const Footer = () => {
           <h3 className="text-lg font-semibold mb-4">Enlaces Rápidos</h3>
           <ul className="space-y-2">
             <li><Link to="/" className="hover:underline">Inicio</Link></li>
-            <li><Link to="/tours" className="hover:underline">Tours</Link></li>
-            <li><Link to="/blog" className="hover:underline">Blog</Link></li>
-            <li><Link to="/contact" className="hover:underline">Contacto</Link></li>
+            <li><Link to="/tours" className="hover:underline">Tours</Link></li> {/* Assuming a /tours page will be created later */}
+            <li><Link to="/blog" className="hover:underline">Blog</Link></li> {/* Updated link */}
+            <li><Link to="/contact" className="hover:underline">Contacto</Link></li> {/* Assuming a /contact page will be created later */}
           </ul>
         </div>
 
@@ -43,8 +42,9 @@ const Footer = () => {
             <a href="https://www.instagram.com" target="_blank" rel="noopener noreferrer" className="hover:text-gray-200 transition-colors">
               <Instagram className="h-6 w-6" />
             </a>
+            {/* Usamos Twitter como un ejemplo si no hay un icono de TikTok directo en Lucide */}
             <a href="https://www.tiktok.com" target="_blank" rel="noopener noreferrer" className="hover:text-gray-200 transition-colors">
-              <TikTokIcon className="h-6 w-6" /> {/* Use TikTokIcon here */}
+              <Twitter className="h-6 w-6" /> {/* Considerar un SVG personalizado si se necesita el logo de TikTok */}
             </a>
           </div>
         </div>
