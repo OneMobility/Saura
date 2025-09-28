@@ -3,7 +3,8 @@ import Slideshow from "@/components/Slideshow";
 import SocialMediaBox from "@/components/SocialMediaBox";
 import PromotionalStrip from "@/components/PromotionalStrip";
 import LatestToursSection from "@/components/LatestToursSection";
-import BlogSection from "@/components/BlogSection"; // Import the new BlogSection
+import BlogSection from "@/components/BlogSection";
+import CustomerReviewsSection from "@/components/CustomerReviewsSection"; // Import the new CustomerReviewsSection
 
 const Index = () => {
   return (
@@ -27,6 +28,9 @@ const Index = () => {
 
       {/* Nueva sección de blog */}
       <BlogSection />
+
+      {/* Nueva sección de opiniones de clientes */}
+      <CustomerReviewsSection />
     </div>
   );
 };
