@@ -1,23 +1,29 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { useSession } from '@/components/SessionContextProvider'; // Import useSession
+import { useSession } from '@/components/SessionContextProvider';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { session, isLoading } = useSession(); // Use useSession to check if already logged in
+  const { session, isLoading } = useSession();
 
   console.log('Login Page: isLoading:', isLoading, 'Session:', session);
 
-  // If already logged in and not loading, redirect to admin dashboard
+  useEffect(() => {
+    // If already logged in and not loading, redirect to admin dashboard
+    if (!isLoading && session) {
+      console.log('Login Page: User is authenticated and not loading, redirecting to /admin/dashboard.');
+      navigate('/admin/dashboard');
+    }
+  }, [session, isLoading, navigate]); // Dependencias del useEffect
+
+  // No renderizar el formulario de login si ya estamos redirigiendo
   if (!isLoading && session) {
-    console.log('Login Page: User is authenticated and not loading, redirecting to /admin/dashboard.');
-    navigate('/admin/dashboard');
-    return null; // Prevent rendering login form
+    return null;
   }
 
   return (
