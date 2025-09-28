@@ -20,7 +20,7 @@ const iconMap: { [key: string]: React.ElementType } = {
 };
 
 const AdminHeader: React.FC<AdminHeaderProps> = ({ pageTitle, children }) => {
-  const { user, isAdmin, isLoading, firstName } = useSession();
+  const { user, isAdmin, isLoading, firstName, lastName } = useSession(); // Get lastName
   const navigate = useNavigate();
 
   const handleLogout = async () => {
@@ -28,7 +28,7 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ pageTitle, children }) => {
     navigate('/login');
   };
 
-  const { greetingPart, namePart, icon: greetingIconName } = getGreeting(firstName);
+  const { greetingPart, namePart, icon: greetingIconName } = getGreeting(firstName, lastName); // Pass both firstName and lastName
   const GreetingIcon = iconMap[greetingIconName];
 
   return (

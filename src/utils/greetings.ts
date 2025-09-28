@@ -1,4 +1,4 @@
-export const getGreeting = (name: string | null) => {
+export const getGreeting = (firstName: string | null, lastName: string | null) => {
   const hour = new Date().getHours();
   let greeting = '';
   let icon = '';
@@ -14,5 +14,6 @@ export const getGreeting = (name: string | null) => {
     icon = 'Moon';
   }
 
-  return { greetingPart: greeting, namePart: name || 'Administrador', icon };
+  const fullName = [firstName, lastName].filter(Boolean).join(' ');
+  return { greetingPart: greeting, namePart: fullName || 'Administrador', icon };
 };
