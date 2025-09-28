@@ -4,7 +4,10 @@ import SocialMediaBox from "@/components/SocialMediaBox";
 import PromotionalStrip from "@/components/PromotionalStrip";
 import LatestToursSection from "@/components/LatestToursSection";
 import BlogSection from "@/components/BlogSection";
-import CustomerReviewsSection from "@/components/CustomerReviewsSection"; // Import the new CustomerReviewsSection
+import CustomerReviewsSection from "@/components/CustomerReviewsSection";
+import TourInquirySection from "@/components/TourInquirySection"; // Import the new TourInquirySection
+import ContactSection from "@/components/ContactSection"; // Import the new ContactSection
+import Footer from "@/components/Footer"; // Import the new Footer
 
 const Index = () => {
   return (
@@ -31,6 +34,15 @@ const Index = () => {
 
       {/* Nueva sección de opiniones de clientes */}
       <CustomerReviewsSection />
+
+      {/* Nueva sección de consulta de tour */}
+      <TourInquirySection />
+
+      {/* Nueva sección de contacto */}
+      <ContactSection />
+
+      {/* Nuevo pie de página */}
+      <Footer />
     </div>
   );
 };
