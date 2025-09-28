@@ -53,7 +53,7 @@ const AdminSidebar = () => {
           variant="ghost"
           size="icon"
           onClick={togglePin}
-          className="absolute -right-4 top-1/2 -translate-y-1/2 bg-gray-800 hover:bg-gray-700 text-white rounded-full h-8 w-8 border border-gray-700 hidden lg:flex z-10"
+          className="absolute -right-4 top-1/2 -translate-y-1/2 bg-gray-800 hover:bg-gray-700 text-white rounded-full h-8 w-8 border border-gray-700 flex z-10" // Removed 'hidden lg:flex'
         >
           {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
           <span className="sr-only">{isPinned ? "Desfijar barra lateral" : "Fijar barra lateral"}</span>
