@@ -74,6 +74,7 @@ const LatestToursSection = () => {
                       description={tour.description}
                       rotationClass={rotationClasses[index % rotationClasses.length]}
                       isMobile={true} // Indicate it's in mobile/carousel mode
+                      tourId={tour.id} // Pass tourId
                     />
                   </div>
                 ))}
@@ -90,6 +91,7 @@ const LatestToursSection = () => {
                 description={tour.description}
                 rotationClass={rotationClasses[index % rotationClasses.length]}
                 isMobile={false} // Indicate it's in desktop/grid mode
+                tourId={tour.id} // Pass tourId
               />
             ))}
           </div>

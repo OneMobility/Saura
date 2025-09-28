@@ -4,6 +4,7 @@ import React, { useRef, useEffect, useState, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import { Link } from 'react-router-dom'; // Import Link from react-router-dom
 
 interface ParallaxCardProps {
   imageUrl: string;
@@ -11,6 +12,7 @@ interface ParallaxCardProps {
   description: string;
   rotationClass?: string;
   isMobile?: boolean; // Para saber si estamos en modo carrusel
+  tourId: string; // Add tourId prop
 }
 
 const ParallaxCard: React.FC<ParallaxCardProps> = ({
@@ -19,6 +21,7 @@ const ParallaxCard: React.FC<ParallaxCardProps> = ({
   description,
   rotationClass,
   isMobile = false,
+  tourId, // Destructure tourId
 }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [translateY, setTranslateY] = useState(0);
@@ -78,8 +81,10 @@ const ParallaxCard: React.FC<ParallaxCardProps> = ({
         </CardDescription>
       </CardContent>
       <CardFooter className="flex justify-end">
-        <Button className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white">
-          Ver Detalles
+        <Button asChild className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white">
+          <Link to={`/tours/${tourId}`}> {/* Link to the new TourDetailsPage */}
+            Ver Detalles
+          </Link>
         </Button>
       </CardFooter>
     </Card>
