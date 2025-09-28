@@ -2,8 +2,9 @@
 
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
+import { Button, buttonVariants } from '@/components/ui/button'; // Importar buttonVariants
 import { ChevronLeft } from 'lucide-react';
+import { cn } from '@/lib/utils'; // Importar cn
 
 // Datos de ejemplo para entradas de blog
 const blogPostsData = [
@@ -133,14 +134,16 @@ const BlogEntryPage = () => {
 
       <div className="max-w-4xl mx-auto py-12 px-4 md:px-8">
         <div className="flex justify-start mb-8">
-          <Button asChild variant="outline" className="bg-white text-rosa-mexicano hover:bg-gray-100 border-rosa-mexicano">
-            <Link to="/">
-              <span> {/* Envuelve el icono y el texto en un span */}
-                <ChevronLeft className="h-4 w-4 mr-2" />
-                Volver al Blog
-              </span>
-            </Link>
-          </Button>
+          <Link
+            to="/"
+            className={cn(
+              buttonVariants({ variant: "outline", size: "default" }),
+              "bg-white text-rosa-mexicano hover:bg-gray-100 border-rosa-mexicano"
+            )}
+          >
+            <ChevronLeft className="h-4 w-4 mr-2" />
+            Volver al Blog
+          </Link>
         </div>
 
         <div className="bg-white shadow-lg rounded-lg p-8 mb-8 prose prose-lg max-w-none">
