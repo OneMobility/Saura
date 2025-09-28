@@ -3,6 +3,7 @@
 import React from 'react';
 import { Facebook, Instagram, Twitter } from 'lucide-react'; // Using Twitter as a placeholder for TikTok if needed
 import { Button } from '@/components/ui/button';
+import { Link } from 'react-router-dom'; // Import Link from react-router-dom
 
 const Footer = () => {
   return (
@@ -21,10 +22,10 @@ const Footer = () => {
         <div>
           <h3 className="text-lg font-semibold mb-4">Enlaces Rápidos</h3>
           <ul className="space-y-2">
-            <li><a href="/" className="hover:underline">Inicio</a></li>
-            <li><a href="/tours" className="hover:underline">Tours</a></li>
-            <li><a href="/blog" className="hover:underline">Blog</a></li>
-            <li><a href="/contact" className="hover:underline">Contacto</a></li>
+            <li><Link to="/" className="hover:underline">Inicio</Link></li>
+            <li><Link to="/tours" className="hover:underline">Tours</Link></li> {/* Assuming a /tours page will be created later */}
+            <li><Link to="/blog" className="hover:underline">Blog</Link></li> {/* Updated link */}
+            <li><Link to="/contact" className="hover:underline">Contacto</Link></li> {/* Assuming a /contact page will be created later */}
           </ul>
         </div>
 
