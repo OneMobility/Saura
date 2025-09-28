@@ -8,9 +8,13 @@ import NotFound from "./pages/NotFound";
 import TourDetailsPage from "./pages/TourDetailsPage";
 import BlogPage from "./pages/BlogPage";
 import BlogPostPage from "./pages/BlogPostPage";
-import ToursPage from "./pages/ToursPage"; // Import the new ToursPage
-import ContactPage from "./pages/ContactPage"; // Import the new ContactPage
+import ToursPage from "./pages/ToursPage";
+import ContactPage from "./pages/ContactPage";
 import ScrollToTop from "./components/ScrollToTop";
+import Login from "./pages/Login"; // Import Login page
+import AdminDashboard from "./pages/AdminDashboard"; // Import AdminDashboard page
+import { SessionContextProvider } from "./components/SessionContextProvider"; // Import SessionContextProvider
+import ProtectedRoute from "./components/ProtectedRoute"; // Import ProtectedRoute
 
 const queryClient = new QueryClient();
 
@@ -21,16 +25,27 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <ScrollToTop />
-        <Routes>
-          <Route path="/" element={<Index />} />
-          <Route path="/tours" element={<ToursPage />} /> {/* New route for all tours */}
-          <Route path="/tours/:id" element={<TourDetailsPage />} />
-          <Route path="/blog" element={<BlogPage />} />
-          <Route path="/blog/:id" element={<BlogPostPage />} />
-          <Route path="/contact" element={<ContactPage />} /> {/* New route for contact page */}
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <SessionContextProvider> {/* Wrap routes with SessionContextProvider */}
+          <Routes>
+            <Route path="/" element={<Index />} />
+            <Route path="/tours" element={<ToursPage />} />
+            <Route path="/tours/:id" element={<TourDetailsPage />} />
+            <Route path="/blog" element={<BlogPage />} />
+            <Route path="/blog/:id" element={<BlogPostPage />} />
+            <Route path="/contact" element={<ContactPage />} />
+            <Route path="/login" element={<Login />} /> {/* New login route */}
+            <Route
+              path="/admin/dashboard"
+              element={
+                <ProtectedRoute adminOnly> {/* Protect admin dashboard */}
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </SessionContextProvider>
       </BrowserRouter>
     </TooltipProvider>
   </QueryClientProvider>

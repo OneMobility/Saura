@@ -5,9 +5,11 @@ import { TreePalm, Menu } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
+import { useSession } from '@/components/SessionContextProvider'; // Import useSession
 
 const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { user, isAdmin, isLoading } = useSession(); // Get session info
 
   const navLinks = [
     { name: 'Inicio', href: '/' },
@@ -50,6 +52,14 @@ const Navbar = () => {
                   {link.name}
                 </Link>
               ))}
+              {/* Admin Access button in the mobile menu */}
+              <Link
+                to={user && isAdmin ? "/admin/dashboard" : "/login"}
+                className="text-lg font-medium text-gray-800 hover:text-rosa-mexicano transition-colors mt-4"
+                onClick={() => setIsMobileMenuOpen(false)}
+              >
+                {user && isAdmin ? "Panel Admin" : "Acceso Admin"}
+              </Link>
             </div>
           </SheetContent>
         </Sheet>
