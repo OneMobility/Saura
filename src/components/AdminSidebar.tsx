@@ -5,7 +5,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { LayoutDashboard, Package, Newspaper, Users, Settings, ChevronLeft, ChevronRight, TreePalm } from 'lucide-react';
+import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff } from 'lucide-react'; // Added Pin and PinOff icons
 
 interface NavItem {
   href: string;
@@ -22,34 +22,41 @@ const navItems: NavItem[] = [
 ];
 
 const AdminSidebar = () => {
-  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [isPinned, setIsPinned] = useState(false); // Estado para fijar/desfijar la barra lateral
+  const [isHovering, setIsHovering] = useState(false); // Estado para detectar si el ratón está sobre la barra lateral
   const location = useLocation();
 
-  const toggleCollapse = () => {
-    setIsCollapsed(!isCollapsed);
+  // La barra lateral estará expandida si está fijada O si el ratón está sobre ella
+  const isExpanded = isPinned || isHovering;
+
+  const togglePin = () => {
+    setIsPinned(prev => !prev);
   };
 
   return (
     <aside
       className={cn(
-        "flex flex-col h-screen bg-gray-900 text-gray-300 transition-all duration-300 ease-in-out relative",
-        isCollapsed ? "w-20" : "w-64"
+        "flex flex-col h-screen bg-gray-900 text-gray-300 transition-all duration-300 ease-in-out relative z-30",
+        isExpanded ? "w-64" : "w-20"
       )}
+      onMouseEnter={() => setIsHovering(true)}
+      onMouseLeave={() => setIsHovering(false)}
     >
       {/* Sidebar Header */}
       <div className="flex items-center justify-center h-16 border-b border-gray-700">
         <Link to="/admin/dashboard" className="flex items-center space-x-2">
           <TreePalm className="h-6 w-6 text-rosa-mexicano" />
-          {!isCollapsed && <span className="text-xl font-bold text-white">Admin Panel</span>}
+          {isExpanded && <span className="text-xl font-bold text-white">Admin Panel</span>}
         </Link>
-        {/* Toggle Button */}
+        {/* Botón para fijar/desfijar la barra lateral */}
         <Button
           variant="ghost"
           size="icon"
-          onClick={toggleCollapse}
+          onClick={togglePin}
           className="absolute -right-4 top-1/2 -translate-y-1/2 bg-gray-800 hover:bg-gray-700 text-white rounded-full h-8 w-8 border border-gray-700 hidden lg:flex z-10"
         >
-          {isCollapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+          {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+          <span className="sr-only">{isPinned ? "Desfijar barra lateral" : "Fijar barra lateral"}</span>
         </Button>
       </div>
 
@@ -57,7 +64,7 @@ const AdminSidebar = () => {
       <nav className="flex-grow mt-4 space-y-2 px-2">
         {navItems.map((item) => (
           <div key={item.href}>
-            {isCollapsed ? (
+            {!isExpanded ? ( // Si está colapsada, muestra solo el icono y un tooltip
               <Tooltip>
                 <TooltipTrigger asChild>
                   <Button
@@ -78,7 +85,7 @@ const AdminSidebar = () => {
                 </TooltipTrigger>
                 <TooltipContent side="right">{item.label}</TooltipContent>
               </Tooltip>
-            ) : (
+            ) : ( // Si está expandida, muestra el icono y el texto
               <Button
                 variant="ghost"
                 className={cn(
