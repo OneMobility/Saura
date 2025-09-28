@@ -2,9 +2,9 @@
 
 import React from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { Button, buttonVariants } from '@/components/ui/button'; // Importar buttonVariants
+import { Button, buttonVariants } from '@/components/ui/button';
 import { ChevronLeft } from 'lucide-react';
-import { cn } from '@/lib/utils'; // Importar cn
+import { cn } from '@/lib/utils';
 
 // Datos de ejemplo para tours (en una aplicación real, esto vendría de una API)
 const tourData = [
@@ -95,8 +95,10 @@ const TourDetailsPage = () => {
               "bg-white text-rosa-mexicano hover:bg-gray-100 border-rosa-mexicano"
             )}
           >
-            <ChevronLeft className="h-4 w-4 mr-2" />
-            Volver a Tours
+            <span> {/* Envuelve el icono y el texto en un span */}
+              <ChevronLeft className="h-4 w-4 mr-2" />
+              Volver a Tours
+            </span>
           </Link>
         </div>
 
