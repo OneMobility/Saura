@@ -40,6 +40,15 @@ interface TourHotelDetail {
   room_type: 'double' | 'triple' | 'quad'; // This is the room type *chosen for this specific tour's booking*
 }
 
+interface Bus {
+  id: string;
+  name: string;
+  license_plate: string;
+  rental_cost: number;
+  total_capacity: number;
+  seat_map_image_url: string | null;
+}
+
 interface Tour {
   id?: string;
   title: string;
@@ -50,8 +59,9 @@ interface Tour {
   duration: string;
   includes: string[];
   itinerary: { day: number; activity: string }[];
-  bus_capacity: number;
-  bus_cost: number;
+  bus_id: string | null; // NEW: Link to Bus
+  bus_capacity: number; // Now derived from selected bus
+  bus_cost: number; // Now derived from selected bus
   courtesies: number;
   hotel_details: TourHotelDetail[]; // Updated type
   provider_details: { name: string; service: string; cost: number }[];
@@ -77,6 +87,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     duration: '',
     includes: [],
     itinerary: [],
+    bus_id: null, // Initialize bus_id
     bus_capacity: 0,
     bus_cost: 0,
     courtesies: 0,
@@ -90,6 +101,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
   const [availableHotelQuotes, setAvailableHotelQuotes] = useState<HotelQuote[]>([]);
+  const [availableBuses, setAvailableBuses] = useState<Bus[]>([]); // NEW: State for available buses
 
   // Fetch available hotel quotes
   useEffect(() => {
@@ -101,13 +113,31 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
         .order('name', { ascending: true });
 
       if (error) {
-        console.error('Error fetching available hotel quotes:', error);
+        console.error('Error al cargar cotizaciones de hoteles disponibles:', error);
         toast.error('Error al cargar la lista de cotizaciones de hoteles disponibles.');
       } else {
         setAvailableHotelQuotes(data || []);
       }
     };
     fetchAvailableHotelQuotes();
+  }, []);
+
+  // NEW: Fetch available buses
+  useEffect(() => {
+    const fetchAvailableBuses = async () => {
+      const { data, error } = await supabase
+        .from('buses')
+        .select('*')
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error('Error al cargar autobuses disponibles:', error);
+        toast.error('Error al cargar la lista de autobuses disponibles.');
+      } else {
+        setAvailableBuses(data || []);
+      }
+    };
+    fetchAvailableBuses();
   }, []);
 
   useEffect(() => {
@@ -121,7 +151,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           .single();
 
         if (error) {
-          console.error('Error fetching tour for editing:', error);
+          console.error('Error al obtener tour para editar:', error);
           toast.error('Error al cargar los datos del tour para editar.');
           setLoadingInitialData(false);
           return;
@@ -134,6 +164,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             itinerary: data.itinerary || [],
             hotel_details: data.hotel_details || [],
             provider_details: data.provider_details || [],
+            bus_id: data.bus_id || null, // Ensure bus_id is set
           });
           setImageUrlPreview(data.image_url);
         }
@@ -148,6 +179,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           duration: '',
           includes: [],
           itinerary: [],
+          bus_id: null,
           bus_capacity: 0,
           bus_cost: 0,
           courtesies: 0,
@@ -262,7 +294,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     setIsUploadingImage(false);
 
     if (error) {
-      console.error('Error uploading image:', error);
+      console.error('Error al subir la imagen:', error);
       toast.error('Error al subir la imagen.');
       return null;
     }
@@ -377,6 +409,17 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     });
   };
 
+  // NEW: Handle bus selection
+  const handleBusSelect = (busId: string) => {
+    const selectedBus = availableBuses.find(bus => bus.id === busId);
+    setFormData(prev => ({
+      ...prev,
+      bus_id: busId,
+      bus_capacity: selectedBus?.total_capacity || 0,
+      bus_cost: selectedBus?.rental_cost || 0,
+    }));
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -392,6 +435,12 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       finalImageUrl = uploadedUrl;
     } else if (!formData.image_url && !tourId) { // Only require image for new tours if not already present
       toast.error('Por favor, sube una imagen de portada.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (!formData.bus_id) {
+      toast.error('Por favor, selecciona un autobús para el tour.');
       setIsSubmitting(false);
       return;
     }
@@ -438,7 +487,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
         .eq('id', tourId);
 
       if (error) {
-        console.error('Error updating tour:', error);
+        console.error('Error al actualizar el tour:', error);
         toast.error('Error al actualizar el tour.');
       } else {
         toast.success('Tour actualizado con éxito.');
@@ -451,7 +500,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
         .insert(tourDataToSave);
 
       if (error) {
-        console.error('Error creating tour:', error);
+        console.error('Error al crear el tour:', error);
         toast.error('Error al crear el tour.');
       } else {
         toast.success('Tour creado con éxito.');
@@ -552,15 +601,30 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           </Button>
         </div>
 
-        {/* Cost & Capacity Details */}
-        <h3 className="text-xl font-semibold col-span-full mt-4">Detalles de Costos y Capacidad</h3>
+        {/* Bus Details */}
+        <h3 className="text-xl font-semibold col-span-full mt-4">Detalles del Autobús</h3>
+        <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
+          <Label htmlFor="bus_id" className="md:text-right">Seleccionar Autobús</Label>
+          <Select value={formData.bus_id || ''} onValueChange={handleBusSelect}>
+            <SelectTrigger className="md:col-span-3">
+              <SelectValue placeholder="Seleccionar un autobús" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableBuses.map((bus) => (
+                <SelectItem key={bus.id} value={bus.id}>
+                  {bus.name} (Capacidad: {bus.total_capacity}, Costo: ${bus.rental_cost.toFixed(2)})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
         <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
           <Label htmlFor="bus_capacity" className="md:text-right">Capacidad Autobús</Label>
-          <Input id="bus_capacity" type="number" value={formData.bus_capacity} onChange={(e) => handleNumberChange('bus_capacity', e.target.value)} className="md:col-span-3" required min={1} />
+          <Input id="bus_capacity" type="number" value={formData.bus_capacity} readOnly className="md:col-span-3 bg-gray-100 cursor-not-allowed" title="Derivado del autobús seleccionado" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
           <Label htmlFor="bus_cost" className="md:text-right">Costo Autobús</Label>
-          <Input id="bus_cost" type="number" value={formData.bus_cost} onChange={(e) => handleNumberChange('bus_cost', e.target.value)} className="md:col-span-3" required min={0} step="0.01" />
+          <Input id="bus_cost" type="number" value={formData.bus_cost} readOnly className="md:col-span-3 bg-gray-100 cursor-not-allowed" title="Derivado del autobús seleccionado" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
           <Label htmlFor="courtesies" className="md:text-right">Cortesías</Label>

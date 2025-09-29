@@ -24,9 +24,9 @@ const navItems: NavItem[] = [
     children: [
       { href: '/admin/tours', icon: Package, label: 'Tours' },
       { href: '/admin/hotels', icon: Hotel, label: 'Hoteles' },
+      { href: '/admin/buses', icon: Bus, label: 'Autobuses' }, // Added Buses here
       { href: '/admin/providers', icon: Truck, label: 'Proveedores' },
       { href: '/admin/clients', icon: UserRound, label: 'Clientes' },
-      { href: '/admin/buses', icon: Bus, label: 'Autobuses' },
     ],
   },
   { href: '/admin/blog', icon: Newspaper, label: 'Blog' },

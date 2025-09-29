@@ -28,7 +28,7 @@ import AdminClientsPage from "./pages/AdminClientsPage";
 import AdminBusesPage from "./pages/AdminBusesPage";
 import AdminToursPage from "./pages/AdminToursPage";
 import AdminTourFormPage from "./pages/AdminTourFormPage";
-import AdminHotelFormPage from "./pages/AdminHotelFormPage"; // Import the new Hotel Form Page
+import AdminHotelFormPage from "./pages/AdminHotelFormPage";
 
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -117,6 +117,15 @@ const App = () => {
                 }
               />
               <Route
+                path="/admin/buses"
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminBusesPage />
+                  </ProtectedRoute>
+                }
+              />
+              {/* No need for /admin/buses/new and /admin/buses/edit/:id as they are handled by the dialog in AdminBusesPage */}
+              <Route
                 path="/admin/providers"
                 element={
                   <ProtectedRoute adminOnly>
@@ -129,14 +138,6 @@ const App = () => {
                 element={
                   <ProtectedRoute adminOnly>
                     <AdminClientsPage />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/admin/buses"
-                element={
-                  <ProtectedRoute adminOnly>
-                    <AdminBusesPage />
                   </ProtectedRoute>
                 }
               />
