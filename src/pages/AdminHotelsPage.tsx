@@ -10,12 +10,15 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import HotelFormDialog from '@/components/admin/hotels/HotelFormDialog'; // Import the new dialog
+import HotelFormDialog from '@/components/admin/hotels/HotelFormDialog';
+import { format } from 'date-fns';
 
 interface Hotel {
   id: string;
   name: string;
   location: string;
+  quoted_date: string | null;
+  num_nights_quoted: number;
   cost_per_night_double: number;
   cost_per_night_triple: number;
   cost_per_night_quad: number;
@@ -23,7 +26,12 @@ interface Hotel {
   capacity_triple: number;
   capacity_quad: number;
   is_active: boolean;
+  advance_payment: number;
+  total_paid: number;
   created_at: string;
+  // Calculated fields for display
+  total_quote_cost_double: number;
+  remaining_payment_double: number;
 }
 
 const AdminHotelsPage = () => {
@@ -47,13 +55,18 @@ const AdminHotelsPage = () => {
     const { data, error } = await supabase
       .from('hotels')
       .select('*')
-      .order('name', { ascending: true });
+      .order('quoted_date', { ascending: false }); // Order by quoted date
 
     if (error) {
       console.error('Error fetching hotels:', error);
-      toast.error('Error al cargar los hoteles.');
+      toast.error('Error al cargar las cotizaciones de hoteles.');
     } else {
-      setHotels(data || []);
+      const hotelsWithCalculatedFields = (data || []).map(hotel => ({
+        ...hotel,
+        total_quote_cost_double: hotel.cost_per_night_double * hotel.num_nights_quoted,
+        remaining_payment_double: (hotel.cost_per_night_double * hotel.num_nights_quoted) - hotel.total_paid,
+      }));
+      setHotels(hotelsWithCalculatedFields);
     }
     setLoading(false);
   };
@@ -69,7 +82,7 @@ const AdminHotelsPage = () => {
   };
 
   const handleDeleteHotel = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar este hotel?')) {
+    if (!window.confirm('¿Estás seguro de que quieres eliminar esta cotización de hotel?')) {
       return;
     }
     setLoading(true);
@@ -79,10 +92,10 @@ const AdminHotelsPage = () => {
       .eq('id', id);
 
     if (error) {
-      console.error('Error deleting hotel:', error);
-      toast.error('Error al eliminar el hotel.');
+      console.error('Error deleting hotel quote:', error);
+      toast.error('Error al eliminar la cotización del hotel.');
     } else {
-      toast.success('Hotel eliminado con éxito.');
+      toast.success('Cotización de hotel eliminada con éxito.');
       fetchHotels(); // Refresh the list
     }
     setLoading(false);
@@ -92,7 +105,7 @@ const AdminHotelsPage = () => {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <Loader2 className="h-12 w-12 animate-spin text-rosa-mexicano" />
-        <p className="ml-4 text-gray-700">Cargando...</p>
+        <p className="ml-4 text-gray-700">Cargando cotizaciones de hoteles...</p>
       </div>
     );
   }
@@ -101,26 +114,29 @@ const AdminHotelsPage = () => {
     <div className="flex min-h-screen bg-gray-100">
       <AdminSidebar />
       <div className="flex flex-col flex-grow">
-        <AdminHeader pageTitle="Gestión de Hoteles">
+        <AdminHeader pageTitle="Gestión de Cotizaciones de Hoteles">
           <Button onClick={handleAddHotel} className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white">
-            <PlusCircle className="mr-2 h-4 w-4" /> Añadir Hotel
+            <PlusCircle className="mr-2 h-4 w-4" /> Añadir Cotización
           </Button>
         </AdminHeader>
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Hoteles Registrados</h2>
+            <h2 className="text-xl font-semibold mb-4">Cotizaciones de Hoteles Registradas</h2>
             {hotels.length === 0 ? (
-              <p className="text-gray-600">No hay hoteles registrados.</p>
+              <p className="text-gray-600">No hay cotizaciones de hoteles registradas.</p>
             ) : (
               <div className="overflow-x-auto">
                 <Table>
                   <TableHeader>
                     <TableRow>
-                      <TableHead>Nombre</TableHead>
+                      <TableHead>Hotel</TableHead>
                       <TableHead>Ubicación</TableHead>
-                      <TableHead>Costo Doble</TableHead>
-                      <TableHead>Costo Triple</TableHead>
-                      <TableHead>Costo Cuádruple</TableHead>
+                      <TableHead>Fecha Cotizada</TableHead>
+                      <TableHead>Noches</TableHead>
+                      <TableHead>Costo Doble/Noche</TableHead>
+                      <TableHead>Anticipo</TableHead>
+                      <TableHead>Total Pagado</TableHead>
+                      <TableHead>Pago Restante (Doble)</TableHead>
                       <TableHead>Activo</TableHead>
                       <TableHead>Acciones</TableHead>
                     </TableRow>
@@ -130,9 +146,12 @@ const AdminHotelsPage = () => {
                       <TableRow key={hotel.id}>
                         <TableCell className="font-medium">{hotel.name}</TableCell>
                         <TableCell>{hotel.location}</TableCell>
+                        <TableCell>{hotel.quoted_date ? format(new Date(hotel.quoted_date), 'PPP') : 'N/A'}</TableCell>
+                        <TableCell>{hotel.num_nights_quoted}</TableCell>
                         <TableCell>${hotel.cost_per_night_double.toFixed(2)}</TableCell>
-                        <TableCell>${hotel.cost_per_night_triple.toFixed(2)}</TableCell>
-                        <TableCell>${hotel.cost_per_night_quad.toFixed(2)}</TableCell>
+                        <TableCell>${hotel.advance_payment.toFixed(2)}</TableCell>
+                        <TableCell>${hotel.total_paid.toFixed(2)}</TableCell>
+                        <TableCell>${hotel.remaining_payment_double.toFixed(2)}</TableCell>
                         <TableCell>{hotel.is_active ? 'Sí' : 'No'}</TableCell>
                         <TableCell className="flex space-x-2">
                           <Button

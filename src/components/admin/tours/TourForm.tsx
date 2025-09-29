@@ -7,17 +7,18 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon } from 'lucide-react';
+import { Loader2, Save, PlusCircle, MinusCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { format } from 'date-fns';
-import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
+import { format } from 'date-fns'; // Import format for dates
 
-interface HotelOption {
+// Hotel interface now represents a "hotel quote" from the 'hotels' table
+interface HotelQuote {
   id: string;
-  name: string;
+  name: string; // Hotel name
+  location: string;
+  quoted_date: string | null;
+  num_nights_quoted: number;
   cost_per_night_double: number;
   cost_per_night_triple: number;
   cost_per_night_quad: number;
@@ -25,21 +26,15 @@ interface HotelOption {
   capacity_triple: number;
   capacity_quad: number;
   is_active: boolean;
+  advance_payment: number;
+  total_paid: number;
 }
 
+// TourHotelDetail now references a hotel quote and specifies room type for THIS tour
 interface TourHotelDetail {
   id: string; // Unique ID for this entry in the tour's hotel_details array
-  hotel_id: string;
-  hotel_name: string; // For display purposes
+  hotel_quote_id: string; // References an ID from the 'hotels' table (which are now quotes)
   room_type: 'double' | 'triple' | 'quad';
-  num_nights: number;
-  cost_per_person_calculated: number; // Calculated cost per person for this hotel entry
-  check_in_date: string | null; // YYYY-MM-DD
-  check_out_date: string | null; // YYYY-MM-DD
-  total_hotel_cost: number; // Total cost for this specific hotel booking (cost_per_night * num_nights * capacity)
-  advance_payment_to_hotel: number;
-  total_paid_to_hotel: number;
-  remaining_payment_to_hotel: number;
 }
 
 interface Tour {
@@ -91,25 +86,25 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
-  const [availableHotels, setAvailableHotels] = useState<HotelOption[]>([]);
+  const [availableHotelQuotes, setAvailableHotelQuotes] = useState<HotelQuote[]>([]);
 
-  // Fetch available hotels
+  // Fetch available hotel quotes
   useEffect(() => {
-    const fetchAvailableHotels = async () => {
+    const fetchAvailableHotelQuotes = async () => {
       const { data, error } = await supabase
-        .from('hotels')
+        .from('hotels') // 'hotels' table now stores quotes
         .select('*')
         .eq('is_active', true)
         .order('name', { ascending: true });
 
       if (error) {
-        console.error('Error fetching available hotels:', error);
-        toast.error('Error al cargar la lista de hoteles disponibles.');
+        console.error('Error fetching available hotel quotes:', error);
+        toast.error('Error al cargar la lista de cotizaciones de hoteles disponibles.');
       } else {
-        setAvailableHotels(data || []);
+        setAvailableHotelQuotes(data || []);
       }
     };
-    fetchAvailableHotels();
+    fetchAvailableHotelQuotes();
   }, []);
 
   useEffect(() => {
@@ -170,41 +165,36 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     const totalProviderCost = formData.provider_details.reduce((sum, provider) => sum + provider.cost, 0);
     
     let totalHotelCostPerPerson = 0;
-    const updatedHotelDetails = formData.hotel_details.map(hotelDetail => {
-      const hotel = availableHotels.find(h => h.id === hotelDetail.hotel_id);
-      if (!hotel) return hotelDetail;
+    formData.hotel_details.forEach(tourHotelDetail => {
+      const hotelQuote = availableHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
+      if (!hotelQuote) return;
 
       let costPerNight = 0;
       let capacity = 0;
 
-      switch (hotelDetail.room_type) {
+      switch (tourHotelDetail.room_type) {
         case 'double':
-          costPerNight = hotel.cost_per_night_double;
-          capacity = hotel.capacity_double;
+          costPerNight = hotelQuote.cost_per_night_double;
+          capacity = hotelQuote.capacity_double;
           break;
         case 'triple':
-          costPerNight = hotel.cost_per_night_triple;
-          capacity = hotel.capacity_triple;
+          costPerNight = hotelQuote.cost_per_night_triple;
+          capacity = hotelQuote.capacity_triple;
           break;
         case 'quad':
-          costPerNight = hotel.cost_per_night_quad;
-          capacity = hotel.capacity_quad;
+          costPerNight = hotelQuote.cost_per_night_quad;
+          capacity = hotelQuote.capacity_quad;
           break;
         default:
           break;
       }
 
-      const totalHotelBookingCost = costPerNight * hotelDetail.num_nights;
-      const costPerPersonForThisHotel = capacity > 0 ? totalHotelBookingCost / capacity : 0;
+      if (capacity === 0) return; // Avoid division by zero
+
+      const totalHotelBookingCost = costPerNight * hotelQuote.num_nights_quoted;
+      const costPerPersonForThisHotel = totalHotelBookingCost / capacity;
       
       totalHotelCostPerPerson += costPerPersonForThisHotel;
-
-      return {
-        ...hotelDetail,
-        cost_per_person_calculated: costPerPersonForThisHotel,
-        total_hotel_cost: totalHotelBookingCost,
-        remaining_payment_to_hotel: totalHotelBookingCost - hotelDetail.total_paid_to_hotel,
-      };
     });
 
     const totalBaseCost = formData.bus_cost + totalProviderCost + totalHotelCostPerPerson;
@@ -214,12 +204,11 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
 
     setFormData((prev) => ({
       ...prev,
-      hotel_details: updatedHotelDetails, // Update with calculated costs
       total_base_cost: totalBaseCost,
       paying_clients_count: payingClientsCount,
       cost_per_paying_person: costPerPayingPerson,
     }));
-  }, [formData.bus_capacity, formData.bus_cost, formData.courtesies, formData.provider_details, formData.hotel_details, availableHotels]);
+  }, [formData.bus_capacity, formData.bus_cost, formData.courtesies, formData.provider_details, formData.hotel_details, availableHotelQuotes]);
 
   useEffect(() => {
     calculateCosts();
@@ -343,27 +332,10 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     });
   };
 
-  const handleTourHotelChange = (index: number, field: keyof TourHotelDetail, value: string | number | Date | null) => {
+  const handleTourHotelChange = (index: number, field: keyof TourHotelDetail, value: string) => {
     setFormData((prev) => {
       const newHotelDetails = [...prev.hotel_details];
-      const currentDetail = newHotelDetails[index];
-
-      if (field === 'hotel_id') {
-        const selectedHotel = availableHotels.find(h => h.id === value);
-        newHotelDetails[index] = {
-          ...currentDetail,
-          hotel_id: value as string,
-          hotel_name: selectedHotel?.name || '',
-        };
-      } else if (field === 'num_nights') {
-        newHotelDetails[index] = { ...currentDetail, num_nights: value as number };
-      } else if (field === 'room_type') {
-        newHotelDetails[index] = { ...currentDetail, room_type: value as 'double' | 'triple' | 'quad' };
-      } else if (field === 'check_in_date' || field === 'check_out_date') {
-        newHotelDetails[index] = { ...currentDetail, [field]: value ? format(value as Date, 'yyyy-MM-dd') : null };
-      } else if (field === 'advance_payment_to_hotel' || field === 'total_paid_to_hotel') {
-        newHotelDetails[index] = { ...currentDetail, [field]: parseFloat(value as string) || 0 };
-      }
+      newHotelDetails[index] = { ...newHotelDetails[index], [field]: value };
       return { ...prev, hotel_details: newHotelDetails };
     });
   };
@@ -373,17 +345,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       ...prev,
       hotel_details: [...prev.hotel_details, {
         id: uuidv4(), // Unique ID for this entry
-        hotel_id: '',
-        hotel_name: '',
+        hotel_quote_id: '',
         room_type: 'double',
-        num_nights: 1,
-        cost_per_person_calculated: 0,
-        check_in_date: null,
-        check_out_date: null,
-        total_hotel_cost: 0,
-        advance_payment_to_hotel: 0,
-        total_paid_to_hotel: 0,
-        remaining_payment_to_hotel: 0,
       }],
     }));
   };
@@ -612,154 +575,53 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           <Input id="courtesies" type="number" value={formData.courtesies} onChange={(e) => handleNumberChange('courtesies', e.target.value)} className="md:col-span-3" required min={0} />
         </div>
 
-        {/* Hotel Details */}
+        {/* Hotel Details (now linking to quotes) */}
         <div className="space-y-2 col-span-full">
-          <Label className="text-lg font-semibold">Hoteles Vinculados</Label>
-          {formData.hotel_details.map((hotelDetail, index) => (
-            <div key={hotelDetail.id} className="flex flex-col gap-2 border p-4 rounded-md mb-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="col-span-full md:col-span-1">
-                  <Label>Hotel</Label>
-                  <Select
-                    value={hotelDetail.hotel_id}
-                    onValueChange={(value) => handleTourHotelChange(index, 'hotel_id', value)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Seleccionar Hotel" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {availableHotels.map((hotel) => (
-                        <SelectItem key={hotel.id} value={hotel.id}>
-                          {hotel.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="col-span-full md:col-span-1">
-                  <Label>Tipo Habitación</Label>
-                  <Select
-                    value={hotelDetail.room_type}
-                    onValueChange={(value) => handleTourHotelChange(index, 'room_type', value)}
-                  >
-                    <SelectTrigger className="w-full">
-                      <SelectValue placeholder="Tipo Habitación" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="double">Doble (x2)</SelectItem>
-                      <SelectItem value="triple">Triple (x3)</SelectItem>
-                      <SelectItem value="quad">Cuádruple (x4)</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="col-span-full md:col-span-1">
-                  <Label htmlFor={`num_nights-${hotelDetail.id}`}>Noches</Label>
-                  <Input
-                    id={`num_nights-${hotelDetail.id}`}
-                    type="number"
-                    value={hotelDetail.num_nights}
-                    onChange={(e) => handleTourHotelChange(index, 'num_nights', parseFloat(e.target.value) || 0)}
-                    placeholder="Noches"
-                    min={1}
-                  />
-                </div>
-                <div className="col-span-full md:col-span-1 flex items-center justify-end">
-                  <Button type="button" variant="destructive" size="icon" onClick={() => removeTourHotelItem(hotelDetail.id)}>
-                    <MinusCircle className="h-4 w-4" />
-                  </Button>
-                </div>
-              </div>
+          <Label className="text-lg font-semibold">Cotizaciones de Hoteles Vinculadas</Label>
+          {formData.hotel_details.map((tourHotelDetail, index) => {
+            const selectedQuote = availableHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
+            const quoteDisplay = selectedQuote
+              ? `${selectedQuote.name} (${selectedQuote.location}) - ${selectedQuote.num_nights_quoted} Noches - ${selectedQuote.quoted_date ? format(new Date(selectedQuote.quoted_date), 'PPP') : 'Fecha N/A'}`
+              : 'Seleccionar Cotización';
 
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mt-2">
-                <div className="col-span-full md:col-span-1">
-                  <Label>Fecha Check-in</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !hotelDetail.check_in_date && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {hotelDetail.check_in_date ? format(new Date(hotelDetail.check_in_date), "PPP") : <span>Seleccionar fecha</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={hotelDetail.check_in_date ? new Date(hotelDetail.check_in_date) : undefined}
-                        onSelect={(date) => handleTourHotelChange(index, 'check_in_date', date)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="col-span-full md:col-span-1">
-                  <Label>Fecha Check-out</Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant={"outline"}
-                        className={cn(
-                          "w-full justify-start text-left font-normal",
-                          !hotelDetail.check_out_date && "text-muted-foreground"
-                        )}
-                      >
-                        <CalendarIcon className="mr-2 h-4 w-4" />
-                        {hotelDetail.check_out_date ? format(new Date(hotelDetail.check_out_date), "PPP") : <span>Seleccionar fecha</span>}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0">
-                      <Calendar
-                        mode="single"
-                        selected={hotelDetail.check_out_date ? new Date(hotelDetail.check_out_date) : undefined}
-                        onSelect={(date) => handleTourHotelChange(index, 'check_out_date', date)}
-                        initialFocus
-                      />
-                    </PopoverContent>
-                  </Popover>
-                </div>
-                <div className="col-span-full md:col-span-1">
-                  <Label htmlFor={`advance_payment-${hotelDetail.id}`}>Anticipo al Hotel</Label>
-                  <Input
-                    id={`advance_payment-${hotelDetail.id}`}
-                    type="number"
-                    value={hotelDetail.advance_payment_to_hotel}
-                    onChange={(e) => handleTourHotelChange(index, 'advance_payment_to_hotel', e.target.value)}
-                    placeholder="Anticipo"
-                    min={0}
-                    step="0.01"
-                  />
-                </div>
-                <div className="col-span-full md:col-span-1">
-                  <Label htmlFor={`total_paid-${hotelDetail.id}`}>Total Pagado al Hotel</Label>
-                  <Input
-                    id={`total_paid-${hotelDetail.id}`}
-                    type="number"
-                    value={hotelDetail.total_paid_to_hotel}
-                    onChange={(e) => handleTourHotelChange(index, 'total_paid_to_hotel', e.target.value)}
-                    placeholder="Total Pagado"
-                    min={0}
-                    step="0.01"
-                  />
-                </div>
+            return (
+              <div key={tourHotelDetail.id} className="flex flex-col md:flex-row items-center gap-2 border p-2 rounded-md">
+                <Select
+                  value={tourHotelDetail.hotel_quote_id}
+                  onValueChange={(value) => handleTourHotelChange(index, 'hotel_quote_id', value)}
+                >
+                  <SelectTrigger className="w-full md:w-2/3">
+                    <SelectValue placeholder={quoteDisplay} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableHotelQuotes.map((quote) => (
+                      <SelectItem key={quote.id} value={quote.id}>
+                        {`${quote.name} (${quote.location}) - ${quote.num_nights_quoted} Noches - ${quote.quoted_date ? format(new Date(quote.quoted_date), 'PPP') : 'Fecha N/A'}`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select
+                  value={tourHotelDetail.room_type}
+                  onValueChange={(value) => handleTourHotelChange(index, 'room_type', value)}
+                >
+                  <SelectTrigger className="w-full md:w-1/4">
+                    <SelectValue placeholder="Tipo Habitación" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="double">Doble (x2)</SelectItem>
+                    <SelectItem value="triple">Triple (x3)</SelectItem>
+                    <SelectItem value="quad">Cuádruple (x4)</SelectItem>
+                  </SelectContent>
+                </Select>
+                <Button type="button" variant="destructive" size="icon" onClick={() => removeTourHotelItem(tourHotelDetail.id)}>
+                  <MinusCircle className="h-4 w-4" />
+                </Button>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-2">
-                <div>
-                  <Label className="font-semibold">Costo Total Hotel:</Label>
-                  <p>${hotelDetail.total_hotel_cost.toFixed(2)}</p>
-                </div>
-                <div>
-                  <Label className="font-semibold">Pago Restante Hotel:</Label>
-                  <p>${hotelDetail.remaining_payment_to_hotel.toFixed(2)}</p>
-                </div>
-              </div>
-            </div>
-          ))}
+            );
+          })}
           <Button type="button" variant="outline" onClick={addTourHotelItem}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Añadir Hotel al Tour
+            <PlusCircle className="mr-2 h-4 w-4" /> Añadir Cotización de Hotel
           </Button>
         </div>
 

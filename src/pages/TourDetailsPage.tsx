@@ -9,19 +9,29 @@ import Footer from '@/components/Footer';
 import { supabase } from '@/integrations/supabase/client'; // Import supabase client
 import { format } from 'date-fns'; // Import format for dates
 
-interface TourHotelDetail {
+// Hotel interface now represents a "hotel quote" from the 'hotels' table
+interface HotelQuote {
   id: string;
-  hotel_id: string;
-  hotel_name: string;
+  name: string; // Hotel name
+  location: string;
+  quoted_date: string | null;
+  num_nights_quoted: number;
+  cost_per_night_double: number;
+  cost_per_night_triple: number;
+  cost_per_night_quad: number;
+  capacity_double: number;
+  capacity_triple: number;
+  capacity_quad: number;
+  is_active: boolean;
+  advance_payment: number;
+  total_paid: number;
+}
+
+// TourHotelDetail now references a hotel quote and specifies room type for THIS tour
+interface TourHotelDetail {
+  id: string; // Unique ID for this entry in the tour's hotel_details array
+  hotel_quote_id: string; // References an ID from the 'hotels' table (which are now quotes)
   room_type: 'double' | 'triple' | 'quad';
-  num_nights: number;
-  cost_per_person_calculated: number;
-  check_in_date: string | null;
-  check_out_date: string | null;
-  total_hotel_cost: number;
-  advance_payment_to_hotel: number;
-  total_paid_to_hotel: number;
-  remaining_payment_to_hotel: number;
 }
 
 interface Tour {
@@ -46,28 +56,48 @@ const TourDetailsPage = () => {
   const [tour, setTour] = useState<Tour | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hotelQuotesMap, setHotelQuotesMap] = useState<Map<string, HotelQuote>>(new Map());
 
   useEffect(() => {
-    const fetchTourDetails = async () => {
+    const fetchTourDetailsAndHotelQuotes = async () => {
       setLoading(true);
       setError(null);
-      const { data, error } = await supabase
+
+      // Fetch all active hotel quotes first
+      const { data: hotelQuotesData, error: hotelQuotesError } = await supabase
+        .from('hotels')
+        .select('*')
+        .eq('is_active', true);
+
+      if (hotelQuotesError) {
+        console.error('Error fetching hotel quotes:', hotelQuotesError);
+        setError('Error al cargar las cotizaciones de hoteles.');
+        setLoading(false);
+        return;
+      }
+
+      const quotesMap = new Map<string, HotelQuote>();
+      hotelQuotesData?.forEach(quote => quotesMap.set(quote.id, quote));
+      setHotelQuotesMap(quotesMap);
+
+      // Then fetch tour details
+      const { data: tourData, error: tourError } = await supabase
         .from('tours')
         .select('*') // Select all columns
         .eq('slug', id) // Fetch by slug
         .single();
 
-      if (error) {
-        console.error('Error fetching tour details:', error);
+      if (tourError) {
+        console.error('Error fetching tour details:', tourError);
         setError('No se pudo cargar los detalles del tour.');
         setTour(null);
-      } else if (data) {
+      } else if (tourData) {
         setTour({
-          ...data,
-          includes: data.includes || [],
-          itinerary: data.itinerary || [],
-          hotel_details: data.hotel_details || [],
-          provider_details: data.provider_details || [],
+          ...tourData,
+          includes: tourData.includes || [],
+          itinerary: tourData.itinerary || [],
+          hotel_details: tourData.hotel_details || [],
+          provider_details: tourData.provider_details || [],
         });
       } else {
         setError('Tour no encontrado.');
@@ -77,7 +107,7 @@ const TourDetailsPage = () => {
     };
 
     if (id) {
-      fetchTourDetails();
+      fetchTourDetailsAndHotelQuotes();
     }
   }, [id]);
 
@@ -181,21 +211,47 @@ const TourDetailsPage = () => {
                 <>
                   <h3 className="text-xl font-semibold text-gray-800 mt-8 mb-3">Hoteles Asociados</h3>
                   <div className="space-y-4">
-                    {tour.hotel_details.map((hotel, index) => (
-                      <div key={hotel.id} className="border p-4 rounded-md bg-gray-50">
-                        <p className="font-semibold text-lg mb-1">{hotel.hotel_name} ({hotel.room_type.charAt(0).toUpperCase() + hotel.room_type.slice(1)})</p>
-                        <ul className="text-gray-700 text-sm space-y-1">
-                          <li><span className="font-medium">Noches:</span> {hotel.num_nights}</li>
-                          {hotel.check_in_date && <li><span className="font-medium">Check-in:</span> {format(new Date(hotel.check_in_date), 'PPP')}</li>}
-                          {hotel.check_out_date && <li><span className="font-medium">Check-out:</span> {format(new Date(hotel.check_out_date), 'PPP')}</li>}
-                          <li><span className="font-medium">Costo por persona (calculado):</span> ${hotel.cost_per_person_calculated.toFixed(2)}</li>
-                          <li><span className="font-medium">Costo total de reserva:</span> ${hotel.total_hotel_cost.toFixed(2)}</li>
-                          <li><span className="font-medium">Anticipo al hotel:</span> ${hotel.advance_payment_to_hotel.toFixed(2)}</li>
-                          <li><span className="font-medium">Total pagado al hotel:</span> ${hotel.total_paid_to_hotel.toFixed(2)}</li>
-                          <li><span className="font-medium">Pago restante al hotel:</span> ${hotel.remaining_payment_to_hotel.toFixed(2)}</li>
-                        </ul>
-                      </div>
-                    ))}
+                    {tour.hotel_details.map((tourHotelDetail) => {
+                      const hotelQuote = hotelQuotesMap.get(tourHotelDetail.hotel_quote_id);
+                      if (!hotelQuote) return null; // Skip if quote not found
+
+                      let costPerNight = 0;
+                      let capacity = 0;
+                      switch (tourHotelDetail.room_type) {
+                        case 'double':
+                          costPerNight = hotelQuote.cost_per_night_double;
+                          capacity = hotelQuote.capacity_double;
+                          break;
+                        case 'triple':
+                          costPerNight = hotelQuote.cost_per_night_triple;
+                          capacity = hotelQuote.capacity_triple;
+                          break;
+                        case 'quad':
+                          costPerNight = hotelQuote.cost_per_night_quad;
+                          capacity = hotelQuote.capacity_quad;
+                          break;
+                      }
+                      const totalHotelBookingCost = costPerNight * hotelQuote.num_nights_quoted;
+                      const costPerPersonCalculated = capacity > 0 ? totalHotelBookingCost / capacity : 0;
+                      const remainingPayment = totalHotelBookingCost - hotelQuote.total_paid;
+
+                      return (
+                        <div key={tourHotelDetail.id} className="border p-4 rounded-md bg-gray-50">
+                          <p className="font-semibold text-lg mb-1">
+                            {hotelQuote.name} ({hotelQuote.location}) - Tipo de Habitación: {tourHotelDetail.room_type.charAt(0).toUpperCase() + tourHotelDetail.room_type.slice(1)}
+                          </p>
+                          <ul className="text-gray-700 text-sm space-y-1">
+                            <li><span className="font-medium">Fecha Cotizada:</span> {hotelQuote.quoted_date ? format(new Date(hotelQuote.quoted_date), 'PPP') : 'N/A'}</li>
+                            <li><span className="font-medium">Noches Cotizadas:</span> {hotelQuote.num_nights_quoted}</li>
+                            <li><span className="font-medium">Costo por persona (calculado para este tour):</span> ${costPerPersonCalculated.toFixed(2)}</li>
+                            <li><span className="font-medium">Costo total de la cotización:</span> ${totalHotelBookingCost.toFixed(2)}</li>
+                            <li><span className="font-medium">Anticipo al hotel:</span> ${hotelQuote.advance_payment.toFixed(2)}</li>
+                            <li><span className="font-medium">Total pagado al hotel:</span> ${hotelQuote.total_paid.toFixed(2)}</li>
+                            <li><span className="font-medium">Pago restante al hotel:</span> ${remainingPayment.toFixed(2)}</li>
+                          </ul>
+                        </div>
+                      );
+                    })}
                   </div>
                 </>
               )}

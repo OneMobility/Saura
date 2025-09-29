@@ -1,0 +1,5 @@
+ALTER TABLE public.hotels
+ADD COLUMN quoted_date DATE,
+ADD COLUMN num_nights_quoted INTEGER DEFAULT 1,
+ADD COLUMN advance_payment NUMERIC DEFAULT 0,
+ADD COLUMN total_paid NUMERIC DEFAULT 0;

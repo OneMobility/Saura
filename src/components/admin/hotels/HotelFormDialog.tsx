@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,12 +8,18 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, CalendarIcon } from 'lucide-react';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
 
 interface Hotel {
   id?: string;
   name: string;
   location: string;
+  quoted_date: string | null; // NEW: Date for this specific quote
+  num_nights_quoted: number; // NEW: Number of nights for this quote
   cost_per_night_double: number;
   cost_per_night_triple: number;
   cost_per_night_quad: number;
@@ -21,6 +27,11 @@ interface Hotel {
   capacity_triple: number;
   capacity_quad: number;
   is_active: boolean;
+  advance_payment: number; // NEW
+  total_paid: number; // NEW
+  // calculated fields
+  total_quote_cost: number; // Calculated total cost for this quote (e.g., for double room)
+  remaining_payment: number; // Calculated remaining payment
 }
 
 interface HotelFormDialogProps {
@@ -34,23 +45,47 @@ const HotelFormDialog: React.FC<HotelFormDialogProps> = ({ isOpen, onClose, onSa
   const [formData, setFormData] = useState<Hotel>({
     name: '',
     location: '',
+    quoted_date: null,
+    num_nights_quoted: 1,
     cost_per_night_double: 0,
     cost_per_night_triple: 0,
     cost_per_night_quad: 0,
-    capacity_double: 2, // Fixed capacity
-    capacity_triple: 3, // Fixed capacity
-    capacity_quad: 4,   // Fixed capacity
+    capacity_double: 2,
+    capacity_triple: 3,
+    capacity_quad: 4,
     is_active: true,
+    advance_payment: 0,
+    total_paid: 0,
+    total_quote_cost: 0, // Initial calculated value
+    remaining_payment: 0, // Initial calculated value
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  const calculateQuoteCosts = useCallback(() => {
+    // For simplicity, let's calculate total_quote_cost based on double room for display in the form.
+    // The actual cost for a tour will depend on the room type chosen.
+    const totalCost = formData.cost_per_night_double * formData.num_nights_quoted;
+    const remaining = totalCost - formData.total_paid;
+    setFormData(prev => ({
+      ...prev,
+      total_quote_cost: totalCost,
+      remaining_payment: remaining,
+    }));
+  }, [formData.cost_per_night_double, formData.num_nights_quoted, formData.total_paid]);
+
   useEffect(() => {
     if (initialData) {
-      setFormData(initialData);
+      setFormData({
+        ...initialData,
+        total_quote_cost: initialData.cost_per_night_double * initialData.num_nights_quoted, // Calculate for initial data
+        remaining_payment: (initialData.cost_per_night_double * initialData.num_nights_quoted) - initialData.total_paid,
+      });
     } else {
       setFormData({
         name: '',
         location: '',
+        quoted_date: null,
+        num_nights_quoted: 1,
         cost_per_night_double: 0,
         cost_per_night_triple: 0,
         cost_per_night_quad: 0,
@@ -58,9 +93,18 @@ const HotelFormDialog: React.FC<HotelFormDialogProps> = ({ isOpen, onClose, onSa
         capacity_triple: 3,
         capacity_quad: 4,
         is_active: true,
+        advance_payment: 0,
+        total_paid: 0,
+        total_quote_cost: 0,
+        remaining_payment: 0,
       });
     }
   }, [initialData, isOpen]);
+
+  useEffect(() => {
+    calculateQuoteCosts();
+  }, [calculateQuoteCosts, formData.cost_per_night_double, formData.num_nights_quoted, formData.total_paid]);
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value, type } = e.target;
@@ -68,6 +112,10 @@ const HotelFormDialog: React.FC<HotelFormDialogProps> = ({ isOpen, onClose, onSa
       ...prev,
       [id]: type === 'number' ? parseFloat(value) : value,
     }));
+  };
+
+  const handleDateChange = (date: Date | undefined) => {
+    setFormData((prev) => ({ ...prev, quoted_date: date ? format(date, 'yyyy-MM-dd') : null }));
   };
 
   const handleSwitchChange = (checked: boolean) => {
@@ -78,8 +126,8 @@ const HotelFormDialog: React.FC<HotelFormDialogProps> = ({ isOpen, onClose, onSa
     e.preventDefault();
     setIsSubmitting(true);
 
-    if (!formData.name || !formData.location) {
-      toast.error('Por favor, rellena el nombre y la ubicación del hotel.');
+    if (!formData.name || !formData.location || !formData.quoted_date) {
+      toast.error('Por favor, rellena el nombre, la ubicación y la fecha cotizada del hotel.');
       setIsSubmitting(false);
       return;
     }
@@ -89,51 +137,62 @@ const HotelFormDialog: React.FC<HotelFormDialogProps> = ({ isOpen, onClose, onSa
       setIsSubmitting(false);
       return;
     }
+    if (formData.num_nights_quoted <= 0) {
+      toast.error('El número de noches debe ser mayor que 0.');
+      setIsSubmitting(false);
+      return;
+    }
+    if (formData.total_paid < formData.advance_payment) {
+      toast.error('El total pagado no puede ser menor que el anticipo.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    const dataToSave = {
+      name: formData.name,
+      location: formData.location,
+      quoted_date: formData.quoted_date,
+      num_nights_quoted: formData.num_nights_quoted,
+      cost_per_night_double: formData.cost_per_night_double,
+      cost_per_night_triple: formData.cost_per_night_triple,
+      cost_per_night_quad: formData.cost_per_night_quad,
+      capacity_double: formData.capacity_double,
+      capacity_triple: formData.capacity_triple,
+      capacity_quad: formData.capacity_quad,
+      is_active: formData.is_active,
+      advance_payment: formData.advance_payment,
+      total_paid: formData.total_paid,
+    };
 
     if (initialData?.id) {
-      // Update existing hotel
+      // Update existing hotel quote
       const { error } = await supabase
         .from('hotels')
         .update({
-          name: formData.name,
-          location: formData.location,
-          cost_per_night_double: formData.cost_per_night_double,
-          cost_per_night_triple: formData.cost_per_night_triple,
-          cost_per_night_quad: formData.cost_per_night_quad,
-          is_active: formData.is_active,
+          ...dataToSave,
           updated_at: new Date().toISOString(),
         })
         .eq('id', initialData.id);
 
       if (error) {
-        console.error('Error updating hotel:', error);
-        toast.error('Error al actualizar el hotel.');
+        console.error('Error updating hotel quote:', error);
+        toast.error('Error al actualizar la cotización del hotel.');
       } else {
-        toast.success('Hotel actualizado con éxito.');
+        toast.success('Cotización de hotel actualizada con éxito.');
         onSave();
         onClose();
       }
     } else {
-      // Insert new hotel
+      // Insert new hotel quote
       const { error } = await supabase
         .from('hotels')
-        .insert({
-          name: formData.name,
-          location: formData.location,
-          cost_per_night_double: formData.cost_per_night_double,
-          cost_per_night_triple: formData.cost_per_night_triple,
-          cost_per_night_quad: formData.cost_per_night_quad,
-          capacity_double: formData.capacity_double,
-          capacity_triple: formData.capacity_triple,
-          capacity_quad: formData.capacity_quad,
-          is_active: formData.is_active,
-        });
+        .insert(dataToSave);
 
       if (error) {
-        console.error('Error creating hotel:', error);
-        toast.error('Error al crear el hotel.');
+        console.error('Error creating hotel quote:', error);
+        toast.error('Error al crear la cotización del hotel.');
       } else {
-        toast.success('Hotel creado con éxito.');
+        toast.success('Cotización de hotel creada con éxito.');
         onSave();
         onClose();
       }
@@ -145,15 +204,15 @@ const HotelFormDialog: React.FC<HotelFormDialogProps> = ({ isOpen, onClose, onSa
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{initialData ? 'Editar Hotel' : 'Añadir Nuevo Hotel'}</DialogTitle>
+          <DialogTitle>{initialData ? 'Editar Cotización de Hotel' : 'Añadir Nueva Cotización de Hotel'}</DialogTitle>
           <DialogDescription>
-            {initialData ? 'Modifica los detalles del hotel.' : 'Rellena los campos para añadir un nuevo hotel.'}
+            {initialData ? 'Modifica los detalles de la cotización del hotel.' : 'Rellena los campos para añadir una nueva cotización de hotel.'}
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">
-              Nombre
+              Nombre Hotel
             </Label>
             <Input
               id="name"
@@ -176,7 +235,50 @@ const HotelFormDialog: React.FC<HotelFormDialogProps> = ({ isOpen, onClose, onSa
             />
           </div>
 
-          <h3 className="col-span-4 text-lg font-semibold mt-4">Costos por Noche y Capacidad</h3>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="quoted_date" className="text-right">
+              Fecha Cotizada
+            </Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "w-full justify-start text-left font-normal col-span-3",
+                    !formData.quoted_date && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {formData.quoted_date ? format(new Date(formData.quoted_date), "PPP") : <span>Seleccionar fecha</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={formData.quoted_date ? new Date(formData.quoted_date) : undefined}
+                  onSelect={handleDateChange}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="num_nights_quoted" className="text-right">
+              Noches Cotizadas
+            </Label>
+            <Input
+              id="num_nights_quoted"
+              type="number"
+              value={formData.num_nights_quoted}
+              onChange={handleChange}
+              className="col-span-3"
+              min={1}
+              required
+            />
+          </div>
+
+          <h3 className="col-span-4 text-lg font-semibold mt-4">Costos por Noche (Cotizados)</h3>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="cost_per_night_double" className="text-right">
               Costo Doble (x{formData.capacity_double})
@@ -239,10 +341,51 @@ const HotelFormDialog: React.FC<HotelFormDialogProps> = ({ isOpen, onClose, onSa
             </div>
           </div>
 
+          <h3 className="col-span-4 text-lg font-semibold mt-4">Gestión de Pagos</h3>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="advance_payment" className="text-right">
+              Anticipo Dado
+            </Label>
+            <Input
+              id="advance_payment"
+              type="number"
+              value={formData.advance_payment}
+              onChange={handleChange}
+              className="col-span-3"
+              min={0}
+              step="0.01"
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="total_paid" className="text-right">
+              Total Pagado
+            </Label>
+            <Input
+              id="total_paid"
+              type="number"
+              value={formData.total_paid}
+              onChange={handleChange}
+              className="col-span-3"
+              min={0}
+              step="0.01"
+            />
+          </div>
+
+          <div className="col-span-4 grid grid-cols-2 gap-4 mt-4 bg-gray-50 p-4 rounded-md">
+            <div>
+              <Label className="font-semibold">Costo Total Cotización (Doble):</Label>
+              <p>${formData.total_quote_cost.toFixed(2)}</p>
+            </div>
+            <div>
+              <Label className="font-semibold">Pago Restante:</Label>
+              <p>${formData.remaining_payment.toFixed(2)}</p>
+            </div>
+          </div>
+
           <DialogFooter>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              {initialData ? 'Guardar Cambios' : 'Añadir Hotel'}
+              {initialData ? 'Guardar Cambios' : 'Añadir Cotización'}
             </Button>
           </DialogFooter>
         </form>
