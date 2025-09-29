@@ -8,6 +8,7 @@ import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { supabase } from '@/integrations/supabase/client'; // Import supabase client
 import { format } from 'date-fns'; // Import format for dates
+import TourSeatMap from '@/components/TourSeatMap'; // Import the new TourSeatMap component
 
 // Hotel interface now represents a "hotel quote" from the 'hotels' table
 interface HotelQuote {
@@ -48,7 +49,8 @@ interface Tour {
   itinerary: { day: number; activity: string }[] | null;
   selling_price_per_person: number;
   cost_per_paying_person: number | null;
-  bus_capacity: number;
+  bus_id: string | null; // Added bus_id
+  bus_capacity: number; // Added bus_capacity
   courtesies: number;
   hotel_details: TourHotelDetail[] | null; // Updated type
   provider_details: { name: string; service: string; cost: number }[] | null;
@@ -60,6 +62,7 @@ const TourDetailsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hotelQuotesMap, setHotelQuotesMap] = useState<Map<string, HotelQuote>>(new Map());
+  const [selectedSeatsForBooking, setSelectedSeatsForBooking] = useState<number[]>([]);
 
   useEffect(() => {
     const fetchTourDetailsAndHotelQuotes = async () => {
@@ -118,6 +121,26 @@ const TourDetailsPage = () => {
       fetchTourDetailsAndHotelQuotes();
     }
   }, [id]);
+
+  const handleSeatsSelection = (seats: number[]) => {
+    setSelectedSeatsForBooking(seats);
+  };
+
+  const handleBookSeats = () => {
+    if (selectedSeatsForBooking.length === 0) {
+      toast.error('Por favor, selecciona al menos un asiento para reservar.');
+      return;
+    }
+    // Here you would implement the actual booking logic
+    // For now, we'll just show a success message
+    toast.success(`Has seleccionado los asientos: ${selectedSeatsForBooking.join(', ')}. ¡Procesando reserva!`);
+    console.log('Booking seats:', selectedSeatsForBooking, 'for tour:', tour?.title);
+    // In a real application, this would involve:
+    // 1. Checking seat availability again on the server
+    // 2. Creating a booking record
+    // 3. Updating seat statuses in 'tour_seat_assignments'
+    // 4. Handling payment
+  };
 
   if (loading) {
     return (
@@ -276,8 +299,29 @@ const TourDetailsPage = () => {
               <p className="text-gray-700 mb-6">
                 ¿Listo para tu próxima aventura? Contáctanos para personalizar tu viaje o reservar este tour.
               </p>
-              <Button className="w-full bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white font-semibold py-3 text-lg">
-                Reservar Tour
+              {tour.bus_capacity > 0 && (
+                <div className="mb-6">
+                  <TourSeatMap
+                    tourId={tour.id}
+                    busCapacity={tour.bus_capacity}
+                    courtesies={tour.courtesies}
+                    onSeatsSelected={handleSeatsSelection}
+                    readOnly={false} // Allow public users to select seats
+                    adminMode={false}
+                  />
+                  {selectedSeatsForBooking.length > 0 && (
+                    <p className="text-sm text-gray-600 mt-2">
+                      Asientos seleccionados: {selectedSeatsForBooking.join(', ')}
+                    </p>
+                  )}
+                </div>
+              )}
+              <Button
+                className="w-full bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white font-semibold py-3 text-lg"
+                onClick={handleBookSeats}
+                disabled={selectedSeatsForBooking.length === 0}
+              >
+                Reservar Tour {selectedSeatsForBooking.length > 0 ? `(${selectedSeatsForBooking.length} asientos)` : ''}
               </Button>
               <Button variant="outline" className="w-full mt-4 bg-white text-rosa-mexicano hover:bg-gray-100 border-rosa-mexicano hover:border-rosa-mexicano/90">
                 Contactar Asesor

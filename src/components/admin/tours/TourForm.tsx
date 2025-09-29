@@ -11,6 +11,7 @@ import { Loader2, Save, PlusCircle, MinusCircle } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns'; // Import format for dates
+import TourSeatMap from '@/components/TourSeatMap'; // Import the new TourSeatMap component
 
 // Hotel interface now represents a "hotel quote" from the 'hotels' table
 interface HotelQuote {
@@ -317,7 +318,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const addArrayItem = (field: keyof Tour) => {
     setFormData((prev) => ({
       ...prev,
-      [field]: [...(prev[field] as string[]), ''],
+      [field]: [...(prev[field] as string[])],
     }));
   };
 
@@ -630,6 +631,20 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           <Label htmlFor="courtesies" className="md:text-right">Cortesías</Label>
           <Input id="courtesies" type="number" value={formData.courtesies} onChange={(e) => handleNumberChange('courtesies', e.target.value)} className="md:col-span-3" required min={0} />
         </div>
+
+        {/* Seat Map for Admin to block courtesies */}
+        {tourId && formData.bus_capacity > 0 && (
+          <div className="col-span-full mt-6">
+            <h3 className="text-xl font-semibold mb-4">Gestión de Asientos (Admin)</h3>
+            <TourSeatMap
+              tourId={tourId}
+              busCapacity={formData.bus_capacity}
+              courtesies={formData.courtesies}
+              readOnly={false}
+              adminMode={true} // Enable admin mode for blocking seats
+            />
+          </div>
+        )}
 
         {/* Hotel Details (now linking to quotes) */}
         <div className="space-y-2 col-span-full">
