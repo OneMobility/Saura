@@ -16,7 +16,7 @@ interface SessionContextType {
 
 const SessionContext = createContext<SessionContextType | undefined>(undefined);
 
-export const SessionContextProvider = ({ children }: { children: ReactNode }) => {
+export const SessionContextProvider = ({ children }: { ReactNode }) => {
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
@@ -35,7 +35,7 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
       .eq('id', currentUser.id)
       .single();
 
-    console.log('SessionContextProvider: Supabase profile query result - Data:', profile, 'Error:', error); // Nuevo log aquí
+    console.log('SessionContextProvider: Supabase query raw result:', { data: profile, error: error }); // Nuevo log aquí
 
     if (error && error.code !== 'PGRST116') { // PGRST116 means "no rows found"
       console.error('SessionContextProvider: Error fetching user profile:', error);
