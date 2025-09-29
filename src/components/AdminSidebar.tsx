@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'; // Import Collapsible components
-import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText, ChevronDown, Hotel, Truck, UserRound } from 'lucide-react'; // Added Hotel, Truck, UserRound, ChevronDown icons
+import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText, ChevronDown, Hotel, Truck, UserRound, Bus } from 'lucide-react'; // Added Hotel, Truck, UserRound, ChevronDown, Bus icons
 import { useSession } from '@/components/SessionContextProvider';
 
 interface NavItem {
@@ -26,6 +26,7 @@ const navItems: NavItem[] = [
       { href: '/admin/hotels', icon: Hotel, label: 'Hoteles' }, // New
       { href: '/admin/providers', icon: Truck, label: 'Proveedores' }, // New
       { href: '/admin/clients', icon: UserRound, label: 'Clientes' }, // New, using UserRound to differentiate from Users
+      { href: '/admin/buses', icon: Bus, label: 'Autobuses' }, // NEW: Buses page
     ],
   },
   { href: '/admin/blog', icon: Newspaper, label: 'Blog' },

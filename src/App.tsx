@@ -18,9 +18,10 @@ import AdminSettingsPage from "./pages/AdminSettingsPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import AdminBlogPage from "./pages/AdminBlogPage";
 import AdminReviewsPage from "./pages/AdminReviewsPage";
-import AdminHotelsPage from "./pages/AdminHotelsPage"; // NEW: Import AdminHotelsPage
-import AdminProvidersPage from "./pages/AdminProvidersPage"; // NEW: Import AdminProvidersPage
-import AdminClientsPage from "./pages/AdminClientsPage"; // NEW: Import AdminClientsPage
+import AdminHotelsPage from "./pages/AdminHotelsPage";
+import AdminProvidersPage from "./pages/AdminProvidersPage";
+import AdminClientsPage from "./pages/AdminClientsPage";
+import AdminBusesPage from "./pages/AdminBusesPage"; // NEW: Import AdminBusesPage
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -84,7 +85,7 @@ const App = () => {
                 }
               />
               <Route
-                path="/admin/hotels" // NEW: Route for AdminHotelsPage
+                path="/admin/hotels"
                 element={
                   <ProtectedRoute adminOnly>
                     <AdminHotelsPage />
@@ -92,7 +93,7 @@ const App = () => {
                 }
               />
               <Route
-                path="/admin/providers" // NEW: Route for AdminProvidersPage
+                path="/admin/providers"
                 element={
                   <ProtectedRoute adminOnly>
                     <AdminProvidersPage />
@@ -100,10 +101,18 @@ const App = () => {
                 }
               />
               <Route
-                path="/admin/clients" // NEW: Route for AdminClientsPage
+                path="/admin/clients"
                 element={
                   <ProtectedRoute adminOnly>
                     <AdminClientsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/buses" {/* NEW: Route for AdminBusesPage */}
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminBusesPage />
                   </ProtectedRoute>
                 }
               />
