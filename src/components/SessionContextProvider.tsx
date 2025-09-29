@@ -10,7 +10,7 @@ interface SessionContextType {
   user: User | null;
   isAdmin: boolean;
   firstName: string | null;
-  lastName: string | null; // Added lastName
+  lastName: string | null;
   isLoading: boolean;
 }
 
@@ -21,7 +21,7 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
   const [user, setUser] = useState<User | null>(null);
   const [isAdmin, setIsAdmin] = useState<boolean>(false);
   const [firstName, setFirstName] = useState<string | null>(null);
-  const [lastName, setLastName] = useState<string | null>(null); // State for lastName
+  const [lastName, setLastName] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const navigate = useNavigate();
   const location = useLocation();
@@ -37,7 +37,7 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
         console.log('SessionContextProvider: User is logged in, fetching profile role and first name...');
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('role, first_name, last_name') // Fetch last_name
+          .select('role, first_name, last_name')
           .eq('id', currentSession.user.id)
           .single();
 
@@ -45,8 +45,9 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
           console.error('SessionContextProvider: Error fetching user profile:', error);
           setIsAdmin(false);
           setFirstName(null);
-          setLastName(null); // Clear lastName
+          setLastName(null);
         } else if (profile) {
+          console.log('SessionContextProvider: Profile fetched:', profile);
           if (profile.role === 'admin') {
             console.log('SessionContextProvider: User is admin.');
             setIsAdmin(true);
@@ -55,23 +56,24 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
             setIsAdmin(false);
           }
           setFirstName(profile.first_name || null);
-          setLastName(profile.last_name || null); // Set lastName
+          setLastName(profile.last_name || null);
         } else {
+          console.log('SessionContextProvider: No profile found for user.');
           setIsAdmin(false);
           setFirstName(null);
-          setLastName(null); // Clear lastName
+          setLastName(null);
         }
 
         // Redirect authenticated users from login page
         if (location.pathname === '/login') {
           console.log('SessionContextProvider: User is authenticated and on /login, redirecting to /admin/dashboard.');
-          navigate('/admin/dashboard'); // Redirect to admin dashboard or a default page
+          navigate('/admin/dashboard');
         }
       } else {
         console.log('SessionContextProvider: User is NOT logged in.');
         setIsAdmin(false);
         setFirstName(null);
-        setLastName(null); // Clear lastName on logout
+        setLastName(null);
         // Redirect unauthenticated users from protected routes
         if (location.pathname.startsWith('/admin')) {
           console.log('SessionContextProvider: User is unauthenticated and on /admin route, redirecting to /login.');
@@ -91,7 +93,7 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
         console.log('SessionContextProvider: Initial check: User is logged in, fetching profile role and first name...');
         supabase
           .from('profiles')
-          .select('role, first_name, last_name') // Fetch last_name
+          .select('role, first_name, last_name')
           .eq('id', initialSession.user.id)
           .single()
           .then(({ data: profile, error }) => {
@@ -99,8 +101,9 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
               console.error('SessionContextProvider: Initial check: Error fetching user profile:', error);
               setIsAdmin(false);
               setFirstName(null);
-              setLastName(null); // Clear lastName
+              setLastName(null);
             } else if (profile) {
+              console.log('SessionContextProvider: Initial check: Profile fetched:', profile);
               if (profile.role === 'admin') {
                 console.log('SessionContextProvider: Initial check: User is admin.');
                 setIsAdmin(true);
@@ -109,11 +112,12 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
                 setIsAdmin(false);
               }
               setFirstName(profile.first_name || null);
-              setLastName(profile.last_name || null); // Set lastName
+              setLastName(profile.last_name || null);
             } else {
+              console.log('SessionContextProvider: Initial check: No profile found for user.');
               setIsAdmin(false);
               setFirstName(null);
-              setLastName(null); // Clear lastName
+              setLastName(null);
             }
           });
       }
@@ -121,6 +125,8 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
 
     return () => subscription.unsubscribe();
   }, [location.pathname, navigate]);
+
+  console.log('SessionContextProvider: Current state - isLoading:', isLoading, 'user:', !!user, 'isAdmin:', isAdmin, 'firstName:', firstName, 'lastName:', lastName);
 
   return (
     <SessionContext.Provider value={{ session, user, isAdmin, firstName, lastName, isLoading }}>
