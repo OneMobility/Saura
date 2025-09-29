@@ -1,22 +1,22 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Armchair, CarFront, Toilet, Square, GripVertical, LogIn } from 'lucide-react'; // Added LogIn
+import { Armchair, CarFront, Toilet, Square, GripVertical, LogIn } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 
 // Definición de tipos para el layout de asientos
 type SeatLayoutItem = {
-  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty' | 'entry'; // Added 'entry'
+  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty' | 'entry';
   number?: number; // Solo para asientos
 };
 type SeatLayoutRow = SeatLayoutItem[];
 type SeatLayout = SeatLayoutRow[];
 
-type ToolType = 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty' | 'entry'; // Added 'entry'
+type ToolType = 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty' | 'entry';
 
 interface SeatLayoutEditorProps {
   initialLayout: SeatLayout | null;
@@ -25,67 +25,88 @@ interface SeatLayoutEditorProps {
 }
 
 const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLayoutChange, totalCapacity }) => {
-  // Initialize rows and cols from initialLayout if available, otherwise defaults
   const [rows, setRows] = useState(initialLayout?.length || 7);
   const [cols, setCols] = useState(initialLayout?.[0]?.length || 10);
   const [grid, setGrid] = useState<SeatLayout>([]);
   const [activeTool, setActiveTool] = useState<ToolType>('seat');
 
-  // Memoize reNumberSeats to ensure its reference is stable
+  // Ref para almacenar el initialLayout anterior y hacer una comparación profunda
+  const prevInitialLayoutRef = useRef<SeatLayout | null>(null);
+
   const reNumberSeats = useCallback((currentLayout: SeatLayout, currentRows: number, currentCols: number): SeatLayout => {
     let currentSeatNumber = 1;
     const newLayout: SeatLayout = currentLayout.map(row => row.map(item => ({ ...item })));
 
-    // Iterate column by column, then row by row within each column
     for (let colIndex = 0; colIndex < currentCols; colIndex++) {
       for (let rowIndex = 0; rowIndex < currentRows; rowIndex++) {
-        // Ensure we don't go out of bounds if grid size changed
         if (newLayout[rowIndex] && newLayout[rowIndex][colIndex] && newLayout[rowIndex][colIndex].type === 'seat') {
           newLayout[rowIndex][colIndex].number = currentSeatNumber++;
         }
       }
     }
     return newLayout;
-  }, []); // No dependencies here, as rows/cols are passed as arguments
+  }, []);
 
-  // Effect to initialize grid or update when initialLayout, rows, or cols change
+  // Effect para inicializar el grid cuando initialLayout cambia (profundamente)
   useEffect(() => {
-    let newGrid: SeatLayout;
-    if (initialLayout && initialLayout.length > 0) {
-      // If initialLayout is provided, use it and adjust to new rows/cols if size changed
-      newGrid = Array.from({ length: rows }, (_, rIdx) =>
+    // Solo actualiza si initialLayout ha cambiado su contenido
+    if (JSON.stringify(initialLayout) !== JSON.stringify(prevInitialLayoutRef.current)) {
+      const initialRows = initialLayout?.length || 7;
+      const initialCols = initialLayout?.[0]?.length || 10;
+
+      setRows(initialRows);
+      setCols(initialCols);
+
+      let newGrid: SeatLayout;
+      if (initialLayout && initialLayout.length > 0) {
+        newGrid = Array.from({ length: initialRows }, (_, rIdx) =>
+          Array.from({ length: initialCols }, (_, cIdx) => {
+            return initialLayout[rIdx] && initialLayout[rIdx][cIdx]
+              ? { ...initialLayout[rIdx][cIdx] }
+              : { type: 'empty' };
+          })
+        );
+      } else {
+        newGrid = Array.from({ length: initialRows }, () =>
+          Array.from({ length: initialCols }, () => ({ type: 'empty' }))
+        );
+      }
+      setGrid(reNumberSeats(newGrid, initialRows, initialCols));
+      prevInitialLayoutRef.current = initialLayout; // Actualiza la referencia del layout anterior
+    }
+  }, [initialLayout, reNumberSeats]); // Depende de initialLayout y reNumberSeats
+
+  // Effect para redimensionar el grid cuando rows o cols cambian (por input del usuario)
+  useEffect(() => {
+    setGrid(prevGrid => {
+      const newGrid: SeatLayout = Array.from({ length: rows }, (_, rIdx) =>
         Array.from({ length: cols }, (_, cIdx) => {
-          return initialLayout[rIdx] && initialLayout[rIdx][cIdx]
-            ? { ...initialLayout[rIdx][cIdx] } // Deep copy item
+          return prevGrid[rIdx] && prevGrid[rIdx][cIdx]
+            ? prevGrid[rIdx][cIdx]
             : { type: 'empty' };
         })
       );
-    } else {
-      // Create an empty grid
-      newGrid = Array.from({ length: rows }, () =>
-        Array.from({ length: cols }, () => ({ type: 'empty' }))
-      );
-    }
-    setGrid(reNumberSeats(newGrid, rows, cols)); // Set and re-number the grid
-  }, [initialLayout, rows, cols, reNumberSeats]); // Added rows and cols to dependencies
+      return reNumberSeats(newGrid, rows, cols);
+    });
+  }, [rows, cols, reNumberSeats]); // Depende de rows, cols y reNumberSeats
 
-  // Effect to notify parent when grid changes (after re-numbering)
+  // Effect para notificar al padre cuando el grid cambia
   useEffect(() => {
     const seatCount = grid.flat().filter(item => item.type === 'seat').length;
     onLayoutChange(grid, seatCount);
-  }, [grid, onLayoutChange]); // Only depends on grid and onLayoutChange
+  }, [grid, onLayoutChange]);
 
   const handleCellClick = (rowIndex: number, colIndex: number) => {
     setGrid(prevGrid => {
-      const newGrid = prevGrid.map(row => [...row]); // Deep copy
-      // Toggle logic: if activeTool is the same as current type, set to 'empty'
+      const newGrid = prevGrid.map(row => [...row]);
       const currentType = newGrid[rowIndex][colIndex].type;
+
       if (currentType === activeTool) {
         newGrid[rowIndex][colIndex] = { type: 'empty' };
       } else {
         newGrid[rowIndex][colIndex] = { type: activeTool };
       }
-      return reNumberSeats(newGrid, rows, cols); // Pass current rows/cols
+      return reNumberSeats(newGrid, rows, cols);
     });
   };
 
@@ -96,7 +117,7 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
     }
     setRows(newRows);
     setCols(newCols);
-    // The useEffect with [initialLayout, rows, cols, reNumberSeats] will handle updating the grid.
+    // El useEffect que depende de rows y cols se encargará de actualizar el grid
   };
 
   const renderCellContent = (item: SeatLayoutItem) => {
@@ -109,7 +130,7 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
         return <Toilet className="h-4 w-4" />;
       case 'aisle':
         return <GripVertical className="h-4 w-4 text-gray-400" />;
-      case 'entry': // New entry type
+      case 'entry':
         return <LogIn className="h-4 w-4" />;
       case 'empty':
       default:
@@ -128,7 +149,7 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
         return cn(base, "bg-purple-600 text-white cursor-default");
       case 'aisle':
         return cn(base, "bg-gray-100 cursor-pointer");
-      case 'entry': // New entry type styling
+      case 'entry':
         return cn(base, "bg-green-600 text-white hover:bg-green-700 cursor-pointer");
       case 'empty':
         return cn(base, "bg-white hover:bg-gray-50 cursor-pointer");
