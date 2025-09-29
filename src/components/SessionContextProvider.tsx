@@ -126,30 +126,7 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
     return () => subscription.unsubscribe();
   }, [location.pathname, navigate]);
 
-  // NEW: Effect to log out admin users when they navigate away from admin paths
-  useEffect(() => {
-    // This effect runs when location.pathname, user, isAdmin, or isLoading changes.
-    // Its purpose is to enforce that admin users are logged out if they are not on an admin path.
-    console.log('SessionContextProvider (Logout Effect): Checking conditions for logout...');
-    console.log('  isLoading:', isLoading, 'user:', !!user, 'isAdmin:', isAdmin, 'location.pathname:', location.pathname);
-
-    if (!isLoading && user && isAdmin) {
-      const currentPathIsAdmin = location.pathname.startsWith('/admin');
-      console.log('  User is admin and loaded. Current path is admin:', currentPathIsAdmin);
-
-      if (!currentPathIsAdmin) {
-        console.log('  Admin user detected on non-admin path. Signing out...');
-        supabase.auth.signOut();
-        // No need to navigate here, onAuthStateChange will handle the redirect to /login
-        // once the session becomes null.
-      }
-    } else if (!isLoading && !user && location.pathname.startsWith('/admin')) {
-      // If not loading, no user, but on an admin path, redirect to login.
-      // This handles cases where the session might have expired or been cleared externally.
-      console.log('  No user detected on admin path. Redirecting to /login.');
-      navigate('/login');
-    }
-  }, [location.pathname, isLoading, user, isAdmin, navigate]);
+  // Eliminado el useEffect que causaba el cierre de sesión automático al salir de rutas /admin
 
   console.log('SessionContextProvider: Current state - isLoading:', isLoading, 'user:', !!user, 'isAdmin:', isAdmin, 'firstName:', firstName, 'lastName:', lastName);
 
