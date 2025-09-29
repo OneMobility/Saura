@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns'; // Import parseISO
 
 interface Hotel {
   id: string;
@@ -158,7 +158,7 @@ const AdminHotelsPage = () => {
                       <TableRow key={hotel.id}>
                         <TableCell className="font-medium">{hotel.name}</TableCell>
                         <TableCell>{hotel.location}</TableCell>
-                        <TableCell>{hotel.quoted_date ? format(new Date(hotel.quoted_date), 'PPP') : 'N/A'}</TableCell>
+                        <TableCell>{hotel.quoted_date ? format(parseISO(hotel.quoted_date), 'dd/MM/yy') : 'N/A'}</TableCell>
                         <TableCell>{hotel.num_nights_quoted}</TableCell>
                         <TableCell>{hotel.num_double_rooms}</TableCell>
                         <TableCell>{hotel.num_triple_rooms}</TableCell>
