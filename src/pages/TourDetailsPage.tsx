@@ -7,6 +7,22 @@ import { ArrowLeft, Loader2 } from 'lucide-react'; // Import Loader2
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { supabase } from '@/integrations/supabase/client'; // Import supabase client
+import { format } from 'date-fns'; // Import format for dates
+
+interface TourHotelDetail {
+  id: string;
+  hotel_id: string;
+  hotel_name: string;
+  room_type: 'double' | 'triple' | 'quad';
+  num_nights: number;
+  cost_per_person_calculated: number;
+  check_in_date: string | null;
+  check_out_date: string | null;
+  total_hotel_cost: number;
+  advance_payment_to_hotel: number;
+  total_paid_to_hotel: number;
+  remaining_payment_to_hotel: number;
+}
 
 interface Tour {
   id: string;
@@ -21,7 +37,7 @@ interface Tour {
   cost_per_paying_person: number | null;
   bus_capacity: number;
   courtesies: number;
-  hotel_details: { name: string; cost: number; capacity: number }[] | null;
+  hotel_details: TourHotelDetail[] | null; // Updated type
   provider_details: { name: string; service: string; cost: number }[] | null;
 }
 
@@ -164,11 +180,23 @@ const TourDetailsPage = () => {
               {tour.hotel_details && tour.hotel_details.length > 0 && (
                 <>
                   <h3 className="text-xl font-semibold text-gray-800 mt-8 mb-3">Hoteles Asociados</h3>
-                  <ul className="list-disc list-inside space-y-2 text-gray-700">
+                  <div className="space-y-4">
                     {tour.hotel_details.map((hotel, index) => (
-                      <li key={index}>{hotel.name} (Capacidad: {hotel.capacity})</li>
+                      <div key={hotel.id} className="border p-4 rounded-md bg-gray-50">
+                        <p className="font-semibold text-lg mb-1">{hotel.hotel_name} ({hotel.room_type.charAt(0).toUpperCase() + hotel.room_type.slice(1)})</p>
+                        <ul className="text-gray-700 text-sm space-y-1">
+                          <li><span className="font-medium">Noches:</span> {hotel.num_nights}</li>
+                          {hotel.check_in_date && <li><span className="font-medium">Check-in:</span> {format(new Date(hotel.check_in_date), 'PPP')}</li>}
+                          {hotel.check_out_date && <li><span className="font-medium">Check-out:</span> {format(new Date(hotel.check_out_date), 'PPP')}</li>}
+                          <li><span className="font-medium">Costo por persona (calculado):</span> ${hotel.cost_per_person_calculated.toFixed(2)}</li>
+                          <li><span className="font-medium">Costo total de reserva:</span> ${hotel.total_hotel_cost.toFixed(2)}</li>
+                          <li><span className="font-medium">Anticipo al hotel:</span> ${hotel.advance_payment_to_hotel.toFixed(2)}</li>
+                          <li><span className="font-medium">Total pagado al hotel:</span> ${hotel.total_paid_to_hotel.toFixed(2)}</li>
+                          <li><span className="font-medium">Pago restante al hotel:</span> ${hotel.remaining_payment_to_hotel.toFixed(2)}</li>
+                        </ul>
+                      </div>
                     ))}
-                  </ul>
+                  </div>
                 </>
               )}
 
