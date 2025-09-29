@@ -35,8 +35,10 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
       .eq('id', currentUser.id)
       .single();
 
+    console.log('SessionContextProvider: Supabase profile query result - Data:', profile, 'Error:', error); // Nuevo log aquí
+
     if (error && error.code !== 'PGRST116') { // PGRST116 means "no rows found"
-      console.error('SessionContextProvider: Error fetching user profile:', error); // Log del error
+      console.error('SessionContextProvider: Error fetching user profile:', error);
       setIsAdmin(false);
       setFirstName(null);
       setLastName(null);
@@ -48,7 +50,7 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
       console.log('SessionContextProvider: Profile fetched. IsAdmin:', profile.role === 'admin', 'Name:', profile.first_name, profile.last_name);
     } else {
       // This block is hit if no profile is found (error.code === 'PGRST116' or data is null)
-      console.log('SessionContextProvider: No profile found for user ID:', currentUser.id, 'Error:', error); // Nuevo log aquí
+      console.log('SessionContextProvider: No profile found for user ID:', currentUser.id, 'Error:', error);
       setIsAdmin(false);
       setFirstName(null);
       setLastName(null);
@@ -64,9 +66,8 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
 
       if (currentSession?.user) {
         await fetchUserProfile(currentSession.user);
-        setIsLoading(false); // Set isLoading to false *after* profile is fetched and isAdmin is set
+        setIsLoading(false);
 
-        // Redirect authenticated users from login page
         if (location.pathname === '/login') {
           console.log('SessionContextProvider: User is authenticated and on /login, redirecting to /admin/dashboard.');
           navigate('/admin/dashboard', { replace: true });
@@ -76,9 +77,8 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
         setIsAdmin(false);
         setFirstName(null);
         setLastName(null);
-        setIsLoading(false); // Set isLoading to false here too
+        setIsLoading(false);
 
-        // Redirect unauthenticated users from protected routes
         if (location.pathname.startsWith('/admin')) {
           console.log('SessionContextProvider: User is unauthenticated and on /admin route, redirecting to /login.');
           navigate('/login', { replace: true });
@@ -86,12 +86,10 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
       }
     };
 
-    // Set up the auth state change listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(handleAuthChange);
 
-    // Initial session check on component mount
     const initialCheck = async () => {
-      setIsLoading(true); // Ensure loading is true during initial check
+      setIsLoading(true);
       const { data: { session: initialSession } } = await supabase.auth.getSession();
       console.log('SessionContextProvider: Initial session check. Session:', initialSession);
       setSession(initialSession);
@@ -99,9 +97,8 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
 
       if (initialSession?.user) {
         await fetchUserProfile(initialSession.user);
-        setIsLoading(false); // Set isLoading to false *after* profile is fetched and isAdmin is set
+        setIsLoading(false);
 
-        // Redirect authenticated users from login page
         if (location.pathname === '/login') {
           console.log('SessionContextProvider: Initial check: User is authenticated and on /login, redirecting to /admin/dashboard.');
           navigate('/admin/dashboard', { replace: true });
@@ -111,9 +108,8 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
         setIsAdmin(false);
         setFirstName(null);
         setLastName(null);
-        setIsLoading(false); // Set isLoading to false here too
+        setIsLoading(false);
 
-        // Redirect unauthenticated users from protected routes
         if (location.pathname.startsWith('/admin')) {
           console.log('SessionContextProvider: Initial check: User is unauthenticated and on /admin route, redirecting to /login.');
           navigate('/login', { replace: true });
@@ -124,7 +120,7 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
     initialCheck();
 
     return () => subscription.unsubscribe();
-  }, [location.pathname, navigate]); // Dependencias del useEffect
+  }, [location.pathname, navigate]);
 
   return (
     <SessionContext.Provider value={{ session, user, isAdmin, firstName, lastName, isLoading }}>
