@@ -36,7 +36,6 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
     let currentLastName: string | null = null;
 
     if (currentSession?.user) {
-      console.log('SessionContextProvider: User is logged in, fetching profile role and first name...');
       const { data: profile, error } = await supabase
         .from('profiles')
         .select('role, first_name, last_name')
@@ -44,33 +43,26 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
         .single();
 
       if (error) {
-        console.error('SessionContextProvider: Error fetching user profile:', error);
+        console.error('Error fetching user profile:', error);
       } else if (profile) {
-        console.log('SessionContextProvider: Profile fetched:', profile);
         currentIsAdmin = (profile.role === 'admin');
         currentFirstName = profile.first_name || null;
         currentLastName = profile.last_name || null;
-      } else {
-        console.log('SessionContextProvider: No profile found for user.');
       }
-
       setIsAdmin(currentIsAdmin);
       setFirstName(currentFirstName);
       setLastName(currentLastName);
 
       // Redirige a usuarios autenticados desde la página de login si son admin
       if (location.pathname === '/login' && currentIsAdmin) {
-        console.log('SessionContextProvider: User is authenticated and admin on /login, redirecting to /admin/dashboard.');
         navigate('/admin/dashboard');
       }
     } else {
-      console.log('SessionContextProvider: User is NOT logged in.');
       setIsAdmin(false);
       setFirstName(null);
       setLastName(null);
       // Redirige a usuarios no autenticados desde rutas protegidas
       if (location.pathname.startsWith('/admin')) {
-        console.log('SessionContextProvider: User is unauthenticated and on /admin route, redirecting to /login.');
         navigate('/login');
       }
     }
@@ -80,13 +72,11 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
   useEffect(() => {
     // Comprobación inicial de la sesión al montar el componente
     supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
-      console.log('SessionContextProvider: Initial getSession check. Session:', initialSession);
       handleSessionData(initialSession);
     });
 
     // Escucha los cambios en el estado de autenticación
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
-      console.log('SessionContextProvider: Auth state change event:', event, 'Session:', currentSession);
       // Para cambios posteriores, procesamos los datos de la sesión.
       // No volvemos a establecer isLoading en true aquí, ya que se maneja en la carga inicial.
       handleSessionData(currentSession);
@@ -94,8 +84,6 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
 
     return () => subscription.unsubscribe();
   }, [location.pathname, navigate]); // Dependencias para useEffect
-
-  console.log('SessionContextProvider: Current state - isLoading:', isLoading, 'user:', !!user, 'isAdmin:', isAdmin, 'firstName:', firstName, 'lastName:', lastName);
 
   return (
     <SessionContext.Provider value={{ session, user, isAdmin, firstName, lastName, isLoading }}>
