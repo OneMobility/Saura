@@ -43,7 +43,7 @@ interface TourHotelDetail {
 
 // Definición de tipos para el layout de asientos
 type SeatLayoutItem = {
-  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty';
+  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty' | 'entry';
   number?: number; // Solo para asientos
 };
 type SeatLayoutRow = SeatLayoutItem[];
@@ -56,6 +56,8 @@ interface Bus {
   rental_cost: number;
   total_capacity: number;
   seat_layout_json: SeatLayout | null; // Incluir el layout de asientos
+  advance_payment: number; // NEW
+  total_paid: number; // NEW
 }
 
 interface Tour {
@@ -113,6 +115,22 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const [availableBuses, setAvailableBuses] = useState<Bus[]>([]); // NEW: State for available buses
   const [selectedBusLayout, setSelectedBusLayout] = useState<SeatLayout | null>(null); // NEW: State for selected bus layout
 
+  // NEW: Financial states
+  const [totalSoldSeats, setTotalSoldSeats] = useState(0);
+  const [totalRemainingPayments, setTotalRemainingPayments] = useState(0);
+  const [desiredProfitPercentage, setDesiredProfitPercentage] = useState(20); // Default 20%
+  const [suggestedSellingPrice, setSuggestedSellingPrice] = useState(0);
+
+  // NEW: Break-even analysis states
+  const [expectedClientsForBreakeven, setExpectedClientsForBreakeven] = useState(0);
+  const [breakevenResult, setBreakevenResult] = useState<{
+    adjustedHotelDetails: TourHotelDetail[];
+    adjustedTotalBaseCost: number;
+    adjustedCostPerPayingPerson: number;
+    suggestedSellingPrice: number;
+    message: string;
+  } | null>(null);
+
   // Fetch available hotel quotes
   useEffect(() => {
     const fetchAvailableHotelQuotes = async () => {
@@ -137,7 +155,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     const fetchAvailableBuses = async () => {
       const { data, error } = await supabase
         .from('buses')
-        .select('*') // Select all columns including seat_layout_json
+        .select('*') // Select all columns including seat_layout_json, advance_payment, total_paid
         .order('name', { ascending: true });
 
       if (error) {
@@ -183,6 +201,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             const bus = availableBuses.find(b => b.id === data.bus_id);
             setSelectedBusLayout(bus?.seat_layout_json || null);
           }
+          setExpectedClientsForBreakeven(data.paying_clients_count || 0); // Initialize with full paying capacity
         }
       } else {
         // Reset form for new tour
@@ -206,6 +225,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
         setImageFile(null);
         setImageUrlPreview('');
         setSelectedBusLayout(null); // Clear layout for new tour
+        setExpectedClientsForBreakeven(0);
       }
       setLoadingInitialData(false);
     };
@@ -213,11 +233,32 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     fetchTourData();
   }, [tourId, availableBuses]); // Add availableBuses to dependencies to ensure layout is set on load
 
+  // NEW: Fetch total sold seats
+  useEffect(() => {
+    const fetchSoldSeats = async () => {
+      if (!tourId) return;
+      const { count, error } = await supabase
+        .from('tour_seat_assignments')
+        .select('id', { count: 'exact' })
+        .eq('tour_id', tourId)
+        .eq('status', 'booked');
+
+      if (error) {
+        console.error('Error fetching sold seats:', error);
+        setTotalSoldSeats(0);
+      } else {
+        setTotalSoldSeats(count || 0);
+      }
+    };
+    fetchSoldSeats();
+  }, [tourId]);
+
   const calculateCosts = useCallback(() => {
     const totalProviderCost = formData.provider_details.reduce((sum, provider) => sum + provider.cost, 0);
     
     let totalHotelCost = 0; // Total cost for all rooms across all linked hotel quotes
     let totalHotelCapacity = 0; // Total capacity for all rooms across all linked hotel quotes
+    let currentTotalRemainingPayments = 0; // NEW: for total remaining payments
 
     formData.hotel_details.forEach(tourHotelDetail => {
       const hotelQuote = availableHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
@@ -236,12 +277,23 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       const capacityQuad = (hotelQuote.num_quad_rooms || 0) * hotelQuote.capacity_quad;
 
       totalHotelCapacity += capacityDouble + capacityTriple + capacityQuad;
+
+      // NEW: Add hotel remaining payment
+      currentTotalRemainingPayments += (costDouble + costTriple + costQuad) - (hotelQuote.total_paid || 0);
     });
 
-    const totalBaseCost = formData.bus_cost + totalProviderCost + totalHotelCost;
+    const selectedBus = availableBuses.find(b => b.id === formData.bus_id);
+    const busRentalCost = selectedBus?.rental_cost || 0;
+    const busAdvancePayment = selectedBus?.advance_payment || 0;
+    const busTotalPaid = selectedBus?.total_paid || 0;
+
+    const totalBaseCost = busRentalCost + totalProviderCost + totalHotelCost;
 
     const payingClientsCount = formData.bus_capacity - formData.courtesies;
     const costPerPayingPerson = payingClientsCount > 0 ? totalBaseCost / payingClientsCount : 0;
+
+    // NEW: Add bus remaining payment
+    currentTotalRemainingPayments += busRentalCost - busTotalPaid;
 
     setFormData((prev) => ({
       ...prev,
@@ -249,7 +301,17 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       paying_clients_count: payingClientsCount,
       cost_per_paying_person: costPerPayingPerson,
     }));
-  }, [formData.bus_capacity, formData.bus_cost, formData.courtesies, formData.provider_details, formData.hotel_details, availableHotelQuotes]);
+    setTotalRemainingPayments(currentTotalRemainingPayments);
+
+    // NEW: Calculate suggested selling price
+    if (costPerPayingPerson > 0 && desiredProfitPercentage >= 0) {
+      const calculatedSuggestedPrice = costPerPayingPerson * (1 + desiredProfitPercentage / 100);
+      setSuggestedSellingPrice(calculatedSuggestedPrice);
+    } else {
+      setSuggestedSellingPrice(0);
+    }
+
+  }, [formData.bus_capacity, formData.bus_id, formData.courtesies, formData.provider_details, formData.hotel_details, availableHotelQuotes, availableBuses, desiredProfitPercentage]);
 
   useEffect(() => {
     calculateCosts();
@@ -334,7 +396,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const addArrayItem = (field: keyof Tour) => {
     setFormData((prev) => ({
       ...prev,
-      [field]: [...(prev[field] as string[])],
+      [field]: [...(prev[field] as string[]), ''],
     }));
   };
 
@@ -438,6 +500,93 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     setSelectedBusLayout(selectedBus?.seat_layout_json || null); // Set the layout
   };
 
+  // NEW: Break-even analysis function
+  const runBreakevenAnalysis = useCallback(() => {
+    if (expectedClientsForBreakeven <= 0 || expectedClientsForBreakeven > formData.bus_capacity - formData.courtesies) {
+      toast.error('El número de clientes esperados debe ser mayor que 0 y no exceder la capacidad pagante del autobús.');
+      setBreakevenResult(null);
+      return;
+    }
+
+    let currentAdjustedHotelDetails = [...formData.hotel_details];
+    let currentAdjustedTotalBaseCost = formData.bus_cost + formData.provider_details.reduce((sum, p) => sum + p.cost, 0);
+    let currentAdjustedHotelCost = 0;
+
+    // Calculate initial hotel cost based on current hotel_details
+    formData.hotel_details.forEach(tourHotelDetail => {
+      const hotelQuote = availableHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
+      if (!hotelQuote) return;
+      const costDouble = (hotelQuote.num_double_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
+      const costTriple = (hotelQuote.num_triple_rooms || 0) * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
+      const costQuad = (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
+      currentAdjustedHotelCost += costDouble + costTriple + costQuad;
+    });
+    currentAdjustedTotalBaseCost += currentAdjustedHotelCost;
+
+    let message = `Análisis para ${expectedClientsForBreakeven} clientes:`;
+
+    // If current paying clients count is already less than expected, we need to adjust
+    if (expectedClientsForBreakeven < (formData.bus_capacity - formData.courtesies)) {
+      // Strategy: Reduce hotel rooms from most expensive/largest capacity first (quad -> triple -> double)
+      // This is a simplified approach. A real-world scenario might involve more complex optimization.
+
+      let roomsReduced = false;
+      let tempHotelDetails = JSON.parse(JSON.stringify(formData.hotel_details)); // Deep copy
+
+      // Iterate through hotel details and try to reduce rooms
+      for (let i = tempHotelDetails.length - 1; i >= 0; i--) {
+        const tourHotelDetail = tempHotelDetails[i];
+        const hotelQuote = availableHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
+        if (!hotelQuote) continue;
+
+        // Try reducing quad rooms first
+        if (hotelQuote.num_quad_rooms > 0) {
+          const originalCost = hotelQuote.num_quad_rooms * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
+          hotelQuote.num_quad_rooms = 0; // Assume we can cancel all quad rooms
+          const newCost = 0;
+          currentAdjustedTotalBaseCost -= (originalCost - newCost);
+          roomsReduced = true;
+          message += ` Se eliminaron las habitaciones cuádruples del hotel ${hotelQuote.name}.`;
+        }
+        // Then triple rooms
+        if (hotelQuote.num_triple_rooms > 0) {
+          const originalCost = hotelQuote.num_triple_rooms * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
+          hotelQuote.num_triple_rooms = 0; // Assume we can cancel all triple rooms
+          const newCost = 0;
+          currentAdjustedTotalBaseCost -= (originalCost - newCost);
+          roomsReduced = true;
+          message += ` Se eliminaron las habitaciones triples del hotel ${hotelQuote.name}.`;
+        }
+        // Then double rooms
+        if (hotelQuote.num_double_rooms > 0) {
+          const originalCost = hotelQuote.num_double_rooms * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
+          hotelQuote.num_double_rooms = 0; // Assume we can cancel all double rooms
+          const newCost = 0;
+          currentAdjustedTotalBaseCost -= (originalCost - newCost);
+          roomsReduced = true;
+          message += ` Se eliminaron las habitaciones dobles del hotel ${hotelQuote.name}.`;
+        }
+      }
+
+      if (!roomsReduced) {
+        message += ' No se pudieron reducir habitaciones de hotel para ajustar el costo.';
+      }
+    }
+
+    const adjustedCostPerPayingPerson = expectedClientsForBreakeven > 0 ? currentAdjustedTotalBaseCost / expectedClientsForBreakeven : 0;
+    const suggestedSellingPriceForBreakeven = adjustedCostPerPayingPerson * (1 + desiredProfitPercentage / 100);
+
+    setBreakevenResult({
+      adjustedHotelDetails: currentAdjustedHotelDetails, // This would be the modified hotel details if we were to save them
+      adjustedTotalBaseCost: currentAdjustedTotalBaseCost,
+      adjustedCostPerPayingPerson: adjustedCostPerPayingPerson,
+      suggestedSellingPrice: suggestedSellingPriceForBreakeven,
+      message: message,
+    });
+
+  }, [expectedClientsForBreakeven, formData.bus_capacity, formData.courtesies, formData.bus_cost, formData.provider_details, formData.hotel_details, availableHotelQuotes, desiredProfitPercentage]);
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -536,6 +685,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       </div>
     );
   }
+
+  const totalToSell = (formData.selling_price_per_person * (formData.paying_clients_count || 0)) - (formData.selling_price_per_person * totalSoldSeats);
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
@@ -749,27 +900,107 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           </Button>
         </div>
 
-        {/* Calculated Costs */}
+        {/* Financial Summary */}
         <div className="col-span-full grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-md">
           <div>
-            <Label className="font-semibold">Costo Base Total:</Label>
+            <Label className="font-semibold">Costo Base Total del Tour:</Label>
             <p>${formData.total_base_cost?.toFixed(2) || '0.00'}</p>
           </div>
           <div>
-            <Label className="font-semibold">Clientes Pagantes:</Label>
+            <Label className="font-semibold">Clientes Pagantes Potenciales:</Label>
             <p>{formData.paying_clients_count || 0}</p>
           </div>
-          <div className="md:col-span-2">
+          <div>
             <Label className="font-semibold">Costo por Persona Pagante:</Label>
             <p>${formData.cost_per_paying_person?.toFixed(2) || '0.00'}</p>
           </div>
+          <div>
+            <Label className="font-semibold">Asientos Vendidos:</Label>
+            <p>{totalSoldSeats}</p>
+          </div>
+          <div>
+            <Label className="font-semibold">Total Vendido (Ingresos):</Label>
+            <p>${(formData.selling_price_per_person * totalSoldSeats).toFixed(2)}</p>
+          </div>
+          <div>
+            <Label className="font-semibold">Total por Vender (Ingresos Potenciales):</Label>
+            <p>${totalToSell.toFixed(2)}</p>
+          </div>
+          <div className="md:col-span-2">
+            <Label className="font-semibold">Total por Pagar en Costos (Pendiente):</Label>
+            <p>${totalRemainingPayments.toFixed(2)}</p>
+          </div>
         </div>
 
-        {/* Selling Price */}
-        <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4 mt-4">
-          <Label htmlFor="selling_price_per_person" className="md:text-right font-bold text-lg">Precio de Venta por Persona</Label>
-          <Input id="selling_price_per_person" type="number" value={formData.selling_price_per_person} onChange={(e) => handleNumberChange('selling_price_per_person', e.target.value)} className="md:col-span-3 text-lg font-bold" required min={0} step="0.01" />
+        {/* Selling Price & Profit */}
+        <div className="col-span-full mt-4 p-4 bg-blue-50 rounded-md">
+          <h3 className="text-xl font-semibold mb-4 text-blue-800">Estrategia de Precios</h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
+            <Label htmlFor="desired_profit_percentage" className="md:text-right">Ganancia Deseada (%)</Label>
+            <Input
+              id="desired_profit_percentage"
+              type="number"
+              value={desiredProfitPercentage}
+              onChange={(e) => setDesiredProfitPercentage(parseFloat(e.target.value) || 0)}
+              className="md:col-span-3"
+              min={0}
+              step="0.1"
+            />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4 mt-4">
+            <Label htmlFor="suggested_selling_price" className="md:text-right font-bold text-lg">Precio de Venta Sugerido por Persona</Label>
+            <Input id="suggested_selling_price" type="number" value={suggestedSellingPrice.toFixed(2)} readOnly className="md:col-span-3 text-lg font-bold bg-blue-100 cursor-not-allowed" title="Calculado en base al costo por persona pagante y la ganancia deseada" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4 mt-4">
+            <Label htmlFor="selling_price_per_person" className="md:text-right font-bold text-lg">Precio de Venta Final por Persona</Label>
+            <Input id="selling_price_per_person" type="number" value={formData.selling_price_per_person} onChange={(e) => handleNumberChange('selling_price_per_person', e.target.value)} className="md:col-span-3 text-lg font-bold" required min={0} step="0.01" />
+          </div>
         </div>
+
+        {/* Break-even Analysis Section */}
+        <div className="col-span-full mt-4 p-4 bg-yellow-50 rounded-md">
+          <h3 className="text-xl font-semibold mb-4 text-yellow-800">Análisis de Punto de Equilibrio (Ajuste de Hoteles)</h3>
+          <p className="text-sm text-gray-700 mb-4">
+            Usa esta herramienta para calcular un precio de venta por persona y posibles ajustes en las habitaciones de hotel si esperas menos clientes de la capacidad total.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
+            <Label htmlFor="expected_clients_for_breakeven" className="md:text-right">Clientes Esperados</Label>
+            <Input
+              id="expected_clients_for_breakeven"
+              type="number"
+              value={expectedClientsForBreakeven}
+              onChange={(e) => setExpectedClientsForBreakeven(parseFloat(e.target.value) || 0)}
+              className="md:col-span-3"
+              min={1}
+              max={formData.bus_capacity - formData.courtesies}
+            />
+          </div>
+          <div className="flex justify-end mt-4">
+            <Button type="button" onClick={runBreakevenAnalysis} className="bg-yellow-600 hover:bg-yellow-700 text-white">
+              Calcular Punto de Equilibrio
+            </Button>
+          </div>
+
+          {breakevenResult && (
+            <div className="mt-6 p-4 bg-yellow-100 border border-yellow-300 rounded-md">
+              <h4 className="font-semibold text-lg text-yellow-900 mb-2">Resultado del Análisis:</h4>
+              <p className="text-yellow-800 mb-2">{breakevenResult.message}</p>
+              <p className="text-yellow-800">
+                Costo Base Total Ajustado: <span className="font-medium">${breakevenResult.adjustedTotalBaseCost.toFixed(2)}</span>
+              </p>
+              <p className="text-yellow-800">
+                Costo por Persona Pagante Ajustado: <span className="font-medium">${breakevenResult.adjustedCostPerPayingPerson.toFixed(2)}</span>
+              </p>
+              <p className="text-yellow-800">
+                Precio de Venta Sugerido para Punto de Equilibrio: <span className="font-bold">${breakevenResult.suggestedSellingPrice.toFixed(2)}</span>
+              </p>
+              <p className="text-sm text-gray-700 mt-2">
+                *Este es un cálculo simulado. Las habitaciones de hotel no se ajustan automáticamente.
+              </p>
+            </div>
+          )}
+        </div>
+
 
         <div className="flex justify-end mt-6">
           <Button type="submit" disabled={isSubmitting || isUploadingImage}>

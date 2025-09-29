@@ -53,6 +53,8 @@ interface Bus {
   rental_cost: number;
   total_capacity: number;
   seat_layout_json: SeatLayout | null; // Incluir el layout de asientos
+  advance_payment: number; // NEW
+  total_paid: number; // NEW
 }
 
 interface Tour {
@@ -68,9 +70,12 @@ interface Tour {
   cost_per_paying_person: number | null;
   bus_id: string | null; // Added bus_id
   bus_capacity: number; // Added bus_capacity
+  bus_cost: number; // Added bus_cost
   courtesies: number;
   hotel_details: TourHotelDetail[] | null; // Updated type
   provider_details: { name: string; service: string; cost: number }[] | null;
+  total_base_cost: number | null; // Added total_base_cost
+  paying_clients_count: number | null; // Added paying_clients_count
 }
 
 const TourDetailsPage = () => {
@@ -81,6 +86,11 @@ const TourDetailsPage = () => {
   const [hotelQuotesMap, setHotelQuotesMap] = useState<Map<string, HotelQuote>>(new Map());
   const [selectedSeatsForBooking, setSelectedSeatsForBooking] = useState<number[]>([]);
   const [busLayout, setBusLayout] = useState<SeatLayout | null>(null); // NEW: State for bus layout
+
+  // NEW: Financial states
+  const [totalSoldSeats, setTotalSoldSeats] = useState(0);
+  const [totalRemainingPayments, setTotalRemainingPayments] = useState(0);
+  const [selectedBus, setSelectedBus] = useState<Bus | null>(null); // To store selected bus details
 
   useEffect(() => {
     const fetchTourDetailsAndHotelQuotes = async () => {
@@ -109,10 +119,25 @@ const TourDetailsPage = () => {
       }));
       setHotelQuotesMap(quotesMap);
 
+      // Fetch all buses
+      const { data: busesData, error: busesError } = await supabase
+        .from('buses')
+        .select('*');
+
+      if (busesError) {
+        console.error('Error fetching buses:', busesError);
+        setError('Error al cargar la información de autobuses.');
+        setLoading(false);
+        return;
+      }
+      const busesMap = new Map<string, Bus>();
+      busesData?.forEach(bus => busesMap.set(bus.id, bus));
+
+
       // Then fetch tour details and associated bus layout
       const { data: tourData, error: tourError } = await supabase
         .from('tours')
-        .select('*, buses(seat_layout_json)') // Select tour data and bus layout
+        .select('*') // Select all tour data
         .eq('slug', id) // Fetch by slug
         .single();
 
@@ -128,12 +153,49 @@ const TourDetailsPage = () => {
           hotel_details: tourData.hotel_details || [],
           provider_details: tourData.provider_details || [],
         });
+
         // Set the bus layout from the fetched data
-        if (tourData.buses && Array.isArray(tourData.buses)) {
-          setBusLayout(tourData.buses[0]?.seat_layout_json || null);
-        } else if (tourData.buses) { // If it's a single object
-          setBusLayout(tourData.buses.seat_layout_json || null);
+        if (tourData.bus_id) {
+          const bus = busesMap.get(tourData.bus_id);
+          setSelectedBus(bus || null);
+          setBusLayout(bus?.seat_layout_json || null);
         }
+
+        // NEW: Fetch total sold seats
+        const { count, error: seatsError } = await supabase
+          .from('tour_seat_assignments')
+          .select('id', { count: 'exact' })
+          .eq('tour_id', tourData.id)
+          .eq('status', 'booked');
+
+        if (seatsError) {
+          console.error('Error fetching sold seats:', seatsError);
+          setTotalSoldSeats(0);
+        } else {
+          setTotalSoldSeats(count || 0);
+        }
+
+        // NEW: Calculate total remaining payments
+        let currentTotalRemainingPayments = 0;
+
+        // Bus remaining payment
+        if (selectedBus) {
+          currentTotalRemainingPayments += (selectedBus.rental_cost || 0) - (selectedBus.total_paid || 0);
+        }
+
+        // Hotel remaining payments
+        tourData.hotel_details?.forEach((tourHotelDetail: TourHotelDetail) => {
+          const hotelQuote = quotesMap.get(tourHotelDetail.hotel_quote_id);
+          if (hotelQuote) {
+            const totalCostDoubleRooms = (hotelQuote.num_double_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
+            const totalCostTripleRooms = (hotelQuote.num_triple_rooms || 0) * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
+            const totalCostQuadRooms = (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
+            const totalHotelBookingCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
+            currentTotalRemainingPayments += totalHotelBookingCost - (hotelQuote.total_paid || 0);
+          }
+        });
+        setTotalRemainingPayments(currentTotalRemainingPayments);
+
       } else {
         setError('Tour no encontrado.');
         setTour(null);
@@ -144,7 +206,7 @@ const TourDetailsPage = () => {
     if (id) {
       fetchTourDetailsAndHotelQuotes();
     }
-  }, [id]);
+  }, [id, selectedBus]); // Added selectedBus to dependencies
 
   const handleSeatsSelection = (seats: number[]) => {
     setSelectedSeatsForBooking(seats);
@@ -188,6 +250,10 @@ const TourDetailsPage = () => {
       </div>
     );
   }
+
+  const totalPotentialRevenue = (tour.selling_price_per_person || 0) * (tour.paying_clients_count || 0);
+  const totalSoldRevenue = (tour.selling_price_per_person || 0) * totalSoldSeats;
+  const totalToSellRevenue = totalPotentialRevenue - totalSoldRevenue;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -350,6 +416,20 @@ const TourDetailsPage = () => {
               <Button variant="outline" className="w-full mt-4 bg-white text-rosa-mexicano hover:bg-gray-100 border-rosa-mexicano hover:border-rosa-mexicano/90">
                 Contactar Asesor
               </Button>
+
+              {/* NEW: Financial Summary for Public View */}
+              <div className="mt-8 p-4 bg-white rounded-md shadow-sm border border-gray-200">
+                <h4 className="text-lg font-semibold mb-3 text-gray-800">Resumen Financiero del Tour</h4>
+                <ul className="space-y-2 text-sm text-gray-700">
+                  <li><span className="font-medium">Costo Base Total:</span> ${tour.total_base_cost?.toFixed(2) || '0.00'}</li>
+                  <li><span className="font-medium">Clientes Pagantes Potenciales:</span> {tour.paying_clients_count || 0}</li>
+                  <li><span className="font-medium">Costo por Persona Pagante:</span> ${tour.cost_per_paying_person?.toFixed(2) || '0.00'}</li>
+                  <li><span className="font-medium">Asientos Vendidos:</span> {totalSoldSeats}</li>
+                  <li><span className="font-medium">Total Vendido (Ingresos):</span> ${totalSoldRevenue.toFixed(2)}</li>
+                  <li><span className="font-medium">Total por Vender (Ingresos Potenciales):</span> ${totalToSellRevenue.toFixed(2)}</li>
+                  <li><span className="font-medium">Total por Pagar en Costos (Pendiente):</span> ${totalRemainingPayments.toFixed(2)}</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
