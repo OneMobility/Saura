@@ -8,7 +8,29 @@ import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Save, PlusCircle, MinusCircle, Upload } from 'lucide-react';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { v4 as uuidv4 } from 'uuid';
+
+interface HotelOption {
+  id: string;
+  name: string;
+  cost_per_night_double: number;
+  cost_per_night_triple: number;
+  cost_per_night_quad: number;
+  capacity_double: number;
+  capacity_triple: number;
+  capacity_quad: number;
+  is_active: boolean;
+}
+
+interface TourHotelDetail {
+  id: string; // Unique ID for this entry in the tour's hotel_details array
+  hotel_id: string;
+  hotel_name: string; // For display purposes
+  room_type: 'double' | 'triple' | 'quad';
+  num_nights: number;
+  cost_per_person_calculated: number; // Calculated cost per person for this hotel entry
+}
 
 interface Tour {
   id?: string;
@@ -23,7 +45,7 @@ interface Tour {
   bus_capacity: number;
   bus_cost: number;
   courtesies: number;
-  hotel_details: { name: string; cost: number; capacity: number }[];
+  hotel_details: TourHotelDetail[]; // Updated type
   provider_details: { name: string; service: string; cost: number }[];
   total_base_cost?: number;
   paying_clients_count?: number;
@@ -59,6 +81,26 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
+  const [availableHotels, setAvailableHotels] = useState<HotelOption[]>([]);
+
+  // Fetch available hotels
+  useEffect(() => {
+    const fetchAvailableHotels = async () => {
+      const { data, error } = await supabase
+        .from('hotels')
+        .select('*')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching available hotels:', error);
+        toast.error('Error al cargar la lista de hoteles disponibles.');
+      } else {
+        setAvailableHotels(data || []);
+      }
+    };
+    fetchAvailableHotels();
+  }, []);
 
   useEffect(() => {
     const fetchTourData = async () => {
@@ -115,9 +157,47 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   }, [tourId]);
 
   const calculateCosts = useCallback(() => {
-    const totalHotelCost = formData.hotel_details.reduce((sum, hotel) => sum + hotel.cost, 0);
     const totalProviderCost = formData.provider_details.reduce((sum, provider) => sum + provider.cost, 0);
-    const totalBaseCost = formData.bus_cost + totalHotelCost + totalProviderCost;
+    
+    // Calculate total hotel cost per person
+    const totalHotelCostPerPerson = formData.hotel_details.reduce((sum, hotelDetail) => {
+      const hotel = availableHotels.find(h => h.id === hotelDetail.hotel_id);
+      if (!hotel) return sum;
+
+      let costPerNight = 0;
+      let capacity = 0;
+
+      switch (hotelDetail.room_type) {
+        case 'double':
+          costPerNight = hotel.cost_per_night_double;
+          capacity = hotel.capacity_double;
+          break;
+        case 'triple':
+          costPerNight = hotel.cost_per_night_triple;
+          capacity = hotel.capacity_triple;
+          break;
+        case 'quad':
+          costPerNight = hotel.cost_per_night_quad;
+          capacity = hotel.capacity_quad;
+          break;
+        default:
+          break;
+      }
+
+      if (capacity === 0) return sum; // Avoid division by zero
+
+      const costPerPerson = (costPerNight * hotelDetail.num_nights) / capacity;
+      // Update the calculated cost in the hotel_details array
+      setFormData(prev => ({
+        ...prev,
+        hotel_details: prev.hotel_details.map(hd => 
+          hd.id === hotelDetail.id ? { ...hd, cost_per_person_calculated: costPerPerson } : hd
+        )
+      }));
+      return sum + costPerPerson;
+    }, 0);
+
+    const totalBaseCost = formData.bus_cost + totalProviderCost + totalHotelCostPerPerson;
 
     const payingClientsCount = formData.bus_capacity - formData.courtesies;
     const costPerPayingPerson = payingClientsCount > 0 ? totalBaseCost / payingClientsCount : 0;
@@ -128,7 +208,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       paying_clients_count: payingClientsCount,
       cost_per_paying_person: costPerPayingPerson,
     }));
-  }, [formData.bus_capacity, formData.bus_cost, formData.courtesies, formData.hotel_details, formData.provider_details]);
+  }, [formData.bus_capacity, formData.bus_cost, formData.courtesies, formData.provider_details, formData.hotel_details, availableHotels]);
 
   useEffect(() => {
     calculateCosts();
@@ -252,31 +332,46 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     });
   };
 
-  const handleHotelChange = (index: number, field: 'name' | 'cost' | 'capacity', value: string) => {
+  const handleTourHotelChange = (index: number, field: keyof TourHotelDetail, value: string | number) => {
     setFormData((prev) => {
-      const newHotels = [...prev.hotel_details];
-      if (field === 'cost' || field === 'capacity') {
-        newHotels[index] = { ...newHotels[index], [field]: parseFloat(value) || 0 };
-      } else {
-        newHotels[index] = { ...newHotels[index], [field]: value };
+      const newHotelDetails = [...prev.hotel_details];
+      const currentDetail = newHotelDetails[index];
+
+      if (field === 'hotel_id') {
+        const selectedHotel = availableHotels.find(h => h.id === value);
+        newHotelDetails[index] = {
+          ...currentDetail,
+          hotel_id: value as string,
+          hotel_name: selectedHotel?.name || '',
+        };
+      } else if (field === 'num_nights') {
+        newHotelDetails[index] = { ...currentDetail, num_nights: value as number };
+      } else if (field === 'room_type') {
+        newHotelDetails[index] = { ...currentDetail, room_type: value as 'double' | 'triple' | 'quad' };
       }
-      return { ...prev, hotel_details: newHotels };
+      return { ...prev, hotel_details: newHotelDetails };
     });
   };
 
-  const addHotelItem = () => {
+  const addTourHotelItem = () => {
     setFormData((prev) => ({
       ...prev,
-      hotel_details: [...prev.hotel_details, { name: '', cost: 0, capacity: 0 }],
+      hotel_details: [...prev.hotel_details, {
+        id: uuidv4(), // Unique ID for this entry
+        hotel_id: '',
+        hotel_name: '',
+        room_type: 'double',
+        num_nights: 1,
+        cost_per_person_calculated: 0,
+      }],
     }));
   };
 
-  const removeHotelItem = (index: number) => {
-    setFormData((prev) => {
-      const newHotels = [...prev.hotel_details];
-      newHotels.splice(index, 1);
-      return { ...prev, hotel_details: newHotels };
-    });
+  const removeTourHotelItem = (idToRemove: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      hotel_details: prev.hotel_details.filter((detail) => detail.id !== idToRemove),
+    }));
   };
 
   const handleProviderChange = (index: number, field: 'name' | 'service' | 'cost', value: string) => {
@@ -499,37 +594,54 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
         {/* Hotel Details */}
         <div className="space-y-2 col-span-full">
           <Label className="text-lg font-semibold">Hoteles Vinculados</Label>
-          {formData.hotel_details.map((hotel, index) => (
-            <div key={index} className="flex flex-col md:flex-row items-center gap-2">
-              <Input
-                value={hotel.name}
-                onChange={(e) => handleHotelChange(index, 'name', e.target.value)}
-                placeholder="Nombre del Hotel"
-                className="w-full md:w-1/3"
-              />
+          {formData.hotel_details.map((hotelDetail, index) => (
+            <div key={hotelDetail.id} className="flex flex-col md:flex-row items-center gap-2 border p-2 rounded-md">
+              <Select
+                value={hotelDetail.hotel_id}
+                onValueChange={(value) => handleTourHotelChange(index, 'hotel_id', value)}
+              >
+                <SelectTrigger className="w-full md:w-1/3">
+                  <SelectValue placeholder="Seleccionar Hotel" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableHotels.map((hotel) => (
+                    <SelectItem key={hotel.id} value={hotel.id}>
+                      {hotel.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <Select
+                value={hotelDetail.room_type}
+                onValueChange={(value) => handleTourHotelChange(index, 'room_type', value)}
+              >
+                <SelectTrigger className="w-full md:w-1/4">
+                  <SelectValue placeholder="Tipo Habitación" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="double">Doble (x2)</SelectItem>
+                  <SelectItem value="triple">Triple (x3)</SelectItem>
+                  <SelectItem value="quad">Cuádruple (x4)</SelectItem>
+                </SelectContent>
+              </Select>
               <Input
                 type="number"
-                value={hotel.cost}
-                onChange={(e) => handleHotelChange(index, 'cost', e.target.value)}
-                placeholder="Costo"
-                className="w-full md:w-1/3"
-                min={0} step="0.01"
+                value={hotelDetail.num_nights}
+                onChange={(e) => handleTourHotelChange(index, 'num_nights', parseFloat(e.target.value) || 0)}
+                placeholder="Noches"
+                className="w-full md:w-1/6"
+                min={1}
               />
-              <Input
-                type="number"
-                value={hotel.capacity}
-                onChange={(e) => handleHotelChange(index, 'capacity', e.target.value)}
-                placeholder="Capacidad"
-                className="w-full md:w-1/3"
-                min={0}
-              />
-              <Button type="button" variant="destructive" size="icon" onClick={() => removeHotelItem(index)}>
+              <div className="w-full md:w-1/4 text-sm text-gray-700">
+                Costo/persona: ${hotelDetail.cost_per_person_calculated.toFixed(2)}
+              </div>
+              <Button type="button" variant="destructive" size="icon" onClick={() => removeTourHotelItem(hotelDetail.id)}>
                 <MinusCircle className="h-4 w-4" />
               </Button>
             </div>
           ))}
-          <Button type="button" variant="outline" onClick={addHotelItem}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Añadir Hotel
+          <Button type="button" variant="outline" onClick={addTourHotelItem}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Añadir Hotel al Tour
           </Button>
         </div>
 
