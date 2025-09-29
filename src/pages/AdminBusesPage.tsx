@@ -8,8 +8,6 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import BusesTable from '@/components/admin/buses/BusesTable'; // Import the new BusesTable
-import BusForm from '@/components/admin/buses/BusForm'; // Import the new BusForm
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 interface Bus {
   id: string;
@@ -25,22 +23,17 @@ const AdminBusesPage = () => {
   const { user, isAdmin, isLoading } = useSession();
   const navigate = useNavigate();
   const [refreshKey, setRefreshKey] = useState(0); // Key to force re-fetch of buses
-  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
-  const [selectedBus, setSelectedBus] = useState<Bus | undefined>(undefined);
 
   const handleBusSave = () => {
     setRefreshKey(prev => prev + 1); // Increment key to trigger re-fetch in BusesTable
-    setIsFormDialogOpen(false); // Close dialog after save
   };
 
   const handleAddBus = () => {
-    setSelectedBus(undefined); // Clear selected bus for new entry
-    setIsFormDialogOpen(true);
+    navigate('/admin/buses/new'); // Navigate to the new form page for creation
   };
 
   const handleEditBus = (bus: Bus) => {
-    setSelectedBus(bus);
-    setIsFormDialogOpen(true);
+    navigate(`/admin/buses/edit/${bus.id}`); // Navigate to the new form page for editing
   };
 
   if (isLoading) {
@@ -73,15 +66,6 @@ const AdminBusesPage = () => {
           <p>&copy; {new Date().getFullYear()} Saura Tours Admin. Todos los derechos reservados.</p>
         </footer>
       </div>
-
-      <Dialog open={isFormDialogOpen} onOpenChange={setIsFormDialogOpen}>
-        <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{selectedBus ? 'Editar Autobús' : 'Añadir Nuevo Autobús'}</DialogTitle>
-          </DialogHeader>
-          <BusForm busId={selectedBus?.id} onSave={handleBusSave} />
-        </DialogContent>
-      </Dialog>
     </div>
   );
 };

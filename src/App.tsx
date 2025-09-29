@@ -26,6 +26,7 @@ import AdminHotelsPage from "./pages/AdminHotelsPage";
 import AdminProvidersPage from "./pages/AdminProvidersPage";
 import AdminClientsPage from "./pages/AdminClientsPage";
 import AdminBusesPage from "./pages/AdminBusesPage";
+import AdminBusFormPage from "./pages/AdminBusFormPage"; // Import the new AdminBusFormPage
 import AdminToursPage from "./pages/AdminToursPage";
 import AdminTourFormPage from "./pages/AdminTourFormPage";
 import AdminHotelFormPage from "./pages/AdminHotelFormPage";
@@ -124,7 +125,22 @@ const App = () => {
                   </ProtectedRoute>
                 }
               />
-              {/* No need for /admin/buses/new and /admin/buses/edit/:id as they are handled by the dialog in AdminBusesPage */}
+              <Route
+                path="/admin/buses/new"
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminBusFormPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/buses/edit/:id"
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminBusFormPage />
+                  </ProtectedRoute>
+                }
+              />
               <Route
                 path="/admin/providers"
                 element={
