@@ -10,6 +10,8 @@ import { useSession } from '@/components/SessionContextProvider';
 const Footer = () => {
   const { user, isAdmin, isLoading } = useSession();
 
+  console.log('Footer: user:', !!user, 'isAdmin:', isAdmin, 'isLoading:', isLoading);
+
   return (
     <footer className="bg-rosa-mexicano text-white py-10 px-4 md:px-8 lg:px-16">
       <div className="max-w-6xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-8 text-center md:text-left">

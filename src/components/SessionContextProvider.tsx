@@ -126,8 +126,6 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
     return () => subscription.unsubscribe();
   }, [location.pathname, navigate]);
 
-  // Eliminado el useEffect que causaba el cierre de sesión automático al salir de rutas /admin
-
   console.log('SessionContextProvider: Current state - isLoading:', isLoading, 'user:', !!user, 'isAdmin:', isAdmin, 'firstName:', firstName, 'lastName:', lastName);
 
   return (

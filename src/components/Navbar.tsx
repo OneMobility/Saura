@@ -11,6 +11,8 @@ const Navbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const { user, isAdmin, isLoading } = useSession(); // Get session info
 
+  console.log('Navbar: user:', !!user, 'isAdmin:', isAdmin, 'isLoading:', isLoading);
+
   const navLinks = [
     { name: 'Inicio', href: '/' },
     { name: 'Tours', href: '/tours' },
