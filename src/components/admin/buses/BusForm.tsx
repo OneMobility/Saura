@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -94,10 +94,15 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
     }));
   };
 
-  const handleLayoutChange = (layout: SeatLayout | null, seatCount: number) => {
-    setCurrentSeatLayout(layout);
-    setCurrentSeatCount(seatCount);
-  };
+  const handleLayoutChange = useCallback((layout: SeatLayout | null, seatCount: number) => {
+    // Solo actualiza si el contenido del layout ha cambiado realmente para prevenir re-renders innecesarios
+    if (JSON.stringify(layout) !== JSON.stringify(currentSeatLayout)) {
+      setCurrentSeatLayout(layout);
+    }
+    if (seatCount !== currentSeatCount) {
+      setCurrentSeatCount(seatCount);
+    }
+  }, [currentSeatLayout, currentSeatCount]); // Dependencies for useCallback
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
