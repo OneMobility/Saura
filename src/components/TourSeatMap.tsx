@@ -3,10 +3,18 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Loader2, Check, X, Ban } from 'lucide-react';
+import { Loader2, Check, X, Ban, CarFront, Toilet } from 'lucide-react'; // Added CarFront and Toilet icons
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useSession } from '@/components/SessionContextProvider';
+
+// Definición de tipos para el layout de asientos
+type SeatLayoutItem = {
+  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty';
+  number?: number; // Solo para asientos
+};
+type SeatLayoutRow = SeatLayoutItem[];
+type SeatLayout = SeatLayoutRow[];
 
 interface Seat {
   seat_number: number;
@@ -19,6 +27,7 @@ interface TourSeatMapProps {
   tourId: string;
   busCapacity: number;
   courtesies: number;
+  seatLayoutJson: SeatLayout | null; // NEW: Prop para la disposición de asientos
   onSeatsSelected?: (selectedSeats: number[]) => void; // Callback for selected seats
   readOnly?: boolean; // If true, no interaction allowed (e.g., for public viewing without booking)
   adminMode?: boolean; // If true, admin can block/unblock seats
@@ -28,6 +37,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
   tourId,
   busCapacity,
   courtesies,
+  seatLayoutJson, // Destructure new prop
   onSeatsSelected,
   readOnly = false,
   adminMode = false,
@@ -50,16 +60,30 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
       toast.error('Error al cargar las asignaciones de asientos.');
       setSeats([]);
     } else {
-      const fetchedSeats = data || [];
-      const allSeats: Seat[] = Array.from({ length: busCapacity }, (_, i) => {
-        const seatNumber = i + 1;
-        const existingSeat = fetchedSeats.find(s => s.seat_number === seatNumber);
-        return existingSeat || { seat_number: seatNumber, status: 'available', user_id: null };
-      });
+      const fetchedAssignments = data || [];
+      const allSeats: Seat[] = [];
+
+      // If seatLayoutJson is provided, use it to determine seat numbers
+      if (seatLayoutJson) {
+        seatLayoutJson.forEach(row => {
+          row.forEach(item => {
+            if (item.type === 'seat' && item.number !== undefined) {
+              const existingAssignment = fetchedAssignments.find(s => s.seat_number === item.number);
+              allSeats.push(existingAssignment || { seat_number: item.number, status: 'available', user_id: null });
+            }
+          });
+        });
+      } else {
+        // Fallback to simple grid if no layout is provided (should not happen if bus has layout)
+        for (let i = 1; i <= busCapacity; i++) {
+          const existingAssignment = fetchedAssignments.find(s => s.seat_number === i);
+          allSeats.push(existingAssignment || { seat_number: i, status: 'available', user_id: null });
+        }
+      }
       setSeats(allSeats);
     }
     setLoading(false);
-  }, [tourId, busCapacity]);
+  }, [tourId, busCapacity, seatLayoutJson]);
 
   useEffect(() => {
     fetchSeats();
@@ -120,9 +144,23 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
     });
   };
 
-  const getSeatClasses = (seat: Seat) => {
-    const isSelected = selectedSeats.includes(seat.seat_number);
+  const getSeatClasses = (seat: Seat | null, itemType: SeatLayoutItem['type']) => {
     const baseClasses = "w-10 h-10 flex items-center justify-center rounded-md text-sm font-semibold transition-colors duration-200";
+
+    if (itemType === 'aisle' || itemType === 'empty') {
+      return "w-10 h-10 flex items-center justify-center text-gray-500"; // Transparent or subtle for non-seats
+    }
+    if (itemType === 'bathroom') {
+      return cn(baseClasses, "bg-gray-300 text-gray-700 cursor-default");
+    }
+    if (itemType === 'driver') {
+      return cn(baseClasses, "bg-gray-700 text-white cursor-default");
+    }
+
+    // Only 'seat' type items proceed here
+    if (!seat) return cn(baseClasses, "bg-gray-200 text-gray-500 cursor-not-allowed"); // Should not happen if logic is correct
+
+    const isSelected = selectedSeats.includes(seat.seat_number);
 
     if (seat.status === 'booked') {
       return cn(baseClasses, "bg-red-500 text-white cursor-not-allowed");
@@ -148,8 +186,19 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
     );
   }
 
-  const numRows = Math.ceil(busCapacity / 4); // Example: 4 seats per row
-  const seatsPerRow = 4;
+  if (!seatLayoutJson || seatLayoutJson.length === 0) {
+    return (
+      <div className="p-4 border rounded-lg bg-gray-50 text-center text-gray-600">
+        <p>No hay una disposición de asientos definida para este autobús.</p>
+        {adminMode && isAdmin && (
+          <p className="text-sm mt-2">Por favor, define el layout en la sección de gestión de autobuses.</p>
+        )}
+      </div>
+    );
+  }
+
+  // Determine the number of columns for the grid based on the widest row
+  const maxCols = seatLayoutJson.reduce((max, row) => Math.max(max, row.length), 0);
 
   return (
     <div className="p-4 border rounded-lg bg-gray-50">
@@ -161,16 +210,38 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
           Modo Administrador: Haz clic en un asiento para bloquearlo/desbloquearlo.
         </p>
       )}
-      <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${seatsPerRow}, minmax(0, 1fr))` }}>
-        {seats.map((seat) => (
-          <Button
-            key={seat.seat_number}
-            className={getSeatClasses(seat)}
-            onClick={() => handleSeatClick(seat.seat_number, seat.status)}
-            disabled={isUpdatingSeats || (readOnly && !adminMode) || (seat.status === 'booked' && !adminMode) || (seat.status === 'courtesy' && !adminMode)}
-          >
-            {seat.seat_number}
-          </Button>
+      <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${maxCols}, minmax(0, 1fr))` }}>
+        {seatLayoutJson.map((row, rowIndex) => (
+          <React.Fragment key={rowIndex}>
+            {row.map((item, colIndex) => {
+              const seat = item.type === 'seat' ? seats.find(s => s.seat_number === item.number) : null;
+              return (
+                <div key={`${rowIndex}-${colIndex}`} className="flex items-center justify-center">
+                  {item.type === 'seat' && seat ? (
+                    <Button
+                      className={getSeatClasses(seat, item.type)}
+                      onClick={() => handleSeatClick(seat.seat_number, seat.status)}
+                      disabled={isUpdatingSeats || (readOnly && !adminMode) || (seat.status === 'booked' && !adminMode) || (seat.status === 'courtesy' && !adminMode)}
+                    >
+                      {item.number}
+                    </Button>
+                  ) : item.type === 'aisle' ? (
+                    <div className={getSeatClasses(null, item.type)}></div>
+                  ) : item.type === 'bathroom' ? (
+                    <div className={getSeatClasses(null, item.type)} title="Baño">
+                      <Toilet className="h-5 w-5" />
+                    </div>
+                  ) : item.type === 'driver' ? (
+                    <div className={getSeatClasses(null, item.type)} title="Conductor">
+                      <CarFront className="h-5 w-5" />
+                    </div>
+                  ) : ( // empty type
+                    <div className={getSeatClasses(null, item.type)}></div>
+                  )}
+                </div>
+              );
+            })}
+          </React.Fragment>
         ))}
       </div>
       <div className="mt-6 p-4 bg-white rounded-md shadow-sm">
@@ -190,6 +261,12 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
           </div>
           <div className="flex items-center">
             <span className="w-5 h-5 bg-purple-500 rounded-sm mr-2"></span> Cortesía
+          </div>
+          <div className="flex items-center">
+            <span className="w-5 h-5 bg-gray-300 rounded-sm mr-2"></span> Baño
+          </div>
+          <div className="flex items-center">
+            <span className="w-5 h-5 bg-gray-700 rounded-sm mr-2"></span> Conductor
           </div>
         </div>
       </div>

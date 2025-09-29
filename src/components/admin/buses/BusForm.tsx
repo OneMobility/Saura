@@ -4,9 +4,18 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Save } from 'lucide-react';
+
+// Definición de tipos para el layout de asientos
+type SeatLayoutItem = {
+  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty';
+  number?: number; // Solo para asientos
+};
+type SeatLayoutRow = SeatLayoutItem[];
+type SeatLayout = SeatLayoutRow[];
 
 interface Bus {
   id?: string;
@@ -14,7 +23,7 @@ interface Bus {
   license_plate: string;
   rental_cost: number;
   total_capacity: number;
-  // seat_map_image_url ya no se gestiona directamente aquí
+  seat_layout_json: SeatLayout | null; // Nueva columna para la disposición de asientos
 }
 
 interface BusFormProps {
@@ -28,9 +37,18 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
     license_plate: '',
     rental_cost: 0,
     total_capacity: 0,
+    seat_layout_json: null,
   });
+  const [seatLayoutInput, setSeatLayoutInput] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
+
+  const exampleSeatLayout = JSON.stringify([
+    [{"type": "driver"}, {"type": "empty"}, {"type": "aisle"}, {"type": "seat", "number": 1}, {"type": "seat", "number": 2}],
+    [{"type": "seat", "number": 3}, {"type": "seat", "number": 4}, {"type": "aisle"}, {"type": "seat", "number": 5}, {"type": "seat", "number": 6}],
+    [{"type": "seat", "number": 7}, {"type": "seat", "number": 8}, {"type": "aisle"}, {"type": "seat", "number": 9}, {"type": "seat", "number": 10}],
+    [{"type": "empty"}, {"type": "empty"}, {"type": "aisle"}, {"type": "bathroom"}, {"type": "empty"}]
+  ], null, 2); // Pretty print JSON
 
   useEffect(() => {
     const fetchBusData = async () => {
@@ -38,7 +56,7 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
         setLoadingInitialData(true);
         const { data, error } = await supabase
           .from('buses')
-          .select('id, name, license_plate, rental_cost, total_capacity') // Seleccionar solo los campos relevantes
+          .select('id, name, license_plate, rental_cost, total_capacity, seat_layout_json')
           .eq('id', busId)
           .single();
 
@@ -51,6 +69,7 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
 
         if (data) {
           setFormData(data);
+          setSeatLayoutInput(data.seat_layout_json ? JSON.stringify(data.seat_layout_json, null, 2) : '');
         }
       } else {
         // Reset form for new bus
@@ -59,7 +78,9 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
           license_plate: '',
           rental_cost: 0,
           total_capacity: 0,
+          seat_layout_json: null,
         });
+        setSeatLayoutInput('');
       }
       setLoadingInitialData(false);
     };
@@ -67,12 +88,48 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
     fetchBusData();
   }, [busId]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value, type } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [id]: type === 'number' ? parseFloat(value) : value,
-    }));
+    if (id === 'seat_layout_json_input') {
+      setSeatLayoutInput(value);
+    } else {
+      setFormData((prev) => ({
+        ...prev,
+        [id]: type === 'number' ? parseFloat(value) : value,
+      }));
+    }
+  };
+
+  const validateAndParseSeatLayout = (jsonString: string): { layout: SeatLayout | null, seatCount: number, error: string | null } => {
+    if (!jsonString.trim()) {
+      return { layout: null, seatCount: 0, error: null };
+    }
+    try {
+      const parsedLayout: SeatLayout = JSON.parse(jsonString);
+      if (!Array.isArray(parsedLayout)) {
+        return { layout: null, seatCount: 0, error: 'El layout debe ser un array de filas.' };
+      }
+      let count = 0;
+      for (const row of parsedLayout) {
+        if (!Array.isArray(row)) {
+          return { layout: null, seatCount: 0, error: 'Cada fila en el layout debe ser un array de elementos.' };
+        }
+        for (const item of row) {
+          if (typeof item !== 'object' || item === null || !('type' in item)) {
+            return { layout: null, seatCount: 0, error: 'Cada elemento del layout debe ser un objeto con una propiedad "type".' };
+          }
+          if (item.type === 'seat') {
+            if (typeof item.number !== 'number' || item.number <= 0) {
+              return { layout: null, seatCount: 0, error: `El asiento con número ${item.number} tiene un número inválido.` };
+            }
+            count++;
+          }
+        }
+      }
+      return { layout: parsedLayout, seatCount: count, error: null };
+    } catch (e: any) {
+      return { layout: null, seatCount: 0, error: `JSON inválido: ${e.message}` };
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -97,12 +154,26 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
       return;
     }
 
+    const { layout: parsedLayout, seatCount, error: layoutError } = validateAndParseSeatLayout(seatLayoutInput);
+
+    if (layoutError) {
+      toast.error(`Error en la disposición de asientos: ${layoutError}`);
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (parsedLayout && seatCount !== formData.total_capacity) {
+      toast.error(`La capacidad total de asientos (${formData.total_capacity}) no coincide con el número de asientos en la disposición JSON (${seatCount}).`);
+      setIsSubmitting(false);
+      return;
+    }
+
     const busDataToSave = {
       name: formData.name,
       license_plate: formData.license_plate,
       rental_cost: formData.rental_cost,
       total_capacity: formData.total_capacity,
-      // seat_map_image_url ya no se incluye aquí
+      seat_layout_json: parsedLayout, // Guardar el JSON parseado
     };
 
     if (busId) {
@@ -202,7 +273,26 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
             required
           />
         </div>
-        {/* El campo de imagen del mapa de asientos se ha eliminado, ya que el mapa es dinámico */}
+        <div className="grid grid-cols-4 items-start gap-4">
+          <Label htmlFor="seat_layout_json_input" className="text-right pt-2">
+            Disposición de Asientos (JSON)
+          </Label>
+          <div className="col-span-3">
+            <Textarea
+              id="seat_layout_json_input"
+              value={seatLayoutInput}
+              onChange={handleChange}
+              rows={10}
+              className="font-mono text-sm"
+              placeholder={`Ejemplo:\n${exampleSeatLayout}`}
+            />
+            <p className="text-sm text-gray-500 mt-2">
+              Define la disposición de los asientos, pasillos, baño, etc. como un array de arrays (filas).
+              Tipos: "seat" (con "number"), "aisle", "bathroom", "driver", "empty".
+              Asegúrate de que el número total de asientos ("seat" con "number") coincida con la Capacidad Total de Asientos.
+            </p>
+          </div>
+        </div>
 
         <div className="flex justify-end mt-6">
           <Button type="submit" disabled={isSubmitting}>

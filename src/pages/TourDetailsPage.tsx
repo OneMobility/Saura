@@ -38,6 +38,23 @@ interface TourHotelDetail {
   room_type: 'double' | 'triple' | 'quad';
 }
 
+// Definición de tipos para el layout de asientos
+type SeatLayoutItem = {
+  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty';
+  number?: number; // Solo para asientos
+};
+type SeatLayoutRow = SeatLayoutItem[];
+type SeatLayout = SeatLayoutRow[];
+
+interface Bus {
+  id: string;
+  name: string;
+  license_plate: string;
+  rental_cost: number;
+  total_capacity: number;
+  seat_layout_json: SeatLayout | null; // Incluir el layout de asientos
+}
+
 interface Tour {
   id: string;
   image_url: string;
@@ -63,6 +80,7 @@ const TourDetailsPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [hotelQuotesMap, setHotelQuotesMap] = useState<Map<string, HotelQuote>>(new Map());
   const [selectedSeatsForBooking, setSelectedSeatsForBooking] = useState<number[]>([]);
+  const [busLayout, setBusLayout] = useState<SeatLayout | null>(null); // NEW: State for bus layout
 
   useEffect(() => {
     const fetchTourDetailsAndHotelQuotes = async () => {
@@ -91,10 +109,10 @@ const TourDetailsPage = () => {
       }));
       setHotelQuotesMap(quotesMap);
 
-      // Then fetch tour details
+      // Then fetch tour details and associated bus layout
       const { data: tourData, error: tourError } = await supabase
         .from('tours')
-        .select('*') // Select all columns
+        .select('*, buses(seat_layout_json)') // Select tour data and bus layout
         .eq('slug', id) // Fetch by slug
         .single();
 
@@ -110,6 +128,12 @@ const TourDetailsPage = () => {
           hotel_details: tourData.hotel_details || [],
           provider_details: tourData.provider_details || [],
         });
+        // Set the bus layout from the fetched data
+        if (tourData.buses && Array.isArray(tourData.buses)) {
+          setBusLayout(tourData.buses[0]?.seat_layout_json || null);
+        } else if (tourData.buses) { // If it's a single object
+          setBusLayout(tourData.buses.seat_layout_json || null);
+        }
       } else {
         setError('Tour no encontrado.');
         setTour(null);
@@ -305,7 +329,7 @@ const TourDetailsPage = () => {
                     tourId={tour.id}
                     busCapacity={tour.bus_capacity}
                     courtesies={tour.courtesies}
-                    onSeatsSelected={handleSeatsSelection}
+                    seatLayoutJson={busLayout} // Pass the fetched bus layout
                     readOnly={false} // Allow public users to select seats
                     adminMode={false}
                   />

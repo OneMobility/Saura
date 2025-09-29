@@ -41,13 +41,21 @@ interface TourHotelDetail {
   room_type: 'double' | 'triple' | 'quad'; // This is the room type *chosen for this specific tour's booking*
 }
 
+// Definición de tipos para el layout de asientos
+type SeatLayoutItem = {
+  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty';
+  number?: number; // Solo para asientos
+};
+type SeatLayoutRow = SeatLayoutItem[];
+type SeatLayout = SeatLayoutRow[];
+
 interface Bus {
   id: string;
   name: string;
   license_plate: string;
   rental_cost: number;
   total_capacity: number;
-  seat_map_image_url: string | null;
+  seat_layout_json: SeatLayout | null; // Incluir el layout de asientos
 }
 
 interface Tour {
@@ -103,6 +111,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const [loadingInitialData, setLoadingInitialData] = useState(true);
   const [availableHotelQuotes, setAvailableHotelQuotes] = useState<HotelQuote[]>([]);
   const [availableBuses, setAvailableBuses] = useState<Bus[]>([]); // NEW: State for available buses
+  const [selectedBusLayout, setSelectedBusLayout] = useState<SeatLayout | null>(null); // NEW: State for selected bus layout
 
   // Fetch available hotel quotes
   useEffect(() => {
@@ -128,7 +137,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     const fetchAvailableBuses = async () => {
       const { data, error } = await supabase
         .from('buses')
-        .select('*')
+        .select('*') // Select all columns including seat_layout_json
         .order('name', { ascending: true });
 
       if (error) {
@@ -168,6 +177,12 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             bus_id: data.bus_id || null, // Ensure bus_id is set
           });
           setImageUrlPreview(data.image_url);
+
+          // Set selected bus layout if bus_id is present
+          if (data.bus_id) {
+            const bus = availableBuses.find(b => b.id === data.bus_id);
+            setSelectedBusLayout(bus?.seat_layout_json || null);
+          }
         }
       } else {
         // Reset form for new tour
@@ -190,12 +205,13 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
         });
         setImageFile(null);
         setImageUrlPreview('');
+        setSelectedBusLayout(null); // Clear layout for new tour
       }
       setLoadingInitialData(false);
     };
 
     fetchTourData();
-  }, [tourId]);
+  }, [tourId, availableBuses]); // Add availableBuses to dependencies to ensure layout is set on load
 
   const calculateCosts = useCallback(() => {
     const totalProviderCost = formData.provider_details.reduce((sum, provider) => sum + provider.cost, 0);
@@ -419,6 +435,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       bus_capacity: selectedBus?.total_capacity || 0,
       bus_cost: selectedBus?.rental_cost || 0,
     }));
+    setSelectedBusLayout(selectedBus?.seat_layout_json || null); // Set the layout
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -640,6 +657,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
               tourId={tourId}
               busCapacity={formData.bus_capacity}
               courtesies={formData.courtesies}
+              seatLayoutJson={selectedBusLayout} // Pass the selected bus layout
               readOnly={false}
               adminMode={true} // Enable admin mode for blocking seats
             />
