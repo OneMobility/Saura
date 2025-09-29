@@ -5,35 +5,50 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText } from 'lucide-react'; // Added MessageSquareText icon
-import { useSession } from '@/components/SessionContextProvider'; // Import useSession
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'; // Import Collapsible components
+import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText, ChevronDown, Hotel, Truck, UserRound } from 'lucide-react'; // Added Hotel, Truck, UserRound, ChevronDown icons
+import { useSession } from '@/components/SessionContextProvider';
 
 interface NavItem {
-  href: string;
+  href?: string; // Optional for parent items
   icon: React.ElementType;
   label: string;
+  children?: NavItem[]; // For submenus
 }
 
 const navItems: NavItem[] = [
   { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/admin/tours', icon: Package, label: 'Tours' },
+  {
+    icon: Package, // Icon for the main "Tours" category
+    label: 'Gestión de Viajes', // A more general label for the parent
+    children: [
+      { href: '/admin/tours', icon: Package, label: 'Tours' }, // Existing tours page
+      { href: '/admin/hotels', icon: Hotel, label: 'Hoteles' }, // New
+      { href: '/admin/providers', icon: Truck, label: 'Proveedores' }, // New
+      { href: '/admin/clients', icon: UserRound, label: 'Clientes' }, // New, using UserRound to differentiate from Users
+    ],
+  },
   { href: '/admin/blog', icon: Newspaper, label: 'Blog' },
-  { href: '/admin/reviews', icon: MessageSquareText, label: 'Opiniones' }, // NEW: Reviews management link
+  { href: '/admin/reviews', icon: MessageSquareText, label: 'Opiniones' },
   { href: '/admin/users', icon: Users, label: 'Usuarios' },
   { href: '/admin/settings', icon: Settings, label: 'Configuración' },
 ];
 
 const AdminSidebar = () => {
-  const [isPinned, setIsPinned] = useState(false); // Estado para fijar/desfijar la barra lateral
-  const [isHovering, setIsHovering] = useState(false); // Estado para detectar si el ratón está sobre la barra lateral
+  const [isPinned, setIsPinned] = useState(false);
+  const [isHovering, setIsHovering] = useState(false);
   const location = useLocation();
-  const { user, isAdmin, isLoading } = useSession(); // Obtener información de la sesión
+  const { user, isAdmin, isLoading } = useSession();
 
-  // La barra lateral estará expandida si está fijada O si el ratón está sobre ella
   const isExpanded = isPinned || isHovering;
 
   const togglePin = () => {
     setIsPinned(prev => !prev);
+  };
+
+  // Determine if a parent item's submenu should be open
+  const isParentActive = (item: NavItem) => {
+    return item.children?.some(child => location.pathname.startsWith(child.href || '')) || false;
   };
 
   return (
@@ -52,16 +67,15 @@ const AdminSidebar = () => {
           {isExpanded && (
             <>
               <span className="text-xl font-bold text-white">Admin Panel</span>
-              {/* Botón para fijar/desfijar la barra lateral, ahora dentro del Link */}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={(e) => {
-                  e.preventDefault(); // Previene la navegación del Link
-                  e.stopPropagation(); // Detiene la propagación del evento para que no afecte al Link
+                  e.preventDefault();
+                  e.stopPropagation();
                   togglePin();
                 }}
-                className="text-white hover:bg-gray-700 rounded-full h-8 w-8 ml-2" // Añadido ml-2 para espaciado
+                className="text-white hover:bg-gray-700 rounded-full h-8 w-8 ml-2"
               >
                 {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
                 <span className="sr-only">{isPinned ? "Desfijar barra lateral" : "Fijar barra lateral"}</span>
@@ -74,52 +88,110 @@ const AdminSidebar = () => {
       {/* Navigation Links */}
       <nav className="flex-grow mt-4 space-y-2 px-2">
         {navItems.map((item) => (
-          <div key={item.href}>
-            {!isExpanded ? ( // Si está colapsada, muestra solo el icono y un tooltip
-              <Tooltip>
-                <TooltipTrigger asChild>
+          item.children ? ( // Render as collapsible if it has children
+            <Collapsible key={item.label} defaultOpen={isParentActive(item)}>
+              <CollapsibleTrigger asChild>
+                {!isExpanded ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        className={cn(
+                          "w-full h-10 justify-center",
+                          isParentActive(item) ? "bg-gray-700 text-white" : "hover:bg-gray-700"
+                        )}
+                      >
+                        <item.icon className="h-5 w-5" />
+                        <span className="sr-only">{item.label}</span>
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="right">{item.label}</TooltipContent>
+                  </Tooltip>
+                ) : (
                   <Button
                     variant="ghost"
                     className={cn(
-                      "w-full h-10 justify-center",
-                      location.pathname === item.href
-                        ? "bg-rosa-mexicano text-white hover:bg-rosa-mexicano/90"
-                        : "hover:bg-gray-700"
+                      "w-full h-10 justify-start px-4 space-x-3",
+                      isParentActive(item) ? "bg-gray-700 text-white" : "hover:bg-gray-700"
                     )}
-                    asChild
                   >
-                    <Link to={item.href}>
-                      <item.icon className="h-5 w-5" />
-                      <span className="sr-only">{item.label}</span>
-                    </Link>
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.label}</span>
+                    <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 data-[state=open]:rotate-180" />
                   </Button>
-                </TooltipTrigger>
-                <TooltipContent side="right">{item.label}</TooltipContent>
-              </Tooltip>
-            ) : ( // Si está expandida, muestra el icono y el texto
-              <Button
-                variant="ghost"
-                className={cn(
-                  "w-full h-10 justify-start px-4 space-x-3",
-                  location.pathname === item.href
-                    ? "bg-rosa-mexicano text-white hover:bg-rosa-mexicano/90"
-                    : "hover:bg-gray-700"
                 )}
-                asChild
-              >
-                <Link to={item.href}>
-                  <item.icon className="h-5 w-5" />
-                  <span>{item.label}</span>
-                </Link>
-              </Button>
-            )}
-          </div>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                <div className="ml-4 border-l border-gray-700 pl-2 py-1 space-y-1">
+                  {item.children.map((child) => (
+                    <Button
+                      key={child.href}
+                      variant="ghost"
+                      className={cn(
+                        "w-full h-9 justify-start px-4 space-x-3 text-sm",
+                        location.pathname === child.href
+                          ? "bg-rosa-mexicano text-white hover:bg-rosa-mexicano/90"
+                          : "hover:bg-gray-700"
+                      )}
+                      asChild
+                    >
+                      <Link to={child.href || '#'}>
+                        <child.icon className="h-4 w-4" />
+                        <span>{child.label}</span>
+                      </Link>
+                    </Button>
+                  ))}
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          ) : ( // Render as a single link if no children
+            <div key={item.href}>
+              {!isExpanded ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      className={cn(
+                        "w-full h-10 justify-center",
+                        location.pathname === item.href
+                          ? "bg-rosa-mexicano text-white hover:bg-rosa-mexicano/90"
+                          : "hover:bg-gray-700"
+                      )}
+                      asChild
+                    >
+                      <Link to={item.href || '#'}>
+                        <item.icon className="h-5 w-5" />
+                        <span className="sr-only">{item.label}</span>
+                      </Link>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{item.label}</TooltipContent>
+                </Tooltip>
+              ) : (
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "w-full h-10 justify-start px-4 space-x-3",
+                    location.pathname === item.href
+                      ? "bg-rosa-mexicano text-white hover:bg-rosa-mexicano/90"
+                      : "hover:bg-gray-700"
+                  )}
+                  asChild
+                >
+                  <Link to={item.href || '#'}>
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.label}</span>
+                  </Link>
+                </Button>
+              )}
+            </div>
+          )
         ))}
       </nav>
 
-      {/* Sidebar Footer (e.g., for fixed items or spacing) */}
+      {/* Sidebar Footer */}
       <div className="p-4 border-t border-gray-700">
-        {/* Puedes añadir elementos de pie de página aquí si es necesario */}
+        {/* Footer content if needed */}
       </div>
     </aside>
   );

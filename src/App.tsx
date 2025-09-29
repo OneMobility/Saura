@@ -17,13 +17,16 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminSettingsPage from "./pages/AdminSettingsPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import AdminBlogPage from "./pages/AdminBlogPage";
-import AdminReviewsPage from "./pages/AdminReviewsPage"; // NEW: Import AdminReviewsPage
+import AdminReviewsPage from "./pages/AdminReviewsPage";
+import AdminHotelsPage from "./pages/AdminHotelsPage"; // NEW: Import AdminHotelsPage
+import AdminProvidersPage from "./pages/AdminProvidersPage"; // NEW: Import AdminProvidersPage
+import AdminClientsPage from "./pages/AdminClientsPage"; // NEW: Import AdminClientsPage
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
-const App = () => { // Eliminado React.FC
+const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -73,10 +76,34 @@ const App = () => { // Eliminado React.FC
                 }
               />
               <Route
-                path="/admin/reviews" // NEW: Route for AdminReviewsPage
+                path="/admin/reviews"
                 element={
                   <ProtectedRoute adminOnly>
                     <AdminReviewsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/hotels" // NEW: Route for AdminHotelsPage
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminHotelsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/providers" // NEW: Route for AdminProvidersPage
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminProvidersPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/clients" // NEW: Route for AdminClientsPage
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminClientsPage />
                   </ProtectedRoute>
                 }
               />
