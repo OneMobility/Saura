@@ -26,61 +26,72 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
   const navigate = useNavigate();
   const location = useLocation();
 
-  useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, currentSession) => {
-      console.log('SessionContextProvider: Auth state change event:', event, 'Session:', currentSession);
-      setSession(currentSession);
-      setUser(currentSession?.user || null);
-      
-      let currentIsAdmin = false; // Variable temporal para el estado de admin
-      let currentFirstName: string | null = null;
-      let currentLastName: string | null = null;
+  // Función para manejar los datos de la sesión y el perfil
+  const handleSessionData = async (currentSession: Session | null) => {
+    setSession(currentSession);
+    setUser(currentSession?.user || null);
 
-      if (currentSession?.user) {
-        console.log('SessionContextProvider: User is logged in, fetching profile role and first name...');
-        const { data: profile, error } = await supabase
-          .from('profiles')
-          .select('role, first_name, last_name')
-          .eq('id', currentSession.user.id)
-          .single();
+    let currentIsAdmin = false;
+    let currentFirstName: string | null = null;
+    let currentLastName: string | null = null;
 
-        if (error) {
-          console.error('SessionContextProvider: Error fetching user profile:', error);
-        } else if (profile) {
-          console.log('SessionContextProvider: Profile fetched:', profile);
-          currentIsAdmin = (profile.role === 'admin');
-          currentFirstName = profile.first_name || null;
-          currentLastName = profile.last_name || null;
-        } else {
-          console.log('SessionContextProvider: No profile found for user.');
-        }
+    if (currentSession?.user) {
+      console.log('SessionContextProvider: User is logged in, fetching profile role and first name...');
+      const { data: profile, error } = await supabase
+        .from('profiles')
+        .select('role, first_name, last_name')
+        .eq('id', currentSession.user.id)
+        .single();
 
-        // Actualiza los estados después de la obtención del perfil
-        setIsAdmin(currentIsAdmin);
-        setFirstName(currentFirstName);
-        setLastName(currentLastName);
-
-        // Redirige a usuarios autenticados desde la página de login
-        if (location.pathname === '/login') {
-          console.log('SessionContextProvider: User is authenticated and on /login, redirecting to /admin/dashboard.');
-          navigate('/admin/dashboard');
-        }
+      if (error) {
+        console.error('SessionContextProvider: Error fetching user profile:', error);
+      } else if (profile) {
+        console.log('SessionContextProvider: Profile fetched:', profile);
+        currentIsAdmin = (profile.role === 'admin');
+        currentFirstName = profile.first_name || null;
+        currentLastName = profile.last_name || null;
       } else {
-        console.log('SessionContextProvider: User is NOT logged in.');
-        setIsAdmin(false);
-        setFirstName(null);
-        setLastName(null);
-        // Redirige a usuarios no autenticados desde rutas protegidas
-        if (location.pathname.startsWith('/admin')) {
-          console.log('SessionContextProvider: User is unauthenticated and on /admin route, redirecting to /login.');
-          navigate('/login');
-        }
+        console.log('SessionContextProvider: No profile found for user.');
       }
-      // Establece isLoading en false solo después de que todas las comprobaciones y actualizaciones de estado estén hechas
-      setIsLoading(false); 
+
+      setIsAdmin(currentIsAdmin);
+      setFirstName(currentFirstName);
+      setLastName(currentLastName);
+
+      // Redirige a usuarios autenticados desde la página de login si son admin
+      if (location.pathname === '/login' && currentIsAdmin) {
+        console.log('SessionContextProvider: User is authenticated and admin on /login, redirecting to /admin/dashboard.');
+        navigate('/admin/dashboard');
+      }
+    } else {
+      console.log('SessionContextProvider: User is NOT logged in.');
+      setIsAdmin(false);
+      setFirstName(null);
+      setLastName(null);
+      // Redirige a usuarios no autenticados desde rutas protegidas
+      if (location.pathname.startsWith('/admin')) {
+        console.log('SessionContextProvider: User is unauthenticated and on /admin route, redirecting to /login.');
+        navigate('/login');
+      }
+    }
+    setIsLoading(false); // Establece isLoading en false después de que todas las comprobaciones estén hechas
+  };
+
+  useEffect(() => {
+    // Comprobación inicial de la sesión al montar el componente
+    supabase.auth.getSession().then(({ data: { session: initialSession } }) => {
+      console.log('SessionContextProvider: Initial getSession check. Session:', initialSession);
+      handleSessionData(initialSession);
     });
 
-    // Limpia la suscripción al desmontar el componente
+    // Escucha los cambios en el estado de autenticación
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, currentSession) => {
+      console.log('SessionContextProvider: Auth state change event:', event, 'Session:', currentSession);
+      // Para cambios posteriores, procesamos los datos de la sesión.
+      // No volvemos a establecer isLoading en true aquí, ya que se maneja en la carga inicial.
+      handleSessionData(currentSession);
+    });
+
     return () => subscription.unsubscribe();
   }, [location.pathname, navigate]); // Dependencias para useEffect
 
