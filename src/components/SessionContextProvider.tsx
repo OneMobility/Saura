@@ -35,12 +35,13 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
       .eq('id', currentUser.id)
       .single();
 
-    if (error) {
+    if (error && error.code !== 'PGRST116') { // PGRST116 means "no rows found"
       console.error('SessionContextProvider: Error fetching user profile:', error);
       setIsAdmin(false);
       setFirstName(null);
       setLastName(null);
     } else if (profile) {
+      console.log('SessionContextProvider: Raw profile data:', profile); // Nuevo log aquí
       setIsAdmin(profile.role === 'admin');
       setFirstName(profile.first_name || null);
       setLastName(profile.last_name || null);
@@ -49,7 +50,7 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
       setIsAdmin(false);
       setFirstName(null);
       setLastName(null);
-      console.log('SessionContextProvider: No profile found for user.');
+      console.log('SessionContextProvider: No profile found for user. Setting IsAdmin to false.');
     }
   };
 
