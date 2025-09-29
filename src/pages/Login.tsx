@@ -9,21 +9,28 @@ import { useSession } from '@/components/SessionContextProvider';
 
 const Login = () => {
   const navigate = useNavigate();
-  const { session, isLoading } = useSession();
-
-  console.log('Login Page: isLoading:', isLoading, 'Session:', session);
+  const { session, isLoading, isAdmin } = useSession(); // También obtenemos isAdmin aquí
 
   useEffect(() => {
-    // If already logged in and not loading, redirect to admin dashboard
-    if (!isLoading && session) {
-      console.log('Login Page: User is authenticated and not loading, redirecting to /admin/dashboard.');
+    console.log('Login Page useEffect: isLoading:', isLoading, 'Session:', session, 'isAdmin:', isAdmin);
+    // Si ya está logueado y no está cargando, y es admin, redirigir al dashboard
+    if (!isLoading && session && isAdmin) {
+      console.log('Login Page: User is authenticated and is admin, redirecting to /admin/dashboard.');
       navigate('/admin/dashboard');
+    } else if (!isLoading && session && !isAdmin) {
+      // Si está logueado pero NO es admin, redirigir a la página de inicio
+      console.log('Login Page: User is authenticated but NOT admin, redirecting to /.');
+      navigate('/');
     }
-  }, [session, isLoading, navigate]); // Dependencias del useEffect
+  }, [session, isLoading, isAdmin, navigate]); // Dependencias del useEffect
 
-  // No renderizar el formulario de login si ya estamos redirigiendo
-  if (!isLoading && session) {
-    return null;
+  // No renderizar el formulario de login si ya estamos redirigiendo o si está cargando
+  if (isLoading || (session && isAdmin)) { // Si está cargando o ya está logueado como admin, no mostrar el formulario
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
+        <p className="text-gray-700">Cargando...</p>
+      </div>
+    );
   }
 
   return (
@@ -45,7 +52,7 @@ const Login = () => {
             },
           }}
           theme="light"
-          redirectTo={window.location.origin + '/admin/dashboard'} // Redirect after successful login
+          redirectTo={window.location.origin + '/admin/dashboard'} // Redirigir después de un login exitoso
         />
       </div>
     </div>

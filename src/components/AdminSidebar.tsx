@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff } from 'lucide-react'; // Added Pin and PinOff icons
+import { useSession } from '@/components/SessionContextProvider'; // Import useSession
 
 interface NavItem {
   href: string;
@@ -25,6 +26,9 @@ const AdminSidebar = () => {
   const [isPinned, setIsPinned] = useState(false); // Estado para fijar/desfijar la barra lateral
   const [isHovering, setIsHovering] = useState(false); // Estado para detectar si el ratón está sobre la barra lateral
   const location = useLocation();
+  const { user, isAdmin, isLoading } = useSession(); // Obtener información de la sesión
+
+  console.log('AdminSidebar: isLoading:', isLoading, 'user:', !!user, 'isAdmin:', isAdmin);
 
   // La barra lateral estará expandida si está fijada O si el ratón está sobre ella
   const isExpanded = isPinned || isHovering;
