@@ -1,9 +1,11 @@
 import React from "react";
+import { BrowserRouter, Routes, Route } from "react-router-dom";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query"; // Asegurando la importación correcta
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route } from "react-router-dom";
+
 import Index from "./pages/Index";
 import NotFound from "./pages/NotFound";
 import TourDetailsPage from "./pages/TourDetailsPage";
@@ -13,6 +15,8 @@ import ToursPage from "./pages/ToursPage";
 import ContactPage from "./pages/ContactPage";
 import ScrollToTop from "./components/ScrollToTop";
 import Login from "./pages/Login";
+
+// Admin Pages
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminSettingsPage from "./pages/AdminSettingsPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
@@ -21,7 +25,8 @@ import AdminReviewsPage from "./pages/AdminReviewsPage";
 import AdminHotelsPage from "./pages/AdminHotelsPage";
 import AdminProvidersPage from "./pages/AdminProvidersPage";
 import AdminClientsPage from "./pages/AdminClientsPage";
-import AdminBusesPage from "./pages/AdminBusesPage"; // NEW: Import AdminBusesPage
+import AdminBusesPage from "./pages/AdminBusesPage";
+
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -109,7 +114,7 @@ const App = () => {
                 }
               />
               <Route
-                path="/admin/buses" {/* NEW: Route for AdminBusesPage */}
+                path="/admin/buses"
                 element={
                   <ProtectedRoute adminOnly>
                     <AdminBusesPage />
