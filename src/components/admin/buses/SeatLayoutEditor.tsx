@@ -30,9 +30,6 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
   const [grid, setGrid] = useState<SeatLayout>([]);
   const [activeTool, setActiveTool] = useState<ToolType>('seat');
 
-  // Ref para almacenar el initialLayout anterior y hacer una comparación profunda
-  const prevInitialLayoutRef = useRef<SeatLayout | null>(null);
-
   const reNumberSeats = useCallback((currentLayout: SeatLayout, currentRows: number, currentCols: number): SeatLayout => {
     let currentSeatNumber = 1;
     const newLayout: SeatLayout = currentLayout.map(row => row.map(item => ({ ...item })));
@@ -47,10 +44,14 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
     return newLayout;
   }, []);
 
+  const prevInitialLayoutRef = useRef<SeatLayout | null>(null);
+  const isUpdatingFromProps = useRef(false); // Flag to prevent onLayoutChange from looping
+
   // Effect para inicializar el grid cuando initialLayout cambia (profundamente)
   useEffect(() => {
-    // Solo actualiza si initialLayout ha cambiado su contenido
-    if (JSON.stringify(initialLayout) !== JSON.stringify(prevInitialLayoutRef.current)) {
+    const hasInitialLayoutChanged = JSON.stringify(initialLayout) !== JSON.stringify(prevInitialLayoutRef.current);
+
+    if (hasInitialLayoutChanged) {
       const initialRows = initialLayout?.length || 7;
       const initialCols = initialLayout?.[0]?.length || 10;
 
@@ -71,10 +72,12 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
           Array.from({ length: initialCols }, () => ({ type: 'empty' }))
         );
       }
-      setGrid(reNumberSeats(newGrid, initialRows, initialCols));
-      prevInitialLayoutRef.current = initialLayout; // Actualiza la referencia del layout anterior
+      const numberedGrid = reNumberSeats(newGrid, initialRows, initialCols);
+      isUpdatingFromProps.current = true; // Set flag as this update is prop-driven
+      setGrid(numberedGrid);
+      prevInitialLayoutRef.current = initialLayout; // Update the ref
     }
-  }, [initialLayout, reNumberSeats]); // Depende de initialLayout y reNumberSeats
+  }, [initialLayout, reNumberSeats]);
 
   // Effect para redimensionar el grid cuando rows o cols cambian (por input del usuario)
   useEffect(() => {
@@ -86,12 +89,17 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
             : { type: 'empty' };
         })
       );
+      isUpdatingFromProps.current = true; // Set flag as this update is size-driven
       return reNumberSeats(newGrid, rows, cols);
     });
-  }, [rows, cols, reNumberSeats]); // Depende de rows, cols y reNumberSeats
+  }, [rows, cols, reNumberSeats]);
 
-  // Effect para notificar al padre cuando el grid cambia
+  // Effect para notificar al padre cuando el grid cambia (pero no si es por actualización de props/tamaño)
   useEffect(() => {
+    if (isUpdatingFromProps.current) {
+      isUpdatingFromProps.current = false; // Reset flag
+      return; // Skip calling onLayoutChange if the update was internal/prop-driven
+    }
     const seatCount = grid.flat().filter(item => item.type === 'seat').length;
     onLayoutChange(grid, seatCount);
   }, [grid, onLayoutChange]);
@@ -106,6 +114,7 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
       } else {
         newGrid[rowIndex][colIndex] = { type: activeTool };
       }
+      // This update will trigger the useEffect for `grid`, which then calls onLayoutChange
       return reNumberSeats(newGrid, rows, cols);
     });
   };
@@ -117,7 +126,7 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
     }
     setRows(newRows);
     setCols(newCols);
-    // El useEffect que depende de rows y cols se encargará de actualizar el grid
+    // The useEffect that depends on rows and cols will handle grid update and parent notification
   };
 
   const renderCellContent = (item: SeatLayoutItem) => {

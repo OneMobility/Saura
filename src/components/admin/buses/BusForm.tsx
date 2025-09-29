@@ -11,7 +11,7 @@ import SeatLayoutEditor from './SeatLayoutEditor'; // Import the new SeatLayoutE
 
 // Definición de tipos para el layout de asientos
 type SeatLayoutItem = {
-  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty';
+  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty' | 'entry';
   number?: number; // Solo para asientos
 };
 type SeatLayoutRow = SeatLayoutItem[];
@@ -95,14 +95,20 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
   };
 
   const handleLayoutChange = useCallback((layout: SeatLayout | null, seatCount: number) => {
-    // Solo actualiza si el contenido del layout ha cambiado realmente para prevenir re-renders innecesarios
-    if (JSON.stringify(layout) !== JSON.stringify(currentSeatLayout)) {
-      setCurrentSeatLayout(layout);
-    }
-    if (seatCount !== currentSeatCount) {
-      setCurrentSeatCount(seatCount);
-    }
-  }, [currentSeatLayout, currentSeatCount]); // Dependencies for useCallback
+    setCurrentSeatLayout(prevLayout => {
+      // Deep comparison to prevent unnecessary state updates
+      if (JSON.stringify(layout) !== JSON.stringify(prevLayout)) {
+        return layout;
+      }
+      return prevLayout;
+    });
+    setCurrentSeatCount(prevCount => {
+      if (seatCount !== prevCount) {
+        return seatCount;
+      }
+      return prevCount;
+    });
+  }, []); // Empty dependency array makes this callback stable
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
