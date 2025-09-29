@@ -1,30 +1,19 @@
 "use client";
 
-import React, { useEffect } from 'react';
+import React from 'react'; // Keep React import
 import { Auth } from '@supabase/auth-ui-react';
 import { ThemeSupa } from '@supabase/auth-ui-shared';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate } from 'react-router-dom';
-import { useSession } from '@/components/SessionContextProvider';
+import { useSession } from '@/components/SessionContextProvider'; // Still need useSession for context, but not for redirecting *from* Login
 
 const Login = () => {
   const navigate = useNavigate();
-  const { session, isLoading } = useSession();
+  // We still need useSession to access context, but the redirect logic will be handled by SessionContextProvider
+  const { session, isLoading } = useSession(); 
 
-  console.log('Login Page: isLoading:', isLoading, 'Session:', session);
-
-  useEffect(() => {
-    // If already logged in and not loading, redirect to admin dashboard
-    if (!isLoading && session) {
-      console.log('Login Page: User is authenticated and not loading, redirecting to /admin/dashboard.');
-      navigate('/admin/dashboard');
-    }
-  }, [session, isLoading, navigate]); // Dependencias del useEffect
-
-  // No renderizar el formulario de login si ya estamos redirigiendo
-  if (!isLoading && session) {
-    return null;
-  }
+  // Removed the useEffect for redirection. SessionContextProvider will handle this.
+  // Removed the conditional render `if (!isLoading && session) { return null; }`
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-100 p-4">
@@ -42,8 +31,8 @@ const Login = () => {
                   brandAccent: '#C00066', // Un tono más oscuro para el hover
                 },
               },
-            },
-          }}
+            }}
+          }
           theme="light"
           redirectTo={window.location.origin + '/admin/dashboard'} // Redirect after successful login
         />
