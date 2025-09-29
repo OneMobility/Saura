@@ -16,6 +16,7 @@ import Login from "./pages/Login";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminSettingsPage from "./pages/AdminSettingsPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
+import AdminBlogPage from "./pages/AdminBlogPage"; {/* NEW: Import AdminBlogPage */}
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -59,6 +60,14 @@ const App: React.FC = () => { // Cambiado para definir explícitamente como Reac
                 element={
                   <ProtectedRoute adminOnly>
                     <AdminUsersPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route {/* NEW: Admin Blog Route */}
+                path="/admin/blog"
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminBlogPage />
                   </ProtectedRoute>
                 }
               />

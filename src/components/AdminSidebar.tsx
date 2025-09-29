@@ -16,8 +16,8 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/admin/tours', icon: Package, label: 'Tours' },
-  { href: '/admin/blog', icon: Newspaper, label: 'Blog' },
-  { href: '/admin/users', icon: Users, label: 'Usuarios' }, // New nav item for user management
+  { href: '/admin/blog', icon: Newspaper, label: 'Blog' }, {/* NEW: Blog management link */}
+  { href: '/admin/users', icon: Users, label: 'Usuarios' },
   { href: '/admin/settings', icon: Settings, label: 'Configuración' },
 ];
 
