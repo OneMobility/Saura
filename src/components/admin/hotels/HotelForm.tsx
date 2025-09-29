@@ -64,7 +64,6 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
-  // dateInput will now always reflect the formatted quoted_date or an empty string
   const [dateInput, setDateInput] = useState<string>(''); 
 
   const calculateQuoteCosts = useCallback(() => {
@@ -102,7 +101,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
           .single();
 
         if (error) {
-          console.error('Error fetching hotel for editing:', error);
+          console.error('Error al obtener hotel para editar:', error);
           toast.error('Error al cargar los datos de la cotización del hotel para editar.');
           setLoadingInitialData(false);
           return;
@@ -122,7 +121,6 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
             total_quote_cost: totalQuoteCost,
             remaining_payment: totalQuoteCost - data.total_paid,
           });
-          // Set dateInput to the formatted date from fetched data
           setDateInput(data.quoted_date ? format(new Date(data.quoted_date), 'yyyy-MM-dd') : '');
         }
       } else {
@@ -147,7 +145,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
           total_quote_cost: 0,
           remaining_payment: 0,
         });
-        setDateInput(''); // Clear dateInput for new form
+        setDateInput('');
       }
       setLoadingInitialData(false);
     };
@@ -271,7 +269,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
         .eq('id', hotelId);
 
       if (error) {
-        console.error('Error updating hotel quote:', error);
+        console.error('Error al actualizar la cotización del hotel:', error);
         toast.error('Error al actualizar la cotización del hotel.');
       } else {
         toast.success('Cotización de hotel actualizada con éxito.');
@@ -284,7 +282,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
         .insert(dataToSave);
 
       if (error) {
-        console.error('Error creating hotel quote:', error);
+        console.error('Error al crear la cotización del hotel:', error);
         toast.error('Error al crear la cotización del hotel.');
       } else {
         toast.success('Cotización de hotel creada con éxito.');
@@ -309,7 +307,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
       <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">
-              Nombre Hotel
+              Nombre del Hotel
             </Label>
             <Input
               id="name"
@@ -343,7 +341,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
                     id="quoted_date_input"
                     value={dateInput}
                     onChange={handleDateInputChange}
-                    placeholder="YYYY-MM-DD"
+                    placeholder="AAAA-MM-DD"
                     className={cn(
                       "w-full justify-start text-left font-normal pr-10",
                       !formData.quoted_date && "text-muted-foreground"
