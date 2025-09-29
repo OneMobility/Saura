@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Armchair, CarFront, Toilet, Minus, Square, GripVertical, Grid3X3 } from 'lucide-react'; // Changed Chair to Armchair
+import { Armchair, CarFront, Toilet, Minus, Square, GripVertical, Grid3X3 } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -48,32 +48,38 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
     return newLayout;
   }, [rows, cols]); // Dependencies for useCallback
 
-  // Initialize grid from initialLayout or create an empty one
+  // Effect to initialize grid or update when rows/cols change
   useEffect(() => {
+    let newGrid: SeatLayout;
     if (initialLayout && initialLayout.length > 0) {
-      setRows(initialLayout.length);
-      setCols(initialLayout[0].length); // Assuming all rows have same length
-      setGrid(reNumberSeats(initialLayout)); // Re-number initial layout
+      // If initialLayout is provided, use it and adjust to new rows/cols if size changed
+      newGrid = Array.from({ length: rows }, (_, rIdx) =>
+        Array.from({ length: cols }, (_, cIdx) => {
+          return initialLayout[rIdx] && initialLayout[rIdx][cIdx]
+            ? { ...initialLayout[rIdx][cIdx] } // Deep copy item
+            : { type: 'empty' };
+        })
+      );
     } else {
-      // Create an empty grid if no initial layout
-      const emptyGrid: SeatLayout = Array.from({ length: rows }, () =>
+      // Create an empty grid
+      newGrid = Array.from({ length: rows }, () =>
         Array.from({ length: cols }, () => ({ type: 'empty' }))
       );
-      setGrid(reNumberSeats(emptyGrid)); // Re-number empty grid
     }
-  }, [initialLayout, rows, cols, reNumberSeats]); // Added reNumberSeats to dependencies
+    setGrid(reNumberSeats(newGrid)); // Set and re-number the grid
+  }, [initialLayout, rows, cols, reNumberSeats]); // Dependencies: initialLayout, rows, cols, and reNumberSeats
 
-  // Notify parent on grid change (after re-numbering)
+  // Effect to notify parent when grid changes (after re-numbering)
   useEffect(() => {
     const seatCount = grid.flat().filter(item => item.type === 'seat').length;
     onLayoutChange(grid, seatCount);
-  }, [grid, onLayoutChange]);
+  }, [grid, onLayoutChange]); // Only depends on grid and onLayoutChange
 
   const handleCellClick = (rowIndex: number, colIndex: number) => {
     setGrid(prevGrid => {
-      const newGrid = prevGrid.map(row => [...row]); // Deep copy
+      const newGrid = prevGrid.map(row => [...row]);
       newGrid[rowIndex][colIndex] = { type: activeTool };
-      return reNumberSeats(newGrid); // Re-number after change
+      return reNumberSeats(newGrid); // Re-number immediately after cell change
     });
   };
 
@@ -84,18 +90,8 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
     }
     setRows(newRows);
     setCols(newCols);
-
-    setGrid(prevGrid => {
-      const newGrid: SeatLayout = Array.from({ length: newRows }, (_, rIdx) =>
-        Array.from({ length: newCols }, (_, cIdx) => {
-          // Preserve existing items if within bounds, otherwise default to empty
-          return prevGrid[rIdx] && prevGrid[rIdx][cIdx]
-            ? prevGrid[rIdx][cIdx]
-            : { type: 'empty' };
-        })
-      );
-      return reNumberSeats(newGrid); // Re-number after size change
-    });
+    // The first useEffect will handle updating the grid based on new rows/cols
+    // and re-numbering it.
   };
 
   const renderCellContent = (item: SeatLayoutItem) => {
