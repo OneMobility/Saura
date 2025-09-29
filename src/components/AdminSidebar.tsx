@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText, ChevronDown, Hotel, Truck, UserRound, Bus } from 'lucide-react';
+import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText, ChevronDown, Hotel, Truck, UserRound, Bus, Briefcase } from 'lucide-react'; // Added Briefcase icon for Clients
 import { useSession } from '@/components/SessionContextProvider';
 
 interface NavItem {
@@ -24,11 +24,11 @@ const navItems: NavItem[] = [
     children: [
       { href: '/admin/tours', icon: Package, label: 'Tours' },
       { href: '/admin/hotels', icon: Hotel, label: 'Hoteles' },
-      { href: '/admin/buses', icon: Bus, label: 'Autobuses' }, // Added Buses here
+      { href: '/admin/buses', icon: Bus, label: 'Autobuses' },
       { href: '/admin/providers', icon: Truck, label: 'Proveedores' },
-      { href: '/admin/clients', icon: UserRound, label: 'Clientes' },
     ],
   },
+  { href: '/admin/clients', icon: Briefcase, label: 'Clientes' }, {/* Updated icon and label */}
   { href: '/admin/blog', icon: Newspaper, label: 'Blog' },
   { href: '/admin/reviews', icon: MessageSquareText, label: 'Opiniones' },
   { href: '/admin/users', icon: Users, label: 'Usuarios' },
