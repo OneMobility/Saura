@@ -1,65 +1,73 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import BlogCard from '@/components/BlogCard';
+import { supabase } from '@/integrations/supabase/client';
+import { Loader2 } from 'lucide-react';
 
 interface BlogPost {
   id: string;
-  imageUrl: string;
+  image_url: string; // Changed to image_url to match Supabase column name
   title: string;
   description: string;
-  // link: string; // No longer needed, using id to construct link
+  slug: string; // Added slug for linking
 }
 
-// Datos de ejemplo para las entradas del blog (reutilizados de BlogSection)
-const allBlogPosts: BlogPost[] = [
-  {
-    id: 'guia-riviera-maya',
-    imageUrl: 'https://images.unsplash.com/photo-1501785888041-af3ba6f602d8?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    title: 'Guía Completa para tu Primer Viaje a la Riviera Maya',
-    description: 'Descubre los secretos mejor guardados de la Riviera Maya, desde las playas paradisíacas hasta las antiguas ruinas mayas. Prepárate para una aventura inolvidable con nuestros consejos de expertos.',
-    // link: '#',
-  },
-  {
-    id: 'sierra-madre-occidental',
-    imageUrl: 'https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    title: '10 Razones para Explorar la Sierra Madre Occidental',
-    description: 'La Sierra Madre Occidental ofrece paisajes impresionantes, cascadas ocultas y una rica biodiversidad. Te damos 10 razones para que tu próxima aventura sea en este majestuoso lugar.',
-    // link: '#',
-  },
-  {
-    id: 'oaxaca-culinario-cultural',
-    imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961dde?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    title: 'Oaxaca: Un Viaje Culinario y Cultural Inolvidable',
-    description: 'Sumérgete en la vibrante cultura y la exquisita gastronomía de Oaxaca. Desde sus mercados tradicionales hasta sus festivales coloridos, cada rincón es una experiencia para los sentidos.',
-    // link: '#',
-  },
-  {
-    id: 'viajar-con-ninos',
-    imageUrl: 'https://images.unsplash.com/photo-1501785888041-af3ba6f602d8?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    title: 'Consejos Esenciales para Viajar con Niños Pequeños',
-    description: 'Viajar con niños puede ser un desafío, pero con la planificación adecuada, puede ser una experiencia maravillosa. Aquí te compartimos nuestros mejores consejos para unas vacaciones familiares sin estrés.',
-    // link: '#',
-  },
-  {
-    id: 'pueblos-magicos-mexico',
-    imageUrl: 'https://images.unsplash.com/photo-1506197603052-3cc9c3a201bd?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    title: 'Descubre la Magia de los Pueblos Mágicos de México',
-    description: 'México está lleno de encanto y tradición. Explora sus Pueblos Mágicos, donde la historia, la cultura y la belleza natural se unen para ofrecerte experiencias únicas.',
-    // link: '#',
-  },
-  {
-    id: 'rafting-veracruz',
-    imageUrl: 'https://images.unsplash.com/photo-1507525428034-b723cf961dde?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
-    title: 'Aventura Extrema: Rafting en los Ríos de Veracruz',
-    description: 'Si buscas adrenalina, el rafting en los ríos de Veracruz es para ti. Prepárate para una emocionante aventura acuática rodeado de paisajes exuberantes.',
-    // link: '#',
-  },
-];
-
 const BlogPage = () => {
+  const [blogPosts, setBlogPosts] = useState<BlogPost[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchBlogPosts = async () => {
+      setLoading(true);
+      setError(null);
+      const { data, error } = await supabase
+        .from('blog_posts')
+        .select('id, image_url, title, description, slug')
+        .order('created_at', { ascending: false }); // Order by creation date, newest first
+
+      if (error) {
+        console.error('Error fetching blog posts for BlogPage:', error);
+        setError('Error al cargar las entradas del blog.');
+        setBlogPosts([]);
+      } else {
+        setBlogPosts(data || []);
+      }
+      setLoading(false);
+    };
+
+    fetchBlogPosts();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-grow py-12 px-4 md:px-8 lg:px-16 bg-white flex items-center justify-center">
+          <Loader2 className="h-12 w-12 animate-spin text-rosa-mexicano" />
+          <p className="ml-4 text-gray-700 text-xl">Cargando entradas del blog...</p>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-grow py-12 px-4 md:px-8 lg:px-16 bg-white text-center text-red-600">
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">Error</h1>
+          <p className="text-xl">{error}</p>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -68,17 +76,21 @@ const BlogPage = () => {
           <h1 className="text-4xl md:text-5xl font-bold text-center text-gray-800 mb-12">
             Nuestro Blog de Viajes
           </h1>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {allBlogPosts.map((post) => (
-              <BlogCard
-                key={post.id}
-                imageUrl={post.imageUrl}
-                title={post.title}
-                description={post.description}
-                blogId={post.id} // Pass the id as blogId
-              />
-            ))}
-          </div>
+          {blogPosts.length === 0 ? (
+            <p className="text-center text-gray-600 text-lg">No hay entradas de blog disponibles en este momento.</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {blogPosts.map((post) => (
+                <BlogCard
+                  key={post.id}
+                  imageUrl={post.image_url}
+                  title={post.title}
+                  description={post.description}
+                  blogId={post.slug} // Use slug for the link
+                />
+              ))}
+            </div>
+          )}
         </div>
       </main>
       <Footer />
