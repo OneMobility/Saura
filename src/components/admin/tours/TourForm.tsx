@@ -124,10 +124,9 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   // NEW: Break-even analysis states
   const [expectedClientsForBreakeven, setExpectedClientsForBreakeven] = useState(0);
   const [breakevenResult, setBreakevenResult] = useState<{
-    adjustedHotelDetails: TourHotelDetail[];
     adjustedTotalBaseCost: number;
     adjustedCostPerPayingPerson: number;
-    suggestedSellingPrice: number;
+    suggestedSellingPrice: number; // This will be the current selling price
     message: string;
   } | null>(null);
 
@@ -502,89 +501,97 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
 
   // NEW: Break-even analysis function
   const runBreakevenAnalysis = useCallback(() => {
-    if (expectedClientsForBreakeven <= 0 || expectedClientsForBreakeven > formData.bus_capacity - formData.courtesies) {
-      toast.error('El número de clientes esperados debe ser mayor que 0 y no exceder la capacidad pagante del autobús.');
+    const maxPayingCapacity = formData.bus_capacity - formData.courtesies;
+    if (expectedClientsForBreakeven <= 0 || expectedClientsForBreakeven > maxPayingCapacity) {
+      toast.error(`El número de clientes esperados debe ser mayor que 0 y no exceder la capacidad pagante del autobús (${maxPayingCapacity}).`);
       setBreakevenResult(null);
       return;
     }
 
-    let currentAdjustedHotelDetails = [...formData.hotel_details];
     let currentAdjustedTotalBaseCost = formData.bus_cost + formData.provider_details.reduce((sum, p) => sum + p.cost, 0);
-    let currentAdjustedHotelCost = 0;
-
-    // Calculate initial hotel cost based on current hotel_details
-    formData.hotel_details.forEach(tourHotelDetail => {
-      const hotelQuote = availableHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
-      if (!hotelQuote) return;
-      const costDouble = (hotelQuote.num_double_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
-      const costTriple = (hotelQuote.num_triple_rooms || 0) * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
-      const costQuad = (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
-      currentAdjustedHotelCost += costDouble + costTriple + costQuad;
-    });
-    currentAdjustedTotalBaseCost += currentAdjustedHotelCost;
-
+    let remainingClientsToAccommodate = expectedClientsForBreakeven;
     let message = `Análisis para ${expectedClientsForBreakeven} clientes:`;
+    let hotelAdjustmentsMessage = '';
 
-    // If current paying clients count is already less than expected, we need to adjust
-    if (expectedClientsForBreakeven < (formData.bus_capacity - formData.courtesies)) {
-      // Strategy: Reduce hotel rooms from most expensive/largest capacity first (quad -> triple -> double)
-      // This is a simplified approach. A real-world scenario might involve more complex optimization.
+    // Deep copy of hotel quotes to simulate adjustments
+    const tempHotelQuotes = availableHotelQuotes.map(hq => ({ ...hq }));
+    const tourLinkedHotelQuotes = formData.hotel_details.map(td => ({ ...td }));
 
-      let roomsReduced = false;
-      let tempHotelDetails = JSON.parse(JSON.stringify(formData.hotel_details)); // Deep copy
+    // Reset room counts for linked hotels in the simulation
+    tourLinkedHotelQuotes.forEach(tourHotelDetail => {
+      const hotelQuote = tempHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
+      if (hotelQuote) {
+        hotelQuote.num_quad_rooms = 0;
+        hotelQuote.num_triple_rooms = 0;
+        hotelQuote.num_double_rooms = 0;
+      }
+    });
 
-      // Iterate through hotel details and try to reduce rooms
-      for (let i = tempHotelDetails.length - 1; i >= 0; i--) {
-        const tourHotelDetail = tempHotelDetails[i];
-        const hotelQuote = availableHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
-        if (!hotelQuote) continue;
+    // Prioritize filling rooms from largest capacity to smallest
+    // This is a simplified greedy approach.
+    tourLinkedHotelQuotes.sort((a, b) => {
+      const quoteA = tempHotelQuotes.find(hq => hq.id === a.hotel_quote_id);
+      const quoteB = tempHotelQuotes.find(hq => hq.id === b.hotel_quote_id);
+      if (!quoteA || !quoteB) return 0;
+      // Sort by total capacity of the quote, or by cost if capacities are similar
+      return (quoteB.capacity_quad * 4 + quoteB.capacity_triple * 3 + quoteB.capacity_double * 2) -
+             (quoteA.capacity_quad * 4 + quoteA.capacity_triple * 3 + quoteA.capacity_double * 2);
+    });
 
-        // Try reducing quad rooms first
-        if (hotelQuote.num_quad_rooms > 0) {
-          const originalCost = hotelQuote.num_quad_rooms * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
-          hotelQuote.num_quad_rooms = 0; // Assume we can cancel all quad rooms
-          const newCost = 0;
-          currentAdjustedTotalBaseCost -= (originalCost - newCost);
-          roomsReduced = true;
-          message += ` Se eliminaron las habitaciones cuádruples del hotel ${hotelQuote.name}.`;
-        }
-        // Then triple rooms
-        if (hotelQuote.num_triple_rooms > 0) {
-          const originalCost = hotelQuote.num_triple_rooms * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
-          hotelQuote.num_triple_rooms = 0; // Assume we can cancel all triple rooms
-          const newCost = 0;
-          currentAdjustedTotalBaseCost -= (originalCost - newCost);
-          roomsReduced = true;
-          message += ` Se eliminaron las habitaciones triples del hotel ${hotelQuote.name}.`;
-        }
-        // Then double rooms
-        if (hotelQuote.num_double_rooms > 0) {
-          const originalCost = hotelQuote.num_double_rooms * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
-          hotelQuote.num_double_rooms = 0; // Assume we can cancel all double rooms
-          const newCost = 0;
-          currentAdjustedTotalBaseCost -= (originalCost - newCost);
-          roomsReduced = true;
-          message += ` Se eliminaron las habitaciones dobles del hotel ${hotelQuote.name}.`;
+    tourLinkedHotelQuotes.forEach(tourHotelDetail => {
+      const hotelQuote = tempHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
+      if (!hotelQuote || remainingClientsToAccommodate <= 0) return;
+
+      let roomsNeededQuad = Math.floor(remainingClientsToAccommodate / hotelQuote.capacity_quad);
+      if (roomsNeededQuad > 0) {
+        hotelQuote.num_quad_rooms = Math.min(roomsNeededQuad, hotelQuote.num_quad_rooms + 100); // Allow "more" rooms than original if needed, up to a large number
+        remainingClientsToAccommodate -= hotelQuote.num_quad_rooms * hotelQuote.capacity_quad;
+        hotelAdjustmentsMessage += ` ${hotelQuote.num_quad_rooms} hab. cuádruples en ${hotelQuote.name}.`;
+      }
+
+      if (remainingClientsToAccommodate > 0) {
+        let roomsNeededTriple = Math.floor(remainingClientsToAccommodate / hotelQuote.capacity_triple);
+        if (roomsNeededTriple > 0) {
+          hotelQuote.num_triple_rooms = Math.min(roomsNeededTriple, hotelQuote.num_triple_rooms + 100);
+          remainingClientsToAccommodate -= hotelQuote.num_triple_rooms * hotelQuote.capacity_triple;
+          hotelAdjustmentsMessage += ` ${hotelQuote.num_triple_rooms} hab. triples en ${hotelQuote.name}.`;
         }
       }
 
-      if (!roomsReduced) {
-        message += ' No se pudieron reducir habitaciones de hotel para ajustar el costo.';
+      if (remainingClientsToAccommodate > 0) {
+        let roomsNeededDouble = Math.ceil(remainingClientsToAccommodate / hotelQuote.capacity_double); // Use ceil for remaining
+        if (roomsNeededDouble > 0) {
+          hotelQuote.num_double_rooms = Math.min(roomsNeededDouble, hotelQuote.num_double_rooms + 100);
+          remainingClientsToAccommodate -= hotelQuote.num_double_rooms * hotelQuote.capacity_double;
+          hotelAdjustmentsMessage += ` ${hotelQuote.num_double_rooms} hab. dobles en ${hotelQuote.name}.`;
+        }
       }
-    }
+    });
+
+    // Recalculate hotel cost based on adjusted rooms
+    let adjustedHotelCost = 0;
+    tempHotelQuotes.forEach(hotelQuote => {
+      adjustedHotelCost += (hotelQuote.num_double_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
+      adjustedHotelCost += (hotelQuote.num_triple_rooms || 0) * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
+      adjustedHotelCost += (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
+    });
+    currentAdjustedTotalBaseCost += adjustedHotelCost;
 
     const adjustedCostPerPayingPerson = expectedClientsForBreakeven > 0 ? currentAdjustedTotalBaseCost / expectedClientsForBreakeven : 0;
-    const suggestedSellingPriceForBreakeven = adjustedCostPerPayingPerson * (1 + desiredProfitPercentage / 100);
+    
+    // The selling price is fixed as per user request
+    const fixedSellingPrice = formData.selling_price_per_person;
+
+    message += ` Para alojar a ${expectedClientsForBreakeven} personas, se necesitarían aproximadamente:${hotelAdjustmentsMessage || ' No se vincularon hoteles.'}`;
 
     setBreakevenResult({
-      adjustedHotelDetails: currentAdjustedHotelDetails, // This would be the modified hotel details if we were to save them
       adjustedTotalBaseCost: currentAdjustedTotalBaseCost,
       adjustedCostPerPayingPerson: adjustedCostPerPayingPerson,
-      suggestedSellingPrice: suggestedSellingPriceForBreakeven,
+      suggestedSellingPrice: fixedSellingPrice, // Use the current selling price as fixed
       message: message,
     });
 
-  }, [expectedClientsForBreakeven, formData.bus_capacity, formData.courtesies, formData.bus_cost, formData.provider_details, formData.hotel_details, availableHotelQuotes, desiredProfitPercentage]);
+  }, [expectedClientsForBreakeven, formData.bus_capacity, formData.courtesies, formData.bus_cost, formData.provider_details, formData.hotel_details, availableHotelQuotes, formData.selling_price_per_person]);
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -992,7 +999,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
                 Costo por Persona Pagante Ajustado: <span className="font-medium">${breakevenResult.adjustedCostPerPayingPerson.toFixed(2)}</span>
               </p>
               <p className="text-yellow-800">
-                Precio de Venta Sugerido para Punto de Equilibrio: <span className="font-bold">${breakevenResult.suggestedSellingPrice.toFixed(2)}</span>
+                Precio de Venta Fijo Utilizado: <span className="font-bold">${breakevenResult.suggestedSellingPrice.toFixed(2)}</span>
               </p>
               <p className="text-sm text-gray-700 mt-2">
                 *Este es un cálculo simulado. Las habitaciones de hotel no se ajustan automáticamente.
