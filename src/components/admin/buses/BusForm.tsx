@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,6 +24,9 @@ interface Bus {
   rental_cost: number;
   total_capacity: number;
   seat_layout_json: SeatLayout | null; // Nueva columna para la disposición de asientos
+  advance_payment: number; // NEW
+  total_paid: number; // NEW
+  remaining_payment: number; // Calculated field
 }
 
 interface BusFormProps {
@@ -38,11 +41,22 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
     rental_cost: 0,
     total_capacity: 0,
     seat_layout_json: null,
+    advance_payment: 0, // Initialize
+    total_paid: 0, // Initialize
+    remaining_payment: 0, // Initialize
   });
   const [currentSeatLayout, setCurrentSeatLayout] = useState<SeatLayout | null>(null);
   const [currentSeatCount, setCurrentSeatCount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
+
+  const calculatePayment = useCallback(() => {
+    const remaining = formData.rental_cost - formData.total_paid;
+    setFormData(prev => ({
+      ...prev,
+      remaining_payment: remaining,
+    }));
+  }, [formData.rental_cost, formData.total_paid]);
 
   useEffect(() => {
     const fetchBusData = async () => {
@@ -50,7 +64,7 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
         setLoadingInitialData(true);
         const { data, error } = await supabase
           .from('buses')
-          .select('id, name, license_plate, rental_cost, total_capacity, seat_layout_json')
+          .select('id, name, license_plate, rental_cost, total_capacity, seat_layout_json, advance_payment, total_paid')
           .eq('id', busId)
           .single();
 
@@ -62,7 +76,12 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
         }
 
         if (data) {
-          setFormData(data);
+          setFormData({
+            ...data,
+            advance_payment: data.advance_payment || 0,
+            total_paid: data.total_paid || 0,
+            remaining_payment: (data.rental_cost || 0) - (data.total_paid || 0), // Calculate initial remaining
+          });
           setCurrentSeatLayout(data.seat_layout_json);
           // Calculate initial seat count from fetched layout
           const count = data.seat_layout_json?.flat().filter(item => item.type === 'seat').length || 0;
@@ -76,6 +95,9 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
           rental_cost: 0,
           total_capacity: 0,
           seat_layout_json: null,
+          advance_payment: 0,
+          total_paid: 0,
+          remaining_payment: 0,
         });
         setCurrentSeatLayout(null);
         setCurrentSeatCount(0);
@@ -85,6 +107,10 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
 
     fetchBusData();
   }, [busId]);
+
+  useEffect(() => {
+    calculatePayment();
+  }, [calculatePayment]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value, type } = e.target;
@@ -144,12 +170,20 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
       return;
     }
 
+    if (formData.total_paid < formData.advance_payment) {
+      toast.error('El total pagado no puede ser menor que el anticipo.');
+      setIsSubmitting(false);
+      return;
+    }
+
     const busDataToSave = {
       name: formData.name,
       license_plate: formData.license_plate,
       rental_cost: formData.rental_cost,
       total_capacity: formData.total_capacity,
       seat_layout_json: currentSeatLayout, // Guardar el JSON del layout generado por el editor
+      advance_payment: formData.advance_payment, // NEW
+      total_paid: formData.total_paid, // NEW
     };
 
     if (busId) {
@@ -249,6 +283,49 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
             required
           />
         </div>
+        
+        {/* Payment Details */}
+        <h3 className="col-span-4 text-lg font-semibold mt-4">Gestión de Pagos</h3>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="advance_payment" className="text-right">
+            Anticipo Dado
+          </Label>
+          <Input
+            id="advance_payment"
+            type="number"
+            value={formData.advance_payment}
+            onChange={handleChange}
+            className="col-span-3"
+            min={0}
+            step="0.01"
+          />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="total_paid" className="text-right">
+            Total Pagado
+          </Label>
+          <Input
+            id="total_paid"
+            type="number"
+            value={formData.total_paid}
+            onChange={handleChange}
+            className="col-span-3"
+            min={0}
+            step="0.01"
+          />
+        </div>
+
+        <div className="col-span-4 grid grid-cols-2 gap-4 mt-4 bg-gray-50 p-4 rounded-md">
+          <div>
+            <Label className="font-semibold">Costo Total de Renta:</Label>
+            <p>${formData.rental_cost.toFixed(2)}</p>
+          </div>
+          <div>
+            <Label className="font-semibold">Pago Restante:</Label>
+            <p>${formData.remaining_payment.toFixed(2)}</p>
+          </div>
+        </div>
+
         <div className="col-span-full mt-4">
           <Label className="text-lg font-semibold mb-2 block">Disposición de Asientos</Label>
           <SeatLayoutEditor

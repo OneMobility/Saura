@@ -13,7 +13,9 @@ interface Bus {
   license_plate: string;
   rental_cost: number;
   total_capacity: number;
-  // seat_map_image_url ya no se muestra aquí
+  advance_payment: number; // NEW
+  total_paid: number; // NEW
+  remaining_payment: number; // Calculated field
   created_at: string;
 }
 
@@ -34,14 +36,20 @@ const BusesTable: React.FC<BusesTableProps> = ({ onEditBus, onBusDeleted }) => {
     setLoading(true);
     const { data, error } = await supabase
       .from('buses')
-      .select('id, name, license_plate, rental_cost, total_capacity, created_at') // Seleccionar solo los campos relevantes
+      .select('id, name, license_plate, rental_cost, total_capacity, advance_payment, total_paid, created_at') // Seleccionar los campos relevantes, incluyendo los nuevos
       .order('name', { ascending: true });
 
     if (error) {
       console.error('Error al cargar autobuses:', error);
       toast.error('Error al cargar la lista de autobuses.');
     } else {
-      setBuses(data || []);
+      const busesWithCalculatedFields = (data || []).map(bus => ({
+        ...bus,
+        advance_payment: bus.advance_payment || 0,
+        total_paid: bus.total_paid || 0,
+        remaining_payment: (bus.rental_cost || 0) - (bus.total_paid || 0),
+      }));
+      setBuses(busesWithCalculatedFields);
     }
     setLoading(false);
   };
@@ -89,6 +97,9 @@ const BusesTable: React.FC<BusesTableProps> = ({ onEditBus, onBusDeleted }) => {
                 <TableHead>Placas/Código</TableHead>
                 <TableHead>Costo Renta</TableHead>
                 <TableHead>Capacidad</TableHead>
+                <TableHead>Anticipo</TableHead> {/* NEW */}
+                <TableHead>Total Pagado</TableHead> {/* NEW */}
+                <TableHead>Pendiente</TableHead> {/* NEW */}
                 <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -99,6 +110,9 @@ const BusesTable: React.FC<BusesTableProps> = ({ onEditBus, onBusDeleted }) => {
                   <TableCell>{bus.license_plate}</TableCell>
                   <TableCell>${bus.rental_cost.toFixed(2)}</TableCell>
                   <TableCell>{bus.total_capacity}</TableCell>
+                  <TableCell>${bus.advance_payment.toFixed(2)}</TableCell> {/* NEW */}
+                  <TableCell>${bus.total_paid.toFixed(2)}</TableCell> {/* NEW */}
+                  <TableCell>${bus.remaining_payment.toFixed(2)}</TableCell> {/* NEW */}
                   <TableCell className="flex space-x-2">
                     <Button
                       variant="outline"

@@ -1,0 +1,3 @@
+ALTER TABLE public.buses
+ADD COLUMN advance_payment NUMERIC DEFAULT 0,
+ADD COLUMN total_paid NUMERIC DEFAULT 0;
