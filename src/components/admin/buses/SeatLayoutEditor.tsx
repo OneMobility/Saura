@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Armchair, CarFront, Toilet, Minus, Square, GripVertical, Grid3X3 } from 'lucide-react';
+import { Armchair, CarFront, Toilet, Square, GripVertical } from 'lucide-react';
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -25,20 +25,20 @@ interface SeatLayoutEditorProps {
 }
 
 const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLayoutChange, totalCapacity }) => {
-  const [rows, setRows] = useState(7); // Default rows
-  const [cols, setCols] = useState(10); // Default columns
+  // Initialize rows and cols from initialLayout if available, otherwise defaults
+  const [rows, setRows] = useState(initialLayout?.length || 7);
+  const [cols, setCols] = useState(initialLayout?.[0]?.length || 10);
   const [grid, setGrid] = useState<SeatLayout>([]);
   const [activeTool, setActiveTool] = useState<ToolType>('seat');
 
-  // Helper function to re-number seats column-first
-  const reNumberSeats = useCallback((currentLayout: SeatLayout): SeatLayout => {
+  // Memoize reNumberSeats to ensure its reference is stable
+  const reNumberSeats = useCallback((currentLayout: SeatLayout, currentRows: number, currentCols: number): SeatLayout => {
     let currentSeatNumber = 1;
-    // Create a deep copy to avoid direct mutation
     const newLayout: SeatLayout = currentLayout.map(row => row.map(item => ({ ...item })));
 
     // Iterate column by column, then row by row within each column
-    for (let colIndex = 0; colIndex < cols; colIndex++) {
-      for (let rowIndex = 0; rowIndex < rows; rowIndex++) {
+    for (let colIndex = 0; colIndex < currentCols; colIndex++) {
+      for (let rowIndex = 0; rowIndex < currentRows; rowIndex++) {
         // Ensure we don't go out of bounds if grid size changed
         if (newLayout[rowIndex] && newLayout[rowIndex][colIndex] && newLayout[rowIndex][colIndex].type === 'seat') {
           newLayout[rowIndex][colIndex].number = currentSeatNumber++;
@@ -46,28 +46,22 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
       }
     }
     return newLayout;
-  }, [rows, cols]); // Dependencies for useCallback
+  }, []); // No dependencies here, as rows/cols are passed as arguments
 
-  // Effect to initialize grid or update when rows/cols change
+  // Effect to initialize grid when initialLayout prop changes (or on mount)
   useEffect(() => {
-    let newGrid: SeatLayout;
     if (initialLayout && initialLayout.length > 0) {
-      // If initialLayout is provided, use it and adjust to new rows/cols if size changed
-      newGrid = Array.from({ length: rows }, (_, rIdx) =>
-        Array.from({ length: cols }, (_, cIdx) => {
-          return initialLayout[rIdx] && initialLayout[rIdx][cIdx]
-            ? { ...initialLayout[rIdx][cIdx] } // Deep copy item
-            : { type: 'empty' };
-        })
-      );
+      setRows(initialLayout.length);
+      setCols(initialLayout[0].length);
+      setGrid(reNumberSeats(initialLayout, initialLayout.length, initialLayout[0].length));
     } else {
-      // Create an empty grid
-      newGrid = Array.from({ length: rows }, () =>
+      // Create an empty grid if no initial layout
+      const emptyGrid: SeatLayout = Array.from({ length: rows }, () =>
         Array.from({ length: cols }, () => ({ type: 'empty' }))
       );
+      setGrid(reNumberSeats(emptyGrid, rows, cols));
     }
-    setGrid(reNumberSeats(newGrid)); // Set and re-number the grid
-  }, [initialLayout, rows, cols, reNumberSeats]); // Dependencies: initialLayout, rows, cols, and reNumberSeats
+  }, [initialLayout]); // Only depends on initialLayout
 
   // Effect to notify parent when grid changes (after re-numbering)
   useEffect(() => {
@@ -77,9 +71,9 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
 
   const handleCellClick = (rowIndex: number, colIndex: number) => {
     setGrid(prevGrid => {
-      const newGrid = prevGrid.map(row => [...row]);
+      const newGrid = prevGrid.map(row => [...row]); // Deep copy
       newGrid[rowIndex][colIndex] = { type: activeTool };
-      return reNumberSeats(newGrid); // Re-number immediately after cell change
+      return reNumberSeats(newGrid, rows, cols); // Pass current rows/cols
     });
   };
 
@@ -90,8 +84,18 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
     }
     setRows(newRows);
     setCols(newCols);
-    // The first useEffect will handle updating the grid based on new rows/cols
-    // and re-numbering it.
+
+    setGrid(prevGrid => {
+      const newGrid: SeatLayout = Array.from({ length: newRows }, (_, rIdx) =>
+        Array.from({ length: newCols }, (_, cIdx) => {
+          // Preserve existing items if within bounds, otherwise default to empty
+          return prevGrid[rIdx] && prevGrid[rIdx][cIdx]
+            ? prevGrid[rIdx][cIdx]
+            : { type: 'empty' };
+        })
+      );
+      return reNumberSeats(newGrid, newRows, newCols); // Pass new rows/cols
+    });
   };
 
   const renderCellContent = (item: SeatLayoutItem) => {
