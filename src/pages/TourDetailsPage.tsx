@@ -31,11 +31,11 @@ interface HotelQuote {
   total_paid: number;
 }
 
-// TourHotelDetail now references a hotel quote and specifies room type for THIS tour
+// TourHotelDetail now references a hotel quote ID
 interface TourHotelDetail {
   id: string; // Unique ID for this entry in the tour's hotel_details array
   hotel_quote_id: string; // References an ID from the 'hotels' table (which are now quotes)
-  room_type: 'double' | 'triple' | 'quad';
+  // room_type is removed as it's now defined by the hotel quote itself
 }
 
 // Definición de tipos para el layout de asientos

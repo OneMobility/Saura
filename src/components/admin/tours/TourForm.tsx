@@ -34,11 +34,11 @@ interface HotelQuote {
   total_paid: number;
 }
 
-// TourHotelDetail now references a hotel quote and specifies room type for THIS tour
+// TourHotelDetail now references a hotel quote ID
 interface TourHotelDetail {
   id: string; // Unique ID for this entry in the tour's hotel_details array
   hotel_quote_id: string; // References an ID from the 'hotels' table (which are now quotes)
-  room_type: 'double' | 'triple' | 'quad'; // This is the room type *chosen for this specific tour's booking*
+  // room_type is removed as it's now defined by the hotel quote itself
 }
 
 // Definición de tipos para el layout de asientos
@@ -256,26 +256,19 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     const totalProviderCost = formData.provider_details.reduce((sum, provider) => sum + provider.cost, 0);
     
     let totalHotelCost = 0; // Total cost for all rooms across all linked hotel quotes
-    let totalHotelCapacity = 0; // Total capacity for all rooms across all linked hotel quotes
     let currentTotalRemainingPayments = 0; // NEW: for total remaining payments
 
     formData.hotel_details.forEach(tourHotelDetail => {
       const hotelQuote = availableHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
       if (!hotelQuote) return;
 
-      // Calculate cost and capacity based on the *contracted rooms in the hotel quote*
+      // Calculate cost based on the *contracted rooms in the hotel quote*
       // and the *cost per night for each room type* from the quote.
       const costDouble = (hotelQuote.num_double_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
       const costTriple = (hotelQuote.num_triple_rooms || 0) * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
       const costQuad = (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
       
       totalHotelCost += costDouble + costTriple + costQuad;
-
-      const capacityDouble = (hotelQuote.num_double_rooms || 0) * hotelQuote.capacity_double;
-      const capacityTriple = (hotelQuote.num_triple_rooms || 0) * hotelQuote.capacity_triple;
-      const capacityQuad = (hotelQuote.num_quad_rooms || 0) * hotelQuote.capacity_quad;
-
-      totalHotelCapacity += capacityDouble + capacityTriple + capacityQuad;
 
       // NEW: Add hotel remaining payment
       currentTotalRemainingPayments += (costDouble + costTriple + costQuad) - (hotelQuote.total_paid || 0);
@@ -434,10 +427,10 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     });
   };
 
-  const handleTourHotelChange = (index: number, field: keyof TourHotelDetail, value: string) => {
+  const handleTourHotelChange = (index: number, value: string) => {
     setFormData((prev) => {
       const newHotelDetails = [...prev.hotel_details];
-      newHotelDetails[index] = { ...newHotelDetails[index], [field]: value };
+      newHotelDetails[index] = { ...newHotelDetails[index], hotel_quote_id: value };
       return { ...prev, hotel_details: newHotelDetails };
     });
   };
@@ -448,7 +441,6 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       hotel_details: [...prev.hotel_details, {
         id: uuidv4(), // Unique ID for this entry
         hotel_quote_id: '',
-        room_type: 'double',
       }],
     }));
   };
@@ -527,44 +519,42 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       }
     });
 
-    // Prioritize filling rooms from largest capacity to smallest
-    // This is a simplified greedy approach.
+    // Sort linked hotel quotes by potential capacity (descending) to prioritize larger rooms
     tourLinkedHotelQuotes.sort((a, b) => {
       const quoteA = tempHotelQuotes.find(hq => hq.id === a.hotel_quote_id);
       const quoteB = tempHotelQuotes.find(hq => hq.id === b.hotel_quote_id);
       if (!quoteA || !quoteB) return 0;
-      // Sort by total capacity of the quote, or by cost if capacities are similar
-      return (quoteB.capacity_quad * 4 + quoteB.capacity_triple * 3 + quoteB.capacity_double * 2) -
-             (quoteA.capacity_quad * 4 + quoteA.capacity_triple * 3 + quoteA.capacity_double * 2);
+      const capacityA = (quoteA.capacity_quad * 4) + (quoteA.capacity_triple * 3) + (quoteA.capacity_double * 2);
+      const capacityB = (quoteB.capacity_quad * 4) + (quoteB.capacity_triple * 3) + (quoteB.capacity_double * 2);
+      return capacityB - capacityA;
     });
 
     tourLinkedHotelQuotes.forEach(tourHotelDetail => {
       const hotelQuote = tempHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
       if (!hotelQuote || remainingClientsToAccommodate <= 0) return;
 
-      let roomsNeededQuad = Math.floor(remainingClientsToAccommodate / hotelQuote.capacity_quad);
-      if (roomsNeededQuad > 0) {
-        hotelQuote.num_quad_rooms = Math.min(roomsNeededQuad, hotelQuote.num_quad_rooms + 100); // Allow "more" rooms than original if needed, up to a large number
-        remainingClientsToAccommodate -= hotelQuote.num_quad_rooms * hotelQuote.capacity_quad;
-        hotelAdjustmentsMessage += ` ${hotelQuote.num_quad_rooms} hab. cuádruples en ${hotelQuote.name}.`;
+      // Prioritize quad rooms
+      if (remainingClientsToAccommodate >= hotelQuote.capacity_quad) {
+        const numRooms = Math.floor(remainingClientsToAccommodate / hotelQuote.capacity_quad);
+        hotelQuote.num_quad_rooms = numRooms;
+        remainingClientsToAccommodate -= numRooms * hotelQuote.capacity_quad;
+        if (numRooms > 0) hotelAdjustmentsMessage += ` ${numRooms} hab. cuádruples en ${hotelQuote.name}.`;
       }
 
-      if (remainingClientsToAccommodate > 0) {
-        let roomsNeededTriple = Math.floor(remainingClientsToAccommodate / hotelQuote.capacity_triple);
-        if (roomsNeededTriple > 0) {
-          hotelQuote.num_triple_rooms = Math.min(roomsNeededTriple, hotelQuote.num_triple_rooms + 100);
-          remainingClientsToAccommodate -= hotelQuote.num_triple_rooms * hotelQuote.capacity_triple;
-          hotelAdjustmentsMessage += ` ${hotelQuote.num_triple_rooms} hab. triples en ${hotelQuote.name}.`;
-        }
+      // Then triple rooms
+      if (remainingClientsToAccommodate >= hotelQuote.capacity_triple) {
+        const numRooms = Math.floor(remainingClientsToAccommodate / hotelQuote.capacity_triple);
+        hotelQuote.num_triple_rooms = numRooms;
+        remainingClientsToAccommodate -= numRooms * hotelQuote.capacity_triple;
+        if (numRooms > 0) hotelAdjustmentsMessage += ` ${numRooms} hab. triples en ${hotelQuote.name}.`;
       }
 
+      // Finally, double rooms (use ceil for any remaining clients)
       if (remainingClientsToAccommodate > 0) {
-        let roomsNeededDouble = Math.ceil(remainingClientsToAccommodate / hotelQuote.capacity_double); // Use ceil for remaining
-        if (roomsNeededDouble > 0) {
-          hotelQuote.num_double_rooms = Math.min(roomsNeededDouble, hotelQuote.num_double_rooms + 100);
-          remainingClientsToAccommodate -= hotelQuote.num_double_rooms * hotelQuote.capacity_double;
-          hotelAdjustmentsMessage += ` ${hotelQuote.num_double_rooms} hab. dobles en ${hotelQuote.name}.`;
-        }
+        const numRooms = Math.ceil(remainingClientsToAccommodate / hotelQuote.capacity_double);
+        hotelQuote.num_double_rooms = numRooms;
+        remainingClientsToAccommodate -= numRooms * hotelQuote.capacity_double;
+        if (numRooms > 0) hotelAdjustmentsMessage += ` ${numRooms} hab. dobles en ${hotelQuote.name}.`;
       }
     });
 
@@ -830,12 +820,17 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             const quoteDisplay = selectedQuote
               ? `${selectedQuote.name} (${selectedQuote.location}) - ${selectedQuote.num_nights_quoted} Noches - ${selectedQuote.quoted_date ? format(new Date(selectedQuote.quoted_date), 'PPP') : 'Fecha N/A'}`
               : 'Seleccionar Cotización';
+            const totalQuoteCost = selectedQuote
+              ? ((selectedQuote.num_double_rooms || 0) * selectedQuote.cost_per_night_double * selectedQuote.num_nights_quoted) +
+                ((selectedQuote.num_triple_rooms || 0) * selectedQuote.cost_per_night_triple * selectedQuote.num_nights_quoted) +
+                ((selectedQuote.num_quad_rooms || 0) * selectedQuote.cost_per_night_quad * selectedQuote.num_nights_quoted)
+              : 0;
 
             return (
               <div key={tourHotelDetail.id} className="flex flex-col md:flex-row items-center gap-2 border p-2 rounded-md">
                 <Select
                   value={tourHotelDetail.hotel_quote_id}
-                  onValueChange={(value) => handleTourHotelChange(index, 'hotel_quote_id', value)}
+                  onValueChange={(value) => handleTourHotelChange(index, value)}
                 >
                   <SelectTrigger className="w-full md:w-2/3">
                     <SelectValue placeholder={quoteDisplay} />
@@ -848,19 +843,11 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
                     ))}
                   </SelectContent>
                 </Select>
-                <Select
-                  value={tourHotelDetail.room_type}
-                  onValueChange={(value) => handleTourHotelChange(index, 'room_type', value)}
-                >
-                  <SelectTrigger className="w-full md:w-1/4">
-                    <SelectValue placeholder="Tipo Habitación" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="double">Doble (x2)</SelectItem>
-                    <SelectItem value="triple">Triple (x3)</SelectItem>
-                    <SelectItem value="quad">Cuádruple (x4)</SelectItem>
-                  </SelectContent>
-                </Select>
+                {selectedQuote && (
+                  <span className="text-sm text-gray-600 md:w-1/4 text-center md:text-left">
+                    Costo: ${totalQuoteCost.toFixed(2)}
+                  </span>
+                )}
                 <Button type="button" variant="destructive" size="icon" onClick={() => removeTourHotelItem(tourHotelDetail.id)}>
                   <MinusCircle className="h-4 w-4" />
                 </Button>
