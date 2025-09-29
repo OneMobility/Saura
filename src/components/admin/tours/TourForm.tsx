@@ -29,6 +29,7 @@ interface HotelQuote {
   num_double_rooms: number; // NEW
   num_triple_rooms: number; // NEW
   num_quad_rooms: number; // NEW
+  num_courtesy_rooms: number; // NEW: Added courtesy rooms
   is_active: boolean;
   advance_payment: number;
   total_paid: number;
@@ -277,10 +278,16 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       const costTriple = (hotelQuote.num_triple_rooms || 0) * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
       const costQuad = (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
       
-      totalHotelCost += costDouble + costTriple + costQuad;
+      const totalContractedRoomsCost = costDouble + costTriple + costQuad;
 
-      // NEW: Add hotel remaining payment
-      currentTotalRemainingPayments += (costDouble + costTriple + costQuad) - (hotelQuote.total_paid || 0);
+      // Subtract the value of courtesy rooms from the total contracted cost
+      // Assuming courtesy rooms are valued at the double occupancy rate for simplicity
+      const costOfCourtesyRooms = (hotelQuote.num_courtesy_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
+      
+      totalHotelCost += totalContractedRoomsCost - costOfCourtesyRooms;
+
+      // NEW: Add hotel remaining payment (adjusted for courtesies)
+      currentTotalRemainingPayments += (totalContractedRoomsCost - costOfCourtesyRooms) - (hotelQuote.total_paid || 0);
     });
 
     const selectedBus = availableBuses.find(b => b.id === formData.bus_id);
@@ -540,6 +547,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
         hotelQuote.num_quad_rooms = 0;
         hotelQuote.num_triple_rooms = 0;
         hotelQuote.num_double_rooms = 0;
+        hotelQuote.num_courtesy_rooms = 0; // Reset courtesy rooms for simulation
       }
     });
 
@@ -580,14 +588,25 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
         remainingClientsToAccommodate -= numRooms * hotelQuote.capacity_double;
         if (numRooms > 0) hotelAdjustmentsMessage += ` ${numRooms} hab. dobles en ${hotelQuote.name}.`;
       }
+      
+      // For simulation, we assume no new courtesies are generated, but existing ones are considered.
+      // If the hotel quote already had courtesy rooms, their cost reduction is applied.
+      // For this simulation, we're calculating *needed* rooms, not necessarily using existing courtesies.
+      // The total hotel cost calculation below will handle the cost reduction.
     });
 
     // Recalculate hotel cost based on adjusted rooms
     let adjustedHotelCost = 0;
     tempHotelQuotes.forEach(hotelQuote => {
-      adjustedHotelCost += (hotelQuote.num_double_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
-      adjustedHotelCost += (hotelQuote.num_triple_rooms || 0) * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
-      adjustedHotelCost += (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
+      const costDouble = (hotelQuote.num_double_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
+      const costTriple = (hotelQuote.num_triple_rooms || 0) * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
+      const costQuad = (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
+      const totalContractedRoomsCost = costDouble + costTriple + costQuad;
+
+      // Subtract the value of courtesy rooms from the total contracted cost for the simulation
+      const costOfCourtesyRooms = (hotelQuote.num_courtesy_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
+      
+      adjustedHotelCost += totalContractedRoomsCost - costOfCourtesyRooms;
     });
     currentAdjustedTotalBaseCost += adjustedHotelCost;
 
@@ -832,7 +851,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           <Input id="bus_cost" type="number" value={formData.bus_cost} readOnly className="md:col-span-3 bg-gray-100 cursor-not-allowed" title="Derivado del autobús seleccionado" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
-          <Label htmlFor="courtesies" className="md:text-right">Cortesías</Label>
+          <Label htmlFor="courtesies" className="md:text-right">Cortesías (Asientos Bus)</Label>
           <Input id="courtesies" type="number" value={formData.courtesies} onChange={(e) => handleNumberChange('courtesies', e.target.value)} className="md:col-span-3" required min={0} />
         </div>
 
@@ -860,9 +879,10 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
               ? `${selectedQuote.name} (${selectedQuote.location}) - ${selectedQuote.num_nights_quoted} Noches - ${selectedQuote.quoted_date ? format(new Date(selectedQuote.quoted_date), 'PPP') : 'Fecha N/A'}`
               : 'Seleccionar Cotización';
             const totalQuoteCost = selectedQuote
-              ? ((selectedQuote.num_double_rooms || 0) * selectedQuote.cost_per_night_double * selectedQuote.num_nights_quoted) +
+              ? (((selectedQuote.num_double_rooms || 0) * selectedQuote.cost_per_night_double * selectedQuote.num_nights_quoted) +
                 ((selectedQuote.num_triple_rooms || 0) * selectedQuote.cost_per_night_triple * selectedQuote.num_nights_quoted) +
-                ((selectedQuote.num_quad_rooms || 0) * selectedQuote.cost_per_night_quad * selectedQuote.num_nights_quoted)
+                ((selectedQuote.num_quad_rooms || 0) * selectedQuote.cost_per_night_quad * selectedQuote.num_nights_quoted)) -
+                ((selectedQuote.num_courtesy_rooms || 0) * selectedQuote.cost_per_night_double * selectedQuote.num_nights_quoted) // Subtract courtesy cost
               : 0;
 
             return (
@@ -877,14 +897,14 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
                   <SelectContent>
                     {availableHotelQuotes.map((quote) => (
                       <SelectItem key={quote.id} value={quote.id}>
-                        {`${quote.name} (${quote.location}) - ${quote.num_nights_quoted} Noches - ${quote.quoted_date ? format(new Date(quote.quoted_date), 'PPP') : 'Fecha N/A'}`}
+                        {`${quote.name} (${quote.location}) - ${quote.num_nights_quoted} Noches - ${quote.quoted_date ? format(new Date(quote.quoted_date), 'PPP') : 'Fecha N/A'} (Cortesías: ${quote.num_courtesy_rooms})`}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
                 {selectedQuote && (
                   <span className="text-sm text-gray-600 md:w-1/4 text-center md:text-left">
-                    Costo: ${totalQuoteCost.toFixed(2)}
+                    Costo Neto: ${totalQuoteCost.toFixed(2)}
                   </span>
                 )}
                 <Button type="button" variant="destructive" size="icon" onClick={() => removeTourHotelItem(tourHotelDetail.id)}>

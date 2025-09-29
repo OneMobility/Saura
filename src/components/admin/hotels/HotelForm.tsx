@@ -28,6 +28,7 @@ interface Hotel {
   num_double_rooms: number;
   num_triple_rooms: number;
   num_quad_rooms: number;
+  num_courtesy_rooms: number; // NEW: Added courtesy rooms
   is_active: boolean;
   advance_payment: number;
   total_paid: number;
@@ -56,6 +57,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
     num_double_rooms: 0,
     num_triple_rooms: 0,
     num_quad_rooms: 0,
+    num_courtesy_rooms: 0, // Initialize new field
     is_active: true,
     advance_payment: 0,
     total_paid: 0,
@@ -71,7 +73,12 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
     const totalCostTripleRooms = formData.num_triple_rooms * formData.cost_per_night_triple * formData.num_nights_quoted;
     const totalCostQuadRooms = formData.num_quad_rooms * formData.cost_per_night_quad * formData.num_nights_quoted;
     
-    const totalQuoteCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
+    const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
+
+    // Calculate cost of courtesy rooms (assuming double occupancy rate for simplicity)
+    const costOfCourtesyRooms = formData.num_courtesy_rooms * formData.cost_per_night_double * formData.num_nights_quoted;
+
+    const totalQuoteCost = totalContractedRoomsCost - costOfCourtesyRooms;
     const remaining = totalQuoteCost - formData.total_paid;
 
     setFormData(prev => ({
@@ -87,7 +94,8 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
     formData.num_quad_rooms,
     formData.cost_per_night_quad,
     formData.num_nights_quoted,
-    formData.total_paid
+    formData.total_paid,
+    formData.num_courtesy_rooms // Added to dependencies
   ]);
 
   useEffect(() => {
@@ -108,18 +116,23 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
         }
 
         if (data) {
-          const totalCostDoubleRooms = data.num_double_rooms * data.cost_per_night_double * data.num_nights_quoted;
-          const totalCostTripleRooms = data.num_triple_rooms * data.cost_per_night_triple * data.num_nights_quoted;
-          const totalCostQuadRooms = data.num_quad_rooms * data.cost_per_night_quad * data.num_nights_quoted;
-          const totalQuoteCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
+          const totalCostDoubleRooms = (data.num_double_rooms || 0) * data.cost_per_night_double * data.num_nights_quoted;
+          const totalCostTripleRooms = (data.num_triple_rooms || 0) * data.cost_per_night_triple * data.num_nights_quoted;
+          const totalCostQuadRooms = (data.num_quad_rooms || 0) * data.cost_per_night_quad * data.num_nights_quoted;
+          const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
+
+          const costOfCourtesyRooms = (data.num_courtesy_rooms || 0) * data.cost_per_night_double * data.num_nights_quoted;
+
+          const totalQuoteCost = totalContractedRoomsCost - costOfCourtesyRooms;
 
           setFormData({
             ...data,
             num_double_rooms: data.num_double_rooms || 0,
             num_triple_rooms: data.num_triple_rooms || 0,
             num_quad_rooms: data.num_quad_rooms || 0,
+            num_courtesy_rooms: data.num_courtesy_rooms || 0, // Set new field
             total_quote_cost: totalQuoteCost,
-            remaining_payment: totalQuoteCost - data.total_paid,
+            remaining_payment: totalQuoteCost - (data.total_paid || 0),
           });
           // Set dateInput to the formatted date from fetched data
           setDateInput(data.quoted_date ? format(new Date(data.quoted_date), 'dd/MM/yy') : '');
@@ -140,6 +153,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
           num_double_rooms: 0,
           num_triple_rooms: 0,
           num_quad_rooms: 0,
+          num_courtesy_rooms: 0, // Reset new field
           is_active: true,
           advance_payment: 0,
           total_paid: 0,
@@ -228,13 +242,13 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
       setIsSubmitting(false);
       return;
     }
-    if (formData.num_double_rooms < 0 || formData.num_triple_rooms < 0 || formData.num_quad_rooms < 0) {
+    if (formData.num_double_rooms < 0 || formData.num_triple_rooms < 0 || formData.num_quad_rooms < 0 || formData.num_courtesy_rooms < 0) {
       toast.error('El número de habitaciones no puede ser negativo.');
       setIsSubmitting(false);
       return;
     }
-    if (formData.num_double_rooms === 0 && formData.num_triple_rooms === 0 && formData.num_quad_rooms === 0) {
-      toast.error('Debes especificar al menos una habitación contratada.');
+    if (formData.num_double_rooms === 0 && formData.num_triple_rooms === 0 && formData.num_quad_rooms === 0 && formData.num_courtesy_rooms === 0) {
+      toast.error('Debes especificar al menos una habitación contratada o de cortesía.');
       setIsSubmitting(false);
       return;
     }
@@ -254,6 +268,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
       num_double_rooms: formData.num_double_rooms,
       num_triple_rooms: formData.num_triple_rooms,
       num_quad_rooms: formData.num_quad_rooms,
+      num_courtesy_rooms: formData.num_courtesy_rooms, // Save new field
       is_active: formData.is_active,
       advance_payment: formData.advance_payment,
       total_paid: formData.total_paid,
@@ -468,6 +483,20 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
               id="num_quad_rooms"
               type="number"
               value={formData.num_quad_rooms}
+              onChange={handleChange}
+              className="col-span-3"
+              min={0}
+              required
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="num_courtesy_rooms" className="text-right">
+              Hab. Cortesía
+            </Label>
+            <Input
+              id="num_courtesy_rooms"
+              type="number"
+              value={formData.num_courtesy_rooms}
               onChange={handleChange}
               className="col-span-3"
               min={0}

@@ -26,6 +26,7 @@ interface HotelQuote {
   num_double_rooms: number; // NEW
   num_triple_rooms: number; // NEW
   num_quad_rooms: number; // NEW
+  num_courtesy_rooms: number; // NEW: Added courtesy rooms
   is_active: boolean;
   advance_payment: number;
   total_paid: number;
@@ -118,6 +119,7 @@ const TourDetailsPage = () => {
         num_double_rooms: quote.num_double_rooms || 0,
         num_triple_rooms: quote.num_triple_rooms || 0,
         num_quad_rooms: quote.num_quad_rooms || 0,
+        num_courtesy_rooms: quote.num_courtesy_rooms || 0, // Set new field
       }));
       setHotelQuotesMap(quotesMap);
 
@@ -195,8 +197,12 @@ const TourDetailsPage = () => {
             const totalCostDoubleRooms = (hotelQuote.num_double_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
             const totalCostTripleRooms = (hotelQuote.num_triple_rooms || 0) * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
             const totalCostQuadRooms = (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
-            const totalHotelBookingCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
-            currentTotalRemainingPayments += totalHotelBookingCost - (hotelQuote.total_paid || 0);
+            const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
+            
+            // Subtract the value of courtesy rooms from the total contracted cost
+            const costOfCourtesyRooms = (hotelQuote.num_courtesy_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
+
+            currentTotalRemainingPayments += (totalContractedRoomsCost - costOfCourtesyRooms) - (hotelQuote.total_paid || 0);
           }
         });
         setTotalRemainingPayments(currentTotalRemainingPayments);
@@ -308,7 +314,7 @@ const TourDetailsPage = () => {
                     <li><span className="font-medium">Precio por persona (Cuádruple):</span> ${tour.selling_price_quad_occupancy.toFixed(2)}</li>
                     <li><span className="font-medium">Duración:</span> {tour.duration}</li>
                     <li><span className="font-medium">Capacidad del autobús:</span> {tour.bus_capacity} personas</li>
-                    <li><span className="font-medium">Cortesías:</span> {tour.courtesies}</li>
+                    <li><span className="font-medium">Cortesías (Asientos Bus):</span> {tour.courtesies}</li>
                     <li><span className="font-medium">Costo por persona pagante:</span> ${tour.cost_per_paying_person?.toFixed(2) || 'N/A'}</li>
                   </ul>
                 </div>
@@ -348,15 +354,17 @@ const TourDetailsPage = () => {
                       const totalCostDoubleRooms = (hotelQuote.num_double_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
                       const totalCostTripleRooms = (hotelQuote.num_triple_rooms || 0) * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
                       const totalCostQuadRooms = (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
-                      const totalHotelBookingCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
+                      const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
                       
+                      const costOfCourtesyRooms = (hotelQuote.num_courtesy_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
+                      const totalHotelBookingCostNet = totalContractedRoomsCost - costOfCourtesyRooms;
+
                       const totalHotelCapacity = 
                         ((hotelQuote.num_double_rooms || 0) * hotelQuote.capacity_double) +
                         ((hotelQuote.num_triple_rooms || 0) * hotelQuote.capacity_triple) +
                         ((hotelQuote.num_quad_rooms || 0) * hotelQuote.capacity_quad);
 
-                      const costPerPersonCalculated = totalHotelCapacity > 0 ? totalHotelBookingCost / totalHotelCapacity : 0;
-                      const remainingPayment = totalHotelBookingCost - (hotelQuote.total_paid || 0);
+                      const remainingPayment = totalHotelBookingCostNet - (hotelQuote.total_paid || 0);
 
                       return (
                         <div key={tourHotelDetail.id} className="border p-4 rounded-md bg-gray-50">
@@ -369,7 +377,8 @@ const TourDetailsPage = () => {
                             <li><span className="font-medium">Habitaciones Dobles Contratadas:</span> {hotelQuote.num_double_rooms}</li>
                             <li><span className="font-medium">Habitaciones Triples Contratadas:</span> {hotelQuote.num_triple_rooms}</li>
                             <li><span className="font-medium">Habitaciones Cuádruples Contratadas:</span> {hotelQuote.num_quad_rooms}</li>
-                            <li><span className="font-medium">Costo total de la cotización:</span> ${totalHotelBookingCost.toFixed(2)}</li>
+                            <li><span className="font-medium">Habitaciones de Cortesía:</span> {hotelQuote.num_courtesy_rooms}</li>
+                            <li><span className="font-medium">Costo total de la cotización (Neto):</span> ${totalHotelBookingCostNet.toFixed(2)}</li>
                             <li><span className="font-medium">Anticipo al hotel:</span> ${hotelQuote.advance_payment.toFixed(2)}</li>
                             <li><span className="font-medium">Total pagado al hotel:</span> ${hotelQuote.total_paid.toFixed(2)}</li>
                             <li><span className="font-medium">Pago restante al hotel:</span> ${remainingPayment.toFixed(2)}</li>
