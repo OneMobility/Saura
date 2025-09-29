@@ -1,15 +1,49 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft } from 'lucide-react';
-import ParallaxCard from '@/components/ParallaxCard'; // Import ParallaxCard
-import { allTours } from '@/data/tours'; // Import allTours
+import { ArrowLeft, Loader2 } from 'lucide-react'; // Import Loader2
+import ParallaxCard from '@/components/ParallaxCard';
+import { supabase } from '@/integrations/supabase/client'; // Import supabase
+
+interface Tour {
+  id: string;
+  image_url: string;
+  title: string;
+  description: string;
+  slug: string; // Use slug for linking
+}
 
 const ToursPage = () => {
+  const [allTours, setAllTours] = useState<Tour[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchAllTours = async () => {
+      setLoading(true);
+      setError(null);
+      const { data, error } = await supabase
+        .from('tours')
+        .select('id, image_url, title, description, slug')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Error fetching all tours for ToursPage:', error);
+        setError('Error al cargar los tours.');
+        setAllTours([]);
+      } else {
+        setAllTours(data || []);
+      }
+      setLoading(false);
+    };
+
+    fetchAllTours();
+  }, []);
+
   const rotationClasses = [
     "transform rotate-1",
     "transform -rotate-1",
@@ -18,6 +52,32 @@ const ToursPage = () => {
     "transform rotate-3",
     "transform -rotate-3",
   ];
+
+  if (loading) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-grow py-12 px-4 md:px-8 lg:px-16 bg-white flex items-center justify-center">
+          <Loader2 className="h-12 w-12 animate-spin text-rosa-mexicano" />
+          <p className="ml-4 text-gray-700 text-xl">Cargando todos los tours...</p>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen flex flex-col">
+        <Navbar />
+        <main className="flex-grow py-12 px-4 md:px-8 lg:px-16 bg-white text-center text-red-600">
+          <h1 className="text-4xl md:text-5xl font-bold mb-4">Error</h1>
+          <p className="text-xl">{error}</p>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -30,18 +90,22 @@ const ToursPage = () => {
           Explora nuestra colección completa de aventuras y encuentra tu próximo destino.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {allTours.map((tour, index) => (
-            <ParallaxCard
-              key={tour.id}
-              imageUrl={tour.imageUrl}
-              title={tour.title}
-              description={tour.description}
-              rotationClass={rotationClasses[index % rotationClasses.length]}
-              tourId={tour.id}
-            />
-          ))}
-        </div>
+        {allTours.length === 0 ? (
+          <p className="text-center text-gray-600 text-lg">No hay tours disponibles en este momento.</p>
+        ) : (
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+            {allTours.map((tour, index) => (
+              <ParallaxCard
+                key={tour.id}
+                imageUrl={tour.image_url}
+                title={tour.title}
+                description={tour.description}
+                rotationClass={rotationClasses[index % rotationClasses.length]}
+                tourId={tour.slug} // Use slug for the link
+              />
+            ))}
+          </div>
+        )}
 
         <div className="text-center mt-12">
           <Button asChild className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white">

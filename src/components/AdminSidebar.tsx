@@ -5,28 +5,28 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'; // Import Collapsible components
-import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText, ChevronDown, Hotel, Truck, UserRound, Bus } from 'lucide-react'; // Added Hotel, Truck, UserRound, ChevronDown, Bus icons
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText, ChevronDown, Hotel, Truck, UserRound, Bus } from 'lucide-react';
 import { useSession } from '@/components/SessionContextProvider';
 
 interface NavItem {
-  href?: string; // Optional for parent items
+  href?: string;
   icon: React.ElementType;
   label: string;
-  children?: NavItem[]; // For submenus
+  children?: NavItem[];
 }
 
 const navItems: NavItem[] = [
   { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   {
-    icon: Package, // Icon for the main "Tours" category
-    label: 'Gestión de Viajes', // A more general label for the parent
+    icon: Package,
+    label: 'Gestión de Viajes',
     children: [
-      { href: '/admin/tours', icon: Package, label: 'Tours' }, // Existing tours page
-      { href: '/admin/hotels', icon: Hotel, label: 'Hoteles' }, // New
-      { href: '/admin/providers', icon: Truck, label: 'Proveedores' }, // New
-      { href: '/admin/clients', icon: UserRound, label: 'Clientes' }, // New, using UserRound to differentiate from Users
-      { href: '/admin/buses', icon: Bus, label: 'Autobuses' }, // NEW: Buses page
+      { href: '/admin/tours', icon: Package, label: 'Tours' }, // Updated to point to AdminToursPage
+      { href: '/admin/hotels', icon: Hotel, label: 'Hoteles' },
+      { href: '/admin/providers', icon: Truck, label: 'Proveedores' },
+      { href: '/admin/clients', icon: UserRound, label: 'Clientes' },
+      { href: '/admin/buses', icon: Bus, label: 'Autobuses' },
     ],
   },
   { href: '/admin/blog', icon: Newspaper, label: 'Blog' },
@@ -47,7 +47,6 @@ const AdminSidebar = () => {
     setIsPinned(prev => !prev);
   };
 
-  // Determine if a parent item's submenu should be open
   const isParentActive = (item: NavItem) => {
     return item.children?.some(child => location.pathname.startsWith(child.href || '')) || false;
   };
@@ -89,7 +88,7 @@ const AdminSidebar = () => {
       {/* Navigation Links */}
       <nav className="flex-grow mt-4 space-y-2 px-2">
         {navItems.map((item) => (
-          item.children ? ( // Render as collapsible if it has children
+          item.children ? (
             <Collapsible key={item.label} defaultOpen={isParentActive(item)}>
               <CollapsibleTrigger asChild>
                 {!isExpanded ? (
@@ -145,7 +144,7 @@ const AdminSidebar = () => {
                 </div>
               </CollapsibleContent>
             </Collapsible>
-          ) : ( // Render as a single link if no children
+          ) : (
             <div key={item.href}>
               {!isExpanded ? (
                 <Tooltip>
