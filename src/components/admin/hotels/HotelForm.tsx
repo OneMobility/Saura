@@ -75,8 +75,8 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
     
     const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
 
-    // Calculate cost of courtesy rooms (assuming double occupancy rate for simplicity)
-    const costOfCourtesyRooms = formData.num_courtesy_rooms * formData.cost_per_night_double * formData.num_nights_quoted;
+    // Calculate cost of courtesy rooms (always using quad occupancy rate)
+    const costOfCourtesyRooms = formData.num_courtesy_rooms * formData.cost_per_night_quad * formData.num_nights_quoted;
 
     const totalQuoteCost = totalContractedRoomsCost - costOfCourtesyRooms;
     const remaining = totalQuoteCost - formData.total_paid;
@@ -117,11 +117,12 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
 
         if (data) {
           const totalCostDoubleRooms = (data.num_double_rooms || 0) * data.cost_per_night_double * data.num_nights_quoted;
-          const totalCostTripleRooms = (data.num_triple_rooms || 0) * data.cost_per_night_triple * data.num_nights_quoted;
+          const totalCostTripleRooms = (data.num_triple_rooms || 0) * data.cost_per_per_night_triple * data.num_nights_quoted;
           const totalCostQuadRooms = (data.num_quad_rooms || 0) * data.cost_per_night_quad * data.num_nights_quoted;
           const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
 
-          const costOfCourtesyRooms = (data.num_courtesy_rooms || 0) * data.cost_per_night_double * data.num_nights_quoted;
+          // Calculate cost of courtesy rooms (always using quad occupancy rate)
+          const costOfCourtesyRooms = (data.num_courtesy_rooms || 0) * data.cost_per_night_quad * data.num_nights_quoted;
 
           const totalQuoteCost = totalContractedRoomsCost - costOfCourtesyRooms;
 

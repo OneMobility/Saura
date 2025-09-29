@@ -281,8 +281,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       const totalContractedRoomsCost = costDouble + costTriple + costQuad;
 
       // Subtract the value of courtesy rooms from the total contracted cost
-      // Assuming courtesy rooms are valued at the double occupancy rate for simplicity
-      const costOfCourtesyRooms = (hotelQuote.num_courtesy_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
+      // Courtesy rooms are always valued at the quad occupancy rate
+      const costOfCourtesyRooms = (hotelQuote.num_courtesy_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
       
       totalHotelCost += totalContractedRoomsCost - costOfCourtesyRooms;
 
@@ -604,7 +604,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       const totalContractedRoomsCost = costDouble + costTriple + costQuad;
 
       // Subtract the value of courtesy rooms from the total contracted cost for the simulation
-      const costOfCourtesyRooms = (hotelQuote.num_courtesy_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
+      // Courtesy rooms are always valued at the quad occupancy rate
+      const costOfCourtesyRooms = (hotelQuote.num_courtesy_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
       
       adjustedHotelCost += totalContractedRoomsCost - costOfCourtesyRooms;
     });
@@ -882,7 +883,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
               ? (((selectedQuote.num_double_rooms || 0) * selectedQuote.cost_per_night_double * selectedQuote.num_nights_quoted) +
                 ((selectedQuote.num_triple_rooms || 0) * selectedQuote.cost_per_night_triple * selectedQuote.num_nights_quoted) +
                 ((selectedQuote.num_quad_rooms || 0) * selectedQuote.cost_per_night_quad * selectedQuote.num_nights_quoted)) -
-                ((selectedQuote.num_courtesy_rooms || 0) * selectedQuote.cost_per_night_double * selectedQuote.num_nights_quoted) // Subtract courtesy cost
+                ((selectedQuote.num_courtesy_rooms || 0) * selectedQuote.cost_per_night_quad * selectedQuote.num_nights_quoted) // Subtract courtesy cost using quad rate
               : 0;
 
             return (

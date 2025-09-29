@@ -200,7 +200,8 @@ const TourDetailsPage = () => {
             const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
             
             // Subtract the value of courtesy rooms from the total contracted cost
-            const costOfCourtesyRooms = (hotelQuote.num_courtesy_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
+            // Courtesy rooms are always valued at the quad occupancy rate
+            const costOfCourtesyRooms = (hotelQuote.num_courtesy_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
 
             currentTotalRemainingPayments += (totalContractedRoomsCost - costOfCourtesyRooms) - (hotelQuote.total_paid || 0);
           }
@@ -356,7 +357,8 @@ const TourDetailsPage = () => {
                       const totalCostQuadRooms = (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
                       const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
                       
-                      const costOfCourtesyRooms = (hotelQuote.num_courtesy_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
+                      // Courtesy rooms are always valued at the quad occupancy rate
+                      const costOfCourtesyRooms = (hotelQuote.num_courtesy_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
                       const totalHotelBookingCostNet = totalContractedRoomsCost - costOfCourtesyRooms;
 
                       const totalHotelCapacity = 
