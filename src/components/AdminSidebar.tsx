@@ -5,7 +5,7 @@ import { Link, useLocation } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff } from 'lucide-react'; // Added Pin and PinOff icons
+import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText } from 'lucide-react'; // Added MessageSquareText icon
 import { useSession } from '@/components/SessionContextProvider'; // Import useSession
 
 interface NavItem {
@@ -17,7 +17,8 @@ interface NavItem {
 const navItems: NavItem[] = [
   { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
   { href: '/admin/tours', icon: Package, label: 'Tours' },
-  { href: '/admin/blog', icon: Newspaper, label: 'Blog' }, // NEW: Blog management link
+  { href: '/admin/blog', icon: Newspaper, label: 'Blog' },
+  { href: '/admin/reviews', icon: MessageSquareText, label: 'Opiniones' }, // NEW: Reviews management link
   { href: '/admin/users', icon: Users, label: 'Usuarios' },
   { href: '/admin/settings', icon: Settings, label: 'Configuración' },
 ];

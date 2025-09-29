@@ -17,6 +17,7 @@ import AdminDashboard from "./pages/AdminDashboard";
 import AdminSettingsPage from "./pages/AdminSettingsPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
 import AdminBlogPage from "./pages/AdminBlogPage";
+import AdminReviewsPage from "./pages/AdminReviewsPage"; // NEW: Import AdminReviewsPage
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -68,6 +69,14 @@ const App = () => { // Eliminado React.FC
                 element={
                   <ProtectedRoute adminOnly>
                     <AdminBlogPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/reviews" // NEW: Route for AdminReviewsPage
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminReviewsPage />
                   </ProtectedRoute>
                 }
               />
