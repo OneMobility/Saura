@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Chair, CarFront, Toilet, Minus, Square, GripVertical, Grid3X3 } from 'lucide-react'; // Icons for tools
+import { Armchair, CarFront, Toilet, Minus, Square, GripVertical, Grid3X3 } from 'lucide-react'; // Changed Chair to Armchair
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
@@ -155,7 +155,7 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
           onClick={() => setActiveTool('seat')}
           className={activeTool === 'seat' ? 'bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white' : ''}
         >
-          <Chair className="h-4 w-4 mr-2" /> Asiento
+          <Armchair className="h-4 w-4 mr-2" /> Asiento
         </Button>
         <Button
           type="button"
