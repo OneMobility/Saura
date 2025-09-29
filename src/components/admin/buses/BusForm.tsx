@@ -4,11 +4,9 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea'; // Using Textarea for description if needed, though not in current schema
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, Upload } from 'lucide-react';
-import { v4 as uuidv4 } from 'uuid';
+import { Loader2, Save } from 'lucide-react';
 
 interface Bus {
   id?: string;
@@ -16,7 +14,7 @@ interface Bus {
   license_plate: string;
   rental_cost: number;
   total_capacity: number;
-  seat_map_image_url: string | null;
+  // seat_map_image_url ya no se gestiona directamente aquí
 }
 
 interface BusFormProps {
@@ -30,12 +28,8 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
     license_plate: '',
     rental_cost: 0,
     total_capacity: 0,
-    seat_map_image_url: null,
   });
-  const [imageFile, setImageFile] = useState<File | null>(null);
-  const [imageUrlPreview, setImageUrlPreview] = useState<string>('');
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
 
   useEffect(() => {
@@ -44,7 +38,7 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
         setLoadingInitialData(true);
         const { data, error } = await supabase
           .from('buses')
-          .select('*')
+          .select('id, name, license_plate, rental_cost, total_capacity') // Seleccionar solo los campos relevantes
           .eq('id', busId)
           .single();
 
@@ -57,7 +51,6 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
 
         if (data) {
           setFormData(data);
-          setImageUrlPreview(data.seat_map_image_url || '');
         }
       } else {
         // Reset form for new bus
@@ -66,10 +59,7 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
           license_plate: '',
           rental_cost: 0,
           total_capacity: 0,
-          seat_map_image_url: null,
         });
-        setImageFile(null);
-        setImageUrlPreview('');
       }
       setLoadingInitialData(false);
     };
@@ -77,7 +67,7 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
     fetchBusData();
   }, [busId]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value, type } = e.target;
     setFormData((prev) => ({
       ...prev,
@@ -85,63 +75,9 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
     }));
   };
 
-  const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      setImageUrlPreview(URL.createObjectURL(file));
-    } else {
-      setImageFile(null);
-      setImageUrlPreview(formData.seat_map_image_url || '');
-    }
-  };
-
-  const uploadImage = async (file: File): Promise<string | null> => {
-    setIsUploadingImage(true);
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${uuidv4()}.${fileExt}`;
-    const filePath = `seat-maps/${fileName}`; // Store in a 'seat-maps' folder within the bucket
-
-    const { data, error } = await supabase.storage
-      .from('bus-seat-maps') // Use the new bucket name
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false,
-      });
-
-    setIsUploadingImage(false);
-
-    if (error) {
-      console.error('Error al subir la imagen:', error);
-      toast.error('Error al subir la imagen del mapa de asientos.');
-      return null;
-    }
-
-    const { data: publicUrlData } = supabase.storage
-      .from('bus-seat-maps')
-      .getPublicUrl(filePath);
-
-    return publicUrlData.publicUrl;
-  };
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-
-    let finalImageUrl = formData.seat_map_image_url;
-
-    if (imageFile) {
-      const uploadedUrl = await uploadImage(imageFile);
-      if (!uploadedUrl) {
-        setIsSubmitting(false);
-        return;
-      }
-      finalImageUrl = uploadedUrl;
-    } else if (!formData.seat_map_image_url && !busId) { // Require image for new buses
-      toast.error('Por favor, sube una imagen para el mapa de asientos.');
-      setIsSubmitting(false);
-      return;
-    }
 
     if (!formData.name || !formData.license_plate) {
       toast.error('Por favor, rellena el nombre y las placas del autobús.');
@@ -166,7 +102,7 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
       license_plate: formData.license_plate,
       rental_cost: formData.rental_cost,
       total_capacity: formData.total_capacity,
-      seat_map_image_url: finalImageUrl,
+      // seat_map_image_url ya no se incluye aquí
     };
 
     if (busId) {
@@ -266,33 +202,12 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
             required
           />
         </div>
-        <div className="grid grid-cols-4 items-start gap-4">
-          <Label htmlFor="seat_map_image_url" className="text-right">
-            Imagen Mapa de Asientos
-          </Label>
-          <div className="col-span-3 flex flex-col gap-2">
-            <Input
-              id="seat_map_image_url"
-              type="file"
-              accept="image/*"
-              onChange={handleImageFileChange}
-              className="file:text-rosa-mexicano file:font-semibold file:border-0 file:bg-transparent file:mr-4"
-            />
-            {imageUrlPreview && (
-              <div className="mt-2">
-                <img src={imageUrlPreview} alt="Vista previa del mapa de asientos" className="w-48 h-32 object-cover rounded-md" />
-              </div>
-            )}
-            {!imageFile && !imageUrlPreview && (
-              <p className="text-sm text-gray-500">Sube una imagen para el mapa de asientos del autobús.</p>
-            )}
-          </div>
-        </div>
+        {/* El campo de imagen del mapa de asientos se ha eliminado, ya que el mapa es dinámico */}
 
         <div className="flex justify-end mt-6">
-          <Button type="submit" disabled={isSubmitting || isUploadingImage}>
-            {isSubmitting || isUploadingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            {isUploadingImage ? 'Subiendo imagen...' : (busId ? 'Guardar Cambios' : 'Añadir Autobús')}
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            {busId ? 'Guardar Cambios' : 'Añadir Autobús'}
           </Button>
         </div>
       </form>

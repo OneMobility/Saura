@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Edit, Trash2, Loader2, Bus as BusIcon } from 'lucide-react'; // Renamed Bus to BusIcon to avoid conflict
+import { Edit, Trash2, Loader2 } from 'lucide-react';
 
 interface Bus {
   id: string;
@@ -13,7 +13,7 @@ interface Bus {
   license_plate: string;
   rental_cost: number;
   total_capacity: number;
-  seat_map_image_url: string | null;
+  // seat_map_image_url ya no se muestra aquí
   created_at: string;
 }
 
@@ -34,7 +34,7 @@ const BusesTable: React.FC<BusesTableProps> = ({ onEditBus, onBusDeleted }) => {
     setLoading(true);
     const { data, error } = await supabase
       .from('buses')
-      .select('*')
+      .select('id, name, license_plate, rental_cost, total_capacity, created_at') // Seleccionar solo los campos relevantes
       .order('name', { ascending: true });
 
     if (error) {
@@ -89,7 +89,6 @@ const BusesTable: React.FC<BusesTableProps> = ({ onEditBus, onBusDeleted }) => {
                 <TableHead>Placas/Código</TableHead>
                 <TableHead>Costo Renta</TableHead>
                 <TableHead>Capacidad</TableHead>
-                <TableHead>Mapa Asientos</TableHead>
                 <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -100,15 +99,6 @@ const BusesTable: React.FC<BusesTableProps> = ({ onEditBus, onBusDeleted }) => {
                   <TableCell>{bus.license_plate}</TableCell>
                   <TableCell>${bus.rental_cost.toFixed(2)}</TableCell>
                   <TableCell>{bus.total_capacity}</TableCell>
-                  <TableCell>
-                    {bus.seat_map_image_url ? (
-                      <a href={bus.seat_map_image_url} target="_blank" rel="noopener noreferrer" className="text-rosa-mexicano hover:underline">
-                        Ver Mapa
-                      </a>
-                    ) : (
-                      'N/A'
-                    )}
-                  </TableCell>
                   <TableCell className="flex space-x-2">
                     <Button
                       variant="outline"
