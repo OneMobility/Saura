@@ -101,7 +101,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
           .single();
 
         if (error) {
-          console.error('Error al obtener hotel para editar:', error);
+          console.error('Error fetching hotel for editing:', error);
           toast.error('Error al cargar los datos de la cotización del hotel para editar.');
           setLoadingInitialData(false);
           return;
@@ -121,7 +121,8 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
             total_quote_cost: totalQuoteCost,
             remaining_payment: totalQuoteCost - data.total_paid,
           });
-          setDateInput(data.quoted_date ? format(new Date(data.quoted_date), 'yyyy-MM-dd') : '');
+          // Set dateInput to the formatted date from fetched data
+          setDateInput(data.quoted_date ? format(new Date(data.quoted_date), 'dd/MM/yy') : '');
         }
       } else {
         // Reset form for new hotel
@@ -145,7 +146,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
           total_quote_cost: 0,
           remaining_payment: 0,
         });
-        setDateInput('');
+        setDateInput(''); // Clear dateInput for new form
       }
       setLoadingInitialData(false);
     };
@@ -160,7 +161,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
   // This useEffect ensures dateInput always reflects formData.quoted_date
   useEffect(() => {
     if (formData.quoted_date) {
-      setDateInput(format(parseISO(formData.quoted_date), 'yyyy-MM-dd'));
+      setDateInput(format(parseISO(formData.quoted_date), 'dd/MM/yy'));
     } else {
       setDateInput('');
     }
@@ -176,7 +177,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
   };
 
   const handleDateSelect = (date: Date | undefined) => {
-    const formattedDate = date ? format(date, 'yyyy-MM-dd') : null;
+    const formattedDate = date ? format(date, 'dd/MM/yy') : null;
     setFormData((prev) => ({ ...prev, quoted_date: formattedDate }));
     // dateInput will be updated by the useEffect above
   };
@@ -185,16 +186,16 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
     const value = e.target.value;
     setDateInput(value); // Update dateInput immediately for user typing experience
 
-    // Try to parse the date using the expected format 'yyyy-MM-dd'
-    const parsedDate = parse(value, 'yyyy-MM-dd', new Date());
+    // Try to parse the date using the expected format 'dd/MM/yy'
+    const parsedDate = parse(value, 'dd/MM/yy', new Date());
     
     if (isValid(parsedDate)) {
-      setFormData((prev) => ({ ...prev, quoted_date: format(parsedDate, 'yyyy-MM-dd') }));
+      setFormData((prev) => ({ ...prev, quoted_date: format(parsedDate, 'yyyy-MM-dd') })); // Store as ISO for Supabase
     } else {
       // If invalid, set quoted_date to null. The useEffect will then clear dateInput.
       setFormData((prev) => ({ ...prev, quoted_date: null }));
       // Optionally, provide user feedback here about invalid format
-      // toast.error('Formato de fecha inválido. Usa YYYY-MM-DD.');
+      // toast.error('Formato de fecha inválido. Usa DD/MM/AA.');
     }
   };
 
@@ -341,7 +342,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
                     id="quoted_date_input"
                     value={dateInput}
                     onChange={handleDateInputChange}
-                    placeholder="AAAA-MM-DD"
+                    placeholder="DD/MM/AA"
                     className={cn(
                       "w-full justify-start text-left font-normal pr-10",
                       !formData.quoted_date && "text-muted-foreground"
