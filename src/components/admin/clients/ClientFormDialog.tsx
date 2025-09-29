@@ -348,7 +348,7 @@ const ClientFormDialog: React.FC<ClientFormDialogProps> = ({ isOpen, onClose, on
                 <SelectItem value="confirmed">Confirmado</SelectItem>
                 <SelectItem value="completed">Completado</SelectItem>
                 <SelectItem value="cancelled">Cancelado</SelectItem>
-              </SelectItemContent>
+              </SelectContent>
             </Select>
           </div>
 
