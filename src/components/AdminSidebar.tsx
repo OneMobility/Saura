@@ -22,7 +22,7 @@ const navItems: NavItem[] = [
     icon: Package,
     label: 'Gestión de Viajes',
     children: [
-      { href: '/admin/tours', icon: Package, label: 'Tours' }, // Updated to point to AdminToursPage
+      { href: '/admin/tours', icon: Package, label: 'Tours' },
       { href: '/admin/hotels', icon: Hotel, label: 'Hoteles' },
       { href: '/admin/providers', icon: Truck, label: 'Proveedores' },
       { href: '/admin/clients', icon: UserRound, label: 'Clientes' },
