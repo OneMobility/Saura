@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Save, CalendarIcon } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format } from 'date-fns';
+import { format, parseISO, isValid } from 'date-fns'; // Added parseISO and isValid
 import { cn } from '@/lib/utils';
 
 interface Hotel {
@@ -25,20 +25,20 @@ interface Hotel {
   capacity_double: number;
   capacity_triple: number;
   capacity_quad: number;
-  num_double_rooms: number; // NEW
-  num_triple_rooms: number; // NEW
-  num_quad_rooms: number; // NEW
+  num_double_rooms: number;
+  num_triple_rooms: number;
+  num_quad_rooms: number;
   is_active: boolean;
   advance_payment: number;
   total_paid: number;
   // calculated fields
-  total_quote_cost: number; // Calculated total cost for this quote (all rooms)
-  remaining_payment: number; // Calculated remaining payment
+  total_quote_cost: number;
+  remaining_payment: number;
 }
 
 interface HotelFormProps {
-  hotelId?: string; // Optional hotelId for editing existing hotels
-  onSave: () => void; // Callback to redirect after saving
+  hotelId?: string;
+  onSave: () => void;
 }
 
 const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
@@ -53,9 +53,9 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
     capacity_double: 2,
     capacity_triple: 3,
     capacity_quad: 4,
-    num_double_rooms: 0, // Initialize new fields
-    num_triple_rooms: 0, // Initialize new fields
-    num_quad_rooms: 0, // Initialize new fields
+    num_double_rooms: 0,
+    num_triple_rooms: 0,
+    num_quad_rooms: 0,
     is_active: true,
     advance_payment: 0,
     total_paid: 0,
@@ -64,6 +64,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
+  const [dateInput, setDateInput] = useState<string>(''); // State for direct date input
 
   const calculateQuoteCosts = useCallback(() => {
     const totalCostDoubleRooms = formData.num_double_rooms * formData.cost_per_night_double * formData.num_nights_quoted;
@@ -120,6 +121,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
             total_quote_cost: totalQuoteCost,
             remaining_payment: totalQuoteCost - data.total_paid,
           });
+          setDateInput(data.quoted_date ? format(new Date(data.quoted_date), 'yyyy-MM-dd') : '');
         }
       } else {
         // Reset form for new hotel
@@ -143,6 +145,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
           total_quote_cost: 0,
           remaining_payment: 0,
         });
+        setDateInput('');
       }
       setLoadingInitialData(false);
     };
@@ -163,8 +166,25 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
     }));
   };
 
-  const handleDateChange = (date: Date | undefined) => {
-    setFormData((prev) => ({ ...prev, quoted_date: date ? format(date, 'yyyy-MM-dd') : null }));
+  const handleDateSelect = (date: Date | undefined) => {
+    const formattedDate = date ? format(date, 'yyyy-MM-dd') : null;
+    setFormData((prev) => ({ ...prev, quoted_date: formattedDate }));
+    setDateInput(formattedDate || '');
+  };
+
+  const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setDateInput(value);
+    try {
+      const parsedDate = parseISO(value);
+      if (isValid(parsedDate)) {
+        setFormData((prev) => ({ ...prev, quoted_date: format(parsedDate, 'yyyy-MM-dd') }));
+      } else {
+        setFormData((prev) => ({ ...prev, quoted_date: null }));
+      }
+    } catch (error) {
+      setFormData((prev) => ({ ...prev, quoted_date: null }));
+    }
   };
 
   const handleSwitchChange = (checked: boolean) => {
@@ -219,9 +239,9 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
       capacity_double: formData.capacity_double,
       capacity_triple: formData.capacity_triple,
       capacity_quad: formData.capacity_quad,
-      num_double_rooms: formData.num_double_rooms, // NEW
-      num_triple_rooms: formData.num_triple_rooms, // NEW
-      num_quad_rooms: formData.num_quad_rooms, // NEW
+      num_double_rooms: formData.num_double_rooms,
+      num_triple_rooms: formData.num_triple_rooms,
+      num_quad_rooms: formData.num_quad_rooms,
       is_active: formData.is_active,
       advance_payment: formData.advance_payment,
       total_paid: formData.total_paid,
@@ -305,22 +325,32 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
             </Label>
             <Popover>
               <PopoverTrigger asChild>
-                <Button
-                  variant={"outline"}
-                  className={cn(
-                    "w-full justify-start text-left font-normal col-span-3",
-                    !formData.quoted_date && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {formData.quoted_date ? format(new Date(formData.quoted_date), "PPP") : <span>Seleccionar fecha</span>}
-                </Button>
+                <div className="relative col-span-3">
+                  <Input
+                    id="quoted_date_input"
+                    value={dateInput}
+                    onChange={handleDateInputChange}
+                    placeholder="YYYY-MM-DD"
+                    className={cn(
+                      "w-full justify-start text-left font-normal pr-10",
+                      !formData.quoted_date && "text-muted-foreground"
+                    )}
+                  />
+                  <Button
+                    variant={"ghost"}
+                    className="absolute right-0 top-0 h-full px-3 py-2"
+                    onClick={(e) => e.preventDefault()} // Prevent form submission
+                  >
+                    <CalendarIcon className="h-4 w-4" />
+                    <span className="sr-only">Seleccionar fecha</span>
+                  </Button>
+                </div>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
                 <Calendar
                   mode="single"
-                  selected={formData.quoted_date ? new Date(formData.quoted_date) : undefined}
-                  onSelect={handleDateChange}
+                  selected={formData.quoted_date ? parseISO(formData.quoted_date) : undefined}
+                  onSelect={handleDateSelect}
                   initialFocus
                 />
               </PopoverContent>
