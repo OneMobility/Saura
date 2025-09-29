@@ -35,7 +35,6 @@ interface HotelQuote {
 interface TourHotelDetail {
   id: string; // Unique ID for this entry in the tour's hotel_details array
   hotel_quote_id: string; // References an ID from the 'hotels' table (which are now quotes)
-  // room_type is removed as it's now defined by the hotel quote itself
 }
 
 // Definición de tipos para el layout de asientos
@@ -66,7 +65,10 @@ interface Tour {
   duration: string;
   includes: string[] | null;
   itinerary: { day: number; activity: string }[] | null;
-  selling_price_per_person: number;
+  // Removed selling_price_per_person
+  selling_price_double_occupancy: number; // NEW
+  selling_price_triple_occupancy: number; // NEW
+  selling_price_quad_occupancy: number; // NEW
   cost_per_paying_person: number | null;
   bus_id: string | null; // Added bus_id
   bus_capacity: number; // Added bus_capacity
@@ -152,6 +154,9 @@ const TourDetailsPage = () => {
           itinerary: tourData.itinerary || [],
           hotel_details: tourData.hotel_details || [],
           provider_details: tourData.provider_details || [],
+          selling_price_double_occupancy: tourData.selling_price_double_occupancy || 0,
+          selling_price_triple_occupancy: tourData.selling_price_triple_occupancy || 0,
+          selling_price_quad_occupancy: tourData.selling_price_quad_occupancy || 0,
         });
 
         // Set the bus layout from the fetched data
@@ -251,8 +256,10 @@ const TourDetailsPage = () => {
     );
   }
 
-  const totalPotentialRevenue = (tour.selling_price_per_person || 0) * (tour.paying_clients_count || 0);
-  const totalSoldRevenue = (tour.selling_price_per_person || 0) * totalSoldSeats;
+  // Calculate average selling price for potential revenue calculations
+  const averageSellingPrice = (tour.selling_price_double_occupancy + tour.selling_price_triple_occupancy + tour.selling_price_quad_occupancy) / 3;
+  const totalPotentialRevenue = (tour.paying_clients_count || 0) * averageSellingPrice;
+  const totalSoldRevenue = totalSoldSeats * averageSellingPrice;
   const totalToSellRevenue = totalPotentialRevenue - totalSoldRevenue;
 
   return (
@@ -296,7 +303,9 @@ const TourDetailsPage = () => {
                 <div>
                   <h3 className="text-xl font-semibold text-gray-800 mb-3">Detalles Clave</h3>
                   <ul className="space-y-2 text-gray-700">
-                    <li><span className="font-medium">Precio por persona:</span> ${tour.selling_price_per_person.toFixed(2)}</li>
+                    <li><span className="font-medium">Precio por persona (Doble):</span> ${tour.selling_price_double_occupancy.toFixed(2)}</li>
+                    <li><span className="font-medium">Precio por persona (Triple):</span> ${tour.selling_price_triple_occupancy.toFixed(2)}</li>
+                    <li><span className="font-medium">Precio por persona (Cuádruple):</span> ${tour.selling_price_quad_occupancy.toFixed(2)}</li>
                     <li><span className="font-medium">Duración:</span> {tour.duration}</li>
                     <li><span className="font-medium">Capacidad del autobús:</span> {tour.bus_capacity} personas</li>
                     <li><span className="font-medium">Cortesías:</span> {tour.courtesies}</li>

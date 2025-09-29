@@ -38,7 +38,6 @@ interface HotelQuote {
 interface TourHotelDetail {
   id: string; // Unique ID for this entry in the tour's hotel_details array
   hotel_quote_id: string; // References an ID from the 'hotels' table (which are now quotes)
-  // room_type is removed as it's now defined by the hotel quote itself
 }
 
 // Definición de tipos para el layout de asientos
@@ -79,7 +78,10 @@ interface Tour {
   total_base_cost?: number;
   paying_clients_count?: number;
   cost_per_paying_person?: number;
-  selling_price_per_person: number;
+  // Removed selling_price_per_person
+  selling_price_double_occupancy: number; // NEW
+  selling_price_triple_occupancy: number; // NEW
+  selling_price_quad_occupancy: number; // NEW
   user_id?: string;
 }
 
@@ -104,7 +106,9 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     courtesies: 0,
     hotel_details: [],
     provider_details: [],
-    selling_price_per_person: 0,
+    selling_price_double_occupancy: 0, // Initialize new fields
+    selling_price_triple_occupancy: 0,
+    selling_price_quad_occupancy: 0,
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrlPreview, setImageUrlPreview] = useState<string>('');
@@ -119,14 +123,14 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const [totalSoldSeats, setTotalSoldSeats] = useState(0);
   const [totalRemainingPayments, setTotalRemainingPayments] = useState(0);
   const [desiredProfitPercentage, setDesiredProfitPercentage] = useState(20); // Default 20%
-  const [suggestedSellingPrice, setSuggestedSellingPrice] = useState(0);
+  const [suggestedSellingPrice, setSuggestedSellingPrice] = useState(0); // This will be an average
 
   // NEW: Break-even analysis states
   const [expectedClientsForBreakeven, setExpectedClientsForBreakeven] = useState(0);
   const [breakevenResult, setBreakevenResult] = useState<{
     adjustedTotalBaseCost: number;
     adjustedCostPerPayingPerson: number;
-    suggestedSellingPrice: number; // This will be the current selling price
+    suggestedSellingPrice: number; // This will be the current average selling price
     message: string;
   } | null>(null);
 
@@ -192,6 +196,9 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             hotel_details: data.hotel_details || [],
             provider_details: data.provider_details || [],
             bus_id: data.bus_id || null, // Ensure bus_id is set
+            selling_price_double_occupancy: data.selling_price_double_occupancy || 0,
+            selling_price_triple_occupancy: data.selling_price_triple_occupancy || 0,
+            selling_price_quad_occupancy: data.selling_price_quad_occupancy || 0,
           });
           setImageUrlPreview(data.image_url);
 
@@ -219,7 +226,9 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           courtesies: 0,
           hotel_details: [],
           provider_details: [],
-          selling_price_per_person: 0,
+          selling_price_double_occupancy: 0,
+          selling_price_triple_occupancy: 0,
+          selling_price_quad_occupancy: 0,
         });
         setImageFile(null);
         setImageUrlPreview('');
@@ -287,6 +296,9 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     // NEW: Add bus remaining payment
     currentTotalRemainingPayments += busRentalCost - busTotalPaid;
 
+    // Calculate average selling price for potential revenue calculations
+    const averageSellingPrice = (formData.selling_price_double_occupancy + formData.selling_price_triple_occupancy + formData.selling_price_quad_occupancy) / 3;
+
     setFormData((prev) => ({
       ...prev,
       total_base_cost: totalBaseCost,
@@ -295,7 +307,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     }));
     setTotalRemainingPayments(currentTotalRemainingPayments);
 
-    // NEW: Calculate suggested selling price
+    // Calculate suggested selling price (average)
     if (costPerPayingPerson > 0 && desiredProfitPercentage >= 0) {
       const calculatedSuggestedPrice = costPerPayingPerson * (1 + desiredProfitPercentage / 100);
       setSuggestedSellingPrice(calculatedSuggestedPrice);
@@ -303,7 +315,19 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       setSuggestedSellingPrice(0);
     }
 
-  }, [formData.bus_capacity, formData.bus_id, formData.courtesies, formData.provider_details, formData.hotel_details, availableHotelQuotes, availableBuses, desiredProfitPercentage]);
+  }, [
+    formData.bus_capacity,
+    formData.bus_id,
+    formData.courtesies,
+    formData.provider_details,
+    formData.hotel_details,
+    formData.selling_price_double_occupancy, // Added to dependencies
+    formData.selling_price_triple_occupancy, // Added to dependencies
+    formData.selling_price_quad_occupancy, // Added to dependencies
+    availableHotelQuotes,
+    availableBuses,
+    desiredProfitPercentage
+  ]);
 
   useEffect(() => {
     calculateCosts();
@@ -534,7 +558,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       if (!hotelQuote || remainingClientsToAccommodate <= 0) return;
 
       // Prioritize quad rooms
-      if (remainingClientsToAccommodate >= hotelQuote.capacity_quad) {
+      if (remainingClientsToAccommodate >= hotelQuote.capacity_quad && hotelQuote.capacity_quad > 0) {
         const numRooms = Math.floor(remainingClientsToAccommodate / hotelQuote.capacity_quad);
         hotelQuote.num_quad_rooms = numRooms;
         remainingClientsToAccommodate -= numRooms * hotelQuote.capacity_quad;
@@ -542,7 +566,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       }
 
       // Then triple rooms
-      if (remainingClientsToAccommodate >= hotelQuote.capacity_triple) {
+      if (remainingClientsToAccommodate >= hotelQuote.capacity_triple && hotelQuote.capacity_triple > 0) {
         const numRooms = Math.floor(remainingClientsToAccommodate / hotelQuote.capacity_triple);
         hotelQuote.num_triple_rooms = numRooms;
         remainingClientsToAccommodate -= numRooms * hotelQuote.capacity_triple;
@@ -550,7 +574,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       }
 
       // Finally, double rooms (use ceil for any remaining clients)
-      if (remainingClientsToAccommodate > 0) {
+      if (remainingClientsToAccommodate > 0 && hotelQuote.capacity_double > 0) {
         const numRooms = Math.ceil(remainingClientsToAccommodate / hotelQuote.capacity_double);
         hotelQuote.num_double_rooms = numRooms;
         remainingClientsToAccommodate -= numRooms * hotelQuote.capacity_double;
@@ -569,19 +593,30 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
 
     const adjustedCostPerPayingPerson = expectedClientsForBreakeven > 0 ? currentAdjustedTotalBaseCost / expectedClientsForBreakeven : 0;
     
-    // The selling price is fixed as per user request
-    const fixedSellingPrice = formData.selling_price_per_person;
+    // The selling price is fixed as per user request (average of the three selling prices)
+    const averageSellingPrice = (formData.selling_price_double_occupancy + formData.selling_price_triple_occupancy + formData.selling_price_quad_occupancy) / 3;
 
     message += ` Para alojar a ${expectedClientsForBreakeven} personas, se necesitarían aproximadamente:${hotelAdjustmentsMessage || ' No se vincularon hoteles.'}`;
 
     setBreakevenResult({
       adjustedTotalBaseCost: currentAdjustedTotalBaseCost,
       adjustedCostPerPayingPerson: adjustedCostPerPayingPerson,
-      suggestedSellingPrice: fixedSellingPrice, // Use the current selling price as fixed
+      suggestedSellingPrice: averageSellingPrice, // Use the current average selling price as fixed
       message: message,
     });
 
-  }, [expectedClientsForBreakeven, formData.bus_capacity, formData.courtesies, formData.bus_cost, formData.provider_details, formData.hotel_details, availableHotelQuotes, formData.selling_price_per_person]);
+  }, [
+    expectedClientsForBreakeven,
+    formData.bus_capacity,
+    formData.courtesies,
+    formData.bus_cost,
+    formData.provider_details,
+    formData.hotel_details,
+    formData.selling_price_double_occupancy,
+    formData.selling_price_triple_occupancy,
+    formData.selling_price_quad_occupancy,
+    availableHotelQuotes
+  ]);
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -621,8 +656,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       return;
     }
 
-    if (formData.selling_price_per_person <= 0) {
-      toast.error('El precio de venta por persona debe ser mayor que 0.');
+    if (formData.selling_price_double_occupancy <= 0 || formData.selling_price_triple_occupancy <= 0 || formData.selling_price_quad_occupancy <= 0) {
+      toast.error('Los precios de venta por persona para todas las ocupaciones deben ser mayores que 0.');
       setIsSubmitting(false);
       return;
     }
@@ -683,7 +718,11 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     );
   }
 
-  const totalToSell = (formData.selling_price_per_person * (formData.paying_clients_count || 0)) - (formData.selling_price_per_person * totalSoldSeats);
+  // Calculate average selling price for display in financial summary
+  const averageSellingPrice = (formData.selling_price_double_occupancy + formData.selling_price_triple_occupancy + formData.selling_price_quad_occupancy) / 3;
+  const totalPotentialRevenue = (formData.paying_clients_count || 0) * averageSellingPrice;
+  const totalSoldRevenue = totalSoldSeats * averageSellingPrice;
+  const totalToSell = totalPotentialRevenue - totalSoldRevenue;
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
@@ -914,7 +953,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           </div>
           <div>
             <Label className="font-semibold">Total Vendido (Ingresos):</Label>
-            <p>${(formData.selling_price_per_person * totalSoldSeats).toFixed(2)}</p>
+            <p>${totalSoldRevenue.toFixed(2)}</p>
           </div>
           <div>
             <Label className="font-semibold">Total por Vender (Ingresos Potenciales):</Label>
@@ -942,12 +981,20 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4 mt-4">
-            <Label htmlFor="suggested_selling_price" className="md:text-right font-bold text-lg">Precio de Venta Sugerido por Persona</Label>
+            <Label htmlFor="suggested_selling_price" className="md:text-right font-bold text-lg">Precio de Venta Sugerido por Persona (Promedio)</Label>
             <Input id="suggested_selling_price" type="number" value={suggestedSellingPrice.toFixed(2)} readOnly className="md:col-span-3 text-lg font-bold bg-blue-100 cursor-not-allowed" title="Calculado en base al costo por persona pagante y la ganancia deseada" />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4 mt-4">
-            <Label htmlFor="selling_price_per_person" className="md:text-right font-bold text-lg">Precio de Venta Final por Persona</Label>
-            <Input id="selling_price_per_person" type="number" value={formData.selling_price_per_person} onChange={(e) => handleNumberChange('selling_price_per_person', e.target.value)} className="md:col-span-3 text-lg font-bold" required min={0} step="0.01" />
+            <Label htmlFor="selling_price_double_occupancy" className="md:text-right font-bold text-lg">Precio Venta por Persona (Doble)</Label>
+            <Input id="selling_price_double_occupancy" type="number" value={formData.selling_price_double_occupancy} onChange={(e) => handleNumberChange('selling_price_double_occupancy', e.target.value)} className="md:col-span-3 text-lg font-bold" required min={0} step="0.01" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4 mt-4">
+            <Label htmlFor="selling_price_triple_occupancy" className="md:text-right font-bold text-lg">Precio Venta por Persona (Triple)</Label>
+            <Input id="selling_price_triple_occupancy" type="number" value={formData.selling_price_triple_occupancy} onChange={(e) => handleNumberChange('selling_price_triple_occupancy', e.target.value)} className="md:col-span-3 text-lg font-bold" required min={0} step="0.01" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4 mt-4">
+            <Label htmlFor="selling_price_quad_occupancy" className="md:text-right font-bold text-lg">Precio Venta por Persona (Cuádruple)</Label>
+            <Input id="selling_price_quad_occupancy" type="number" value={formData.selling_price_quad_occupancy} onChange={(e) => handleNumberChange('selling_price_quad_occupancy', e.target.value)} className="md:col-span-3 text-lg font-bold" required min={0} step="0.01" />
           </div>
         </div>
 
@@ -986,7 +1033,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
                 Costo por Persona Pagante Ajustado: <span className="font-medium">${breakevenResult.adjustedCostPerPayingPerson.toFixed(2)}</span>
               </p>
               <p className="text-yellow-800">
-                Precio de Venta Fijo Utilizado: <span className="font-bold">${breakevenResult.suggestedSellingPrice.toFixed(2)}</span>
+                Precio de Venta Fijo Utilizado (Promedio): <span className="font-bold">${breakevenResult.suggestedSellingPrice.toFixed(2)}</span>
               </p>
               <p className="text-sm text-gray-700 mt-2">
                 *Este es un cálculo simulado. Las habitaciones de hotel no se ajustan automáticamente.
