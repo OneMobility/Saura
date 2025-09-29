@@ -28,8 +28,6 @@ const AdminSidebar = () => {
   const location = useLocation();
   const { user, isAdmin, isLoading } = useSession(); // Obtener información de la sesión
 
-  console.log('AdminSidebar: isLoading:', isLoading, 'user:', !!user, 'isAdmin:', isAdmin);
-
   // La barra lateral estará expandida si está fijada O si el ratón está sobre ella
   const isExpanded = isPinned || isHovering;
 

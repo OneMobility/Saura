@@ -126,6 +126,18 @@ export const SessionContextProvider = ({ children }: { children: ReactNode }) =>
     return () => subscription.unsubscribe();
   }, [location.pathname, navigate]);
 
+  // NEW: Effect to log out admin users when they navigate away from admin paths
+  useEffect(() => {
+    // Only run if session is loaded and user is an admin
+    if (!isLoading && user && isAdmin) {
+      const currentPathIsAdmin = location.pathname.startsWith('/admin');
+      if (!currentPathIsAdmin) {
+        console.log('SessionContextProvider: User is admin but navigated away from admin panel. Signing out.');
+        supabase.auth.signOut();
+      }
+    }
+  }, [location.pathname, isLoading, user, isAdmin]);
+
   console.log('SessionContextProvider: Current state - isLoading:', isLoading, 'user:', !!user, 'isAdmin:', isAdmin, 'firstName:', firstName, 'lastName:', lastName);
 
   return (
