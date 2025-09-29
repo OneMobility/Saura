@@ -30,7 +30,7 @@ const Login = () => {
             }}
           }
           theme="light"
-          // redirectTo={window.location.origin + '/admin/dashboard'} // Eliminado para que SessionContextProvider maneje la redirección
+          redirectTo={window.location.origin + '/admin/dashboard'} // Reintroducido para que el componente Auth maneje la redirección inicial
         />
       </div>
     </div>
