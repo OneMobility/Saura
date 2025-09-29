@@ -91,6 +91,18 @@ interface TourFormProps {
   onSave: () => void; // Callback to redirect after saving
 }
 
+// NEW: Interface for BreakevenResult
+interface BreakevenResult {
+  adjustedTotalBaseCost: number;
+  adjustedCostPerPayingPerson: number;
+  suggestedSellingPrice: number;
+  message: string;
+  simulatedDoubleRooms: number; // NEW
+  simulatedTripleRooms: number; // NEW
+  simulatedQuadRooms: number; // NEW
+  costCovered: boolean; // NEW: Indicates if costs are covered
+}
+
 const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const [formData, setFormData] = useState<Tour>({
     title: '',
@@ -128,12 +140,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
 
   // NEW: Break-even analysis states
   const [expectedClientsForBreakeven, setExpectedClientsForBreakeven] = useState(0);
-  const [breakevenResult, setBreakevenResult] = useState<{
-    adjustedTotalBaseCost: number;
-    adjustedCostPerPayingPerson: number;
-    suggestedSellingPrice: number; // This will be the current average selling price
-    message: string;
-  } | null>(null);
+  const [breakevenResult, setBreakevenResult] = useState<BreakevenResult | null>(null);
 
   // Fetch available hotel quotes
   useEffect(() => {
@@ -533,7 +540,6 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
 
     let currentAdjustedTotalBaseCost = formData.bus_cost + formData.provider_details.reduce((sum, p) => sum + p.cost, 0);
     let remainingClientsToAccommodate = expectedClientsForBreakeven;
-    let message = `Análisis para ${expectedClientsForBreakeven} clientes:`;
     let hotelAdjustmentsMessage = '';
 
     // Deep copy of hotel quotes to simulate adjustments
@@ -561,6 +567,10 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       return capacityB - capacityA;
     });
 
+    let simulatedDoubleRooms = 0;
+    let simulatedTripleRooms = 0;
+    let simulatedQuadRooms = 0;
+
     tourLinkedHotelQuotes.forEach(tourHotelDetail => {
       const hotelQuote = tempHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
       if (!hotelQuote || remainingClientsToAccommodate <= 0) return;
@@ -569,6 +579,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       if (remainingClientsToAccommodate >= hotelQuote.capacity_quad && hotelQuote.capacity_quad > 0) {
         const numRooms = Math.floor(remainingClientsToAccommodate / hotelQuote.capacity_quad);
         hotelQuote.num_quad_rooms = numRooms;
+        simulatedQuadRooms += numRooms;
         remainingClientsToAccommodate -= numRooms * hotelQuote.capacity_quad;
         if (numRooms > 0) hotelAdjustmentsMessage += ` ${numRooms} hab. cuádruples en ${hotelQuote.name}.`;
       }
@@ -577,6 +588,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       if (remainingClientsToAccommodate >= hotelQuote.capacity_triple && hotelQuote.capacity_triple > 0) {
         const numRooms = Math.floor(remainingClientsToAccommodate / hotelQuote.capacity_triple);
         hotelQuote.num_triple_rooms = numRooms;
+        simulatedTripleRooms += numRooms;
         remainingClientsToAccommodate -= numRooms * hotelQuote.capacity_triple;
         if (numRooms > 0) hotelAdjustmentsMessage += ` ${numRooms} hab. triples en ${hotelQuote.name}.`;
       }
@@ -585,6 +597,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       if (remainingClientsToAccommodate > 0 && hotelQuote.capacity_double > 0) {
         const numRooms = Math.ceil(remainingClientsToAccommodate / hotelQuote.capacity_double);
         hotelQuote.num_double_rooms = numRooms;
+        simulatedDoubleRooms += numRooms;
         remainingClientsToAccommodate -= numRooms * hotelQuote.capacity_double;
         if (numRooms > 0) hotelAdjustmentsMessage += ` ${numRooms} hab. dobles en ${hotelQuote.name}.`;
       }
@@ -616,13 +629,18 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     // The selling price is fixed as per user request (average of the three selling prices)
     const averageSellingPrice = (formData.selling_price_double_occupancy + formData.selling_price_triple_occupancy + formData.selling_price_quad_occupancy) / 3;
 
-    message += ` Para alojar a ${expectedClientsForBreakeven} personas, se necesitarían aproximadamente:${hotelAdjustmentsMessage || ' No se vincularon hoteles.'}`;
+    const message = `Análisis para ${expectedClientsForBreakeven} clientes: Para alojar a ${expectedClientsForBreakeven} personas, se necesitarían aproximadamente:${hotelAdjustmentsMessage || ' No se vincularon hoteles.'}`;
+    const costCovered = averageSellingPrice >= adjustedCostPerPayingPerson;
 
     setBreakevenResult({
       adjustedTotalBaseCost: currentAdjustedTotalBaseCost,
       adjustedCostPerPayingPerson: adjustedCostPerPayingPerson,
       suggestedSellingPrice: averageSellingPrice, // Use the current average selling price as fixed
       message: message,
+      simulatedDoubleRooms: simulatedDoubleRooms,
+      simulatedTripleRooms: simulatedTripleRooms,
+      simulatedQuadRooms: simulatedQuadRooms,
+      costCovered: costCovered,
     });
 
   }, [
@@ -1055,6 +1073,18 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
               </p>
               <p className="text-yellow-800">
                 Precio de Venta Fijo Utilizado (Promedio): <span className="font-bold">${breakevenResult.suggestedSellingPrice.toFixed(2)}</span>
+              </p>
+              <p className="text-yellow-800">
+                Habitaciones Dobles Simuladas: <span className="font-medium">{breakevenResult.simulatedDoubleRooms}</span>
+              </p>
+              <p className="text-yellow-800">
+                Habitaciones Triples Simuladas: <span className="font-medium">{breakevenResult.simulatedTripleRooms}</span>
+              </p>
+              <p className="text-yellow-800">
+                Habitaciones Cuádruples Simuladas: <span className="font-medium">{breakevenResult.simulatedQuadRooms}</span>
+              </p>
+              <p className={`text-lg font-bold mt-4 ${breakevenResult.costCovered ? 'text-green-700' : 'text-red-700'}`}>
+                {breakevenResult.costCovered ? '¡Los costos se cubren con el precio de venta actual!' : 'Advertencia: Los costos NO se cubren con el precio de venta actual.'}
               </p>
               <p className="text-sm text-gray-700 mt-2">
                 *Este es un cálculo simulado. Las habitaciones de hotel no se ajustan automáticamente.
