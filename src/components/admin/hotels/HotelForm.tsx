@@ -10,7 +10,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Save, CalendarIcon } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format, parseISO, isValid } from 'date-fns'; // Added parseISO and isValid
+import { format, parse, isValid, parseISO } from 'date-fns'; // Import parse
 import { cn } from '@/lib/utils';
 
 interface Hotel {
@@ -64,7 +64,8 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
-  const [dateInput, setDateInput] = useState<string>(''); // State for direct date input
+  // dateInput will now always reflect the formatted quoted_date or an empty string
+  const [dateInput, setDateInput] = useState<string>(''); 
 
   const calculateQuoteCosts = useCallback(() => {
     const totalCostDoubleRooms = formData.num_double_rooms * formData.cost_per_night_double * formData.num_nights_quoted;
@@ -121,6 +122,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
             total_quote_cost: totalQuoteCost,
             remaining_payment: totalQuoteCost - data.total_paid,
           });
+          // Set dateInput to the formatted date from fetched data
           setDateInput(data.quoted_date ? format(new Date(data.quoted_date), 'yyyy-MM-dd') : '');
         }
       } else {
@@ -145,7 +147,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
           total_quote_cost: 0,
           remaining_payment: 0,
         });
-        setDateInput('');
+        setDateInput(''); // Clear dateInput for new form
       }
       setLoadingInitialData(false);
     };
@@ -156,6 +158,15 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
   useEffect(() => {
     calculateQuoteCosts();
   }, [calculateQuoteCosts]);
+
+  // This useEffect ensures dateInput always reflects formData.quoted_date
+  useEffect(() => {
+    if (formData.quoted_date) {
+      setDateInput(format(parseISO(formData.quoted_date), 'yyyy-MM-dd'));
+    } else {
+      setDateInput('');
+    }
+  }, [formData.quoted_date]);
 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -169,21 +180,23 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
   const handleDateSelect = (date: Date | undefined) => {
     const formattedDate = date ? format(date, 'yyyy-MM-dd') : null;
     setFormData((prev) => ({ ...prev, quoted_date: formattedDate }));
-    setDateInput(formattedDate || '');
+    // dateInput will be updated by the useEffect above
   };
 
   const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setDateInput(value);
-    try {
-      const parsedDate = parseISO(value);
-      if (isValid(parsedDate)) {
-        setFormData((prev) => ({ ...prev, quoted_date: format(parsedDate, 'yyyy-MM-dd') }));
-      } else {
-        setFormData((prev) => ({ ...prev, quoted_date: null }));
-      }
-    } catch (error) {
+    setDateInput(value); // Update dateInput immediately for user typing experience
+
+    // Try to parse the date using the expected format 'yyyy-MM-dd'
+    const parsedDate = parse(value, 'yyyy-MM-dd', new Date());
+    
+    if (isValid(parsedDate)) {
+      setFormData((prev) => ({ ...prev, quoted_date: format(parsedDate, 'yyyy-MM-dd') }));
+    } else {
+      // If invalid, set quoted_date to null. The useEffect will then clear dateInput.
       setFormData((prev) => ({ ...prev, quoted_date: null }));
+      // Optionally, provide user feedback here about invalid format
+      // toast.error('Formato de fecha inválido. Usa YYYY-MM-DD.');
     }
   };
 
