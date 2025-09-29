@@ -16,13 +16,13 @@ import Login from "./pages/Login";
 import AdminDashboard from "./pages/AdminDashboard";
 import AdminSettingsPage from "./pages/AdminSettingsPage";
 import AdminUsersPage from "./pages/AdminUsersPage";
-import AdminBlogPage from "./pages/AdminBlogPage"; {/* NEW: Import AdminBlogPage */}
+import AdminBlogPage from "./pages/AdminBlogPage";
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
 
-const App: React.FC = () => { // Cambiado para definir explícitamente como React.FC
+const App = () => { // Eliminado React.FC
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -63,7 +63,7 @@ const App: React.FC = () => { // Cambiado para definir explícitamente como Reac
                   </ProtectedRoute>
                 }
               />
-              <Route {/* NEW: Admin Blog Route */}
+              <Route
                 path="/admin/blog"
                 element={
                   <ProtectedRoute adminOnly>
