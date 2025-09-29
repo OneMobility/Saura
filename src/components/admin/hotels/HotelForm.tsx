@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -18,8 +17,8 @@ interface Hotel {
   id?: string;
   name: string;
   location: string;
-  quoted_date: string | null; // NEW: Date for this specific quote
-  num_nights_quoted: number; // NEW: Number of nights for this quote
+  quoted_date: string | null;
+  num_nights_quoted: number;
   cost_per_night_double: number;
   cost_per_night_triple: number;
   cost_per_night_quad: number;
@@ -27,21 +26,19 @@ interface Hotel {
   capacity_triple: number;
   capacity_quad: number;
   is_active: boolean;
-  advance_payment: number; // NEW
-  total_paid: number; // NEW
+  advance_payment: number;
+  total_paid: number;
   // calculated fields
   total_quote_cost: number; // Calculated total cost for this quote (e.g., for double room)
   remaining_payment: number; // Calculated remaining payment
 }
 
-interface HotelFormDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSave: () => void; // Callback to refresh hotel list
-  initialData?: Hotel | null;
+interface HotelFormProps {
+  hotelId?: string; // Optional hotelId for editing existing hotels
+  onSave: () => void; // Callback to redirect after saving
 }
 
-const HotelFormDialog: React.FC<HotelFormDialogProps> = ({ isOpen, onClose, onSave, initialData }) => {
+const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
   const [formData, setFormData] = useState<Hotel>({
     name: '',
     location: '',
@@ -60,10 +57,9 @@ const HotelFormDialog: React.FC<HotelFormDialogProps> = ({ isOpen, onClose, onSa
     remaining_payment: 0, // Initial calculated value
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [loadingInitialData, setLoadingInitialData] = useState(true);
 
   const calculateQuoteCosts = useCallback(() => {
-    // For simplicity, let's calculate total_quote_cost based on double room for display in the form.
-    // The actual cost for a tour will depend on the room type chosen.
     const totalCost = formData.cost_per_night_double * formData.num_nights_quoted;
     const remaining = totalCost - formData.total_paid;
     setFormData(prev => ({
@@ -74,36 +70,58 @@ const HotelFormDialog: React.FC<HotelFormDialogProps> = ({ isOpen, onClose, onSa
   }, [formData.cost_per_night_double, formData.num_nights_quoted, formData.total_paid]);
 
   useEffect(() => {
-    if (initialData) {
-      setFormData({
-        ...initialData,
-        total_quote_cost: initialData.cost_per_night_double * initialData.num_nights_quoted, // Calculate for initial data
-        remaining_payment: (initialData.cost_per_night_double * initialData.num_nights_quoted) - initialData.total_paid,
-      });
-    } else {
-      setFormData({
-        name: '',
-        location: '',
-        quoted_date: null,
-        num_nights_quoted: 1,
-        cost_per_night_double: 0,
-        cost_per_night_triple: 0,
-        cost_per_night_quad: 0,
-        capacity_double: 2,
-        capacity_triple: 3,
-        capacity_quad: 4,
-        is_active: true,
-        advance_payment: 0,
-        total_paid: 0,
-        total_quote_cost: 0,
-        remaining_payment: 0,
-      });
-    }
-  }, [initialData, isOpen]);
+    const fetchHotelData = async () => {
+      if (hotelId) {
+        setLoadingInitialData(true);
+        const { data, error } = await supabase
+          .from('hotels')
+          .select('*')
+          .eq('id', hotelId)
+          .single();
+
+        if (error) {
+          console.error('Error fetching hotel for editing:', error);
+          toast.error('Error al cargar los datos de la cotización del hotel para editar.');
+          setLoadingInitialData(false);
+          return;
+        }
+
+        if (data) {
+          setFormData({
+            ...data,
+            total_quote_cost: data.cost_per_night_double * data.num_nights_quoted,
+            remaining_payment: (data.cost_per_night_double * data.num_nights_quoted) - data.total_paid,
+          });
+        }
+      } else {
+        // Reset form for new hotel
+        setFormData({
+          name: '',
+          location: '',
+          quoted_date: null,
+          num_nights_quoted: 1,
+          cost_per_night_double: 0,
+          cost_per_night_triple: 0,
+          cost_per_night_quad: 0,
+          capacity_double: 2,
+          capacity_triple: 3,
+          capacity_quad: 4,
+          is_active: true,
+          advance_payment: 0,
+          total_paid: 0,
+          total_quote_cost: 0,
+          remaining_payment: 0,
+        });
+      }
+      setLoadingInitialData(false);
+    };
+
+    fetchHotelData();
+  }, [hotelId]);
 
   useEffect(() => {
     calculateQuoteCosts();
-  }, [calculateQuoteCosts, formData.cost_per_night_double, formData.num_nights_quoted, formData.total_paid]);
+  }, [calculateQuoteCosts]);
 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -164,7 +182,7 @@ const HotelFormDialog: React.FC<HotelFormDialogProps> = ({ isOpen, onClose, onSa
       total_paid: formData.total_paid,
     };
 
-    if (initialData?.id) {
+    if (hotelId) {
       // Update existing hotel quote
       const { error } = await supabase
         .from('hotels')
@@ -172,7 +190,7 @@ const HotelFormDialog: React.FC<HotelFormDialogProps> = ({ isOpen, onClose, onSa
           ...dataToSave,
           updated_at: new Date().toISOString(),
         })
-        .eq('id', initialData.id);
+        .eq('id', hotelId);
 
       if (error) {
         console.error('Error updating hotel quote:', error);
@@ -180,7 +198,6 @@ const HotelFormDialog: React.FC<HotelFormDialogProps> = ({ isOpen, onClose, onSa
       } else {
         toast.success('Cotización de hotel actualizada con éxito.');
         onSave();
-        onClose();
       }
     } else {
       // Insert new hotel quote
@@ -194,22 +211,24 @@ const HotelFormDialog: React.FC<HotelFormDialogProps> = ({ isOpen, onClose, onSa
       } else {
         toast.success('Cotización de hotel creada con éxito.');
         onSave();
-        onClose();
       }
     }
     setIsSubmitting(false);
   };
 
+  if (loadingInitialData) {
+    return (
+      <div className="flex items-center justify-center p-8 bg-white rounded-lg shadow-lg">
+        <Loader2 className="h-12 w-12 animate-spin text-rosa-mexicano" />
+        <p className="ml-4 text-gray-700">Cargando formulario del hotel...</p>
+      </div>
+    );
+  }
+
   return (
-    <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{initialData ? 'Editar Cotización de Hotel' : 'Añadir Nueva Cotización de Hotel'}</DialogTitle>
-          <DialogDescription>
-            {initialData ? 'Modifica los detalles de la cotización del hotel.' : 'Rellena los campos para añadir una nueva cotización de hotel.'}
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="grid gap-4 py-4">
+    <div className="bg-white rounded-lg shadow-lg p-6">
+      <h2 className="text-2xl font-bold text-gray-800 mb-6">{hotelId ? 'Editar Cotización de Hotel' : 'Añadir Nueva Cotización de Hotel'}</h2>
+      <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="name" className="text-right">
               Nombre Hotel
@@ -382,16 +401,15 @@ const HotelFormDialog: React.FC<HotelFormDialogProps> = ({ isOpen, onClose, onSa
             </div>
           </div>
 
-          <DialogFooter>
+          <div className="flex justify-end mt-6">
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              {initialData ? 'Guardar Cambios' : 'Añadir Cotización'}
+              {hotelId ? 'Guardar Cambios' : 'Añadir Cotización'}
             </Button>
-          </DialogFooter>
+          </div>
         </form>
-      </DialogContent>
-    </Dialog>
+    </div>
   );
 };
 
-export default HotelFormDialog;
+export default HotelForm;

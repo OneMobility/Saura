@@ -27,7 +27,8 @@ import AdminProvidersPage from "./pages/AdminProvidersPage";
 import AdminClientsPage from "./pages/AdminClientsPage";
 import AdminBusesPage from "./pages/AdminBusesPage";
 import AdminToursPage from "./pages/AdminToursPage";
-import AdminTourFormPage from "./pages/AdminTourFormPage"; // Import the new Tour Form Page
+import AdminTourFormPage from "./pages/AdminTourFormPage";
+import AdminHotelFormPage from "./pages/AdminHotelFormPage"; // Import the new Hotel Form Page
 
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -96,6 +97,22 @@ const App = () => {
                 element={
                   <ProtectedRoute adminOnly>
                     <AdminHotelsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/hotels/new"
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminHotelFormPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/hotels/edit/:id"
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminHotelFormPage />
                   </ProtectedRoute>
                 }
               />

@@ -10,7 +10,6 @@ import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import HotelFormDialog from '@/components/admin/hotels/HotelFormDialog';
 import { format } from 'date-fns';
 
 interface Hotel {
@@ -39,8 +38,7 @@ const AdminHotelsPage = () => {
   const navigate = useNavigate();
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
-  const [selectedHotel, setSelectedHotel] = useState<Hotel | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0); // Key to force re-fetch of hotels
 
   useEffect(() => {
     if (!sessionLoading && (!user || !isAdmin)) {
@@ -48,7 +46,7 @@ const AdminHotelsPage = () => {
     } else if (!sessionLoading && user && isAdmin) {
       fetchHotels();
     }
-  }, [user, isAdmin, sessionLoading, navigate]);
+  }, [user, isAdmin, sessionLoading, navigate, refreshKey]); // Add refreshKey to dependencies
 
   const fetchHotels = async () => {
     setLoading(true);
@@ -72,13 +70,11 @@ const AdminHotelsPage = () => {
   };
 
   const handleAddHotel = () => {
-    setSelectedHotel(null);
-    setIsFormDialogOpen(true);
+    navigate('/admin/hotels/new'); // Navigate to the new form page for creation
   };
 
   const handleEditHotel = (hotel: Hotel) => {
-    setSelectedHotel(hotel);
-    setIsFormDialogOpen(true);
+    navigate(`/admin/hotels/edit/${hotel.id}`); // Navigate to the new form page for editing
   };
 
   const handleDeleteHotel = async (id: string) => {
@@ -96,7 +92,7 @@ const AdminHotelsPage = () => {
       toast.error('Error al eliminar la cotización del hotel.');
     } else {
       toast.success('Cotización de hotel eliminada con éxito.');
-      fetchHotels(); // Refresh the list
+      setRefreshKey(prev => prev + 1); // Trigger re-fetch
     }
     setLoading(false);
   };
@@ -184,12 +180,6 @@ const AdminHotelsPage = () => {
           <p>&copy; {new Date().getFullYear()} Saura Tours Admin. Todos los derechos reservados.</p>
         </footer>
       </div>
-      <HotelFormDialog
-        isOpen={isFormDialogOpen}
-        onClose={() => setIsFormDialogOpen(false)}
-        onSave={fetchHotels}
-        initialData={selectedHotel}
-      />
     </div>
   );
 };
