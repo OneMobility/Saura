@@ -25,6 +25,9 @@ interface HotelQuote {
   capacity_double: number;
   capacity_triple: number;
   capacity_quad: number;
+  num_double_rooms: number; // NEW
+  num_triple_rooms: number; // NEW
+  num_quad_rooms: number; // NEW
   is_active: boolean;
   advance_payment: number;
   total_paid: number;
@@ -34,7 +37,7 @@ interface HotelQuote {
 interface TourHotelDetail {
   id: string; // Unique ID for this entry in the tour's hotel_details array
   hotel_quote_id: string; // References an ID from the 'hotels' table (which are now quotes)
-  room_type: 'double' | 'triple' | 'quad';
+  room_type: 'double' | 'triple' | 'quad'; // This is the room type *chosen for this specific tour's booking*
 }
 
 interface Tour {
@@ -164,40 +167,29 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const calculateCosts = useCallback(() => {
     const totalProviderCost = formData.provider_details.reduce((sum, provider) => sum + provider.cost, 0);
     
-    let totalHotelCostPerPerson = 0;
+    let totalHotelCost = 0; // Total cost for all rooms across all linked hotel quotes
+    let totalHotelCapacity = 0; // Total capacity for all rooms across all linked hotel quotes
+
     formData.hotel_details.forEach(tourHotelDetail => {
       const hotelQuote = availableHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
       if (!hotelQuote) return;
 
-      let costPerNight = 0;
-      let capacity = 0;
-
-      switch (tourHotelDetail.room_type) {
-        case 'double':
-          costPerNight = hotelQuote.cost_per_night_double;
-          capacity = hotelQuote.capacity_double;
-          break;
-        case 'triple':
-          costPerNight = hotelQuote.cost_per_night_triple;
-          capacity = hotelQuote.capacity_triple;
-          break;
-        case 'quad':
-          costPerNight = hotelQuote.cost_per_night_quad;
-          capacity = hotelQuote.capacity_quad;
-          break;
-        default:
-          break;
-      }
-
-      if (capacity === 0) return; // Avoid division by zero
-
-      const totalHotelBookingCost = costPerNight * hotelQuote.num_nights_quoted;
-      const costPerPersonForThisHotel = totalHotelBookingCost / capacity;
+      // Calculate cost and capacity based on the *contracted rooms in the hotel quote*
+      // and the *cost per night for each room type* from the quote.
+      const costDouble = (hotelQuote.num_double_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
+      const costTriple = (hotelQuote.num_triple_rooms || 0) * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
+      const costQuad = (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
       
-      totalHotelCostPerPerson += costPerPersonForThisHotel;
+      totalHotelCost += costDouble + costTriple + costQuad;
+
+      const capacityDouble = (hotelQuote.num_double_rooms || 0) * hotelQuote.capacity_double;
+      const capacityTriple = (hotelQuote.num_triple_rooms || 0) * hotelQuote.capacity_triple;
+      const capacityQuad = (hotelQuote.num_quad_rooms || 0) * hotelQuote.capacity_quad;
+
+      totalHotelCapacity += capacityDouble + capacityTriple + capacityQuad;
     });
 
-    const totalBaseCost = formData.bus_cost + totalProviderCost + totalHotelCostPerPerson;
+    const totalBaseCost = formData.bus_cost + totalProviderCost + totalHotelCost;
 
     const payingClientsCount = formData.bus_capacity - formData.courtesies;
     const costPerPayingPerson = payingClientsCount > 0 ? totalBaseCost / payingClientsCount : 0;

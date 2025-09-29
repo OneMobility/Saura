@@ -22,6 +22,9 @@ interface HotelQuote {
   capacity_double: number;
   capacity_triple: number;
   capacity_quad: number;
+  num_double_rooms: number; // NEW
+  num_triple_rooms: number; // NEW
+  num_quad_rooms: number; // NEW
   is_active: boolean;
   advance_payment: number;
   total_paid: number;
@@ -77,7 +80,12 @@ const TourDetailsPage = () => {
       }
 
       const quotesMap = new Map<string, HotelQuote>();
-      hotelQuotesData?.forEach(quote => quotesMap.set(quote.id, quote));
+      hotelQuotesData?.forEach(quote => quotesMap.set(quote.id, {
+        ...quote,
+        num_double_rooms: quote.num_double_rooms || 0,
+        num_triple_rooms: quote.num_triple_rooms || 0,
+        num_quad_rooms: quote.num_quad_rooms || 0,
+      }));
       setHotelQuotesMap(quotesMap);
 
       // Then fetch tour details
@@ -215,35 +223,30 @@ const TourDetailsPage = () => {
                       const hotelQuote = hotelQuotesMap.get(tourHotelDetail.hotel_quote_id);
                       if (!hotelQuote) return null; // Skip if quote not found
 
-                      let costPerNight = 0;
-                      let capacity = 0;
-                      switch (tourHotelDetail.room_type) {
-                        case 'double':
-                          costPerNight = hotelQuote.cost_per_night_double;
-                          capacity = hotelQuote.capacity_double;
-                          break;
-                        case 'triple':
-                          costPerNight = hotelQuote.cost_per_night_triple;
-                          capacity = hotelQuote.capacity_triple;
-                          break;
-                        case 'quad':
-                          costPerNight = hotelQuote.cost_per_night_quad;
-                          capacity = hotelQuote.capacity_quad;
-                          break;
-                      }
-                      const totalHotelBookingCost = costPerNight * hotelQuote.num_nights_quoted;
-                      const costPerPersonCalculated = capacity > 0 ? totalHotelBookingCost / capacity : 0;
-                      const remainingPayment = totalHotelBookingCost - hotelQuote.total_paid;
+                      const totalCostDoubleRooms = (hotelQuote.num_double_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
+                      const totalCostTripleRooms = (hotelQuote.num_triple_rooms || 0) * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
+                      const totalCostQuadRooms = (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
+                      const totalHotelBookingCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
+                      
+                      const totalHotelCapacity = 
+                        ((hotelQuote.num_double_rooms || 0) * hotelQuote.capacity_double) +
+                        ((hotelQuote.num_triple_rooms || 0) * hotelQuote.capacity_triple) +
+                        ((hotelQuote.num_quad_rooms || 0) * hotelQuote.capacity_quad);
+
+                      const costPerPersonCalculated = totalHotelCapacity > 0 ? totalHotelBookingCost / totalHotelCapacity : 0;
+                      const remainingPayment = totalHotelBookingCost - (hotelQuote.total_paid || 0);
 
                       return (
                         <div key={tourHotelDetail.id} className="border p-4 rounded-md bg-gray-50">
                           <p className="font-semibold text-lg mb-1">
-                            {hotelQuote.name} ({hotelQuote.location}) - Tipo de Habitación: {tourHotelDetail.room_type.charAt(0).toUpperCase() + tourHotelDetail.room_type.slice(1)}
+                            {hotelQuote.name} ({hotelQuote.location})
                           </p>
                           <ul className="text-gray-700 text-sm space-y-1">
                             <li><span className="font-medium">Fecha Cotizada:</span> {hotelQuote.quoted_date ? format(new Date(hotelQuote.quoted_date), 'PPP') : 'N/A'}</li>
                             <li><span className="font-medium">Noches Cotizadas:</span> {hotelQuote.num_nights_quoted}</li>
-                            <li><span className="font-medium">Costo por persona (calculado para este tour):</span> ${costPerPersonCalculated.toFixed(2)}</li>
+                            <li><span className="font-medium">Habitaciones Dobles Contratadas:</span> {hotelQuote.num_double_rooms}</li>
+                            <li><span className="font-medium">Habitaciones Triples Contratadas:</span> {hotelQuote.num_triple_rooms}</li>
+                            <li><span className="font-medium">Habitaciones Cuádruples Contratadas:</span> {hotelQuote.num_quad_rooms}</li>
                             <li><span className="font-medium">Costo total de la cotización:</span> ${totalHotelBookingCost.toFixed(2)}</li>
                             <li><span className="font-medium">Anticipo al hotel:</span> ${hotelQuote.advance_payment.toFixed(2)}</li>
                             <li><span className="font-medium">Total pagado al hotel:</span> ${hotelQuote.total_paid.toFixed(2)}</li>

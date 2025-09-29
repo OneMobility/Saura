@@ -24,13 +24,16 @@ interface Hotel {
   capacity_double: number;
   capacity_triple: number;
   capacity_quad: number;
+  num_double_rooms: number; // NEW
+  num_triple_rooms: number; // NEW
+  num_quad_rooms: number; // NEW
   is_active: boolean;
   advance_payment: number;
   total_paid: number;
   created_at: string;
   // Calculated fields for display
-  total_quote_cost_double: number;
-  remaining_payment_double: number;
+  total_quote_cost: number; // Total cost for all contracted rooms in this quote
+  remaining_payment: number; // Remaining payment for all contracted rooms
 }
 
 const AdminHotelsPage = () => {
@@ -59,11 +62,21 @@ const AdminHotelsPage = () => {
       console.error('Error fetching hotels:', error);
       toast.error('Error al cargar las cotizaciones de hoteles.');
     } else {
-      const hotelsWithCalculatedFields = (data || []).map(hotel => ({
-        ...hotel,
-        total_quote_cost_double: hotel.cost_per_night_double * hotel.num_nights_quoted,
-        remaining_payment_double: (hotel.cost_per_night_double * hotel.num_nights_quoted) - hotel.total_paid,
-      }));
+      const hotelsWithCalculatedFields = (data || []).map(hotel => {
+        const totalCostDoubleRooms = (hotel.num_double_rooms || 0) * hotel.cost_per_night_double * hotel.num_nights_quoted;
+        const totalCostTripleRooms = (hotel.num_triple_rooms || 0) * hotel.cost_per_night_triple * hotel.num_nights_quoted;
+        const totalCostQuadRooms = (hotel.num_quad_rooms || 0) * hotel.cost_per_night_quad * hotel.num_nights_quoted;
+        const totalQuoteCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
+
+        return {
+          ...hotel,
+          num_double_rooms: hotel.num_double_rooms || 0,
+          num_triple_rooms: hotel.num_triple_rooms || 0,
+          num_quad_rooms: hotel.num_quad_rooms || 0,
+          total_quote_cost: totalQuoteCost,
+          remaining_payment: totalQuoteCost - (hotel.total_paid || 0),
+        };
+      });
       setHotels(hotelsWithCalculatedFields);
     }
     setLoading(false);
@@ -129,10 +142,13 @@ const AdminHotelsPage = () => {
                       <TableHead>Ubicación</TableHead>
                       <TableHead>Fecha Cotizada</TableHead>
                       <TableHead>Noches</TableHead>
-                      <TableHead>Costo Doble/Noche</TableHead>
+                      <TableHead>Hab. Dobles</TableHead>
+                      <TableHead>Hab. Triples</TableHead>
+                      <TableHead>Hab. Cuádruples</TableHead>
+                      <TableHead>Costo Total Cotización</TableHead>
                       <TableHead>Anticipo</TableHead>
                       <TableHead>Total Pagado</TableHead>
-                      <TableHead>Pago Restante (Doble)</TableHead>
+                      <TableHead>Pago Restante</TableHead>
                       <TableHead>Activo</TableHead>
                       <TableHead>Acciones</TableHead>
                     </TableRow>
@@ -144,10 +160,13 @@ const AdminHotelsPage = () => {
                         <TableCell>{hotel.location}</TableCell>
                         <TableCell>{hotel.quoted_date ? format(new Date(hotel.quoted_date), 'PPP') : 'N/A'}</TableCell>
                         <TableCell>{hotel.num_nights_quoted}</TableCell>
-                        <TableCell>${hotel.cost_per_night_double.toFixed(2)}</TableCell>
+                        <TableCell>{hotel.num_double_rooms}</TableCell>
+                        <TableCell>{hotel.num_triple_rooms}</TableCell>
+                        <TableCell>{hotel.num_quad_rooms}</TableCell>
+                        <TableCell>${hotel.total_quote_cost.toFixed(2)}</TableCell>
                         <TableCell>${hotel.advance_payment.toFixed(2)}</TableCell>
                         <TableCell>${hotel.total_paid.toFixed(2)}</TableCell>
-                        <TableCell>${hotel.remaining_payment_double.toFixed(2)}</TableCell>
+                        <TableCell>${hotel.remaining_payment.toFixed(2)}</TableCell>
                         <TableCell>{hotel.is_active ? 'Sí' : 'No'}</TableCell>
                         <TableCell className="flex space-x-2">
                           <Button

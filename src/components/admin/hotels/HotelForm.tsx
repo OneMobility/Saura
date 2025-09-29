@@ -25,11 +25,14 @@ interface Hotel {
   capacity_double: number;
   capacity_triple: number;
   capacity_quad: number;
+  num_double_rooms: number; // NEW
+  num_triple_rooms: number; // NEW
+  num_quad_rooms: number; // NEW
   is_active: boolean;
   advance_payment: number;
   total_paid: number;
   // calculated fields
-  total_quote_cost: number; // Calculated total cost for this quote (e.g., for double room)
+  total_quote_cost: number; // Calculated total cost for this quote (all rooms)
   remaining_payment: number; // Calculated remaining payment
 }
 
@@ -50,24 +53,41 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
     capacity_double: 2,
     capacity_triple: 3,
     capacity_quad: 4,
+    num_double_rooms: 0, // Initialize new fields
+    num_triple_rooms: 0, // Initialize new fields
+    num_quad_rooms: 0, // Initialize new fields
     is_active: true,
     advance_payment: 0,
     total_paid: 0,
-    total_quote_cost: 0, // Initial calculated value
-    remaining_payment: 0, // Initial calculated value
+    total_quote_cost: 0,
+    remaining_payment: 0,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
 
   const calculateQuoteCosts = useCallback(() => {
-    const totalCost = formData.cost_per_night_double * formData.num_nights_quoted;
-    const remaining = totalCost - formData.total_paid;
+    const totalCostDoubleRooms = formData.num_double_rooms * formData.cost_per_night_double * formData.num_nights_quoted;
+    const totalCostTripleRooms = formData.num_triple_rooms * formData.cost_per_night_triple * formData.num_nights_quoted;
+    const totalCostQuadRooms = formData.num_quad_rooms * formData.cost_per_night_quad * formData.num_nights_quoted;
+    
+    const totalQuoteCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
+    const remaining = totalQuoteCost - formData.total_paid;
+
     setFormData(prev => ({
       ...prev,
-      total_quote_cost: totalCost,
+      total_quote_cost: totalQuoteCost,
       remaining_payment: remaining,
     }));
-  }, [formData.cost_per_night_double, formData.num_nights_quoted, formData.total_paid]);
+  }, [
+    formData.num_double_rooms,
+    formData.cost_per_night_double,
+    formData.num_triple_rooms,
+    formData.cost_per_night_triple,
+    formData.num_quad_rooms,
+    formData.cost_per_night_quad,
+    formData.num_nights_quoted,
+    formData.total_paid
+  ]);
 
   useEffect(() => {
     const fetchHotelData = async () => {
@@ -87,10 +107,18 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
         }
 
         if (data) {
+          const totalCostDoubleRooms = data.num_double_rooms * data.cost_per_night_double * data.num_nights_quoted;
+          const totalCostTripleRooms = data.num_triple_rooms * data.cost_per_night_triple * data.num_nights_quoted;
+          const totalCostQuadRooms = data.num_quad_rooms * data.cost_per_night_quad * data.num_nights_quoted;
+          const totalQuoteCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
+
           setFormData({
             ...data,
-            total_quote_cost: data.cost_per_night_double * data.num_nights_quoted,
-            remaining_payment: (data.cost_per_night_double * data.num_nights_quoted) - data.total_paid,
+            num_double_rooms: data.num_double_rooms || 0,
+            num_triple_rooms: data.num_triple_rooms || 0,
+            num_quad_rooms: data.num_quad_rooms || 0,
+            total_quote_cost: totalQuoteCost,
+            remaining_payment: totalQuoteCost - data.total_paid,
           });
         }
       } else {
@@ -106,6 +134,9 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
           capacity_double: 2,
           capacity_triple: 3,
           capacity_quad: 4,
+          num_double_rooms: 0,
+          num_triple_rooms: 0,
+          num_quad_rooms: 0,
           is_active: true,
           advance_payment: 0,
           total_paid: 0,
@@ -165,6 +196,17 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
       setIsSubmitting(false);
       return;
     }
+    if (formData.num_double_rooms < 0 || formData.num_triple_rooms < 0 || formData.num_quad_rooms < 0) {
+      toast.error('El número de habitaciones no puede ser negativo.');
+      setIsSubmitting(false);
+      return;
+    }
+    if (formData.num_double_rooms === 0 && formData.num_triple_rooms === 0 && formData.num_quad_rooms === 0) {
+      toast.error('Debes especificar al menos una habitación contratada.');
+      setIsSubmitting(false);
+      return;
+    }
+
 
     const dataToSave = {
       name: formData.name,
@@ -177,6 +219,9 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
       capacity_double: formData.capacity_double,
       capacity_triple: formData.capacity_triple,
       capacity_quad: formData.capacity_quad,
+      num_double_rooms: formData.num_double_rooms, // NEW
+      num_triple_rooms: formData.num_triple_rooms, // NEW
+      num_quad_rooms: formData.num_quad_rooms, // NEW
       is_active: formData.is_active,
       advance_payment: formData.advance_payment,
       total_paid: formData.total_paid,
@@ -344,6 +389,50 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
             />
           </div>
 
+          <h3 className="col-span-4 text-lg font-semibold mt-4">Habitaciones Contratadas para esta Cotización</h3>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="num_double_rooms" className="text-right">
+              Hab. Dobles
+            </Label>
+            <Input
+              id="num_double_rooms"
+              type="number"
+              value={formData.num_double_rooms}
+              onChange={handleChange}
+              className="col-span-3"
+              min={0}
+              required
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="num_triple_rooms" className="text-right">
+              Hab. Triples
+            </Label>
+            <Input
+              id="num_triple_rooms"
+              type="number"
+              value={formData.num_triple_rooms}
+              onChange={handleChange}
+              className="col-span-3"
+              min={0}
+              required
+            />
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="num_quad_rooms" className="text-right">
+              Hab. Cuádruples
+            </Label>
+            <Input
+              id="num_quad_rooms"
+              type="number"
+              value={formData.num_quad_rooms}
+              onChange={handleChange}
+              className="col-span-3"
+              min={0}
+              required
+            />
+          </div>
+
           <div className="grid grid-cols-4 items-center gap-4 mt-4">
             <Label htmlFor="is_active" className="text-right">
               Activo para Tours
@@ -392,7 +481,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
 
           <div className="col-span-4 grid grid-cols-2 gap-4 mt-4 bg-gray-50 p-4 rounded-md">
             <div>
-              <Label className="font-semibold">Costo Total Cotización (Doble):</Label>
+              <Label className="font-semibold">Costo Total de esta Cotización:</Label>
               <p>${formData.total_quote_cost.toFixed(2)}</p>
             </div>
             <div>
