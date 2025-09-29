@@ -3,20 +3,20 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Armchair, CarFront, Toilet, Square, GripVertical } from 'lucide-react';
+import { Armchair, CarFront, Toilet, Square, GripVertical, LogIn } from 'lucide-react'; // Added LogIn
 import { Label } from '@/components/ui/label';
 import { Input } from '@/components/ui/input';
 import { toast } from 'sonner';
 
 // Definición de tipos para el layout de asientos
 type SeatLayoutItem = {
-  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty';
+  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty' | 'entry'; // Added 'entry'
   number?: number; // Solo para asientos
 };
 type SeatLayoutRow = SeatLayoutItem[];
 type SeatLayout = SeatLayoutRow[];
 
-type ToolType = 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty';
+type ToolType = 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty' | 'entry'; // Added 'entry'
 
 interface SeatLayoutEditorProps {
   initialLayout: SeatLayout | null;
@@ -48,20 +48,26 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
     return newLayout;
   }, []); // No dependencies here, as rows/cols are passed as arguments
 
-  // Effect to initialize grid when initialLayout prop changes (or on mount)
+  // Effect to initialize grid or update when initialLayout, rows, or cols change
   useEffect(() => {
+    let newGrid: SeatLayout;
     if (initialLayout && initialLayout.length > 0) {
-      setRows(initialLayout.length);
-      setCols(initialLayout[0].length);
-      setGrid(reNumberSeats(initialLayout, initialLayout.length, initialLayout[0].length));
+      // If initialLayout is provided, use it and adjust to new rows/cols if size changed
+      newGrid = Array.from({ length: rows }, (_, rIdx) =>
+        Array.from({ length: cols }, (_, cIdx) => {
+          return initialLayout[rIdx] && initialLayout[rIdx][cIdx]
+            ? { ...initialLayout[rIdx][cIdx] } // Deep copy item
+            : { type: 'empty' };
+        })
+      );
     } else {
-      // Create an empty grid if no initial layout
-      const emptyGrid: SeatLayout = Array.from({ length: rows }, () =>
+      // Create an empty grid
+      newGrid = Array.from({ length: rows }, () =>
         Array.from({ length: cols }, () => ({ type: 'empty' }))
       );
-      setGrid(reNumberSeats(emptyGrid, rows, cols));
     }
-  }, [initialLayout]); // Only depends on initialLayout
+    setGrid(reNumberSeats(newGrid, rows, cols)); // Set and re-number the grid
+  }, [initialLayout, rows, cols, reNumberSeats]); // Added rows and cols to dependencies
 
   // Effect to notify parent when grid changes (after re-numbering)
   useEffect(() => {
@@ -72,7 +78,13 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
   const handleCellClick = (rowIndex: number, colIndex: number) => {
     setGrid(prevGrid => {
       const newGrid = prevGrid.map(row => [...row]); // Deep copy
-      newGrid[rowIndex][colIndex] = { type: activeTool };
+      // Toggle logic: if activeTool is the same as current type, set to 'empty'
+      const currentType = newGrid[rowIndex][colIndex].type;
+      if (currentType === activeTool) {
+        newGrid[rowIndex][colIndex] = { type: 'empty' };
+      } else {
+        newGrid[rowIndex][colIndex] = { type: activeTool };
+      }
       return reNumberSeats(newGrid, rows, cols); // Pass current rows/cols
     });
   };
@@ -84,18 +96,7 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
     }
     setRows(newRows);
     setCols(newCols);
-
-    setGrid(prevGrid => {
-      const newGrid: SeatLayout = Array.from({ length: newRows }, (_, rIdx) =>
-        Array.from({ length: newCols }, (_, cIdx) => {
-          // Preserve existing items if within bounds, otherwise default to empty
-          return prevGrid[rIdx] && prevGrid[rIdx][cIdx]
-            ? prevGrid[rIdx][cIdx]
-            : { type: 'empty' };
-        })
-      );
-      return reNumberSeats(newGrid, newRows, newCols); // Pass new rows/cols
-    });
+    // The useEffect with [initialLayout, rows, cols, reNumberSeats] will handle updating the grid.
   };
 
   const renderCellContent = (item: SeatLayoutItem) => {
@@ -108,6 +109,8 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
         return <Toilet className="h-4 w-4" />;
       case 'aisle':
         return <GripVertical className="h-4 w-4 text-gray-400" />;
+      case 'entry': // New entry type
+        return <LogIn className="h-4 w-4" />;
       case 'empty':
       default:
         return null;
@@ -125,6 +128,8 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
         return cn(base, "bg-purple-600 text-white cursor-default");
       case 'aisle':
         return cn(base, "bg-gray-100 cursor-pointer");
+      case 'entry': // New entry type styling
+        return cn(base, "bg-green-600 text-white hover:bg-green-700 cursor-pointer");
       case 'empty':
         return cn(base, "bg-white hover:bg-gray-50 cursor-pointer");
       default:
@@ -155,7 +160,7 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
         />
       </div>
 
-      <div className="flex space-x-2 p-2 border rounded-md bg-gray-50">
+      <div className="flex flex-wrap gap-2 p-2 border rounded-md bg-gray-50">
         <Button
           type="button"
           variant={activeTool === 'seat' ? 'default' : 'outline'}
@@ -187,6 +192,14 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
           className={activeTool === 'driver' ? 'bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white' : ''}
         >
           <CarFront className="h-4 w-4 mr-2" /> Conductor
+        </Button>
+        <Button
+          type="button"
+          variant={activeTool === 'entry' ? 'default' : 'outline'}
+          onClick={() => setActiveTool('entry')}
+          className={activeTool === 'entry' ? 'bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white' : ''}
+        >
+          <LogIn className="h-4 w-4 mr-2" /> Ascenso
         </Button>
         <Button
           type="button"
