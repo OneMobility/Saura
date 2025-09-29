@@ -18,6 +18,7 @@ interface BlogPost {
   description: string;
   image_url: string;
   full_content: string;
+  video_url?: string | null; // NEW: Added video_url
   user_id?: string;
 }
 
@@ -35,6 +36,7 @@ const BlogFormDialog: React.FC<BlogFormDialogProps> = ({ isOpen, onClose, onSave
     description: '',
     image_url: '',
     full_content: '',
+    video_url: '', // Initialize video_url
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrlPreview, setImageUrlPreview] = useState<string>('');
@@ -52,6 +54,7 @@ const BlogFormDialog: React.FC<BlogFormDialogProps> = ({ isOpen, onClose, onSave
         description: '',
         image_url: '',
         full_content: '',
+        video_url: '',
       });
       setImageFile(null);
       setImageUrlPreview('');
@@ -128,8 +131,8 @@ const BlogFormDialog: React.FC<BlogFormDialogProps> = ({ isOpen, onClose, onSave
         return;
       }
       finalImageUrl = uploadedUrl;
-    } else if (!formData.image_url) {
-      toast.error('Por favor, sube una imagen o proporciona una URL de imagen.');
+    } else if (!formData.image_url && !initialData?.image_url) { // Ensure image is present for new posts or if it was cleared
+      toast.error('Por favor, sube una imagen de portada.');
       setIsSubmitting(false);
       return;
     }
@@ -147,6 +150,7 @@ const BlogFormDialog: React.FC<BlogFormDialogProps> = ({ isOpen, onClose, onSave
       description: formData.description,
       image_url: finalImageUrl,
       full_content: formData.full_content,
+      video_url: formData.video_url || null, // Save video_url
       user_id: user.id,
     };
 
@@ -232,7 +236,7 @@ const BlogFormDialog: React.FC<BlogFormDialogProps> = ({ isOpen, onClose, onSave
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="image_url" className="text-right">
+            <Label htmlFor="image_file" className="text-right">
               Imagen de Portada
             </Label>
             <div className="col-span-3 flex flex-col gap-2">
@@ -248,15 +252,23 @@ const BlogFormDialog: React.FC<BlogFormDialogProps> = ({ isOpen, onClose, onSave
                   <img src={imageUrlPreview} alt="Vista previa" className="w-48 h-32 object-cover rounded-md" />
                 </div>
               )}
-              <p className="text-sm text-gray-500">O introduce una URL de imagen directamente:</p>
-              <Input
-                id="image_url"
-                type="url"
-                value={formData.image_url}
-                onChange={handleChange}
-                placeholder="https://ejemplo.com/imagen.jpg"
-              />
+              {!imageFile && !imageUrlPreview && (
+                <p className="text-sm text-gray-500">Sube una imagen para la portada del blog.</p>
+              )}
             </div>
+          </div>
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="video_url" className="text-right">
+              URL de Video (YouTube/TikTok)
+            </Label>
+            <Input
+              id="video_url"
+              type="url"
+              value={formData.video_url || ''}
+              onChange={handleChange}
+              className="col-span-3"
+              placeholder="https://www.youtube.com/watch?v=..."
+            />
           </div>
           <div className="grid grid-cols-4 items-start gap-4">
             <Label htmlFor="full_content" className="text-right pt-2">
