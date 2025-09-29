@@ -26,7 +26,8 @@ import AdminHotelsPage from "./pages/AdminHotelsPage";
 import AdminProvidersPage from "./pages/AdminProvidersPage";
 import AdminClientsPage from "./pages/AdminClientsPage";
 import AdminBusesPage from "./pages/AdminBusesPage";
-import AdminToursPage from "./pages/AdminToursPage"; // Asegurarse de que AdminToursPage esté importado
+import AdminToursPage from "./pages/AdminToursPage";
+import AdminTourFormPage from "./pages/AdminTourFormPage"; // Import the new Tour Form Page
 
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -127,6 +128,22 @@ const App = () => {
                 element={
                   <ProtectedRoute adminOnly>
                     <AdminToursPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/tours/new"
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminTourFormPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/tours/edit/:id"
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminTourFormPage />
                   </ProtectedRoute>
                 }
               />

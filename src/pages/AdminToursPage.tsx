@@ -5,33 +5,26 @@ import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { Button } from '@/components/ui/button';
 import { PlusCircle } from 'lucide-react';
-import ToursTable from '@/components/admin/tours/ToursTable'; // Import the new ToursTable
-import TourFormDialog from '@/components/admin/tours/TourFormDialog'; // Import the new TourFormDialog
+import ToursTable from '@/components/admin/tours/ToursTable';
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 
 const AdminToursPage = () => {
-  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
-  const [selectedTour, setSelectedTour] = useState(null); // For editing
   const [refreshKey, setRefreshKey] = useState(0); // Key to force re-fetch of tours
   const { user, isAdmin, isLoading } = useSession();
   const navigate = useNavigate();
 
   const handleTourSave = () => {
     setRefreshKey(prev => prev + 1); // Increment key to trigger re-fetch in ToursTable
-    setIsFormDialogOpen(false); // Close dialog after saving
-    setSelectedTour(null); // Clear selected tour
   };
 
   const handleAddTour = () => {
-    setSelectedTour(null); // Ensure no tour is selected for a new entry
-    setIsFormDialogOpen(true);
+    navigate('/admin/tours/new'); // Navigate to the new form page for creation
   };
 
   const handleEditTour = (tour: any) => { // Use 'any' for now, will define Tour interface later
-    setSelectedTour(tour);
-    setIsFormDialogOpen(true);
+    navigate(`/admin/tours/edit/${tour.id}`); // Navigate to the new form page for editing
   };
 
   if (isLoading) {
@@ -64,15 +57,6 @@ const AdminToursPage = () => {
           <p>&copy; {new Date().getFullYear()} Saura Tours Admin. Todos los derechos reservados.</p>
         </footer>
       </div>
-      <TourFormDialog
-        isOpen={isFormDialogOpen}
-        onClose={() => {
-          setIsFormDialogOpen(false);
-          setSelectedTour(null); // Clear selected tour on close
-        }}
-        onSave={handleTourSave}
-        initialData={selectedTour}
-      />
     </div>
   );
 };
