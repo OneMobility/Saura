@@ -25,9 +25,9 @@ const generateBookingSheetHtml = (data: any) => {
   const seats = data.seats;
   const agency = data.agency;
 
-  // Provide default empty arrays for companions and extra_services if they are null
-  const safeCompanions = client.companions || [];
-  const safeExtraServices = client.extra_services || [];
+  // Provide default empty arrays for companions and extra_services if they are null or not arrays
+  const safeCompanions = Array.isArray(client.companions) ? client.companions : [];
+  const safeExtraServices = Array.isArray(client.extra_services) ? client.extra_services : [];
 
   const companionsList = safeCompanions.length > 0
     ? safeCompanions.map((c: any) => `<li>${c.name || 'Acompañante sin nombre'} ${c.age !== null && typeof c.age === 'number' ? `(${c.age} años)` : ''}</li>`).join('')
@@ -121,7 +121,6 @@ serve(async (req) => {
   console.log('Edge Function: generate-booking-sheet invoked.');
 
   if (req.method === 'OPTIONS') {
-    console.log('Edge Function: OPTIONS request received.');
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -152,7 +151,6 @@ serve(async (req) => {
       },
     }
   );
-  console.log('Edge Function: Supabase admin client initialized.');
 
   const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
@@ -160,7 +158,6 @@ serve(async (req) => {
     console.error('Edge Function: Auth error:', authError?.message || 'User not found.');
     return jsonResponse({ error: 'Unauthorized: Invalid token or user not found' }, 401);
   }
-  console.log('Edge Function: User authenticated:', authUser.id);
 
   const { data: profile, error: profileError } = await supabaseAdmin
     .from('profiles')
@@ -172,7 +169,6 @@ serve(async (req) => {
     console.error('Edge Function: Profile error or not admin. Profile error:', profileError?.message, 'User role:', profile?.role);
     return jsonResponse({ error: 'Forbidden: Only administrators can perform this action' }, 403);
   }
-  console.log('Edge Function: Invoking user is an administrator.');
 
   try {
     const { clientId } = await req.json();
@@ -180,7 +176,6 @@ serve(async (req) => {
       return jsonResponse({ error: 'Client ID is required.' }, 400);
     }
 
-    // Fetch client data
     const { data: client, error: clientError } = await supabaseAdmin
       .from('clients')
       .select(`
@@ -201,7 +196,6 @@ serve(async (req) => {
       return jsonResponse({ error: 'Client not found or error fetching client data.' }, 404);
     }
 
-    // Fetch seat assignments for this client and tour
     const { data: seats, error: seatsError } = await supabaseAdmin
       .from('tour_seat_assignments')
       .select('seat_number')
@@ -210,10 +204,8 @@ serve(async (req) => {
 
     if (seatsError) {
       console.error('Error fetching seats:', seatsError.message);
-      // Continue without seats if there's an error, but log it
     }
 
-    // Fetch agency settings
     const { data: agency, error: agencyError } = await supabaseAdmin
       .from('agency_settings')
       .select('*')
@@ -221,12 +213,11 @@ serve(async (req) => {
 
     if (agencyError && agencyError.code !== 'PGRST116') {
       console.error('Error fetching agency settings:', agencyError.message);
-      // Continue without agency info if there's an error
     }
 
     const htmlContent = generateBookingSheetHtml({
       client,
-      tour: client.tours, // The tour data is nested under client.tours
+      tour: client.tours,
       seats: seats || [],
       agency: agency,
     });
