@@ -30,7 +30,7 @@ const generateBookingSheetHtml = (data: any) => {
   const safeExtraServices = client.extra_services || [];
 
   const companionsList = safeCompanions.length > 0
-    ? safeCompanions.map((c: any) => `<li>${c.name} ${c.age !== null ? `(${c.age} años)` : ''}</li>`).join('')
+    ? safeCompanions.map((c: any) => `<li>${c.name || 'Acompañante sin nombre'} ${c.age !== null ? `(${c.age} años)` : ''}</li>`).join('')
     : '<li>N/A</li>';
 
   const seatNumbers = seats && seats.length > 0
@@ -38,10 +38,17 @@ const generateBookingSheetHtml = (data: any) => {
     : 'N/A';
 
   const extraServicesList = safeExtraServices.length > 0
-    ? safeExtraServices.map((s: any) => `<li>${s.name_snapshot} (${s.service_type_snapshot}) - Cantidad: ${s.quantity} - Precio: $${s.selling_price_per_unit_snapshot.toFixed(2)}</li>`).join('')
+    ? safeExtraServices.map((s: any) => {
+        const price = typeof s.selling_price_per_unit_snapshot === 'number' ? s.selling_price_per_unit_snapshot : 0;
+        const quantity = typeof s.quantity === 'number' ? s.quantity : 0;
+        return `<li>${s.name_snapshot || 'Servicio sin nombre'} (${s.service_type_snapshot || 'N/A'}) - Cantidad: ${quantity} - Precio: $${price.toFixed(2)}</li>`;
+      }).join('')
     : '<li>N/A</li>';
 
-  const remainingPayment = (client.total_amount - client.total_paid).toFixed(2);
+  // Ensure total_amount and total_paid are numbers before calling toFixed
+  const clientTotalAmount = typeof client.total_amount === 'number' ? client.total_amount : 0;
+  const clientTotalPaid = typeof client.total_paid === 'number' ? client.total_paid : 0;
+  const remainingPayment = (clientTotalAmount - clientTotalPaid).toFixed(2);
 
   return `
     <!DOCTYPE html>
@@ -49,7 +56,7 @@ const generateBookingSheetHtml = (data: any) => {
     <head>
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
-        <title>Hoja de Reserva - ${client.contract_number}</title>
+        <title>Hoja de Reserva - ${client.contract_number || 'N/A'}</title>
         <style>
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 20px; }
             .container { max-width: 800px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
@@ -95,8 +102,8 @@ const generateBookingSheetHtml = (data: any) => {
 
             <div class="section payment-summary">
                 <h2>Resumen de Pagos</h2>
-                <p><span class="label">Monto Total del Contrato:</span> $${client.total_amount !== undefined ? client.total_amount.toFixed(2) : '0.00'}</p>
-                <p><span class="label">Total Pagado:</span> $${client.total_paid !== undefined ? client.total_paid.toFixed(2) : '0.00'}</p>
+                <p><span class="label">Monto Total del Contrato:</span> $${clientTotalAmount.toFixed(2)}</p>
+                <p><span class="label">Total Pagado:</span> $${clientTotalPaid.toFixed(2)}</p>
                 <p class="total-amount"><span class="label">Adeudo:</span> $${remainingPayment}</p>
             </div>
 
