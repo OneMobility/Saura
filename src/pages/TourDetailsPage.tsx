@@ -12,34 +12,6 @@ import TourSeatMap from '@/components/TourSeatMap';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog'; // Import Dialog and DialogTrigger
 import ClientBookingForm from '@/components/ClientBookingForm'; // Import the new ClientBookingForm
 
-// Hotel interface now represents a "hotel quote" from the 'hotels' table
-interface HotelQuote {
-  id: string;
-  name: string; // Hotel name
-  location: string;
-  quoted_date: string | null;
-  num_nights_quoted: number;
-  cost_per_night_double: number;
-  cost_per_night_triple: number;
-  cost_per_night_quad: number;
-  capacity_double: number;
-  capacity_triple: number;
-  capacity_quad: number;
-  num_double_rooms: number;
-  num_triple_rooms: number;
-  num_quad_rooms: number;
-  num_courtesy_rooms: number;
-  is_active: boolean;
-  advance_payment: number;
-  total_paid: number;
-}
-
-// TourHotelDetail now references a hotel quote ID
-interface TourHotelDetail {
-  id: string; // Unique ID for this entry in the tour's hotel_details array
-  hotel_quote_id: string; // References an ID from the 'hotels' table (which are now quotes)
-}
-
 // Definición de tipos para el layout de asientos
 type SeatLayoutItem = {
   type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty';
@@ -52,11 +24,8 @@ interface Bus {
   id: string;
   name: string;
   license_plate: string;
-  rental_cost: number;
   total_capacity: number;
   seat_layout_json: SeatLayout | null; // Incluir el layout de asientos
-  advance_payment: number;
-  total_paid: number;
 }
 
 interface Tour {
@@ -75,8 +44,6 @@ interface Tour {
   bus_id: string | null;
   bus_capacity: number;
   courtesies: number;
-  hotel_details: TourHotelDetail[] | null;
-  provider_details: { name: string; service: string; cost: number }[] | null;
 }
 
 const TourDetailsPage = () => {
@@ -84,42 +51,18 @@ const TourDetailsPage = () => {
   const [tour, setTour] = useState<Tour | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [hotelQuotesMap, setHotelQuotesMap] = useState<Map<string, HotelQuote>>(new Map());
   const [busLayout, setBusLayout] = useState<SeatLayout | null>(null);
   const [isBookingFormOpen, setIsBookingFormOpen] = useState(false); // State to control booking form dialog
 
   useEffect(() => {
-    const fetchTourDetailsAndHotelQuotes = async () => {
+    const fetchTourDetails = async () => {
       setLoading(true);
       setError(null);
 
-      // Fetch all active hotel quotes first
-      const { data: hotelQuotesData, error: hotelQuotesError } = await supabase
-        .from('hotels')
-        .select('*')
-        .eq('is_active', true);
-
-      if (hotelQuotesError) {
-        console.error('Error fetching hotel quotes:', hotelQuotesError);
-        setError('Error al cargar las cotizaciones de hoteles.');
-        setLoading(false);
-        return;
-      }
-
-      const quotesMap = new Map<string, HotelQuote>();
-      hotelQuotesData?.forEach(quote => quotesMap.set(quote.id, {
-        ...quote,
-        num_double_rooms: quote.num_double_rooms || 0,
-        num_triple_rooms: quote.num_triple_rooms || 0,
-        num_quad_rooms: quote.num_quad_rooms || 0,
-        num_courtesy_rooms: quote.num_courtesy_rooms || 0,
-      }));
-      setHotelQuotesMap(quotesMap);
-
-      // Fetch all buses
+      // Fetch all buses to get their layouts
       const { data: busesData, error: busesError } = await supabase
         .from('buses')
-        .select('id, name, total_capacity, seat_layout_json'); // Only fetch necessary bus details
+        .select('id, seat_layout_json');
 
       if (busesError) {
         console.error('Error fetching buses:', busesError);
@@ -128,8 +71,7 @@ const TourDetailsPage = () => {
         return;
       }
       const busesMap = new Map<string, Bus>();
-      busesData?.forEach(bus => busesMap.set(bus.id, bus));
-
+      busesData?.forEach(bus => busesMap.set(bus.id, bus as Bus)); // Cast to Bus interface
 
       // Then fetch tour details
       const { data: tourData, error: tourError } = await supabase
@@ -149,9 +91,7 @@ const TourDetailsPage = () => {
           selling_price_child,
           bus_id,
           bus_capacity,
-          courtesies,
-          hotel_details,
-          provider_details
+          courtesies
         `) // Select only public-facing fields
         .eq('slug', id)
         .single();
@@ -165,8 +105,6 @@ const TourDetailsPage = () => {
           ...tourData,
           includes: tourData.includes || [],
           itinerary: tourData.itinerary || [],
-          hotel_details: tourData.hotel_details || [],
-          provider_details: tourData.provider_details || [],
           selling_price_double_occupancy: tourData.selling_price_double_occupancy || 0,
           selling_price_triple_occupancy: tourData.selling_price_triple_occupancy || 0,
           selling_price_quad_occupancy: tourData.selling_price_quad_occupancy || 0,
@@ -188,7 +126,7 @@ const TourDetailsPage = () => {
     };
 
     if (id) {
-      fetchTourDetailsAndHotelQuotes();
+      fetchTourDetails();
     }
   }, [id]);
 
@@ -289,45 +227,6 @@ const TourDetailsPage = () => {
                   </ol>
                 </>
               )}
-
-              {tour.hotel_details && tour.hotel_details.length > 0 && (
-                <>
-                  <h3 className="text-xl font-semibold text-gray-800 mt-8 mb-3">Hoteles Asociados</h3>
-                  <div className="space-y-4">
-                    {tour.hotel_details.map((tourHotelDetail) => {
-                      const hotelQuote = hotelQuotesMap.get(tourHotelDetail.hotel_quote_id);
-                      if (!hotelQuote) return null; // Skip if quote not found
-
-                      return (
-                        <div key={tourHotelDetail.id} className="border p-4 rounded-md bg-gray-50">
-                          <p className="font-semibold text-lg mb-1">
-                            {hotelQuote.name} ({hotelQuote.location})
-                          </p>
-                          <ul className="text-gray-700 text-sm space-y-1">
-                            <li><span className="font-medium">Fecha Cotizada:</span> {hotelQuote.quoted_date ? format(new Date(hotelQuote.quoted_date), 'PPP') : 'N/A'}</li>
-                            <li><span className="font-medium">Noches Cotizadas:</span> {hotelQuote.num_nights_quoted}</li>
-                            <li><span className="font-medium">Habitaciones Dobles Contratadas:</span> {hotelQuote.num_double_rooms}</li>
-                            <li><span className="font-medium">Habitaciones Triples Contratadas:</span> {hotelQuote.num_triple_rooms}</li>
-                            <li><span className="font-medium">Habitaciones Cuádruples Contratadas:</span> {hotelQuote.num_quad_rooms}</li>
-                            <li><span className="font-medium">Habitaciones de Cortesía:</span> {hotelQuote.num_courtesy_rooms}</li>
-                          </ul>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-
-              {tour.provider_details && tour.provider_details.length > 0 && (
-                <>
-                  <h3 className="text-xl font-semibold text-gray-800 mt-8 mb-3">Proveedores de Servicios</h3>
-                  <ul className="list-disc list-inside space-y-2 text-gray-700">
-                    {tour.provider_details.map((provider, index) => (
-                      <li key={index}>{provider.name} - {provider.service}</li>
-                    ))}
-                  </ul>
-                </>
-              )}
             </div>
 
             <div className="lg:col-span-1 bg-gray-50 p-6 rounded-lg shadow-inner">
@@ -342,7 +241,7 @@ const TourDetailsPage = () => {
                     busCapacity={tour.bus_capacity}
                     courtesies={tour.courtesies}
                     seatLayoutJson={busLayout}
-                    readOnly={true} // Set to readOnly for display purposes here
+                    readOnly={false} // Allow public users to select seats
                     adminMode={false}
                   />
                 </div>
