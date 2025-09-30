@@ -118,38 +118,46 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
   const [roomDetails, setRoomDetails] = useState<RoomDetails>({ double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // NEW: States for breakdown display
+  const [numAdults, setNumAdults] = useState(0);
+  const [numChildren, setNumChildren] = useState(0);
+  const [extraServicesTotal, setExtraServicesTotal] = useState(0);
+
   // Effect to calculate total_amount and room_details
   useEffect(() => {
-    let numAdults = 0;
-    let numChildren = 0;
+    let currentNumAdults = 0;
+    let currentNumChildren = 0;
 
     // Contractor
     if (formData.contractor_age !== null) {
       if (formData.contractor_age >= 12) {
-        numAdults++;
+        currentNumAdults++;
       } else {
-        numChildren++;
+        currentNumChildren++;
       }
     } else {
-      numAdults++; // Default to adult if age not specified for contractor
+      currentNumAdults++; // Default to adult if age not specified for contractor
     }
 
     // Companions
     formData.companions.forEach(c => {
       if (c.age !== null) {
         if (c.age >= 12) {
-          numAdults++;
+          currentNumAdults++;
         } else {
-          numChildren++;
+          currentNumChildren++;
         }
       } else {
-        numAdults++; // Default to adult if age not specified for companion
+        currentNumAdults++; // Default to adult if age not specified for companion
       }
     });
 
-    const totalPeople = numAdults + numChildren;
+    setNumAdults(currentNumAdults);
+    setNumChildren(currentNumChildren);
 
-    const calculatedRoomDetails = allocateRoomsForPeople(numAdults); // Allocate rooms based on adults
+    const totalPeople = currentNumAdults + currentNumChildren;
+
+    const calculatedRoomDetails = allocateRoomsForPeople(currentNumAdults); // Allocate rooms based on adults
     setRoomDetails(calculatedRoomDetails); // Update roomDetails state
 
     let calculatedTotalAmount = 0;
@@ -159,13 +167,14 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     calculatedTotalAmount += calculatedRoomDetails.quad_rooms * ((tourSellingPrices.quad || 0) * 4);
     
     // Add cost for children
-    calculatedTotalAmount += numChildren * (tourSellingPrices.child || 0);
+    calculatedTotalAmount += currentNumChildren * (tourSellingPrices.child || 0);
 
     // NEW: Add cost of extra services
-    const extraServicesTotal = formData.extra_services.reduce((sum, service) => {
+    const currentExtraServicesTotal = formData.extra_services.reduce((sum, service) => {
       return sum + (service.selling_price_per_unit_snapshot * service.quantity);
     }, 0);
-    calculatedTotalAmount += extraServicesTotal;
+    setExtraServicesTotal(currentExtraServicesTotal);
+    calculatedTotalAmount += currentExtraServicesTotal;
 
     setTotalAmount(calculatedTotalAmount);
   }, [formData.contractor_age, formData.companions, tourSellingPrices, formData.extra_services, setRoomDetails]); // Added setRoomDetails to dependencies
@@ -529,6 +538,39 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
               )}
             </div>
           )}
+
+          {/* NEW: Price Breakdown */}
+          <div className="col-span-full mt-6 p-4 bg-gray-100 rounded-md">
+            <h4 className="font-semibold text-lg mb-2">Desglose del Cálculo:</h4>
+            <p className="text-sm text-gray-700">Adultos: <span className="font-medium">{numAdults}</span></p>
+            <p className="text-sm text-gray-700">Niños (-12 años): <span className="font-medium">{numChildren}</span></p>
+            {roomDetails.double_rooms > 0 && (
+              <p className="text-sm text-gray-700">
+                Habitaciones Dobles: <span className="font-medium">{roomDetails.double_rooms}</span> x ${tourSellingPrices.double.toFixed(2)}/persona x 2 = <span className="font-medium">${(roomDetails.double_rooms * tourSellingPrices.double * 2).toFixed(2)}</span>
+              </p>
+            )}
+            {roomDetails.triple_rooms > 0 && (
+              <p className="text-sm text-gray-700">
+                Habitaciones Triples: <span className="font-medium">{roomDetails.triple_rooms}</span> x ${tourSellingPrices.triple.toFixed(2)}/persona x 3 = <span className="font-medium">${(roomDetails.triple_rooms * tourSellingPrices.triple * 3).toFixed(2)}</span>
+              </p>
+            )}
+            {roomDetails.quad_rooms > 0 && (
+              <p className="text-sm text-gray-700">
+                Habitaciones Cuádruples: <span className="font-medium">{roomDetails.quad_rooms}</span> x ${tourSellingPrices.quad.toFixed(2)}/persona x 4 = <span className="font-medium">${(roomDetails.quad_rooms * tourSellingPrices.quad * 4).toFixed(2)}</span>
+              </p>
+            )}
+            {numChildren > 0 && (
+              <p className="text-sm text-gray-700">
+                Costo Niños: <span className="font-medium">{numChildren}</span> x ${tourSellingPrices.child.toFixed(2)}/niño = <span className="font-medium">${(numChildren * tourSellingPrices.child).toFixed(2)}</span>
+              </p>
+            )}
+            {extraServicesTotal > 0 && (
+              <p className="text-sm text-gray-700">
+                Servicios Adicionales: <span className="font-medium">${extraServicesTotal.toFixed(2)}</span>
+              </p>
+            )}
+            <p className="font-bold mt-2 text-gray-800">Total Calculado: <span className="text-xl">${totalAmount.toFixed(2)}</span></p>
+          </div>
 
           {/* Total Amount */}
           <div className="col-span-full mt-6 p-4 bg-rosa-mexicano text-white rounded-md flex justify-between items-center">

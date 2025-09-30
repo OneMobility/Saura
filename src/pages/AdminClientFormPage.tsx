@@ -142,6 +142,11 @@ const AdminClientFormPage = () => {
   const [initialClientStatus, setInitialClientStatus] = useState<string>('pending'); // To track status change
   const [roomDetails, setRoomDetails] = useState<RoomDetails>({ double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }); // Define roomDetails state
 
+  // NEW: States for breakdown display
+  const [numAdults, setNumAdults] = useState(0);
+  const [numChildren, setNumChildren] = useState(0);
+  const [extraServicesTotal, setExtraServicesTotal] = useState(0);
+
   useEffect(() => {
     if (!sessionLoading && (!user || !isAdmin)) {
       navigate('/login');
@@ -299,37 +304,40 @@ const AdminClientFormPage = () => {
 
   // Effect to calculate total_amount, number_of_people, and room_details
   useEffect(() => {
-    let numAdults = 0;
-    let numChildren = 0;
+    let currentNumAdults = 0;
+    let currentNumChildren = 0;
 
     // Contractor
     if (formData.contractor_age !== null) {
       if (formData.contractor_age >= 12) {
-        numAdults++;
+        currentNumAdults++;
       } else {
-        numChildren++;
+        currentNumChildren++;
       }
     } else {
-      numAdults++; // Default to adult if age not specified for contractor
+      currentNumAdults++; // Default to adult if age not specified for contractor
     }
 
     // Companions
     formData.companions.forEach(c => {
       if (c.age !== null) {
         if (c.age >= 12) {
-          numAdults++;
+          currentNumAdults++;
         } else {
-          numChildren++;
+          currentNumChildren++;
         }
       } else {
-        numAdults++; // Default to adult if age not specified for companion
+        currentNumAdults++; // Default to adult if age not specified for companion
       }
     });
 
-    const totalPeople = numAdults + numChildren;
+    setNumAdults(currentNumAdults);
+    setNumChildren(currentNumChildren);
+
+    const totalPeople = currentNumAdults + currentNumChildren;
 
     // Allocate rooms based on total people (adults + children)
-    const calculatedRoomDetails = allocateRoomsForPeople(totalPeople);
+    const calculatedRoomDetails = allocateRoomsForPeople(currentNumAdults);
     setRoomDetails(calculatedRoomDetails); // Update roomDetails state
 
     let calculatedTotalAmount = 0;
@@ -340,13 +348,14 @@ const AdminClientFormPage = () => {
     calculatedTotalAmount += calculatedRoomDetails.quad_rooms * ((selectedTourPrices?.selling_price_quad_occupancy || 0) * 4);
     
     // Add cost for children
-    calculatedTotalAmount += numChildren * (selectedTourPrices?.selling_price_child || 0);
+    calculatedTotalAmount += currentNumChildren * (selectedTourPrices?.selling_price_child || 0);
 
     // Add cost of extra services
-    const extraServicesTotal = formData.extra_services.reduce((sum, service) => {
+    const currentExtraServicesTotal = formData.extra_services.reduce((sum, service) => {
       return sum + (service.selling_price_per_unit_snapshot * service.quantity);
     }, 0);
-    calculatedTotalAmount += extraServicesTotal;
+    setExtraServicesTotal(currentExtraServicesTotal);
+    calculatedTotalAmount += currentExtraServicesTotal;
 
     setFormData(prev => ({
       ...prev,
@@ -776,6 +785,39 @@ const AdminClientFormPage = () => {
                   )}
                 </div>
               )}
+
+              {/* NEW: Price Breakdown */}
+              <div className="col-span-full mt-6 p-4 bg-gray-100 rounded-md">
+                <h4 className="font-semibold text-lg mb-2">Desglose del Cálculo:</h4>
+                <p className="text-sm text-gray-700">Adultos: <span className="font-medium">{numAdults}</span></p>
+                <p className="text-sm text-gray-700">Niños (-12 años): <span className="font-medium">{numChildren}</span></p>
+                {roomDetails.double_rooms > 0 && (
+                  <p className="text-sm text-gray-700">
+                    Habitaciones Dobles: <span className="font-medium">{roomDetails.double_rooms}</span> x ${selectedTourPrices?.selling_price_double_occupancy.toFixed(2) || '0.00'}/persona x 2 = <span className="font-medium">${(roomDetails.double_rooms * (selectedTourPrices?.selling_price_double_occupancy || 0) * 2).toFixed(2)}</span>
+                  </p>
+                )}
+                {roomDetails.triple_rooms > 0 && (
+                  <p className="text-sm text-gray-700">
+                    Habitaciones Triples: <span className="font-medium">{roomDetails.triple_rooms}</span> x ${selectedTourPrices?.selling_price_triple_occupancy.toFixed(2) || '0.00'}/persona x 3 = <span className="font-medium">${(roomDetails.triple_rooms * (selectedTourPrices?.selling_price_triple_occupancy || 0) * 3).toFixed(2)}</span>
+                  </p>
+                )}
+                {roomDetails.quad_rooms > 0 && (
+                  <p className="text-sm text-gray-700">
+                    Habitaciones Cuádruples: <span className="font-medium">{roomDetails.quad_rooms}</span> x ${selectedTourPrices?.selling_price_quad_occupancy.toFixed(2) || '0.00'}/persona x 4 = <span className="font-medium">${(roomDetails.quad_rooms * (selectedTourPrices?.selling_price_quad_occupancy || 0) * 4).toFixed(2)}</span>
+                  </p>
+                )}
+                {numChildren > 0 && (
+                  <p className="text-sm text-gray-700">
+                    Costo Niños: <span className="font-medium">{numChildren}</span> x ${selectedTourPrices?.selling_price_child.toFixed(2) || '0.00'}/niño = <span className="font-medium">${(numChildren * (selectedTourPrices?.selling_price_child || 0)).toFixed(2)}</span>
+                  </p>
+                )}
+                {extraServicesTotal > 0 && (
+                  <p className="text-sm text-gray-700">
+                    Servicios Adicionales: <span className="font-medium">${extraServicesTotal.toFixed(2)}</span>
+                  </p>
+                )}
+                <p className="font-bold mt-2 text-gray-800">Total Calculado: <span className="text-xl">${formData.total_amount.toFixed(2)}</span></p>
+              </div>
 
               {/* Payment Details */}
               <h3 className="text-lg font-semibold mt-4">Detalles de Pago</h3>
