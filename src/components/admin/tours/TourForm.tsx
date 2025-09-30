@@ -102,6 +102,45 @@ interface BreakevenResult {
   recommendations: string[]; // NEW: Array of recommendations
 }
 
+// NEW: Helper function to calculate room allocation for a given number of people (simplified for analysis)
+interface RoomDetails {
+  double_rooms: number;
+  triple_rooms: number;
+  quad_rooms: number;
+}
+
+const calculateIdealRoomAllocation = (numAdults: number): RoomDetails => {
+  let double = 0;
+  let triple = 0;
+  let quad = 0;
+  let remaining = numAdults;
+
+  if (remaining <= 0) return { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 };
+
+  // Prioritize quad rooms
+  quad = Math.floor(remaining / 4);
+  remaining %= 4;
+
+  // Handle remaining people
+  if (remaining === 3) {
+    triple++;
+  } else if (remaining === 2) {
+    double++;
+  } else if (remaining === 1) {
+    // If 1 person remains, try to convert a quad to a triple + double if possible
+    // Otherwise, assign a double room (paying for 2)
+    if (quad > 0) {
+      quad--;
+      triple++;
+      double++;
+    } else {
+      double++;
+    }
+  }
+  return { double_rooms: quad, triple_rooms: triple, quad_rooms: quad };
+};
+
+
 const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const navigate = useNavigate(); // Initialize useNavigate
   const [formData, setFormData] = useState<Tour>({
@@ -624,16 +663,13 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
 
     if (totalBaseCost <= 0 || averageSellingPrice <= 0) {
       message = 'Asegúrate de que el costo base total y el precio de venta promedio sean mayores que cero para calcular el punto de equilibrio.';
-      setBreakevenResult({
-        clientsNeededToBreakEven: 0,
-        message,
-        recommendations: [],
-      });
+      setBreakevenResult({ clientsNeededToBreakEven: 0, message, recommendations: [] });
       return;
     }
 
-    const clientsNeededToBreakEven = totalBaseCost / averageSellingPrice;
-    message = `Para cubrir el costo base total de $${totalBaseCost.toFixed(2)} con un precio de venta promedio de $${averageSellingPrice.toFixed(2)} por persona, necesitas aproximadamente ${Math.ceil(clientsNeededToBreakEven)} clientes.`;
+    // --- Initial Break-even Calculation ---
+    const initialClientsNeededToBreakEven = totalBaseCost / averageSellingPrice;
+    message = `Para cubrir el costo base total de $${totalBaseCost.toFixed(2)} con un precio de venta promedio de $${averageSellingPrice.toFixed(2)} por persona, necesitas aproximadamente ${Math.ceil(initialClientsNeededToBreakEven)} clientes.`;
 
     // --- Recommendations ---
 
@@ -644,29 +680,99 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       recommendations.push(`¡Bien! El precio de venta promedio cubre el costo por persona si el tour se llena. Tienes un margen de ganancia saludable.`);
     }
 
-    // 2. Comparison with expected clients
+    // 2. Required Selling Price for Expected Clients
     if (expectedClientsForBreakeven > 0) {
-      if (expectedClientsForBreakeven < clientsNeededToBreakEven) {
-        const remainingToSell = Math.ceil(clientsNeededToBreakEven - expectedClientsForBreakeven);
-        recommendations.push(`Con ${expectedClientsForBreakeven} clientes esperados, aún necesitas vender aproximadamente ${remainingToSell} boletos más para cubrir los costos.`);
-        
-        const requiredPriceForExpectedClients = totalBaseCost / expectedClientsForBreakeven;
-        if (requiredPriceForExpectedClients > averageSellingPrice) {
-          recommendations.push(`Para alcanzar el punto de equilibrio con ${expectedClientsForBreakeven} clientes, el precio de venta promedio debería ser de $${requiredPriceForExpectedClients.toFixed(2)} por persona.`);
-        }
+      const requiredPriceForExpectedClients = totalBaseCost / expectedClientsForBreakeven;
+      if (requiredPriceForExpectedClients > averageSellingPrice) {
+        recommendations.push(`Para alcanzar el punto de equilibrio con ${expectedClientsForBreakeven} clientes, el precio de venta promedio debería ser de $${requiredPriceForExpectedClients.toFixed(2)} por persona.`);
       } else {
-        recommendations.push(`¡Excelente! Con ${expectedClientsForBreakeven} clientes esperados, ya estás por encima del punto de equilibrio.`);
-        recommendations.push(`Podrías considerar ofrecer descuentos o servicios adicionales para atraer más clientes y maximizar ganancias.`);
+        recommendations.push(`Con ${expectedClientsForBreakeven} clientes esperados, tu precio de venta promedio actual ($${averageSellingPrice.toFixed(2)}) ya es suficiente para cubrir los costos.`);
       }
     }
 
-    // 3. Room optimization (if expected clients are much lower than capacity)
-    if (expectedClientsForBreakeven > 0 && maxPayingCapacity > 0 && expectedClientsForBreakeven < maxPayingCapacity * 0.7) { // If less than 70% of paying capacity
-      recommendations.push(`Con solo ${expectedClientsForBreakeven} clientes esperados de una capacidad pagante de ${maxPayingCapacity}, podrías considerar ajustar las habitaciones de hotel contratadas para reducir costos fijos.`);
+    // 3. Room Reduction Analysis (if expected clients are less than current capacity)
+    if (expectedClientsForBreakeven > 0 && expectedClientsForBreakeven < maxPayingCapacity) {
+      const idealRoomAllocation = calculateIdealRoomAllocation(expectedClientsForBreakeven);
+
+      let totalContractedDouble = 0;
+      let totalContractedTriple = 0;
+      let totalContractedQuad = 0;
+      let totalContractedCourtesy = 0;
+
+      formData.hotel_details.forEach(tourHotelDetail => {
+        const hotelQuote = availableHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
+        if (hotelQuote) {
+          totalContractedDouble += hotelQuote.num_double_rooms || 0;
+          totalContractedTriple += hotelQuote.num_triple_rooms || 0;
+          totalContractedQuad += hotelQuote.num_quad_rooms || 0;
+          totalContractedCourtesy += hotelQuote.num_courtesy_rooms || 0;
+        }
+      });
+
+      let potentialRoomSavings = 0;
+      let roomsToReduceMessage = [];
+
+      // Prioritize reducing quad rooms first
+      if (totalContractedQuad > idealRoomAllocation.quad_rooms) {
+        const reduceBy = totalContractedQuad - idealRoomAllocation.quad_rooms;
+        roomsToReduceMessage.push(`${reduceBy} habitación(es) cuádruple(s)`);
+        // Calculate savings for quad rooms (using cost_per_night_quad)
+        formData.hotel_details.forEach(tourHotelDetail => {
+          const hotelQuote = availableHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
+          if (hotelQuote && hotelQuote.num_quad_rooms > 0) {
+            const actualReduction = Math.min(reduceBy, hotelQuote.num_quad_rooms);
+            potentialRoomSavings += actualReduction * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
+          }
+        });
+      }
+      // Then triple rooms
+      if (totalContractedTriple > idealRoomAllocation.triple_rooms) {
+        const reduceBy = totalContractedTriple - idealRoomAllocation.triple_rooms;
+        roomsToReduceMessage.push(`${reduceBy} habitación(es) triple(s)`);
+        // Calculate savings for triple rooms
+        formData.hotel_details.forEach(tourHotelDetail => {
+          const hotelQuote = availableHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
+          if (hotelQuote && hotelQuote.num_triple_rooms > 0) {
+            const actualReduction = Math.min(reduceBy, hotelQuote.num_triple_rooms);
+            potentialRoomSavings += actualReduction * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
+          }
+        });
+      }
+      // Then double rooms
+      if (totalContractedDouble > idealRoomAllocation.double_rooms) {
+        const reduceBy = totalContractedDouble - idealRoomAllocation.double_rooms;
+        roomsToReduceMessage.push(`${reduceBy} habitación(es) doble(s)`);
+        // Calculate savings for double rooms
+        formData.hotel_details.forEach(tourHotelDetail => {
+          const hotelQuote = availableHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
+          if (hotelQuote && hotelQuote.num_double_rooms > 0) {
+            const actualReduction = Math.min(reduceBy, hotelQuote.num_double_rooms);
+            potentialRoomSavings += actualReduction * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
+          }
+        });
+      }
+      // Finally, courtesy rooms (if they have a cost, which they do by reducing total cost)
+      if (totalContractedCourtesy > 0) { // Assuming courtesy rooms are always "extra" and can be reduced if not needed
+        const reduceBy = totalContractedCourtesy; // Reduce all courtesy rooms for max savings
+        roomsToReduceMessage.push(`${reduceBy} habitación(es) de coordinador`);
+        formData.hotel_details.forEach(tourHotelDetail => {
+          const hotelQuote = availableHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
+          if (hotelQuote && hotelQuote.num_courtesy_rooms > 0) {
+            potentialRoomSavings += hotelQuote.num_courtesy_rooms * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
+          }
+        });
+      }
+
+
+      if (potentialRoomSavings > 0) {
+        const newTotalBaseCostAfterRoomReduction = totalBaseCost - potentialRoomSavings;
+        const newClientsNeededToBreakEven = newTotalBaseCostAfterRoomReduction / averageSellingPrice;
+        recommendations.push(`Considera reducir ${roomsToReduceMessage.join(', ')} para ahorrar $${potentialRoomSavings.toFixed(2)}. Con estos ahorros, el nuevo punto de equilibrio sería de ${Math.ceil(newClientsNeededToBreakEven)} clientes.`);
+      }
     }
 
     setBreakevenResult({
-      clientsNeededToBreakEven: clientsNeededToBreakEven,
+      clientsNeededToBreakEven: initialClientsNeededToBreakEven,
       message: message,
       recommendations: recommendations,
     });
@@ -679,7 +785,9 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     formData.cost_per_paying_person,
     formData.bus_capacity,
     formData.courtesies,
-    expectedClientsForBreakeven
+    expectedClientsForBreakeven,
+    formData.hotel_details,
+    availableHotelQuotes,
   ]);
 
 
