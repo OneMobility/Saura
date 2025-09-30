@@ -206,7 +206,8 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
     if (isCurrentlySelected) {
       return cn(baseClasses, "bg-green-500 text-white hover:bg-green-600 cursor-pointer");
     }
-    return cn(baseClasses, "bg-blue-500 text-white hover:bg-blue-600 cursor-pointer");
+    // Default for 'available' seats
+    return cn(baseClasses, "bg-gray-200 text-gray-800 hover:bg-gray-300 cursor-pointer");
   };
 
   if (loading || sessionLoading) {
@@ -285,7 +286,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
         <h4 className="text-lg font-semibold mb-3">Leyenda:</h4>
         <div className="grid grid-cols-2 gap-3 text-sm text-gray-700">
           <div className="flex items-center">
-            <span className="w-5 h-5 bg-blue-500 rounded-sm mr-2"></span> Disponible
+            <span className="w-5 h-5 bg-gray-200 rounded-sm mr-2"></span> Disponible
           </div>
           <div className="flex items-center">
             <span className="w-5 h-5 bg-green-500 rounded-sm mr-2"></span> Seleccionado (o tuyo)
