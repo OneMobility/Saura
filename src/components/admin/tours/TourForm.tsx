@@ -79,6 +79,7 @@ interface Tour {
   total_base_cost?: number;
   paying_clients_count?: number;
   cost_per_paying_person?: number;
+  selling_price_per_person: number; // Ensure this is part of the interface
   selling_price_double_occupancy: number;
   selling_price_triple_occupancy: number;
   selling_price_quad_occupancy: number;
@@ -119,6 +120,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     courtesies: 0,
     hotel_details: [],
     provider_details: [],
+    selling_price_per_person: 0, // Initialize this field
     selling_price_double_occupancy: 0, // Initialize new fields
     selling_price_triple_occupancy: 0,
     selling_price_quad_occupancy: 0,
@@ -205,6 +207,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             hotel_details: data.hotel_details || [],
             provider_details: data.provider_details || [],
             bus_id: data.bus_id || null, // Ensure bus_id is set
+            selling_price_per_person: data.selling_price_per_person || 0, // Set this field
             selling_price_double_occupancy: data.selling_price_double_occupancy || 0,
             selling_price_triple_occupancy: data.selling_price_triple_occupancy || 0,
             selling_price_quad_occupancy: data.selling_price_quad_occupancy || 0,
@@ -236,6 +239,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           courtesies: 0,
           hotel_details: [],
           provider_details: [],
+          selling_price_per_person: 0, // Reset this field
           selling_price_double_occupancy: 0,
           selling_price_triple_occupancy: 0,
           selling_price_quad_occupancy: 0,
@@ -322,6 +326,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       total_base_cost: totalBaseCost,
       paying_clients_count: payingClientsCount,
       cost_per_paying_person: costPerPayingPerson,
+      selling_price_per_person: averageAdultSellingPrice, // Set the average here
     }));
     setTotalRemainingPayments(currentTotalRemainingPayments);
 
@@ -577,7 +582,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
 
     tourLinkedHotelQuotes.forEach(tourHotelDetail => {
       const hotelQuote = tempHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
-      if (hotelQuote || remainingClientsToAccommodate <= 0) return;
+      if (!hotelQuote || remainingClientsToAccommodate <= 0) return;
 
       // Prioritize quad rooms
       if (remainingClientsToAccommodate >= hotelQuote.capacity_quad && hotelQuote.capacity_quad > 0) {
@@ -718,6 +723,13 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       return;
     }
 
+    // Calculate selling_price_per_person as the average of the tiered prices
+    const calculatedSellingPricePerPerson = (
+      formData.selling_price_double_occupancy +
+      formData.selling_price_triple_occupancy +
+      formData.selling_price_quad_occupancy
+    ) / 3;
+
     const tourDataToSave = {
       ...formData,
       image_url: finalImageUrl,
@@ -725,6 +737,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       total_base_cost: formData.total_base_cost,
       paying_clients_count: formData.paying_clients_count,
       cost_per_paying_person: formData.cost_per_paying_person,
+      selling_price_per_person: calculatedSellingPricePerPerson, // Add this line
     };
 
     if (tourId) {
