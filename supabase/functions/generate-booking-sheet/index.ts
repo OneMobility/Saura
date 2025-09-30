@@ -34,7 +34,11 @@ const generateBookingSheetHtml = (data: any) => {
     : '<li>N/A</li>';
 
   const seatNumbers = seats && seats.length > 0
-    ? seats.map((s: any) => typeof s.seat_number === 'number' ? s.seat_number : 0).sort((a: number, b: number) => a - b).join(', ')
+    ? seats
+        .filter((s: any) => s && typeof s.seat_number === 'number') // Filtrar elementos nulos/indefinidos y asegurar que seat_number es un número
+        .map((s: any) => s.seat_number)
+        .sort((a: number, b: number) => a - b)
+        .join(', ')
     : 'N/A';
 
   const extraServicesList = safeExtraServices.length > 0
