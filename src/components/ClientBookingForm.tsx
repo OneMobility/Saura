@@ -25,7 +25,7 @@ type SeatLayout = SeatLayoutRow[];
 interface Companion {
   id: string;
   name: string;
-  age: number | null;
+  age: number | null; // Added age for companions
 }
 
 interface RoomDetails {
@@ -168,7 +168,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     calculatedTotalAmount += extraServicesTotal;
 
     setTotalAmount(calculatedTotalAmount);
-  }, [formData.contractor_age, formData.companions, tourSellingPrices, formData.extra_services]);
+  }, [formData.contractor_age, formData.companions, tourSellingPrices, formData.extra_services, setRoomDetails]); // Added setRoomDetails to dependencies
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
