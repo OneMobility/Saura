@@ -30,11 +30,11 @@ const generateBookingSheetHtml = (data: any) => {
   const safeExtraServices = client.extra_services || [];
 
   const companionsList = safeCompanions.length > 0
-    ? safeCompanions.map((c: any) => `<li>${c.name || 'Acompañante sin nombre'} ${c.age !== null ? `(${c.age} años)` : ''}</li>`).join('')
+    ? safeCompanions.map((c: any) => `<li>${c.name || 'Acompañante sin nombre'} ${c.age !== null && typeof c.age === 'number' ? `(${c.age} años)` : ''}</li>`).join('')
     : '<li>N/A</li>';
 
   const seatNumbers = seats && seats.length > 0
-    ? seats.map((s: any) => s.seat_number).sort((a: number, b: number) => a - b).join(', ')
+    ? seats.map((s: any) => typeof s.seat_number === 'number' ? s.seat_number : 0).sort((a: number, b: number) => a - b).join(', ')
     : 'N/A';
 
   const extraServicesList = safeExtraServices.length > 0
@@ -81,7 +81,7 @@ const generateBookingSheetHtml = (data: any) => {
                 <h2>Datos del Cliente</h2>
                 <p><span class="label">Nombre del Cliente:</span> ${client.first_name || 'N/A'} ${client.last_name || 'N/A'}</p>
                 <p><span class="label">Teléfono:</span> ${client.phone || 'N/A'}</p>
-                <p><span class="label">Edad del Contratante:</span> ${client.contractor_age !== null ? client.contractor_age : 'N/A'}</p>
+                <p><span class="label">Edad del Contratante:</span> ${client.contractor_age !== null && typeof client.contractor_age === 'number' ? client.contractor_age : 'N/A'}</p>
                 <p><span class="label">Acompañantes:</span></p>
                 <ul>
                     ${companionsList}
