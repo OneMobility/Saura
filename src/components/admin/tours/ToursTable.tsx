@@ -42,19 +42,15 @@ interface RoomDetails {
   quad_rooms: number;
 }
 
-// Nueva interfaz para la exportación de clientes, agrupada por contrato
-interface ClientForExport {
+// Nueva interfaz para la exportación de clientes, ahora una fila por persona
+interface PersonForExport {
   contract_number: string;
-  contractor_name: string;
-  companion_names: string;
-  email: string;
-  phone: string | null;
+  person_name: string; // Nombre del contratante o acompañante
+  contractor_phone: string | null; // Teléfono del contratante
   total_amount: number;
-  total_paid: number;
   remaining_payment: number;
-  status: string;
   room_details_formatted: string;
-  assigned_seat_numbers: string;
+  assigned_seat_numbers: string; // Todos los asientos del contrato
 }
 
 interface ToursTableProps {
@@ -131,7 +127,6 @@ const ToursTable: React.FC<ToursTableProps> = ({ onEditTour, onTourDeleted }) =>
           phone,
           total_amount,
           total_paid,
-          status,
           companions,
           room_details,
           tour_seat_assignments (
@@ -146,45 +141,43 @@ const ToursTable: React.FC<ToursTableProps> = ({ onEditTour, onTourDeleted }) =>
         return;
       }
 
-      const clientsForExport: ClientForExport[] = [];
+      const peopleForExport: PersonForExport[] = [];
 
       clientsData?.forEach(client => {
         const remainingPayment = client.total_amount - client.total_paid;
-        
-        // Contractor's full name
-        const contractorName = `${client.first_name} ${client.last_name}`;
-
-        // Companion names
-        const companionNames = (client.companions || [])
-          .map((c: Companion) => c.name)
-          .filter(Boolean) // Remove empty names
-          .join(', ');
-
-        // Formatted room details
+        const contractorFullName = `${client.first_name} ${client.last_name}`;
         const roomDetailsFormatted = formatRoomDetails(client.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
-
-        // All assigned seat numbers for this client
         const assignedSeatNumbers = (client.tour_seat_assignments || [])
           .map((seat: { seat_number: number }) => seat.seat_number)
           .sort((a: number, b: number) => a - b)
           .join(', ');
 
-        clientsForExport.push({
+        // Add row for the contractor
+        peopleForExport.push({
           contract_number: client.contract_number,
-          contractor_name: contractorName,
-          companion_names: companionNames,
-          email: client.email,
-          phone: client.phone,
+          person_name: contractorFullName,
+          contractor_phone: client.phone || 'N/A',
           total_amount: client.total_amount,
-          total_paid: client.total_paid,
           remaining_payment: remainingPayment,
-          status: client.status,
           room_details_formatted: roomDetailsFormatted,
           assigned_seat_numbers: assignedSeatNumbers,
         });
+
+        // Add rows for each companion
+        (client.companions || []).forEach((companion: Companion) => {
+          peopleForExport.push({
+            contract_number: client.contract_number,
+            person_name: companion.name || 'Acompañante sin nombre',
+            contractor_phone: client.phone || 'N/A', // Repetir el teléfono del contratante
+            total_amount: client.total_amount, // Repetir el monto total
+            remaining_payment: remainingPayment, // Repetir el adeudo
+            room_details_formatted: roomDetailsFormatted, // Repetir los detalles de habitación
+            assigned_seat_numbers: assignedSeatNumbers, // Repetir los asientos asignados
+          });
+        });
       });
 
-      if (clientsForExport.length === 0) {
+      if (peopleForExport.length === 0) {
         toast.info('No hay clientes registrados para este tour.');
         return;
       }
@@ -192,30 +185,22 @@ const ToursTable: React.FC<ToursTableProps> = ({ onEditTour, onTourDeleted }) =>
       // Generate CSV
       const headers = [
         'Número de Contrato',
-        'Nombre del Contratante',
-        'Nombres de Acompañantes',
-        'Email',
-        'Teléfono',
+        'Nombre (Contratante/Acompañante)',
+        'Teléfono del Contratante',
         'Monto Total del Contrato',
-        'Total Pagado',
         'Adeudo',
-        'Estado del Contrato',
         'Detalles de Habitaciones',
-        'Números de Asiento Asignados'
+        'Números de Asiento Asignados (Contrato)'
       ];
       
-      const csvRows = clientsForExport.map(client => [
-        client.contract_number,
-        client.contractor_name,
-        client.companion_names,
-        client.email,
-        client.phone || 'N/A',
-        client.total_amount.toFixed(2),
-        client.total_paid.toFixed(2),
-        client.remaining_payment.toFixed(2),
-        client.status,
-        client.room_details_formatted,
-        client.assigned_seat_numbers || 'N/A',
+      const csvRows = peopleForExport.map(person => [
+        person.contract_number,
+        person.person_name,
+        person.contractor_phone,
+        person.total_amount.toFixed(2),
+        person.remaining_payment.toFixed(2),
+        person.room_details_formatted,
+        person.assigned_seat_numbers || 'N/A',
       ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','));
 
       const csvContent = [headers.join(','), ...csvRows].join('\n');
