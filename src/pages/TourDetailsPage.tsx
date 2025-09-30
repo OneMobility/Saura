@@ -169,7 +169,7 @@ const TourDetailsPage = () => {
   }
 
   return (
-    <React.Fragment>
+    <>
       <div className="min-h-screen flex flex-col">
         <Navbar />
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
@@ -317,7 +317,7 @@ const TourDetailsPage = () => {
         </main>
         <Footer />
       </div>
-    </React.Fragment>
+    </>
   );
 };
 
