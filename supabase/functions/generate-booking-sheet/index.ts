@@ -21,7 +21,7 @@ const formatRoomDetails = (details: any) => {
 // Helper function to generate HTML for the booking sheet
 const generateBookingSheetHtml = (data: any) => {
   const client = data.client;
-  const tour = data.tour;
+  const tour = data.tour || {}; // Ensure tour is at least an empty object
   const seats = data.seats;
   const agency = data.agency;
 
@@ -33,13 +33,15 @@ const generateBookingSheetHtml = (data: any) => {
     ? safeCompanions.map((c: any) => `<li>${c.name || 'Acompañante sin nombre'} ${c.age !== null && typeof c.age === 'number' ? `(${c.age} años)` : ''}</li>`).join('')
     : '<li>N/A</li>';
 
-  const seatNumbers = seats && seats.length > 0
-    ? seats
-        .filter((s: any) => s && typeof s.seat_number === 'number') // Filtrar elementos nulos/indefinidos y asegurar que seat_number es un número
-        .map((s: any) => s.seat_number)
-        .sort((a: number, b: number) => a - b)
-        .join(', ')
-    : 'N/A';
+  let seatNumbers = 'N/A';
+  if (seats && seats.length > 0) {
+    const validSeats = seats.filter((s: any) => s && typeof s.seat_number === 'number');
+    if (validSeats.length > 0) {
+      const numbers = validSeats.map((s: any) => s.seat_number);
+      const sortedNumbers = numbers.sort((a: number, b: number) => a - b);
+      seatNumbers = sortedNumbers.join(', ');
+    }
+  }
 
   const extraServicesList = safeExtraServices.length > 0
     ? safeExtraServices.map((s: any) => {
@@ -156,13 +158,16 @@ serve(async (req) => {
     }
   );
 
+  console.log('Edge Function: Verifying user token with admin client...');
   const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
   if (authError || !authUser) {
     console.error('Edge Function: Auth error:', authError?.message || 'User not found.');
     return jsonResponse({ error: 'Unauthorized: Invalid token or user not found' }, 401);
   }
+  console.log('Edge Function: User authenticated:', authUser.id);
 
+  console.log('Edge Function: Checking invoking user role with admin client...');
   const { data: profile, error: profileError } = await supabaseAdmin
     .from('profiles')
     .select('role')
@@ -173,13 +178,16 @@ serve(async (req) => {
     console.error('Edge Function: Profile error or not admin. Profile error:', profileError?.message, 'User role:', profile?.role);
     return jsonResponse({ error: 'Forbidden: Only administrators can perform this action' }, 403);
   }
+  console.log('Edge Function: Invoking user is an administrator.');
 
   try {
     const { clientId } = await req.json();
+    console.log('Edge Function: Received clientId:', clientId);
     if (!clientId) {
       return jsonResponse({ error: 'Client ID is required.' }, 400);
     }
 
+    console.log('Edge Function: Fetching client data...');
     const { data: client, error: clientError } = await supabaseAdmin
       .from('clients')
       .select(`
@@ -196,12 +204,17 @@ serve(async (req) => {
       .single();
 
     if (clientError || !client) {
-      console.error('Error fetching client:', clientError?.message);
+      console.error('Edge Function: Error fetching client:', clientError?.message || 'Client not found.');
       return jsonResponse({ error: 'Client not found or error fetching client data.' }, 404);
     }
+    console.log('Edge Function: Client data fetched successfully.');
+    console.log('Edge Function: Client object:', JSON.stringify(client));
+    console.log('Edge Function: Client.tours object:', JSON.stringify(client.tours));
+
 
     let seats: any[] = [];
     if (client.tour_id) { // Only fetch seats if a tour_id is present
+      console.log('Edge Function: Fetching seat assignments for tour_id:', client.tour_id);
       const { data: fetchedSeats, error: seatsError } = await supabaseAdmin
         .from('tour_seat_assignments')
         .select('seat_number')
@@ -209,35 +222,40 @@ serve(async (req) => {
         .eq('tour_id', client.tour_id);
 
       if (seatsError) {
-        console.error('Error fetching seats:', seatsError.message);
+        console.error('Edge Function: Error fetching seats:', seatsError.message);
         // Continue without seats if there's an error, but log it
       } else {
         seats = fetchedSeats || [];
+        console.log('Edge Function: Fetched seats:', JSON.stringify(seats));
       }
     } else {
-      console.log('Client has no tour_id, skipping seat assignment fetch.');
+      console.log('Edge Function: Client has no tour_id, skipping seat assignment fetch.');
     }
 
+    console.log('Edge Function: Fetching agency settings...');
     const { data: agency, error: agencyError } = await supabaseAdmin
       .from('agency_settings')
       .select('*')
       .single();
 
     if (agencyError && agencyError.code !== 'PGRST116') {
-      console.error('Error fetching agency settings:', agencyError.message);
+      console.error('Edge Function: Error fetching agency settings:', agencyError.message);
     }
+    console.log('Edge Function: Agency data:', JSON.stringify(agency));
 
+    console.log('Edge Function: Generating HTML content...');
     const htmlContent = generateBookingSheetHtml({
       client,
       tour: client.tours,
-      seats: seats, // Pass the potentially empty seats array
+      seats: seats,
       agency: agency,
     });
+    console.log('Edge Function: HTML content generated successfully.');
 
     return htmlResponse(htmlContent, 200);
 
   } catch (error: any) {
-    console.error('Edge Function: Unexpected error:', error.message);
+    console.error('Edge Function: UNEXPECTED ERROR IN CATCH BLOCK:', error.message);
     return jsonResponse({ error: error.message }, 500);
   }
 });
