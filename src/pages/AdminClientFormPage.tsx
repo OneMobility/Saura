@@ -90,19 +90,20 @@ const allocateRoomsForPeople = (totalPeople: number): RoomDetails => {
   remaining %= 4;
 
   // Handle remaining people
-  if (remaining === 1) {
+  if (remaining === 3) {
+    triple++;
+  } else if (remaining === 2) {
+    double++;
+  } else if (remaining === 1) {
+    // If 1 person remains, try to convert a quad to a triple + double if possible
+    // Otherwise, assign a double room (paying for 2)
     if (quad > 0) {
-      quad--; // Convert one quad to a triple and a double
+      quad--;
       triple++;
       double++;
     } else {
-      // If no quad rooms, for 1 person, assign a double (paying for 2)
       double++;
     }
-  } else if (remaining === 2) {
-    double++;
-  } else if (remaining === 3) {
-    triple++;
   }
 
   return { double_rooms: double, triple_rooms: triple, quad_rooms: quad };
@@ -324,20 +325,21 @@ const AdminClientFormPage = () => {
 
     const totalPeople = numAdults + numChildren;
 
-    const calculatedRoomDetails = allocateRoomsForPeople(numAdults); // Allocate rooms based on adults
-    
-    let calculatedTotalAmount = 0;
-    if (selectedTourPrices) {
-      // Cost for adults based on room distribution
-      calculatedTotalAmount += calculatedRoomDetails.double_rooms * selectedTourPrices.selling_price_double_occupancy * 2;
-      calculatedTotalAmount += calculatedRoomDetails.triple_rooms * selectedTourPrices.selling_price_triple_occupancy * 3;
-      calculatedTotalAmount += calculatedRoomDetails.quad_rooms * selectedTourPrices.selling_price_quad_occupancy * 4;
-      
-      // Add cost for children
-      calculatedTotalAmount += numChildren * selectedTourPrices.selling_price_child;
-    }
+    // Allocate rooms based on total people (adults + children)
+    const calculatedRoomDetails = allocateRoomsForPeople(totalPeople);
+    setRoomDetails(calculatedRoomDetails); // Update roomDetails state
 
-    // NEW: Add cost of extra services
+    let calculatedTotalAmount = 0;
+    
+    // Cost for rooms based on their occupancy type
+    calculatedTotalAmount += calculatedRoomDetails.double_rooms * (selectedTourPrices?.selling_price_double_occupancy || 0 * 2);
+    calculatedTotalAmount += calculatedRoomDetails.triple_rooms * (selectedTourPrices?.selling_price_triple_occupancy || 0 * 3);
+    calculatedTotalAmount += calculatedRoomDetails.quad_rooms * (selectedTourPrices?.selling_price_quad_occupancy || 0 * 4);
+    
+    // Add cost for children
+    calculatedTotalAmount += numChildren * (selectedTourPrices?.selling_price_child || 0);
+
+    // Add cost of extra services
     const extraServicesTotal = formData.extra_services.reduce((sum, service) => {
       return sum + (service.selling_price_per_unit_snapshot * service.quantity);
     }, 0);
@@ -769,7 +771,7 @@ const AdminClientFormPage = () => {
                   <TourSeatMap
                     tourId={formData.tour_id}
                     busCapacity={busDetails.bus_capacity}
-                    courtesies={busDetails.courtesies}
+                    courtesies={busDetails.courtesies} // Use 'courtesies' here
                     seatLayoutJson={busDetails.seat_layout_json}
                     onSeatsSelected={handleSeatsSelected}
                     readOnly={false}

@@ -24,7 +24,7 @@ interface Tour {
   itinerary: any[] | null; // JSONB type
   bus_capacity: number;
   bus_cost: number;
-  courtesies: number;
+  courtesies: number; // Renamed to Coordinadores
   hotel_details: any[] | null; // JSONB type
   provider_details: any[] | null; // JSONB type
   total_base_cost: number | null;
@@ -265,7 +265,7 @@ const ToursTable: React.FC<ToursTableProps> = ({ onEditTour, onTourDeleted }) =>
                 <TableHead>Precio Venta</TableHead>
                 <TableHead>Costo por Persona</TableHead>
                 <TableHead>Capacidad Bus</TableHead>
-                <TableHead>Cortesías</TableHead>
+                <TableHead>Coordinadores</TableHead> {/* Changed label */}
                 <TableHead>Total Vendido</TableHead> {/* NEW COLUMN */}
                 <TableHead>Acciones</TableHead>
               </TableRow>

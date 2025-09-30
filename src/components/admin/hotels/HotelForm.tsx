@@ -117,7 +117,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
 
         if (data) {
           const totalCostDoubleRooms = (data.num_double_rooms || 0) * data.cost_per_night_double * data.num_nights_quoted;
-          const totalCostTripleRooms = (data.num_triple_rooms || 0) * data.cost_per_per_night_triple * data.num_nights_quoted;
+          const totalCostTripleRooms = (data.num_triple_rooms || 0) * data.cost_per_night_triple * data.num_nights_quoted;
           const totalCostQuadRooms = (data.num_quad_rooms || 0) * data.cost_per_night_quad * data.num_nights_quoted;
           const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
 
@@ -249,7 +249,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
       return;
     }
     if (formData.num_double_rooms === 0 && formData.num_triple_rooms === 0 && formData.num_quad_rooms === 0 && formData.num_courtesy_rooms === 0) {
-      toast.error('Debes especificar al menos una habitación contratada o de cortesía.');
+      toast.error('Debes especificar al menos una habitación contratada o de coordinador.');
       setIsSubmitting(false);
       return;
     }
@@ -492,7 +492,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="num_courtesy_rooms" className="text-right">
-              Hab. Cortesía
+              Hab. Coordinadores
             </Label>
             <Input
               id="num_courtesy_rooms"

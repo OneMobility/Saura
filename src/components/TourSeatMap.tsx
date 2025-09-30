@@ -26,7 +26,7 @@ interface Seat {
 interface TourSeatMapProps {
   tourId: string;
   busCapacity: number;
-  courtesies: number;
+  courtesies: number; // Renamed to Coordinadores
   seatLayoutJson: SeatLayout | null; // NEW: Prop para la disposición de asientos
   onSeatsSelected?: (selectedSeats: number[]) => void; // Callback for selected seats
   readOnly?: boolean; // If true, no interaction allowed (e.g., for public viewing without booking)
@@ -38,7 +38,7 @@ interface TourSeatMapProps {
 const TourSeatMap: React.FC<TourSeatMapProps> = ({
   tourId,
   busCapacity,
-  courtesies,
+  courtesies, // Destructure new prop
   seatLayoutJson, // Destructure new prop
   onSeatsSelected,
   readOnly = false,
@@ -98,7 +98,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
       const updatedSeats = allSeats.map(seat => {
         // Only apply courtesy if it's currently 'available' and we still need to assign courtesies
         // And if it's not already explicitly marked as courtesy in DB (though it shouldn't be if it's 'available')
-        if (seat.status === 'available' && courtesySeatsAssigned < courtesies) {
+        if (seat.status === 'available' && courtesySeatsAssigned < courtesies) { // Use 'courtesies' here
           courtesySeatsAssigned++;
           return { ...seat, status: 'courtesy' };
         }
@@ -185,7 +185,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
       } else if (currentStatus === 'blocked') {
         toast.info('Este asiento está bloqueado por el administrador.');
       } else if (currentStatus === 'courtesy') {
-        toast.info('Este asiento es de cortesía.');
+        toast.info('Este asiento es de coordinador.'); // Changed text
       }
       return;
     }
@@ -273,7 +273,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
       </h3>
       {adminMode && isAdmin && (
         <p className="text-sm text-gray-600 mb-4">
-          Modo Administrador: Haz clic en un asiento bloqueado o de cortesía para liberarlo, o en uno disponible para bloquearlo.
+          Modo Administrador: Haz clic en un asiento bloqueado o de coordinador para liberarlo, o en uno disponible para bloquearlo.
         </p>
       )}
       {currentClientId && (
@@ -331,7 +331,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
             <span className="w-5 h-5 bg-gray-400 rounded-sm mr-2"></span> Bloqueado (Admin)
           </div>
           <div className="flex items-center">
-            <span className="w-5 h-5 bg-purple-500 rounded-sm mr-2"></span> Cortesía
+            <span className="w-5 h-5 bg-purple-500 rounded-sm mr-2"></span> Coordinador
           </div>
           <div className="flex items-center">
             <span className="w-5 h-5 bg-gray-300 rounded-sm mr-2"></span> Baño

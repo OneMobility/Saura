@@ -27,6 +27,7 @@ interface Hotel {
   num_double_rooms: number; // NEW
   num_triple_rooms: number; // NEW
   num_quad_rooms: number; // NEW
+  num_courtesy_rooms: number; // NEW: Added courtesy rooms
   is_active: boolean;
   advance_payment: number;
   total_paid: number;
@@ -66,13 +67,19 @@ const AdminHotelsPage = () => {
         const totalCostDoubleRooms = (hotel.num_double_rooms || 0) * hotel.cost_per_night_double * hotel.num_nights_quoted;
         const totalCostTripleRooms = (hotel.num_triple_rooms || 0) * hotel.cost_per_night_triple * hotel.num_nights_quoted;
         const totalCostQuadRooms = (hotel.num_quad_rooms || 0) * hotel.cost_per_night_quad * hotel.num_nights_quoted;
-        const totalQuoteCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
+        const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
+
+        // Calculate cost of courtesy rooms (always using quad occupancy rate)
+        const costOfCourtesyRooms = (hotel.num_courtesy_rooms || 0) * hotel.cost_per_night_quad * hotel.num_nights_quoted;
+
+        const totalQuoteCost = totalContractedRoomsCost - costOfCourtesyRooms;
 
         return {
           ...hotel,
           num_double_rooms: hotel.num_double_rooms || 0,
           num_triple_rooms: hotel.num_triple_rooms || 0,
           num_quad_rooms: hotel.num_quad_rooms || 0,
+          num_courtesy_rooms: hotel.num_courtesy_rooms || 0, // Set new field
           total_quote_cost: totalQuoteCost,
           remaining_payment: totalQuoteCost - (hotel.total_paid || 0),
         };
@@ -145,6 +152,7 @@ const AdminHotelsPage = () => {
                       <TableHead>Hab. Dobles</TableHead>
                       <TableHead>Hab. Triples</TableHead>
                       <TableHead>Hab. Cuádruples</TableHead>
+                      <TableHead>Hab. Coordinadores</TableHead> {/* Changed label */}
                       <TableHead>Costo Total Cotización</TableHead>
                       <TableHead>Anticipo</TableHead>
                       <TableHead>Total Pagado</TableHead>
@@ -163,6 +171,7 @@ const AdminHotelsPage = () => {
                         <TableCell>{hotel.num_double_rooms}</TableCell>
                         <TableCell>{hotel.num_triple_rooms}</TableCell>
                         <TableCell>{hotel.num_quad_rooms}</TableCell>
+                        <TableCell>{hotel.num_courtesy_rooms}</TableCell> {/* Display new field */}
                         <TableCell>${hotel.total_quote_cost.toFixed(2)}</TableCell>
                         <TableCell>${hotel.advance_payment.toFixed(2)}</TableCell>
                         <TableCell>${hotel.total_paid.toFixed(2)}</TableCell>

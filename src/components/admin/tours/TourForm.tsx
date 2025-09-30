@@ -75,7 +75,7 @@ interface Tour {
   bus_id: string | null; // NEW: Link to Bus
   bus_capacity: number; // Now derived from selected bus
   bus_cost: number; // Now derived from selected bus
-  courtesies: number;
+  courtesies: number; // Renamed to Coordinadores
   hotel_details: TourHotelDetail[]; // Updated type
   provider_details: TourProviderService[]; // Updated type to reference providers
   total_base_cost?: number;
@@ -121,11 +121,11 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     bus_id: null, // Initialize bus_id
     bus_capacity: 0,
     bus_cost: 0,
-    courtesies: 0,
+    courtesies: 0, // Renamed to Coordinadores
     hotel_details: [],
-    provider_details: [], // Initialize with new type
+    provider_details: [],
     selling_price_per_person: 0, // Initialize this field
-    selling_price_double_occupancy: 0, // Initialize new fields
+    selling_price_double_occupancy: 0,
     selling_price_triple_occupancy: 0,
     selling_price_quad_occupancy: 0,
     selling_price_child: 0, // Initialize new field
@@ -263,7 +263,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           bus_id: null,
           bus_capacity: 0,
           bus_cost: 0,
-          courtesies: 0,
+          courtesies: 0, // Renamed to Coordinadores
           hotel_details: [],
           provider_details: [],
           selling_price_per_person: 0, // Reset this field
@@ -364,7 +364,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
 
     const totalBaseCost = busRentalCost + totalProviderCost + totalHotelCost;
 
-    const payingClientsCount = formData.bus_capacity - formData.courtesies;
+    const payingClientsCount = formData.bus_capacity - formData.courtesies; // Use 'courtesies' here
     const costPerPayingPerson = payingClientsCount > 0 ? totalBaseCost / payingClientsCount : 0;
 
     // NEW: Add bus remaining payment
@@ -394,8 +394,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   }, [
     formData.bus_capacity,
     formData.bus_id,
-    formData.courtesies,
-    formData.provider_details, // Added to dependencies
+    formData.courtesies, // Use 'courtesies' here
+    formData.provider_details,
     formData.hotel_details,
     formData.selling_price_double_occupancy,
     formData.selling_price_triple_occupancy,
@@ -734,9 +734,9 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   }, [
     expectedClientsForBreakeven,
     formData.bus_capacity,
-    formData.courtesies,
+    formData.courtesies, // Use 'courtesies' here
     formData.bus_cost,
-    formData.provider_details, // Added to dependencies
+    formData.provider_details,
     formData.hotel_details,
     formData.selling_price_double_occupancy,
     formData.selling_price_triple_occupancy,
@@ -776,8 +776,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       return;
     }
 
-    if (formData.courtesies >= formData.bus_capacity) {
-      toast.error('El número de cortesías no puede ser igual o mayor que la capacidad del autobús.');
+    if (formData.courtesies >= formData.bus_capacity) { // Use 'courtesies' here
+      toast.error('El número de coordinadores no puede ser igual o mayor que la capacidad del autobús.');
       setIsSubmitting(false);
       return;
     }
@@ -974,7 +974,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           <Input id="bus_cost" type="number" value={formData.bus_cost} readOnly className="md:col-span-3 bg-gray-100 cursor-not-allowed" title="Derivado del autobús seleccionado" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
-          <Label htmlFor="courtesies" className="md:text-right">Cortesías (Asientos Bus)</Label>
+          <Label htmlFor="courtesies" className="md:text-right">Coordinadores (Asientos Bus)</Label>
           <Input id="courtesies" type="number" value={formData.courtesies} onChange={(e) => handleNumberChange('courtesies', e.target.value)} className="md:col-span-3" required min={0} />
         </div>
 
@@ -1029,7 +1029,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
                   <SelectContent>
                     {availableHotelQuotes.map((quote) => (
                       <SelectItem key={quote.id} value={quote.id}>
-                        {`${quote.name} (${quote.location}) - ${quote.num_nights_quoted} Noches - ${quote.quoted_date ? format(new Date(quote.quoted_date), 'PPP') : 'Fecha N/A'} (Cortesías: ${quote.num_courtesy_rooms})`}
+                        {`${quote.name} (${quote.location}) - ${quote.num_nights_quoted} Noches - ${quote.quoted_date ? format(new Date(quote.quoted_date), 'PPP') : 'Fecha N/A'} (Coordinadores: ${quote.num_courtesy_rooms})`}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -1199,7 +1199,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
               onChange={(e) => setExpectedClientsForBreakeven(parseFloat(e.target.value) || 0)}
               className="md:col-span-3"
               min={1}
-              max={formData.bus_capacity - formData.courtesies}
+              max={formData.bus_capacity - formData.courtesies} // Use 'courtesies' here
             />
           </div>
           <div className="flex justify-end mt-4">

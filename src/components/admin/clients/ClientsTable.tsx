@@ -36,7 +36,6 @@ interface Client {
   created_at: string;
   contractor_age: number | null; // Added contractor_age
   room_details: RoomDetails; // NEW: Stores calculated room breakdown
-  tour_title?: string; // To display tour title in table
   remaining_payment?: number; // Calculated field
 }
 

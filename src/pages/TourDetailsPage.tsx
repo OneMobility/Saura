@@ -15,7 +15,7 @@ import { TourProviderService } from '@/types/shared'; // NEW: Import shared type
 
 // Definición de tipos para el layout de asientos
 type SeatLayoutItem = {
-  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty';
+  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty' | 'entry';
   number?: number; // Solo para asientos
 };
 type SeatLayoutRow = SeatLayoutItem[];
@@ -44,7 +44,7 @@ interface Tour {
   selling_price_child: number;
   bus_id: string | null;
   bus_capacity: number;
-  courtesies: number;
+  courtesies: number; // Renamed to Coordinadores
   provider_details: TourProviderService[]; // NEW: Add provider_details
 }
 
@@ -204,7 +204,7 @@ const TourDetailsPage = () => {
                     <li><span className="font-medium">Precio por Menor (-12 años):</span> ${tour.selling_price_child.toFixed(2)}</li>
                     <li><span className="font-medium">Duración:</span> {tour.duration}</li>
                     <li><span className="font-medium">Capacidad del autobús:</span> {tour.bus_capacity} personas</li>
-                    <li><span className="font-medium">Cortesías (Asientos Bus):</span> {tour.courtesies}</li>
+                    <li><span className="font-medium">Coordinadores (Asientos Bus):</span> {tour.courtesies}</li>
                   </ul>
                 </div>
                 {tour.includes && tour.includes.length > 0 && (

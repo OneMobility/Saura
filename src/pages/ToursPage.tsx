@@ -101,6 +101,7 @@ const ToursPage = () => {
                 title={tour.title}
                 description={tour.description}
                 rotationClass={rotationClasses[index % rotationClasses.length]}
+                isMobile={false}
                 tourId={tour.slug} // Use slug for the link
               />
             ))}
