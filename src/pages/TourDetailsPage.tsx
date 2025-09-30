@@ -11,6 +11,7 @@ import { format } from 'date-fns';
 import TourSeatMap from '@/components/TourSeatMap';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog'; // Import Dialog and DialogTrigger
 import ClientBookingForm from '@/components/ClientBookingForm'; // Import the new ClientBookingForm
+import { TourProviderService } from '@/types/shared'; // NEW: Import shared type
 
 // Definición de tipos para el layout de asientos
 type SeatLayoutItem = {
@@ -44,6 +45,7 @@ interface Tour {
   bus_id: string | null;
   bus_capacity: number;
   courtesies: number;
+  provider_details: TourProviderService[]; // NEW: Add provider_details
 }
 
 const TourDetailsPage = () => {
@@ -91,7 +93,8 @@ const TourDetailsPage = () => {
           selling_price_child,
           bus_id,
           bus_capacity,
-          courtesies
+          courtesies,
+          provider_details
         `) // Select only public-facing fields
         .eq('slug', id)
         .single();
@@ -109,6 +112,7 @@ const TourDetailsPage = () => {
           selling_price_triple_occupancy: tourData.selling_price_triple_occupancy || 0,
           selling_price_quad_occupancy: tourData.selling_price_quad_occupancy || 0,
           selling_price_child: tourData.selling_price_child || 0,
+          provider_details: tourData.provider_details || [], // Ensure provider_details is an array
         });
 
         // Set the bus layout from the fetched data
@@ -227,6 +231,21 @@ const TourDetailsPage = () => {
                   </ol>
                 </>
               )}
+
+              {/* NEW: Display Tour Provider Services */}
+              {tour.provider_details && tour.provider_details.length > 0 && (
+                <div className="mt-8">
+                  <h3 className="text-xl font-semibold text-gray-800 mb-3">Servicios Adicionales Disponibles</h3>
+                  <ul className="list-disc list-inside space-y-2 text-gray-700">
+                    {tour.provider_details.map((service) => (
+                      <li key={service.id}>
+                        <span className="font-medium">{service.name_snapshot} ({service.service_type_snapshot}):</span>{' '}
+                        ${service.selling_price_per_unit_snapshot.toFixed(2)} por {service.unit_type_snapshot}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
 
             <div className="lg:col-span-1 bg-gray-50 p-6 rounded-lg shadow-inner">
@@ -274,6 +293,7 @@ const TourDetailsPage = () => {
                       courtesies: tour.courtesies,
                       seat_layout_json: busLayout,
                     }}
+                    tourAvailableExtraServices={tour.provider_details} // NEW: Pass provider details
                   />
                 )}
               </Dialog>

@@ -15,6 +15,7 @@ import AdminHeader from '@/components/admin/AdminHeader';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
 import TourSeatMap from '@/components/TourSeatMap'; // Import TourSeatMap
+import { TourProviderService, AvailableProvider } from '@/types/shared'; // NEW: Import shared types
 
 // Definición de tipos para el layout de asientos
 type SeatLayoutItem = {
@@ -36,28 +37,6 @@ interface RoomDetails {
   quad_rooms: number;
 }
 
-// NEW: Interface for ProviderService selected by a client
-interface ClientProviderService {
-  id: string; // Unique ID for this entry in the client's extra_services array
-  provider_id: string; // References an ID from the 'providers' table
-  quantity: number; // How many units of this service the client is purchasing
-  selling_price_per_unit_snapshot: number; // Snapshot of selling price at time of selection
-  name_snapshot: string; // Snapshot of provider name
-  service_type_snapshot: string; // Snapshot of service type
-  unit_type_snapshot: string; // Snapshot of unit type
-}
-
-// NEW: Interface for available providers (from the 'providers' table)
-interface AvailableProvider {
-  id: string;
-  name: string;
-  service_type: string;
-  cost_per_unit: number;
-  unit_type: string;
-  selling_price_per_unit: number;
-  is_active: boolean;
-}
-
 interface Client {
   id?: string;
   first_name: string;
@@ -69,7 +48,7 @@ interface Client {
   tour_id: string | null;
   number_of_people: number;
   companions: Companion[];
-  extra_services: ClientProviderService[]; // NEW: Array of selected provider services
+  extra_services: TourProviderService[]; // NEW: Array of selected provider services
   total_amount: number;
   advance_payment: number;
   total_paid: number;

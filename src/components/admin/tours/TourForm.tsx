@@ -13,6 +13,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns'; // Import format for dates
 import TourSeatMap from '@/components/TourSeatMap'; // Import the new TourSeatMap component
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
+import { TourProviderService, AvailableProvider } from '@/types/shared'; // NEW: Import shared types
 
 // Hotel interface now represents a "hotel quote" from the 'hotels' table
 interface HotelQuote {
@@ -59,29 +60,6 @@ interface Bus {
   seat_layout_json: SeatLayout | null; // Incluir el layout de asientos
   advance_payment: number; // NEW
   total_paid: number; // NEW
-}
-
-// NEW: Interface for ProviderService linked to a tour
-interface TourProviderService {
-  id: string; // Unique ID for this entry in the tour's provider_details array
-  provider_id: string; // References an ID from the 'providers' table
-  quantity: number; // How many units of this service are needed for the tour
-  cost_per_unit_snapshot: number; // Snapshot of cost at time of linking
-  selling_price_per_unit_snapshot: number; // Snapshot of selling price at time of linking
-  name_snapshot: string; // Snapshot of provider name
-  service_type_snapshot: string; // Snapshot of service type
-  unit_type_snapshot: string; // Snapshot of unit type
-}
-
-// NEW: Interface for available providers (from the 'providers' table)
-interface AvailableProvider {
-  id: string;
-  name: string;
-  service_type: string;
-  cost_per_unit: number;
-  unit_type: string;
-  selling_price_per_unit: number;
-  is_active: boolean;
 }
 
 interface Tour {
