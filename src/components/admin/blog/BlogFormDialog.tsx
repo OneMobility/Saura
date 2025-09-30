@@ -97,7 +97,7 @@ const BlogFormDialog: React.FC<BlogFormDialogProps> = ({ isOpen, onClose, onSave
     const filePath = `blog-images/${fileName}`; // Store in a 'blog-images' folder within the bucket
 
     const { data, error } = await supabase.storage
-      .from('slideshow-images') // Reusing the existing bucket for simplicity
+      .from('tour-images') // Changed to 'tour-images' bucket
       .upload(filePath, file, {
         cacheControl: '3600',
         upsert: false,
@@ -112,7 +112,7 @@ const BlogFormDialog: React.FC<BlogFormDialogProps> = ({ isOpen, onClose, onSave
     }
 
     const { data: publicUrlData } = supabase.storage
-      .from('slideshow-images')
+      .from('tour-images') // Changed to 'tour-images' bucket
       .getPublicUrl(filePath);
 
     return publicUrlData.publicUrl;

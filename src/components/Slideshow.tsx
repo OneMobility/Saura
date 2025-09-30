@@ -97,6 +97,14 @@ const Slideshow = () => {
     };
   }, [emblaApi, onSelect, startAutoplay, stopAutoplay]);
 
+  const handleMouseEnter = () => {
+    stopAutoplay();
+  };
+
+  const handleMouseLeave = () => {
+    startAutoplay();
+  };
+
   if (loading) {
     return (
       <div className="relative w-full h-[500px] md:h-[600px] lg:h-[700px] flex items-center justify-center bg-gray-200">

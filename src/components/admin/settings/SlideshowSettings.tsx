@@ -67,7 +67,7 @@ const SlideshowSettings = () => {
     const filePath = `public/${fileName}`; // Store in a 'public' folder within the bucket
 
     const { data, error } = await supabase.storage
-      .from('slideshow-images') // Use the new bucket name
+      .from('tour-images') // Changed to 'tour-images' bucket
       .upload(filePath, file, {
         cacheControl: '3600',
         upsert: false,
@@ -83,7 +83,7 @@ const SlideshowSettings = () => {
 
     // Get the public URL of the uploaded image
     const { data: publicUrlData } = supabase.storage
-      .from('slideshow-images')
+      .from('tour-images') // Changed to 'tour-images' bucket
       .getPublicUrl(filePath);
 
     return publicUrlData.publicUrl;
