@@ -6,8 +6,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import SlideshowSettings from '@/components/admin/settings/SlideshowSettings';
 import SeoSettings from '@/components/admin/settings/SeoSettings';
 import SocialMediaSettings from '@/components/admin/settings/SocialMediaSettings';
+import AgencySettings from '@/components/admin/settings/AgencySettings'; // Import the new AgencySettings component
 import { useSession } from '@/components/SessionContextProvider';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate } => 'react-router-dom';
 import AdminHeader from '@/components/admin/AdminHeader'; // Import the new AdminHeader
 
 const AdminSettingsPage = () => {
@@ -34,10 +35,11 @@ const AdminSettingsPage = () => {
         <AdminHeader pageTitle="Configuración del Sitio" /> {/* Usando el nuevo AdminHeader */}
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <Tabs defaultValue="slideshow" className="w-full">
-            <TabsList className="grid w-full grid-cols-3">
+            <TabsList className="grid w-full grid-cols-4"> {/* Adjusted grid-cols to 4 */}
               <TabsTrigger value="slideshow">Slideshow</TabsTrigger>
               <TabsTrigger value="seo">SEO</TabsTrigger>
               <TabsTrigger value="social-media">Redes Sociales</TabsTrigger>
+              <TabsTrigger value="agency-info">Agencia</TabsTrigger> {/* New tab trigger */}
             </TabsList>
             <TabsContent value="slideshow">
               <SlideshowSettings />
@@ -47,6 +49,9 @@ const AdminSettingsPage = () => {
             </TabsContent>
             <TabsContent value="social-media">
               <SocialMediaSettings />
+            </TabsContent>
+            <TabsContent value="agency-info"> {/* New tab content */}
+              <AgencySettings />
             </TabsContent>
           </Tabs>
         </main>

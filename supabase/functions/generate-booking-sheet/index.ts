@@ -1,0 +1,226 @@
+import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+// Helper function to format room details
+const formatRoomDetails = (details: any) => {
+  const parts = [];
+  if (details.quad_rooms > 0) parts.push(`${details.quad_rooms} Cuádruple(s)`);
+  if (details.triple_rooms > 0) parts.push(`${details.triple_rooms} Triple(s)`);
+  if (details.double_rooms > 0) parts.push(`${details.double_rooms} Doble(s)`);
+  return parts.join(', ') || 'N/A';
+};
+
+// Helper function to generate HTML for the booking sheet
+const generateBookingSheetHtml = (data: any) => {
+  const client = data.client;
+  const tour = data.tour;
+  const seats = data.seats;
+  const agency = data.agency;
+
+  const companionsList = client.companions && client.companions.length > 0
+    ? client.companions.map((c: any) => `<li>${c.name} ${c.age !== null ? `(${c.age} años)` : ''}</li>`).join('')
+    : '<li>N/A</li>';
+
+  const seatNumbers = seats && seats.length > 0
+    ? seats.map((s: any) => s.seat_number).sort((a: number, b: number) => a - b).join(', ')
+    : 'N/A';
+
+  const extraServicesList = client.extra_services && client.extra_services.length > 0
+    ? client.extra_services.map((s: any) => `<li>${s.name_snapshot} (${s.service_type_snapshot}) - Cantidad: ${s.quantity} - Precio: $${s.selling_price_per_unit_snapshot.toFixed(2)}</li>`).join('')
+    : '<li>N/A</li>';
+
+  const remainingPayment = (client.total_amount - client.total_paid).toFixed(2);
+
+  return `
+    <!DOCTYPE html>
+    <html lang="es">
+    <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Hoja de Reserva - ${client.contract_number}</title>
+        <style>
+            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 20px; }
+            .container { max-width: 800px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
+            h1, h2, h3 { color: #E4007C; }
+            h1 { text-align: center; margin-bottom: 20px; }
+            .section { margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px dashed #eee; }
+            .section:last-child { border-bottom: none; }
+            .label { font-weight: bold; }
+            ul { list-style-type: none; padding: 0; }
+            ul li { margin-bottom: 5px; }
+            .payment-summary { background-color: #f9f9f9; padding: 15px; border-radius: 5px; border: 1px solid #eee; }
+            .payment-summary p { margin: 5px 0; }
+            .total-amount { font-size: 1.2em; font-weight: bold; color: #E4007C; }
+            .agency-info { text-align: center; margin-top: 30px; font-size: 0.9em; color: #666; }
+        </style>
+    </head>
+    <body>
+        <div class="container">
+            <h1>Hoja de Reserva</h1>
+
+            <div class="section">
+                <h2>Datos del Cliente</h2>
+                <p><span class="label">Nombre del Cliente:</span> ${client.first_name} ${client.last_name}</p>
+                <p><span class="label">Teléfono:</span> ${client.phone || 'N/A'}</p>
+                <p><span class="label">Edad del Contratante:</span> ${client.contractor_age !== null ? client.contractor_age : 'N/A'}</p>
+                <p><span class="label">Acompañantes:</span></p>
+                <ul>
+                    ${companionsList}
+                </ul>
+            </div>
+
+            <div class="section">
+                <h2>Detalles de la Reserva</h2>
+                <p><span class="label">Número de Reserva:</span> ${client.contract_number}</p>
+                <p><span class="label">Tour:</span> ${tour?.title || 'N/A'}</p>
+                <p><span class="label">Distribución de Habitación:</span> ${formatRoomDetails(client.room_details)}</p>
+                <p><span class="label">Asientos Asignados:</span> ${seatNumbers}</p>
+                <p><span class="label">Servicios Adicionales:</span></p>
+                <ul>
+                    ${extraServicesList}
+                </ul>
+            </div>
+
+            <div class="section payment-summary">
+                <h2>Resumen de Pagos</h2>
+                <p><span class="label">Monto Total del Contrato:</span> $${client.total_amount.toFixed(2)}</p>
+                <p><span class="label">Total Pagado:</span> $${client.total_paid.toFixed(2)}</p>
+                <p class="total-amount"><span class="label">Adeudo:</span> $${remainingPayment}</p>
+            </div>
+
+            <div class="agency-info">
+                <p><span class="label">${agency?.agency_name || 'Tu Agencia de Viajes'}</span></p>
+                <p>Teléfono: ${agency?.agency_phone || 'N/A'} | Email: ${agency?.agency_email || 'N/A'} | Dirección: ${agency?.agency_address || 'N/A'}</p>
+            </div>
+        </div>
+    </body>
+    </html>
+  `;
+};
+
+serve(async (req) => {
+  console.log('Edge Function: generate-booking-sheet invoked.');
+
+  if (req.method === 'OPTIONS') {
+    console.log('Edge Function: OPTIONS request received.');
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  const jsonResponse = (body: any, status: number) => new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+
+  const htmlResponse = (html: string, status: number) => new Response(html, {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' },
+  });
+
+  const authHeader = req.headers.get('Authorization');
+  if (!authHeader) {
+    console.error('Edge Function: Unauthorized: Missing Authorization header.');
+    return jsonResponse({ error: 'Unauthorized: Missing Authorization header' }, 401);
+  }
+
+  const token = authHeader.replace('Bearer ', '');
+  
+  const supabaseAdmin = createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    {
+      auth: {
+        persistSession: false,
+      },
+    }
+  );
+  console.log('Edge Function: Supabase admin client initialized.');
+
+  const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
+
+  if (authError || !authUser) {
+    console.error('Edge Function: Auth error:', authError?.message || 'User not found.');
+    return jsonResponse({ error: 'Unauthorized: Invalid token or user not found' }, 401);
+  }
+  console.log('Edge Function: User authenticated:', authUser.id);
+
+  const { data: profile, error: profileError } = await supabaseAdmin
+    .from('profiles')
+    .select('role')
+    .eq('id', authUser.id)
+    .single();
+
+  if (profileError || profile?.role !== 'admin') {
+    console.error('Edge Function: Profile error or not admin. Profile error:', profileError?.message, 'User role:', profile?.role);
+    return jsonResponse({ error: 'Forbidden: Only administrators can perform this action' }, 403);
+  }
+  console.log('Edge Function: Invoking user is an administrator.');
+
+  try {
+    const { clientId } = await req.json();
+    if (!clientId) {
+      return jsonResponse({ error: 'Client ID is required.' }, 400);
+    }
+
+    // Fetch client data
+    const { data: client, error: clientError } = await supabaseAdmin
+      .from('clients')
+      .select(`
+        *,
+        tours (
+          title,
+          description,
+          duration,
+          includes,
+          itinerary
+        )
+      `)
+      .eq('id', clientId)
+      .single();
+
+    if (clientError || !client) {
+      console.error('Error fetching client:', clientError?.message);
+      return jsonResponse({ error: 'Client not found or error fetching client data.' }, 404);
+    }
+
+    // Fetch seat assignments for this client and tour
+    const { data: seats, error: seatsError } = await supabaseAdmin
+      .from('tour_seat_assignments')
+      .select('seat_number')
+      .eq('client_id', clientId)
+      .eq('tour_id', client.tour_id);
+
+    if (seatsError) {
+      console.error('Error fetching seats:', seatsError.message);
+      // Continue without seats if there's an error, but log it
+    }
+
+    // Fetch agency settings
+    const { data: agency, error: agencyError } = await supabaseAdmin
+      .from('agency_settings')
+      .select('*')
+      .single();
+
+    if (agencyError && agencyError.code !== 'PGRST116') {
+      console.error('Error fetching agency settings:', agencyError.message);
+      // Continue without agency info if there's an error
+    }
+
+    const htmlContent = generateBookingSheetHtml({
+      client,
+      tour: client.tours, // The tour data is nested under client.tours
+      seats: seats || [],
+      agency: agency,
+    });
+
+    return htmlResponse(htmlContent, 200);
+
+  } catch (error: any) {
+    console.error('Edge Function: Unexpected error:', error.message);
+    return jsonResponse({ error: error.message }, 500);
+  }
+});

@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Edit, Trash2, Loader2, DollarSign } from 'lucide-react'; // Import DollarSign icon
+import { Edit, Trash2, Loader2, DollarSign, FileText } from 'lucide-react'; // Import FileText icon
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
 interface Companion {
@@ -25,10 +25,13 @@ interface Client {
   first_name: string;
   last_name: string;
   email: string;
+  phone: string | null; // Allow null
+  address: string | null; // Allow null
   contract_number: string;
   tour_id: string | null;
   number_of_people: number;
   companions: Companion[];
+  extra_services: any[]; // Assuming any for now, will be TourProviderService[]
   total_amount: number;
   advance_payment: number;
   total_paid: number;
@@ -37,6 +40,7 @@ interface Client {
   contractor_age: number | null; // Added contractor_age
   room_details: RoomDetails; // NEW: Stores calculated room breakdown
   remaining_payment?: number; // Calculated field
+  tour_title?: string; // Added for display
 }
 
 interface ClientsTableProps {
@@ -48,6 +52,7 @@ interface ClientsTableProps {
 const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayment, onEditClient }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [exportingClientId, setExportingClientId] = useState<string | null>(null); // For loading state on export button
   const navigate = useNavigate(); // Initialize useNavigate
 
   useEffect(() => {
@@ -82,11 +87,6 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
     setLoading(false);
   };
 
-  // The handleEditClient function is now passed as a prop, so we just call it
-  // const handleEditClient = (client: Client) => {
-  //   navigate(`/admin/clients/edit/${client.id}`); // Navigate to the new form page for editing
-  // };
-
   const handleDeleteClient = async (id: string) => {
     if (!window.confirm('¿Estás seguro de que quieres eliminar este cliente y su contrato? Esto también liberará los asientos asignados.')) {
       return;
@@ -115,6 +115,41 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
     return parts.join(', ') || 'N/A';
   };
 
+  const handleDownloadBookingSheet = async (clientId: string, clientName: string) => {
+    setExportingClientId(clientId);
+    toast.info(`Generando hoja de reserva para ${clientName}...`);
+
+    try {
+      const { data, error } = await supabase.functions.invoke('generate-booking-sheet', {
+        body: JSON.stringify({ clientId }),
+        headers: { 'Content-Type': 'application/json' },
+      });
+
+      if (error) {
+        console.error('Error invoking generate-booking-sheet function:', error);
+        toast.error(`Error al generar la hoja de reserva: ${data?.error || error.message || 'Error desconocido.'}`);
+      } else if (data) {
+        // Open the HTML in a new tab
+        const newWindow = window.open('', '_blank');
+        if (newWindow) {
+          newWindow.document.write(data);
+          newWindow.document.close();
+          newWindow.focus();
+          toast.success('Hoja de reserva generada. Puedes imprimirla desde la nueva pestaña.');
+        } else {
+          toast.error('No se pudo abrir una nueva ventana. Por favor, permite pop-ups.');
+        }
+      } else {
+        toast.error('Respuesta inesperada al generar la hoja de reserva.');
+      }
+    } catch (err: any) {
+      console.error('Unexpected error during booking sheet generation:', err);
+      toast.error(`Error inesperado: ${err.message}`);
+    } finally {
+      setExportingClientId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -139,7 +174,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                 <TableHead>Email</TableHead>
                 <TableHead>Tour</TableHead>
                 <TableHead>Personas</TableHead>
-                <TableHead>Habitaciones</TableHead> {/* Changed from Ocupación */}
+                <TableHead>Habitaciones</TableHead>
                 <TableHead>Total</TableHead>
                 <TableHead>Pagado</TableHead>
                 <TableHead>Pendiente</TableHead>
@@ -155,7 +190,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                   <TableCell>{client.email}</TableCell>
                   <TableCell>{client.tour_title}</TableCell>
                   <TableCell>{client.number_of_people}</TableCell>
-                  <TableCell>{formatRoomDetails(client.room_details)}</TableCell> {/* Display room details */}
+                  <TableCell>{formatRoomDetails(client.room_details)}</TableCell>
                   <TableCell>${client.total_amount.toFixed(2)}</TableCell>
                   <TableCell>${client.total_paid.toFixed(2)}</TableCell>
                   <TableCell>${(client.remaining_payment || 0).toFixed(2)}</TableCell>
@@ -164,7 +199,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => onEditClient(client)} // Use the passed prop
+                      onClick={() => onEditClient(client)}
                       className="text-blue-600 hover:bg-blue-50"
                     >
                       <Edit className="h-4 w-4" />
@@ -181,11 +216,25 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => onRegisterPayment(client)} // NEW: Register Payment button
+                      onClick={() => onRegisterPayment(client)}
                       className="text-green-600 hover:bg-green-50"
                     >
                       <DollarSign className="h-4 w-4" />
                       <span className="sr-only">Registrar Abono</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleDownloadBookingSheet(client.id, `${client.first_name} ${client.last_name}`)}
+                      disabled={exportingClientId === client.id}
+                      className="text-purple-600 hover:bg-purple-50"
+                    >
+                      {exportingClientId === client.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileText className="h-4 w-4" />
+                      )}
+                      <span className="sr-only">Descargar Hoja de Reserva</span>
                     </Button>
                   </TableCell>
                 </TableRow>
