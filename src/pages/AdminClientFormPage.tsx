@@ -14,6 +14,15 @@ import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
+import TourSeatMap from '@/components/TourSeatMap'; // Import TourSeatMap
+
+// Definición de tipos para el layout de asientos
+type SeatLayoutItem = {
+  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty' | 'entry';
+  number?: number; // Solo para asientos
+};
+type SeatLayoutRow = SeatLayoutItem[];
+type SeatLayout = SeatLayoutRow[];
 
 interface Companion {
   id: string;
@@ -53,6 +62,16 @@ interface Tour {
   selling_price_double_occupancy: number;
   selling_price_triple_occupancy: number;
   selling_price_quad_occupancy: number;
+  selling_price_child: number; // NEW: Price for children under 12
+  bus_id: string | null;
+  courtesies: number; // Tour's courtesies
+}
+
+interface BusDetails {
+  bus_id: string | null;
+  bus_capacity: number;
+  courtesies: number; // Tour's courtesies, not bus's
+  seat_layout_json: SeatLayout | null;
 }
 
 const AdminClientFormPage = () => {
@@ -81,6 +100,8 @@ const AdminClientFormPage = () => {
   const [loadingInitialData, setLoadingInitialData] = useState(true);
   const [availableTours, setAvailableTours] = useState<Tour[]>([]);
   const [selectedTourPrices, setSelectedTourPrices] = useState<Tour | null>(null);
+  const [busDetails, setBusDetails] = useState<BusDetails | null>(null); // State for bus details
+  const [clientSelectedSeats, setClientSelectedSeats] = useState<number[]>([]); // Seats selected for *this* client
 
   useEffect(() => {
     if (!sessionLoading && (!user || !isAdmin)) {
@@ -92,7 +113,7 @@ const AdminClientFormPage = () => {
     const fetchTours = async () => {
       const { data, error } = await supabase
         .from('tours')
-        .select('id, title, selling_price_double_occupancy, selling_price_triple_occupancy, selling_price_quad_occupancy')
+        .select('id, title, selling_price_double_occupancy, selling_price_triple_occupancy, selling_price_quad_occupancy, selling_price_child, bus_id, courtesies')
         .order('title', { ascending: true });
 
       if (error) {
@@ -130,6 +151,21 @@ const AdminClientFormPage = () => {
             contractor_age: data.contractor_age || null,
             room_details: data.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }, // Set room_details
           });
+
+          // Fetch existing seat assignments for this client and tour
+          if (data.tour_id) {
+            const { data: seatAssignments, error: seatsError } = await supabase
+              .from('tour_seat_assignments')
+              .select('seat_number')
+              .eq('client_id', data.id)
+              .eq('tour_id', data.tour_id);
+
+            if (seatsError) {
+              console.error('Error fetching client seat assignments:', seatsError);
+            } else {
+              setClientSelectedSeats(seatAssignments?.map(s => s.seat_number) || []);
+            }
+          }
         }
       } else {
         // Reset form for new client
@@ -150,6 +186,7 @@ const AdminClientFormPage = () => {
           contractor_age: null,
           room_details: { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
         });
+        setClientSelectedSeats([]); // Clear selected seats for new client
       }
       setLoadingInitialData(false);
     };
@@ -159,13 +196,40 @@ const AdminClientFormPage = () => {
     }
   }, [clientId, sessionLoading]);
 
-  // Effect to update selectedTourPrices when formData.tour_id changes
+  // Effect to update selectedTourPrices and busDetails when formData.tour_id changes
   useEffect(() => {
     if (formData.tour_id) {
       const tour = availableTours.find(t => t.id === formData.tour_id);
       setSelectedTourPrices(tour || null);
+
+      // Fetch bus details for the selected tour
+      const fetchBusForTour = async () => {
+        if (tour?.bus_id) {
+          const { data: busData, error: busError } = await supabase
+            .from('buses')
+            .select('id, total_capacity, seat_layout_json')
+            .eq('id', tour.bus_id)
+            .single();
+
+          if (busError) {
+            console.error('Error fetching bus details for tour:', busError);
+            setBusDetails(null);
+          } else if (busData) {
+            setBusDetails({
+              bus_id: busData.id,
+              bus_capacity: busData.total_capacity,
+              courtesies: tour.courtesies, // Use tour's courtesies, not bus's
+              seat_layout_json: busData.seat_layout_json,
+            });
+          }
+        } else {
+          setBusDetails(null);
+        }
+      };
+      fetchBusForTour();
     } else {
       setSelectedTourPrices(null);
+      setBusDetails(null);
     }
   }, [formData.tour_id, availableTours]);
 
@@ -176,14 +240,9 @@ const AdminClientFormPage = () => {
     let quad = 0;
     
     const allAges = [contractorAge, ...companions.map(c => c.age)].filter((age): age is number => age !== null);
-    const adults = allAges.filter(age => age >= 12).length;
-    const minors = allAges.filter(age => age < 12).length;
-    const totalPeople = adults + minors;
+    const totalPeople = allAges.length;
 
-    // Special rule: 2 adults + 2 minors < 12 = 1 double room
-    if (adults === 2 && minors === 2 && totalPeople === 4) {
-      return { double_rooms: 1, triple_rooms: 0, quad_rooms: 0 };
-    }
+    if (totalPeople === 0) return { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 };
 
     let remaining = totalPeople;
 
@@ -217,9 +276,21 @@ const AdminClientFormPage = () => {
 
     let calculatedTotalAmount = 0;
     if (selectedTourPrices) {
+      const allAges = [formData.contractor_age, ...formData.companions.map(c => c.age)].filter((age): age is number => age !== null);
+      const adultsCount = allAges.filter(age => age >= 12).length;
+      const childrenCount = allAges.filter(age => age < 12).length;
+
+      // Calculate cost for adults based on room distribution
       calculatedTotalAmount += calculatedRoomDetails.double_rooms * selectedTourPrices.selling_price_double_occupancy * 2;
       calculatedTotalAmount += calculatedRoomDetails.triple_rooms * selectedTourPrices.selling_price_triple_occupancy * 3;
       calculatedTotalAmount += calculatedRoomDetails.quad_rooms * selectedTourPrices.selling_price_quad_occupancy * 4;
+      
+      // Add cost for children (if any, and if they are not already covered by room occupancy)
+      // This logic assumes children are added on top of adult room occupancy, or fill empty spots.
+      // For simplicity, we'll add child price for each child, assuming they don't reduce adult room price.
+      // A more complex logic might involve assigning children to rooms first.
+      // For now, we'll just add the child price for each child.
+      calculatedTotalAmount += childrenCount * selectedTourPrices.selling_price_child;
     }
 
     setFormData(prev => ({
@@ -269,6 +340,10 @@ const AdminClientFormPage = () => {
     }));
   };
 
+  const handleSeatsSelected = useCallback((seats: number[]) => {
+    setClientSelectedSeats(seats);
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -299,6 +374,12 @@ const AdminClientFormPage = () => {
       }
     }
 
+    if (clientSelectedSeats.length !== formData.number_of_people) {
+      toast.error(`Debes seleccionar ${formData.number_of_people} asientos para este contrato.`);
+      setIsSubmitting(false);
+      return;
+    }
+
     const { data: { user: authUser } } = await supabase.auth.getUser();
     if (!authUser) {
       toast.error('Debes iniciar sesión para gestionar clientes.');
@@ -325,6 +406,8 @@ const AdminClientFormPage = () => {
       user_id: authUser.id, // Link to the admin user who created/updated it
     };
 
+    let currentClientIdToUse = clientId;
+
     if (clientId) {
       // Update existing client
       const { error } = await supabase
@@ -335,24 +418,68 @@ const AdminClientFormPage = () => {
       if (error) {
         console.error('Error updating client:', error);
         toast.error('Error al actualizar el cliente.');
-      } else {
-        toast.success('Cliente actualizado con éxito.');
-        navigate('/admin/clients'); // Redirect back to clients list
+        setIsSubmitting(false);
+        return;
       }
+      toast.success('Cliente actualizado con éxito.');
     } else {
       // Insert new client
-      const { error } = await supabase
+      const { data: newClientData, error } = await supabase
         .from('clients')
-        .insert(clientDataToSave);
+        .insert(clientDataToSave)
+        .select('id')
+        .single();
 
       if (error) {
         console.error('Error creating client:', error);
         toast.error('Error al crear el cliente.');
-      } else {
-        toast.success('Cliente creado con éxito.');
-        navigate('/admin/clients'); // Redirect back to clients list
+        setIsSubmitting(false);
+        return;
       }
+      toast.success('Cliente creado con éxito.');
+      currentClientIdToUse = newClientData.id; // Get the ID of the newly created client
     }
+
+    // Update seat assignments
+    if (currentClientIdToUse && formData.tour_id) {
+      // 1. Delete existing assignments for this client on this tour
+      const { error: deleteError } = await supabase
+        .from('tour_seat_assignments')
+        .delete()
+        .eq('client_id', currentClientIdToUse)
+        .eq('tour_id', formData.tour_id);
+
+      if (deleteError) {
+        console.error('Error deleting old seat assignments:', deleteError);
+        toast.error('Error al actualizar la asignación de asientos.');
+        setIsSubmitting(false);
+        return;
+      }
+
+      // 2. Insert new assignments
+      const newSeatAssignments = clientSelectedSeats.map(seatNumber => ({
+        tour_id: formData.tour_id,
+        seat_number: seatNumber,
+        status: 'booked',
+        client_id: currentClientIdToUse,
+      }));
+
+      if (newSeatAssignments.length > 0) {
+        const { error: insertError } = await supabase
+          .from('tour_seat_assignments')
+          .insert(newSeatAssignments);
+
+        if (insertError) {
+          console.error('Error inserting new seat assignments:', insertError);
+          toast.error('Error al guardar la asignación de asientos.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+      toast.success('Asientos asignados con éxito.');
+    }
+
+    navigate('/admin/clients'); // Redirect back to clients list
     setIsSubmitting(false);
   };
 
@@ -478,6 +605,29 @@ const AdminClientFormPage = () => {
                   <PlusCircle className="mr-2 h-4 w-4" /> Añadir Acompañante
                 </Button>
               </div>
+
+              {/* Seat Selection */}
+              {formData.tour_id && busDetails && busDetails.bus_capacity > 0 && (
+                <div className="col-span-full mt-6">
+                  <h3 className="text-lg font-semibold mb-4">Selección de Asientos</h3>
+                  <TourSeatMap
+                    tourId={formData.tour_id}
+                    busCapacity={busDetails.bus_capacity}
+                    courtesies={busDetails.courtesies}
+                    seatLayoutJson={busDetails.seat_layout_json}
+                    onSeatsSelected={handleSeatsSelected}
+                    readOnly={false}
+                    adminMode={false} // Client mode, not admin blocking mode
+                    currentClientId={clientId || undefined} // Pass client ID if editing, or undefined for new
+                    initialSelectedSeats={clientSelectedSeats}
+                  />
+                  {clientSelectedSeats.length > 0 && (
+                    <p className="text-sm text-gray-600 mt-2">
+                      Asientos seleccionados: {clientSelectedSeats.join(', ')}
+                    </p>
+                  )}
+                </div>
+              )}
 
               {/* Payment Details */}
               <h3 className="text-lg font-semibold mt-4">Detalles de Pago</h3>
