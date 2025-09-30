@@ -28,6 +28,18 @@ interface Bus {
   seat_layout_json: SeatLayout | null; // Incluir el layout de asientos
 }
 
+// NEW: Interface for ProviderService linked to a tour (snapshot data)
+interface TourProviderService {
+  id: string; // Unique ID for this entry in the tour's provider_details array
+  provider_id: string; // References an ID from the 'providers' table
+  quantity: number; // How many units of this service are needed for the tour
+  cost_per_unit_snapshot: number; // Snapshot of cost at time of linking
+  selling_price_per_unit_snapshot: number; // Snapshot of selling price at time of linking
+  name_snapshot: string; // Snapshot of provider name
+  service_type_snapshot: string; // Snapshot of service type
+  unit_type_snapshot: string; // Snapshot of unit type
+}
+
 interface Tour {
   id: string;
   image_url: string;
@@ -44,6 +56,7 @@ interface Tour {
   bus_id: string | null;
   bus_capacity: number;
   courtesies: number;
+  provider_details: TourProviderService[] | null; // NEW: Add provider_details
 }
 
 const TourDetailsPage = () => {
@@ -91,7 +104,8 @@ const TourDetailsPage = () => {
           selling_price_child,
           bus_id,
           bus_capacity,
-          courtesies
+          courtesies,
+          provider_details
         `) // Select only public-facing fields
         .eq('slug', id)
         .single();
@@ -109,6 +123,7 @@ const TourDetailsPage = () => {
           selling_price_triple_occupancy: tourData.selling_price_triple_occupancy || 0,
           selling_price_quad_occupancy: tourData.selling_price_quad_occupancy || 0,
           selling_price_child: tourData.selling_price_child || 0,
+          provider_details: tourData.provider_details || [], // Ensure provider_details is an array
         });
 
         // Set the bus layout from the fetched data
@@ -227,6 +242,20 @@ const TourDetailsPage = () => {
                   </ol>
                 </>
               )}
+
+              {tour.provider_details && tour.provider_details.length > 0 && (
+                <div className="mt-8">
+                  <h3 className="text-xl font-semibold text-gray-800 mb-3">Servicios Adicionales Disponibles</h3>
+                  <ul className="list-disc list-inside space-y-2 text-gray-700">
+                    {tour.provider_details.map((service) => (
+                      <li key={service.id}>
+                        <span className="font-medium">{service.name_snapshot} ({service.service_type_snapshot}):</span> ${service.selling_price_per_unit_snapshot.toFixed(2)} por {service.unit_type_snapshot}
+                      </li>
+                    ))}
+                  </ul>
+                  <p className="text-sm text-gray-600 mt-2">Puedes seleccionar estos servicios al reservar tu tour.</p>
+                </div>
+              )}
             </div>
 
             <div className="lg:col-span-1 bg-gray-50 p-6 rounded-lg shadow-inner">
@@ -274,6 +303,7 @@ const TourDetailsPage = () => {
                       courtesies: tour.courtesies,
                       seat_layout_json: busLayout,
                     }}
+                    tourProviderServices={tour.provider_details} {/* NEW: Pass provider details */}
                   />
                 )}
               </Dialog>
