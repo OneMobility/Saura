@@ -102,6 +102,7 @@ const AdminClientFormPage = () => {
   const [selectedTourPrices, setSelectedTourPrices] = useState<Tour | null>(null);
   const [busDetails, setBusDetails] = useState<BusDetails | null>(null); // State for bus details
   const [clientSelectedSeats, setClientSelectedSeats] = useState<number[]>([]); // Seats selected for *this* client
+  const [initialClientStatus, setInitialClientStatus] = useState<string>('pending'); // To track status change
 
   useEffect(() => {
     if (!sessionLoading && (!user || !isAdmin)) {
@@ -151,6 +152,7 @@ const AdminClientFormPage = () => {
             contractor_age: data.contractor_age || null,
             room_details: data.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }, // Set room_details
           });
+          setInitialClientStatus(data.status); // Store initial status
 
           // Fetch existing seat assignments for this client and tour
           if (data.tour_id) {
@@ -187,6 +189,7 @@ const AdminClientFormPage = () => {
           room_details: { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
         });
         setClientSelectedSeats([]); // Clear selected seats for new client
+        setInitialClientStatus('pending');
       }
       setLoadingInitialData(false);
     };
@@ -277,19 +280,16 @@ const AdminClientFormPage = () => {
     let calculatedTotalAmount = 0;
     if (selectedTourPrices) {
       const allAges = [formData.contractor_age, ...formData.companions.map(c => c.age)].filter((age): age is number => age !== null);
-      const adultsCount = allAges.filter(age => age >= 12).length;
       const childrenCount = allAges.filter(age => age < 12).length;
 
       // Calculate cost for adults based on room distribution
-      calculatedTotalAmount += calculatedRoomDetails.double_rooms * selectedTourPrices.selling_price_double_occupancy * 2;
-      calculatedTotalAmount += calculatedRoomDetails.triple_rooms * selectedTourPrices.selling_price_triple_occupancy * 3;
-      calculatedTotalAmount += calculatedRoomDetails.quad_rooms * selectedTourPrices.selling_price_quad_occupancy * 4;
+      calculatedTotalAmount += calculatedRoomDetails.double_rooms * selectedTourPrices.selling_price_double_occupancy;
+      calculatedTotalAmount += calculatedRoomDetails.triple_rooms * selectedTourPrices.selling_price_triple_occupancy;
+      calculatedTotalAmount += calculatedRoomDetails.quad_rooms * selectedTourPrices.selling_price_quad_occupancy;
       
       // Add cost for children (if any, and if they are not already covered by room occupancy)
       // This logic assumes children are added on top of adult room occupancy, or fill empty spots.
-      // For simplicity, we'll add child price for each child, assuming they don't reduce adult room price.
-      // A more complex logic might involve assigning children to rooms first.
-      // For now, we'll just add the child price for each child.
+      // For simplicity, we'll add child price for each child.
       calculatedTotalAmount += childrenCount * selectedTourPrices.selling_price_child;
     }
 
@@ -374,8 +374,9 @@ const AdminClientFormPage = () => {
       }
     }
 
-    if (clientSelectedSeats.length !== formData.number_of_people) {
-      toast.error(`Debes seleccionar ${formData.number_of_people} asientos para este contrato.`);
+    const totalPeople = 1 + formData.companions.length;
+    if (clientSelectedSeats.length !== totalPeople) {
+      toast.error(`Debes seleccionar ${totalPeople} asientos para este contrato.`);
       setIsSubmitting(false);
       return;
     }
@@ -440,7 +441,7 @@ const AdminClientFormPage = () => {
       currentClientIdToUse = newClientData.id; // Get the ID of the newly created client
     }
 
-    // Update seat assignments
+    // Handle seat assignments based on status and selected seats
     if (currentClientIdToUse && formData.tour_id) {
       // 1. Delete existing assignments for this client on this tour
       const { error: deleteError } = await supabase
@@ -456,27 +457,31 @@ const AdminClientFormPage = () => {
         return;
       }
 
-      // 2. Insert new assignments
-      const newSeatAssignments = clientSelectedSeats.map(seatNumber => ({
-        tour_id: formData.tour_id,
-        seat_number: seatNumber,
-        status: 'booked',
-        client_id: currentClientIdToUse,
-      }));
+      // 2. Insert new assignments ONLY if status is NOT 'cancelled'
+      if (formData.status !== 'cancelled') {
+        const newSeatAssignments = clientSelectedSeats.map(seatNumber => ({
+          tour_id: formData.tour_id,
+          seat_number: seatNumber,
+          status: 'booked',
+          client_id: currentClientIdToUse,
+        }));
 
-      if (newSeatAssignments.length > 0) {
-        const { error: insertError } = await supabase
-          .from('tour_seat_assignments')
-          .insert(newSeatAssignments);
+        if (newSeatAssignments.length > 0) {
+          const { error: insertError } = await supabase
+            .from('tour_seat_assignments')
+            .insert(newSeatAssignments);
 
-        if (insertError) {
-          console.error('Error inserting new seat assignments:', insertError);
-          toast.error('Error al guardar la asignación de asientos.');
-          setIsSubmitting(false);
-          return;
+          if (insertError) {
+            console.error('Error inserting new seat assignments:', insertError);
+            toast.error('Error al guardar la asignación de asientos.');
+            setIsSubmitting(false);
+            return;
+          }
         }
+        toast.success('Asientos asignados con éxito.');
+      } else {
+        toast.info('Cliente cancelado. Los asientos han sido liberados.');
       }
-      toast.success('Asientos asignados con éxito.');
     }
 
     navigate('/admin/clients'); // Redirect back to clients list

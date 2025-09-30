@@ -37,6 +37,11 @@ const AdminClientsPage = () => {
     navigate('/admin/clients/new'); // Navigate to the new form page for creation
   };
 
+  // Handler for editing a client
+  const handleEditClient = (client: Client) => {
+    navigate(`/admin/clients/edit/${client.id}`);
+  };
+
   // NEW: Handler for opening payment dialog
   const handleRegisterPayment = (client: Client) => {
     setSelectedClientForPayment(client);
@@ -67,7 +72,11 @@ const AdminClientsPage = () => {
           </Button>
         </AdminHeader>
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
-          <ClientsTable refreshKey={refreshKey} onRegisterPayment={handleRegisterPayment} /> {/* Pass new prop */}
+          <ClientsTable 
+            refreshKey={refreshKey} 
+            onRegisterPayment={handleRegisterPayment} 
+            onEditClient={handleEditClient} // Pass the edit handler
+          />
         </main>
         <footer className="bg-gray-800 text-white py-4 text-center text-sm">
           <p>&copy; {new Date().getFullYear()} Saura Tours Admin. Todos los derechos reservados.</p>

@@ -43,9 +43,10 @@ interface Client {
 interface ClientsTableProps {
   refreshKey: number; // Prop to trigger re-fetch
   onRegisterPayment: (client: Client) => void; // NEW: Callback for registering payment
+  onEditClient: (client: Client) => void; // NEW: Callback for editing client
 }
 
-const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayment }) => {
+const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayment, onEditClient }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate(); // Initialize useNavigate
@@ -82,12 +83,13 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
     setLoading(false);
   };
 
-  const handleEditClient = (client: Client) => {
-    navigate(`/admin/clients/edit/${client.id}`); // Navigate to the new form page for editing
-  };
+  // The handleEditClient function is now passed as a prop, so we just call it
+  // const handleEditClient = (client: Client) => {
+  //   navigate(`/admin/clients/edit/${client.id}`); // Navigate to the new form page for editing
+  // };
 
   const handleDeleteClient = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar este cliente y su contrato?')) {
+    if (!window.confirm('¿Estás seguro de que quieres eliminar este cliente y su contrato? Esto también liberará los asientos asignados.')) {
       return;
     }
     setLoading(true);
@@ -100,7 +102,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
       console.error('Error deleting client:', error);
       toast.error('Error al eliminar el cliente.');
     } else {
-      toast.success('Cliente eliminado con éxito.');
+      toast.success('Cliente eliminado con éxito. Los asientos asignados han sido liberados.');
       fetchClients(); // Refresh the list
     }
     setLoading(false);
@@ -163,7 +165,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => onEditClient(client)}
+                      onClick={() => onEditClient(client)} // Use the passed prop
                       className="text-blue-600 hover:bg-blue-50"
                     >
                       <Edit className="h-4 w-4" />
