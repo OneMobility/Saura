@@ -8,16 +8,20 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ClientsTable from '@/components/admin/clients/ClientsTable'; // Import the new ClientsTable
-import ClientFormDialog from '@/components/admin/clients/ClientFormDialog'; // Import the new ClientFormDialog
+// Removed ClientFormDialog import as it's now a page
 
 const AdminClientsPage = () => {
   const { user, isAdmin, isLoading } = useSession();
   const navigate = useNavigate();
-  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  // Removed isCreateDialogOpen state
   const [refreshKey, setRefreshKey] = useState(0); // Key to force re-fetch of clients
 
   const handleClientSave = () => {
     setRefreshKey(prev => prev + 1); // Increment key to trigger re-fetch in ClientsTable
+  };
+
+  const handleAddClient = () => {
+    navigate('/admin/clients/new'); // Navigate to the new form page for creation
   };
 
   if (isLoading) {
@@ -39,7 +43,7 @@ const AdminClientsPage = () => {
       <AdminSidebar />
       <div className="flex flex-col flex-grow">
         <AdminHeader pageTitle="Gestión de Clientes">
-          <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white">
+          <Button onClick={handleAddClient} className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white">
             <PlusCircle className="mr-2 h-4 w-4" /> Añadir Nuevo Cliente
           </Button>
         </AdminHeader>
@@ -50,11 +54,7 @@ const AdminClientsPage = () => {
           <p>&copy; {new Date().getFullYear()} Saura Tours Admin. Todos los derechos reservados.</p>
         </footer>
       </div>
-      <ClientFormDialog
-        isOpen={isCreateDialogOpen}
-        onClose={() => setIsCreateDialogOpen(false)}
-        onSave={handleClientSave}
-      />
+      {/* Removed ClientFormDialog */}
     </div>
   );
 };

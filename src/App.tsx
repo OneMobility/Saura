@@ -26,10 +26,11 @@ import AdminHotelsPage from "./pages/AdminHotelsPage";
 import AdminProvidersPage from "./pages/AdminProvidersPage";
 import AdminClientsPage from "./pages/AdminClientsPage";
 import AdminBusesPage from "./pages/AdminBusesPage";
-import AdminBusFormPage from "./pages/AdminBusFormPage"; // Import the new AdminBusFormPage
+import AdminBusFormPage from "./pages/AdminBusFormPage";
 import AdminToursPage from "./pages/AdminToursPage";
 import AdminTourFormPage from "./pages/AdminTourFormPage";
 import AdminHotelFormPage from "./pages/AdminHotelFormPage";
+import AdminClientFormPage from "./pages/AdminClientFormPage"; // Import the new AdminClientFormPage
 
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -154,6 +155,22 @@ const App = () => {
                 element={
                   <ProtectedRoute adminOnly>
                     <AdminClientsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/clients/new"
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminClientFormPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/clients/edit/:id"
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminClientFormPage />
                   </ProtectedRoute>
                 }
               />

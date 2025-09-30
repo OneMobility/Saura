@@ -6,11 +6,13 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Edit, Trash2, Loader2 } from 'lucide-react';
-import ClientFormDialog from './ClientFormDialog'; // Import the form dialog
+// Removed ClientFormDialog import as it's now a page
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
 interface Companion {
   id: string;
   name: string;
+  age: number | null; // Added age for companions
 }
 
 interface Client {
@@ -28,6 +30,7 @@ interface Client {
   total_paid: number;
   status: string;
   created_at: string;
+  contractor_age: number | null; // Added contractor_age
   tour_title?: string; // To display tour title in table
   remaining_payment?: number; // Calculated field
 }
@@ -39,8 +42,8 @@ interface ClientsTableProps {
 const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
-  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
+  // Removed isEditDialogOpen and selectedClient states
+  const navigate = useNavigate(); // Initialize useNavigate
 
   useEffect(() => {
     fetchClients();
@@ -74,8 +77,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey }) => {
   };
 
   const handleEditClient = (client: Client) => {
-    setSelectedClient(client);
-    setIsEditDialogOpen(true);
+    navigate(`/admin/clients/edit/${client.id}`); // Navigate to the new form page for editing
   };
 
   const handleDeleteClient = async (id: string) => {
@@ -168,14 +170,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey }) => {
           </Table>
         </div>
       )}
-      {selectedClient && (
-        <ClientFormDialog
-          isOpen={isEditDialogOpen}
-          onClose={() => setIsEditDialogOpen(false)}
-          onSave={fetchClients}
-          initialData={selectedClient}
-        />
-      )}
+      {/* Removed ClientFormDialog */}
     </div>
   );
 };

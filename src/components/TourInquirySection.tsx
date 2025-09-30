@@ -11,6 +11,7 @@ import { Loader2 } from 'lucide-react';
 interface Companion {
   id: string;
   name: string;
+  age: number | null; // Added age for companions
 }
 
 interface ClientContract {
@@ -27,6 +28,7 @@ interface ClientContract {
   advance_payment: number;
   total_paid: number;
   status: string;
+  contractor_age: number | null; // Added contractor_age
   tour_title: string;
   tour_description: string;
   tour_image_url: string;
@@ -64,6 +66,7 @@ const TourInquirySection = () => {
           advance_payment,
           total_paid,
           status,
+          contractor_age,
           tours (
             title,
             description,
@@ -88,6 +91,7 @@ const TourInquirySection = () => {
           tour_description: data.tours?.description || 'N/A',
           tour_image_url: data.tours?.image_url || 'https://via.placeholder.com/400x200?text=Tour+Image',
           companions: data.companions || [],
+          contractor_age: data.contractor_age || null,
         });
         toast.success('¡Contrato encontrado!');
       } else {
@@ -145,6 +149,7 @@ const TourInquirySection = () => {
               <div>
                 <p><span className="font-semibold">Contrato:</span> {contractDetails.contract_number}</p>
                 <p><span className="font-semibold">Cliente:</span> {contractDetails.first_name} {contractDetails.last_name}</p>
+                {contractDetails.contractor_age !== null && <p><span className="font-semibold">Edad Contratante:</span> {contractDetails.contractor_age}</p>}
                 <p><span className="font-semibold">Email:</span> {contractDetails.email}</p>
                 {contractDetails.phone && <p><span className="font-semibold">Teléfono:</span> {contractDetails.phone}</p>}
                 {contractDetails.address && <p><span className="font-semibold">Dirección:</span> {contractDetails.address}</p>}
@@ -162,7 +167,7 @@ const TourInquirySection = () => {
               {contractDetails.companions.length > 0 ? (
                 <ul className="list-disc list-inside">
                   {contractDetails.companions.map((c, index) => (
-                    <li key={c.id || index}>{c.name}</li>
+                    <li key={c.id || index}>{c.name} {c.age !== null && `(${c.age} años)`}</li>
                   ))}
                 </ul>
               ) : (
