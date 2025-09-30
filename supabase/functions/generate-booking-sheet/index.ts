@@ -200,14 +200,22 @@ serve(async (req) => {
       return jsonResponse({ error: 'Client not found or error fetching client data.' }, 404);
     }
 
-    const { data: seats, error: seatsError } = await supabaseAdmin
-      .from('tour_seat_assignments')
-      .select('seat_number')
-      .eq('client_id', clientId)
-      .eq('tour_id', client.tour_id);
+    let seats: any[] = [];
+    if (client.tour_id) { // Only fetch seats if a tour_id is present
+      const { data: fetchedSeats, error: seatsError } = await supabaseAdmin
+        .from('tour_seat_assignments')
+        .select('seat_number')
+        .eq('client_id', clientId)
+        .eq('tour_id', client.tour_id);
 
-    if (seatsError) {
-      console.error('Error fetching seats:', seatsError.message);
+      if (seatsError) {
+        console.error('Error fetching seats:', seatsError.message);
+        // Continue without seats if there's an error, but log it
+      } else {
+        seats = fetchedSeats || [];
+      }
+    } else {
+      console.log('Client has no tour_id, skipping seat assignment fetch.');
     }
 
     const { data: agency, error: agencyError } = await supabaseAdmin
@@ -222,7 +230,7 @@ serve(async (req) => {
     const htmlContent = generateBookingSheetHtml({
       client,
       tour: client.tours,
-      seats: seats || [],
+      seats: seats, // Pass the potentially empty seats array
       agency: agency,
     });
 
