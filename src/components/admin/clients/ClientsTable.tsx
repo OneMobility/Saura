@@ -15,6 +15,12 @@ interface Companion {
   age: number | null; // Added age for companions
 }
 
+interface RoomDetails {
+  double_rooms: number;
+  triple_rooms: number;
+  quad_rooms: number;
+}
+
 interface Client {
   id: string;
   first_name: string;
@@ -23,7 +29,6 @@ interface Client {
   contract_number: string;
   tour_id: string | null;
   number_of_people: number;
-  occupancy_type: 'double' | 'triple' | 'quad';
   companions: Companion[];
   total_amount: number;
   advance_payment: number;
@@ -31,6 +36,7 @@ interface Client {
   status: string;
   created_at: string;
   contractor_age: number | null; // Added contractor_age
+  room_details: RoomDetails; // NEW: Stores calculated room breakdown
   tour_title?: string; // To display tour title in table
   remaining_payment?: number; // Calculated field
 }
@@ -69,6 +75,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey }) => {
         ...client,
         tour_title: client.tours?.title || 'N/A',
         companions: client.companions || [], // Ensure companions is an array
+        room_details: client.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }, // Ensure room_details
         remaining_payment: client.total_amount - client.total_paid,
       }));
       setClients(clientsWithTourTitles);
@@ -100,6 +107,14 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey }) => {
     setLoading(false);
   };
 
+  const formatRoomDetails = (details: RoomDetails) => {
+    const parts = [];
+    if (details.quad_rooms > 0) parts.push(`${details.quad_rooms} Cuádruple(s)`);
+    if (details.triple_rooms > 0) parts.push(`${details.triple_rooms} Triple(s)`);
+    if (details.double_rooms > 0) parts.push(`${details.double_rooms} Doble(s)`);
+    return parts.join(', ') || 'N/A';
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -124,7 +139,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey }) => {
                 <TableHead>Email</TableHead>
                 <TableHead>Tour</TableHead>
                 <TableHead>Personas</TableHead>
-                <TableHead>Ocupación</TableHead>
+                <TableHead>Habitaciones</TableHead> {/* Changed from Ocupación */}
                 <TableHead>Total</TableHead>
                 <TableHead>Pagado</TableHead>
                 <TableHead>Pendiente</TableHead>
@@ -140,7 +155,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey }) => {
                   <TableCell>{client.email}</TableCell>
                   <TableCell>{client.tour_title}</TableCell>
                   <TableCell>{client.number_of_people}</TableCell>
-                  <TableCell>{client.occupancy_type}</TableCell>
+                  <TableCell>{formatRoomDetails(client.room_details)}</TableCell> {/* Display room details */}
                   <TableCell>${client.total_amount.toFixed(2)}</TableCell>
                   <TableCell>${client.total_paid.toFixed(2)}</TableCell>
                   <TableCell>${(client.remaining_payment || 0).toFixed(2)}</TableCell>

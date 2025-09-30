@@ -14,6 +14,12 @@ interface Companion {
   age: number | null; // Added age for companions
 }
 
+interface RoomDetails {
+  double_rooms: number;
+  triple_rooms: number;
+  quad_rooms: number;
+}
+
 interface ClientContract {
   first_name: string;
   last_name: string;
@@ -22,13 +28,13 @@ interface ClientContract {
   address: string | null;
   contract_number: string;
   number_of_people: number;
-  occupancy_type: 'double' | 'triple' | 'quad';
   companions: Companion[];
   total_amount: number;
   advance_payment: number;
   total_paid: number;
   status: string;
   contractor_age: number | null; // Added contractor_age
+  room_details: RoomDetails; // NEW: Stores calculated room breakdown
   tour_title: string;
   tour_description: string;
   tour_image_url: string;
@@ -60,13 +66,13 @@ const TourInquirySection = () => {
           address,
           contract_number,
           number_of_people,
-          occupancy_type,
           companions,
           total_amount,
           advance_payment,
           total_paid,
           status,
           contractor_age,
+          room_details,
           tours (
             title,
             description,
@@ -92,6 +98,7 @@ const TourInquirySection = () => {
           tour_image_url: data.tours?.image_url || 'https://via.placeholder.com/400x200?text=Tour+Image',
           companions: data.companions || [],
           contractor_age: data.contractor_age || null,
+          room_details: data.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
         });
         toast.success('¡Contrato encontrado!');
       } else {
@@ -105,6 +112,14 @@ const TourInquirySection = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const formatRoomDetails = (details: RoomDetails) => {
+    const parts = [];
+    if (details.quad_rooms > 0) parts.push(`${details.quad_rooms} Cuádruple(s)`);
+    if (details.triple_rooms > 0) parts.push(`${details.triple_rooms} Triple(s)`);
+    if (details.double_rooms > 0) parts.push(`${details.double_rooms} Doble(s)`);
+    return parts.join(', ') || 'N/A';
   };
 
   return (
@@ -157,7 +172,7 @@ const TourInquirySection = () => {
               <div>
                 <p><span className="font-semibold">Tour:</span> {contractDetails.tour_title}</p>
                 <p><span className="font-semibold">Personas:</span> {contractDetails.number_of_people}</p>
-                <p><span className="font-semibold">Ocupación:</span> {contractDetails.occupancy_type}</p>
+                <p><span className="font-semibold">Habitaciones:</span> {formatRoomDetails(contractDetails.room_details)}</p>
                 <p><span className="font-semibold">Estado:</span> {contractDetails.status}</p>
               </div>
             </div>

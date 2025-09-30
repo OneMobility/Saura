@@ -21,6 +21,12 @@ interface Companion {
   age: number | null; // Added age for companions
 }
 
+interface RoomDetails {
+  double_rooms: number;
+  triple_rooms: number;
+  quad_rooms: number;
+}
+
 interface Client {
   id?: string;
   first_name: string;
@@ -31,13 +37,13 @@ interface Client {
   contract_number: string;
   tour_id: string | null;
   number_of_people: number;
-  occupancy_type: 'double' | 'triple' | 'quad';
   companions: Companion[];
   total_amount: number;
   advance_payment: number;
   total_paid: number;
   status: string;
   contractor_age: number | null; // Added contractor_age
+  room_details: RoomDetails; // NEW: Stores calculated room breakdown
   remaining_payment?: number; // Calculated field
 }
 
@@ -63,13 +69,13 @@ const AdminClientFormPage = () => {
     contract_number: uuidv4().substring(0, 8).toUpperCase(), // Generate a short UUID for contract
     tour_id: null,
     number_of_people: 1,
-    occupancy_type: 'double',
     companions: [],
     total_amount: 0,
     advance_payment: 0,
     total_paid: 0,
     status: 'pending',
     contractor_age: null, // Initialize contractor_age
+    room_details: { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }, // Initialize room_details
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
@@ -122,6 +128,7 @@ const AdminClientFormPage = () => {
             companions: data.companions || [],
             contract_number: data.contract_number || uuidv4().substring(0, 8).toUpperCase(),
             contractor_age: data.contractor_age || null,
+            room_details: data.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }, // Set room_details
           });
         }
       } else {
@@ -135,13 +142,13 @@ const AdminClientFormPage = () => {
           contract_number: uuidv4().substring(0, 8).toUpperCase(),
           tour_id: null,
           number_of_people: 1,
-          occupancy_type: 'double',
           companions: [],
           total_amount: 0,
           advance_payment: 0,
           total_paid: 0,
           status: 'pending',
           contractor_age: null,
+          room_details: { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
         });
       }
       setLoadingInitialData(false);
@@ -162,35 +169,56 @@ const AdminClientFormPage = () => {
     }
   }, [formData.tour_id, availableTours]);
 
-  // Effect to calculate total_amount and number_of_people
+  // NEW: Function to calculate room allocation
+  const calculateRoomAllocation = useCallback((totalPeople: number): RoomDetails => {
+    let double = 0;
+    let triple = 0;
+    let quad = 0;
+    let remaining = totalPeople;
+
+    // Prioritize quad rooms
+    quad = Math.floor(remaining / 4);
+    remaining %= 4;
+
+    // Handle remaining people
+    if (remaining === 1) {
+      if (quad > 0) {
+        quad--; // Convert one quad to a triple and a double
+        triple++;
+        double++;
+      } else {
+        // If no quad rooms, for 1 person, assign a double (paying for 2)
+        double++;
+      }
+    } else if (remaining === 2) {
+      double++;
+    } else if (remaining === 3) {
+      triple++;
+    }
+
+    return { double_rooms: double, triple_rooms: triple, quad_rooms: quad };
+  }, []);
+
+  // Effect to calculate total_amount, number_of_people, and room_details
   useEffect(() => {
     const numPeople = 1 + formData.companions.length;
-    let pricePerPerson = 0;
+    const calculatedRoomDetails = calculateRoomAllocation(numPeople);
 
+    let calculatedTotalAmount = 0;
     if (selectedTourPrices) {
-      switch (formData.occupancy_type) {
-        case 'double':
-          pricePerPerson = selectedTourPrices.selling_price_double_occupancy;
-          break;
-        case 'triple':
-          pricePerPerson = selectedTourPrices.selling_price_triple_occupancy;
-          break;
-        case 'quad':
-          pricePerPerson = selectedTourPrices.selling_price_quad_occupancy;
-          break;
-        default:
-          pricePerPerson = 0;
-      }
+      calculatedTotalAmount += calculatedRoomDetails.double_rooms * selectedTourPrices.selling_price_double_occupancy * 2;
+      calculatedTotalAmount += calculatedRoomDetails.triple_rooms * selectedTourPrices.selling_price_triple_occupancy * 3;
+      calculatedTotalAmount += calculatedRoomDetails.quad_rooms * selectedTourPrices.selling_price_quad_occupancy * 4;
     }
-    const calculatedTotalAmount = numPeople * pricePerPerson;
 
     setFormData(prev => ({
       ...prev,
       number_of_people: numPeople,
+      room_details: calculatedRoomDetails,
       total_amount: calculatedTotalAmount,
       remaining_payment: calculatedTotalAmount - prev.total_paid,
     }));
-  }, [formData.companions.length, formData.occupancy_type, formData.total_paid, selectedTourPrices]);
+  }, [formData.companions.length, formData.total_paid, selectedTourPrices, calculateRoomAllocation]);
 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -276,13 +304,13 @@ const AdminClientFormPage = () => {
       contract_number: formData.contract_number,
       tour_id: formData.tour_id,
       number_of_people: formData.number_of_people,
-      occupancy_type: formData.occupancy_type,
       companions: formData.companions,
       total_amount: formData.total_amount,
       advance_payment: formData.advance_payment,
       total_paid: formData.total_paid,
       status: formData.status,
       contractor_age: formData.contractor_age,
+      room_details: formData.room_details, // Save room_details
       user_id: authUser.id, // Link to the admin user who created/updated it
     };
 
@@ -329,6 +357,10 @@ const AdminClientFormPage = () => {
   if (!user || !isAdmin) {
     return null; // Should be redirected by ProtectedRoute
   }
+
+  const roomDetailsDisplay = `${formData.room_details.quad_rooms > 0 ? `${formData.room_details.quad_rooms} Cuádruple(s), ` : ''}` +
+                             `${formData.room_details.triple_rooms > 0 ? `${formData.room_details.triple_rooms} Triple(s), ` : ''}` +
+                             `${formData.room_details.double_rooms > 0 ? `${formData.room_details.double_rooms} Doble(s)` : ''}`;
 
   return (
     <div className="flex min-h-screen bg-gray-100">
@@ -399,21 +431,12 @@ const AdminClientFormPage = () => {
               <h3 className="text-lg font-semibold mt-4">Ocupación y Acompañantes</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="occupancy_type">Tipo de Ocupación</Label>
-                  <Select value={formData.occupancy_type} onValueChange={(value) => handleSelectChange('occupancy_type', value as 'double' | 'triple' | 'quad')} required>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Seleccionar Ocupación" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="double">Doble</SelectItem>
-                      <SelectItem value="triple">Triple</SelectItem>
-                      <SelectItem value="quad">Cuádruple</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
                   <Label htmlFor="number_of_people">Número Total de Personas</Label>
                   <Input id="number_of_people" type="number" value={formData.number_of_people} readOnly className="bg-gray-100 cursor-not-allowed" />
+                </div>
+                <div>
+                  <Label>Distribución de Habitaciones</Label>
+                  <Input value={roomDetailsDisplay.replace(/,\s*$/, '') || 'N/A'} readOnly className="bg-gray-100 cursor-not-allowed" />
                 </div>
               </div>
 
