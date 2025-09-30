@@ -170,10 +170,21 @@ const AdminClientFormPage = () => {
   }, [formData.tour_id, availableTours]);
 
   // NEW: Function to calculate room allocation
-  const calculateRoomAllocation = useCallback((totalPeople: number): RoomDetails => {
+  const calculateRoomAllocation = useCallback((contractorAge: number | null, companions: Companion[]): RoomDetails => {
     let double = 0;
     let triple = 0;
     let quad = 0;
+    
+    const allAges = [contractorAge, ...companions.map(c => c.age)].filter((age): age is number => age !== null);
+    const adults = allAges.filter(age => age >= 12).length;
+    const minors = allAges.filter(age => age < 12).length;
+    const totalPeople = adults + minors;
+
+    // Special rule: 2 adults + 2 minors < 12 = 1 double room
+    if (adults === 2 && minors === 2 && totalPeople === 4) {
+      return { double_rooms: 1, triple_rooms: 0, quad_rooms: 0 };
+    }
+
     let remaining = totalPeople;
 
     // Prioritize quad rooms
@@ -202,7 +213,7 @@ const AdminClientFormPage = () => {
   // Effect to calculate total_amount, number_of_people, and room_details
   useEffect(() => {
     const numPeople = 1 + formData.companions.length;
-    const calculatedRoomDetails = calculateRoomAllocation(numPeople);
+    const calculatedRoomDetails = calculateRoomAllocation(formData.contractor_age, formData.companions);
 
     let calculatedTotalAmount = 0;
     if (selectedTourPrices) {
@@ -218,7 +229,7 @@ const AdminClientFormPage = () => {
       total_amount: calculatedTotalAmount,
       remaining_payment: calculatedTotalAmount - prev.total_paid,
     }));
-  }, [formData.companions.length, formData.total_paid, selectedTourPrices, calculateRoomAllocation]);
+  }, [formData.companions.length, formData.total_paid, selectedTourPrices, formData.contractor_age, formData.companions, calculateRoomAllocation]);
 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
