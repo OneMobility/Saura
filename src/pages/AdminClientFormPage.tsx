@@ -335,9 +335,9 @@ const AdminClientFormPage = () => {
     let calculatedTotalAmount = 0;
     
     // Cost for rooms based on their occupancy type
-    calculatedTotalAmount += calculatedRoomDetails.double_rooms * (selectedTourPrices?.selling_price_double_occupancy || 0 * 2);
-    calculatedTotalAmount += calculatedRoomDetails.triple_rooms * (selectedTourPrices?.selling_price_triple_occupancy || 0 * 3);
-    calculatedTotalAmount += calculatedRoomDetails.quad_rooms * (selectedTourPrices?.selling_price_quad_occupancy || 0 * 4);
+    calculatedTotalAmount += calculatedRoomDetails.double_rooms * ((selectedTourPrices?.selling_price_double_occupancy || 0) * 2);
+    calculatedTotalAmount += calculatedRoomDetails.triple_rooms * ((selectedTourPrices?.selling_price_triple_occupancy || 0) * 3);
+    calculatedTotalAmount += calculatedRoomDetails.quad_rooms * ((selectedTourPrices?.selling_price_quad_occupancy || 0) * 4);
     
     // Add cost for children
     calculatedTotalAmount += numChildren * (selectedTourPrices?.selling_price_child || 0);

@@ -154,12 +154,12 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
 
     let calculatedTotalAmount = 0;
     // Cost for adults based on room distribution
-    calculatedTotalAmount += calculatedRoomDetails.double_rooms * tourSellingPrices.double * 2;
-    calculatedTotalAmount += calculatedRoomDetails.triple_rooms * tourSellingPrices.triple * 3;
-    calculatedTotalAmount += calculatedRoomDetails.quad_rooms * tourSellingPrices.quad * 4;
+    calculatedTotalAmount += calculatedRoomDetails.double_rooms * ((tourSellingPrices.double || 0) * 2);
+    calculatedTotalAmount += calculatedRoomDetails.triple_rooms * ((tourSellingPrices.triple || 0) * 3);
+    calculatedTotalAmount += calculatedRoomDetails.quad_rooms * ((tourSellingPrices.quad || 0) * 4);
     
     // Add cost for children
-    calculatedTotalAmount += numChildren * tourSellingPrices.child;
+    calculatedTotalAmount += numChildren * (tourSellingPrices.child || 0);
 
     // NEW: Add cost of extra services
     const extraServicesTotal = formData.extra_services.reduce((sum, service) => {
