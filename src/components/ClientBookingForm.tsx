@@ -57,6 +57,38 @@ interface ClientBookingFormProps {
   busDetails: BusDetails;
 }
 
+// NEW: Helper function to calculate room allocation for a given number of people
+const allocateRoomsForPeople = (totalPeople: number): RoomDetails => {
+  let double = 0;
+  let triple = 0;
+  let quad = 0;
+  let remaining = totalPeople;
+
+  if (remaining <= 0) return { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 };
+
+  // Prioritize quad rooms
+  quad = Math.floor(remaining / 4);
+  remaining %= 4;
+
+  // Handle remaining people
+  if (remaining === 1) {
+    if (quad > 0) {
+      quad--; // Convert one quad to a triple and a double
+      triple++;
+      double++;
+    } else {
+      // If no quad rooms, for 1 person, assign a double (paying for 2)
+      double++;
+    }
+  } else if (remaining === 2) {
+    double++;
+  } else if (remaining === 3) {
+    triple++;
+  }
+
+  return { double_rooms: double, triple_rooms: triple, quad_rooms: quad };
+};
+
 const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
   isOpen,
   onClose,
@@ -81,61 +113,27 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
   const [roomDetails, setRoomDetails] = useState<RoomDetails>({ double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // NEW: Function to calculate room allocation
-  const calculateRoomAllocation = useCallback((contractorAge: number | null, companions: Companion[]): RoomDetails => {
-    let double = 0;
-    let triple = 0;
-    let quad = 0;
-    
-    const allAges = [contractorAge, ...companions.map(c => c.age)].filter((age): age is number => age !== null);
-    const totalPeople = allAges.length;
-
-    if (totalPeople === 0) return { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 };
-
-    let remaining = totalPeople;
-
-    // Prioritize quad rooms
-    quad = Math.floor(remaining / 4);
-    remaining %= 4;
-
-    // Handle remaining people
-    if (remaining === 1) {
-      if (quad > 0) {
-        quad--; // Convert one quad to a triple and a double
-        triple++;
-        double++;
-      } else {
-        // If no quad rooms, for 1 person, assign a double (paying for 2)
-        double++;
-      }
-    } else if (remaining === 2) {
-      double++;
-    } else if (remaining === 3) {
-      triple++;
-    }
-
-    return { double_rooms: double, triple_rooms: triple, quad_rooms: quad };
-  }, []);
-
   // Effect to calculate total_amount and room_details
   useEffect(() => {
-    const calculatedRoomDetails = calculateRoomAllocation(formData.contractor_age, formData.companions);
-    setRoomDetails(calculatedRoomDetails);
+    const allPeopleAges = [formData.contractor_age, ...formData.companions.map(c => c.age)].filter((age): age is number => age !== null);
+    const numAdults = allPeopleAges.filter(age => age >= 12).length;
+    const numChildren = allPeopleAges.filter(age => age < 12).length;
+    const totalPeople = numAdults + numChildren;
+
+    const calculatedRoomDetails = allocateRoomsForPeople(numAdults); // Allocate rooms based on adults
+    setRoomDetails(calculatedRoomDetails); // Update roomDetails state
 
     let calculatedTotalAmount = 0;
-    const allAges = [formData.contractor_age, ...formData.companions.map(c => c.age)].filter((age): age is number => age !== null);
-    const childrenCount = allAges.filter(age => age < 12).length;
-
-    // Calculate cost for adults based on room distribution
-    calculatedTotalAmount += calculatedRoomDetails.double_rooms * tourSellingPrices.double;
-    calculatedTotalAmount += calculatedRoomDetails.triple_rooms * tourSellingPrices.triple;
-    calculatedTotalAmount += calculatedRoomDetails.quad_rooms * tourSellingPrices.quad;
+    // Cost for adults based on room distribution
+    calculatedTotalAmount += calculatedRoomDetails.double_rooms * tourSellingPrices.double * 2;
+    calculatedTotalAmount += calculatedRoomDetails.triple_rooms * tourSellingPrices.triple * 3;
+    calculatedTotalAmount += calculatedRoomDetails.quad_rooms * tourSellingPrices.quad * 4;
     
     // Add cost for children
-    calculatedTotalAmount += childrenCount * tourSellingPrices.child;
+    calculatedTotalAmount += numChildren * tourSellingPrices.child;
 
     setTotalAmount(calculatedTotalAmount);
-  }, [formData.contractor_age, formData.companions, tourSellingPrices, calculateRoomAllocation]);
+  }, [formData.contractor_age, formData.companions, tourSellingPrices]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;

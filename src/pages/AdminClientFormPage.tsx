@@ -74,6 +74,38 @@ interface BusDetails {
   seat_layout_json: SeatLayout | null;
 }
 
+// NEW: Helper function to calculate room allocation for a given number of people
+const allocateRoomsForPeople = (totalPeople: number): RoomDetails => {
+  let double = 0;
+  let triple = 0;
+  let quad = 0;
+  let remaining = totalPeople;
+
+  if (remaining <= 0) return { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 };
+
+  // Prioritize quad rooms
+  quad = Math.floor(remaining / 4);
+  remaining %= 4;
+
+  // Handle remaining people
+  if (remaining === 1) {
+    if (quad > 0) {
+      quad--; // Convert one quad to a triple and a double
+      triple++;
+      double++;
+    } else {
+      // If no quad rooms, for 1 person, assign a double (paying for 2)
+      double++;
+    }
+  } else if (remaining === 2) {
+    double++;
+  } else if (remaining === 3) {
+    triple++;
+  }
+
+  return { double_rooms: double, triple_rooms: triple, quad_rooms: quad };
+};
+
 const AdminClientFormPage = () => {
   const { id: clientId } = useParams<{ id: string }>(); // Get client ID from URL for editing
   const navigate = useNavigate();
@@ -236,71 +268,34 @@ const AdminClientFormPage = () => {
     }
   }, [formData.tour_id, availableTours]);
 
-  // NEW: Function to calculate room allocation
-  const calculateRoomAllocation = useCallback((contractorAge: number | null, companions: Companion[]): RoomDetails => {
-    let double = 0;
-    let triple = 0;
-    let quad = 0;
-    
-    const allAges = [contractorAge, ...companions.map(c => c.age)].filter((age): age is number => age !== null);
-    const totalPeople = allAges.length;
-
-    if (totalPeople === 0) return { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 };
-
-    let remaining = totalPeople;
-
-    // Prioritize quad rooms
-    quad = Math.floor(remaining / 4);
-    remaining %= 4;
-
-    // Handle remaining people
-    if (remaining === 1) {
-      if (quad > 0) {
-        quad--; // Convert one quad to a triple and a double
-        triple++;
-        double++;
-      } else {
-        // If no quad rooms, for 1 person, assign a double (paying for 2)
-        double++;
-      }
-    } else if (remaining === 2) {
-      double++;
-    } else if (remaining === 3) {
-      triple++;
-    }
-
-    return { double_rooms: double, triple_rooms: triple, quad_rooms: quad };
-  }, []);
-
   // Effect to calculate total_amount, number_of_people, and room_details
   useEffect(() => {
-    const numPeople = 1 + formData.companions.length;
-    const calculatedRoomDetails = calculateRoomAllocation(formData.contractor_age, formData.companions);
+    const allPeopleAges = [formData.contractor_age, ...formData.companions.map(c => c.age)].filter((age): age is number => age !== null);
+    const numAdults = allPeopleAges.filter(age => age >= 12).length;
+    const numChildren = allPeopleAges.filter(age => age < 12).length;
+    const totalPeople = numAdults + numChildren;
 
+    const calculatedRoomDetails = allocateRoomsForPeople(numAdults); // Allocate rooms based on adults
+    
     let calculatedTotalAmount = 0;
     if (selectedTourPrices) {
-      const allAges = [formData.contractor_age, ...formData.companions.map(c => c.age)].filter((age): age is number => age !== null);
-      const childrenCount = allAges.filter(age => age < 12).length;
-
-      // Calculate cost for adults based on room distribution
-      calculatedTotalAmount += calculatedRoomDetails.double_rooms * selectedTourPrices.selling_price_double_occupancy;
-      calculatedTotalAmount += calculatedRoomDetails.triple_rooms * selectedTourPrices.selling_price_triple_occupancy;
-      calculatedTotalAmount += calculatedRoomDetails.quad_rooms * selectedTourPrices.selling_price_quad_occupancy;
+      // Cost for adults based on room distribution
+      calculatedTotalAmount += calculatedRoomDetails.double_rooms * selectedTourPrices.selling_price_double_occupancy * 2;
+      calculatedTotalAmount += calculatedRoomDetails.triple_rooms * selectedTourPrices.selling_price_triple_occupancy * 3;
+      calculatedTotalAmount += calculatedRoomDetails.quad_rooms * selectedTourPrices.selling_price_quad_occupancy * 4;
       
-      // Add cost for children (if any, and if they are not already covered by room occupancy)
-      // This logic assumes children are added on top of adult room occupancy, or fill empty spots.
-      // For simplicity, we'll add child price for each child.
-      calculatedTotalAmount += childrenCount * selectedTourPrices.selling_price_child;
+      // Add cost for children
+      calculatedTotalAmount += numChildren * selectedTourPrices.selling_price_child;
     }
 
     setFormData(prev => ({
       ...prev,
-      number_of_people: numPeople,
-      room_details: calculatedRoomDetails,
+      number_of_people: totalPeople, // Total people including children
+      room_details: calculatedRoomDetails, // Room details based on adults
       total_amount: calculatedTotalAmount,
       remaining_payment: calculatedTotalAmount - prev.total_paid,
     }));
-  }, [formData.companions.length, formData.total_paid, selectedTourPrices, formData.contractor_age, formData.companions, calculateRoomAllocation]);
+  }, [formData.companions.length, formData.total_paid, selectedTourPrices, formData.contractor_age, formData.companions]);
 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
