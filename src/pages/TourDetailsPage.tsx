@@ -3,12 +3,14 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2 } from 'lucide-react'; // Import Loader2
+import { ArrowLeft, Loader2 } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
-import { supabase } from '@/integrations/supabase/client'; // Import supabase client
-import { format } from 'date-fns'; // Import format for dates
-import TourSeatMap from '@/components/TourSeatMap'; // Import the new TourSeatMap component
+import { supabase } from '@/integrations/supabase/client';
+import { format } from 'date-fns';
+import TourSeatMap from '@/components/TourSeatMap';
+import { Dialog, DialogTrigger } from '@/components/ui/dialog'; // Import Dialog and DialogTrigger
+import ClientBookingForm from '@/components/ClientBookingForm'; // Import the new ClientBookingForm
 
 // Hotel interface now represents a "hotel quote" from the 'hotels' table
 interface HotelQuote {
@@ -23,10 +25,10 @@ interface HotelQuote {
   capacity_double: number;
   capacity_triple: number;
   capacity_quad: number;
-  num_double_rooms: number; // NEW
-  num_triple_rooms: number; // NEW
-  num_quad_rooms: number; // NEW
-  num_courtesy_rooms: number; // NEW: Added courtesy rooms
+  num_double_rooms: number;
+  num_triple_rooms: number;
+  num_quad_rooms: number;
+  num_courtesy_rooms: number;
   is_active: boolean;
   advance_payment: number;
   total_paid: number;
@@ -53,8 +55,8 @@ interface Bus {
   rental_cost: number;
   total_capacity: number;
   seat_layout_json: SeatLayout | null; // Incluir el layout de asientos
-  advance_payment: number; // NEW
-  total_paid: number; // NEW
+  advance_payment: number;
+  total_paid: number;
 }
 
 interface Tour {
@@ -66,19 +68,15 @@ interface Tour {
   duration: string;
   includes: string[] | null;
   itinerary: { day: number; activity: string }[] | null;
-  selling_price_double_occupancy: number; // NEW
-  selling_price_triple_occupancy: number; // NEW
-  selling_price_quad_occupancy: number; // NEW
-  selling_price_child: number; // NEW: Price for children under 12
-  cost_per_paying_person: number | null;
-  bus_id: string | null; // Added bus_id
-  bus_capacity: number; // Added bus_capacity
-  bus_cost: number; // Added bus_cost
+  selling_price_double_occupancy: number;
+  selling_price_triple_occupancy: number;
+  selling_price_quad_occupancy: number;
+  selling_price_child: number;
+  bus_id: string | null;
+  bus_capacity: number;
   courtesies: number;
-  hotel_details: TourHotelDetail[] | null; // Updated type
+  hotel_details: TourHotelDetail[] | null;
   provider_details: { name: string; service: string; cost: number }[] | null;
-  total_base_cost: number | null; // Added total_base_cost
-  paying_clients_count: number | null; // Added paying_clients_count
 }
 
 const TourDetailsPage = () => {
@@ -87,13 +85,8 @@ const TourDetailsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hotelQuotesMap, setHotelQuotesMap] = useState<Map<string, HotelQuote>>(new Map());
-  const [selectedSeatsForBooking, setSelectedSeatsForBooking] = useState<number[]>([]);
-  const [busLayout, setBusLayout] = useState<SeatLayout | null>(null); // NEW: State for bus layout
-
-  // NEW: Financial states
-  const [totalSoldSeats, setTotalSoldSeats] = useState(0);
-  const [totalRemainingPayments, setTotalRemainingPayments] = useState(0);
-  const [selectedBus, setSelectedBus] = useState<Bus | null>(null); // To store selected bus details
+  const [busLayout, setBusLayout] = useState<SeatLayout | null>(null);
+  const [isBookingFormOpen, setIsBookingFormOpen] = useState(false); // State to control booking form dialog
 
   useEffect(() => {
     const fetchTourDetailsAndHotelQuotes = async () => {
@@ -119,14 +112,14 @@ const TourDetailsPage = () => {
         num_double_rooms: quote.num_double_rooms || 0,
         num_triple_rooms: quote.num_triple_rooms || 0,
         num_quad_rooms: quote.num_quad_rooms || 0,
-        num_courtesy_rooms: quote.num_courtesy_rooms || 0, // Set new field
+        num_courtesy_rooms: quote.num_courtesy_rooms || 0,
       }));
       setHotelQuotesMap(quotesMap);
 
       // Fetch all buses
       const { data: busesData, error: busesError } = await supabase
         .from('buses')
-        .select('*');
+        .select('id, name, total_capacity, seat_layout_json'); // Only fetch necessary bus details
 
       if (busesError) {
         console.error('Error fetching buses:', busesError);
@@ -138,11 +131,29 @@ const TourDetailsPage = () => {
       busesData?.forEach(bus => busesMap.set(bus.id, bus));
 
 
-      // Then fetch tour details and associated bus layout
+      // Then fetch tour details
       const { data: tourData, error: tourError } = await supabase
         .from('tours')
-        .select('*') // Select all tour data
-        .eq('slug', id) // Fetch by slug
+        .select(`
+          id,
+          image_url,
+          title,
+          description,
+          full_content,
+          duration,
+          includes,
+          itinerary,
+          selling_price_double_occupancy,
+          selling_price_triple_occupancy,
+          selling_price_quad_occupancy,
+          selling_price_child,
+          bus_id,
+          bus_capacity,
+          courtesies,
+          hotel_details,
+          provider_details
+        `) // Select only public-facing fields
+        .eq('slug', id)
         .single();
 
       if (tourError) {
@@ -159,67 +170,16 @@ const TourDetailsPage = () => {
           selling_price_double_occupancy: tourData.selling_price_double_occupancy || 0,
           selling_price_triple_occupancy: tourData.selling_price_triple_occupancy || 0,
           selling_price_quad_occupancy: tourData.selling_price_quad_occupancy || 0,
-          selling_price_child: tourData.selling_price_child || 0, // Set new field
+          selling_price_child: tourData.selling_price_child || 0,
         });
 
         // Set the bus layout from the fetched data
-        let currentBusForCalculation: Bus | null = null; // Use a local variable for immediate calculations
         if (tourData.bus_id) {
           const bus = busesMap.get(tourData.bus_id);
-          currentBusForCalculation = bus || null;
-          setSelectedBus(prevBus => {
-            // Only update if the bus ID has actually changed
-            if (prevBus?.id === currentBusForCalculation?.id) {
-              return prevBus;
-            }
-            return currentBusForCalculation;
-          });
-          setBusLayout(currentBusForCalculation?.seat_layout_json || null);
+          setBusLayout(bus?.seat_layout_json || null);
         } else {
-          setSelectedBus(null);
           setBusLayout(null);
         }
-
-        // NEW: Fetch total sold seats
-        const { count, error: seatsError } = await supabase
-          .from('tour_seat_assignments')
-          .select('id', { count: 'exact' })
-          .eq('tour_id', tourData.id)
-          .eq('status', 'booked');
-
-        if (seatsError) {
-          console.error('Error fetching sold seats:', seatsError);
-          setTotalSoldSeats(0);
-        } else {
-          setTotalSoldSeats(count || 0);
-        }
-
-        // NEW: Calculate total remaining payments
-        let currentTotalRemainingPayments = 0;
-
-        // Bus remaining payment
-        if (currentBusForCalculation) { // Use the local currentBusForCalculation variable
-          currentTotalRemainingPayments += (currentBusForCalculation.rental_cost || 0) - (currentBusForCalculation.total_paid || 0);
-        }
-
-        // Hotel remaining payments
-        tourData.hotel_details?.forEach((tourHotelDetail: TourHotelDetail) => {
-          const hotelQuote = quotesMap.get(tourHotelDetail.hotel_quote_id);
-          if (hotelQuote) {
-            const totalCostDoubleRooms = (hotelQuote.num_double_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
-            const totalCostTripleRooms = (hotelQuote.num_triple_rooms || 0) * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
-            const totalCostQuadRooms = (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
-            const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
-            
-            // Subtract the value of courtesy rooms from the total contracted cost
-            // Courtesy rooms are always valued at the quad occupancy rate
-            const costOfCourtesyRooms = (hotelQuote.num_courtesy_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
-
-            currentTotalRemainingPayments += (totalContractedRoomsCost - costOfCourtesyRooms) - (hotelQuote.total_paid || 0);
-          }
-        });
-        setTotalRemainingPayments(currentTotalRemainingPayments);
-
       } else {
         setError('Tour no encontrado.');
         setTour(null);
@@ -230,27 +190,7 @@ const TourDetailsPage = () => {
     if (id) {
       fetchTourDetailsAndHotelQuotes();
     }
-  }, [id]); // Removed selectedBus from dependencies
-
-  const handleSeatsSelection = (seats: number[]) => {
-    setSelectedSeatsForBooking(seats);
-  };
-
-  const handleBookSeats = () => {
-    if (selectedSeatsForBooking.length === 0) {
-      toast.error('Por favor, selecciona al menos un asiento para reservar.');
-      return;
-    }
-    // Here you would implement the actual booking logic
-    // For now, we'll just show a success message
-    toast.success(`Has seleccionado los asientos: ${selectedSeatsForBooking.join(', ')}. ¡Procesando reserva!`);
-    console.log('Booking seats:', selectedSeatsForBooking, 'for tour:', tour?.title);
-    // In a real application, this would involve:
-    // 1. Checking seat availability again on the server
-    // 2. Creating a booking record
-    // 3. Updating seat statuses in 'tour_seat_assignments'
-    // 4. Handling payment
-  };
+  }, [id]);
 
   if (loading) {
     return (
@@ -274,12 +214,6 @@ const TourDetailsPage = () => {
       </div>
     );
   }
-
-  // Calculate average selling price for potential revenue calculations
-  const averageSellingPrice = (tour.selling_price_double_occupancy + tour.selling_price_triple_occupancy + tour.selling_price_quad_occupancy) / 3;
-  const totalPotentialRevenue = (tour.paying_clients_count || 0) * averageSellingPrice;
-  const totalSoldRevenue = totalSoldSeats * averageSellingPrice;
-  const totalToSellRevenue = totalPotentialRevenue - totalSoldRevenue;
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -329,7 +263,6 @@ const TourDetailsPage = () => {
                     <li><span className="font-medium">Duración:</span> {tour.duration}</li>
                     <li><span className="font-medium">Capacidad del autobús:</span> {tour.bus_capacity} personas</li>
                     <li><span className="font-medium">Cortesías (Asientos Bus):</span> {tour.courtesies}</li>
-                    <li><span className="font-medium">Costo por persona pagante:</span> ${tour.cost_per_paying_person?.toFixed(2) || 'N/A'}</li>
                   </ul>
                 </div>
                 {tour.includes && tour.includes.length > 0 && (
@@ -365,24 +298,6 @@ const TourDetailsPage = () => {
                       const hotelQuote = hotelQuotesMap.get(tourHotelDetail.hotel_quote_id);
                       if (!hotelQuote) return null; // Skip if quote not found
 
-                      const totalCostDoubleRooms = (hotelQuote.num_double_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
-                      const totalCostTripleRooms = (hotelQuote.num_triple_rooms || 0) * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
-                      const totalCostQuadRooms = (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
-                      const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
-                      
-                      // Subtract the value of courtesy rooms from the total contracted cost
-                      // Courtesy rooms are always valued at the quad occupancy rate
-                      const costOfCourtesyRooms = (hotelQuote.num_courtesy_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
-
-                      const totalHotelBookingCostNet = totalContractedRoomsCost - costOfCourtesyRooms;
-
-                      const totalHotelCapacity = 
-                        ((hotelQuote.num_double_rooms || 0) * hotelQuote.capacity_double) +
-                        ((hotelQuote.num_triple_rooms || 0) * hotelQuote.capacity_triple) +
-                        ((hotelQuote.num_quad_rooms || 0) * hotelQuote.capacity_quad);
-
-                      const remainingPayment = totalHotelBookingCostNet - (hotelQuote.total_paid || 0);
-
                       return (
                         <div key={tourHotelDetail.id} className="border p-4 rounded-md bg-gray-50">
                           <p className="font-semibold text-lg mb-1">
@@ -395,10 +310,6 @@ const TourDetailsPage = () => {
                             <li><span className="font-medium">Habitaciones Triples Contratadas:</span> {hotelQuote.num_triple_rooms}</li>
                             <li><span className="font-medium">Habitaciones Cuádruples Contratadas:</span> {hotelQuote.num_quad_rooms}</li>
                             <li><span className="font-medium">Habitaciones de Cortesía:</span> {hotelQuote.num_courtesy_rooms}</li>
-                            <li><span className="font-medium">Costo total de la cotización (Neto):</span> ${totalHotelBookingCostNet.toFixed(2)}</li>
-                            <li><span className="font-medium">Anticipo al hotel:</span> ${hotelQuote.advance_payment.toFixed(2)}</li>
-                            <li><span className="font-medium">Total pagado al hotel:</span> ${hotelQuote.total_paid.toFixed(2)}</li>
-                            <li><span className="font-medium">Pago restante al hotel:</span> ${remainingPayment.toFixed(2)}</li>
                           </ul>
                         </div>
                       );
@@ -430,41 +341,46 @@ const TourDetailsPage = () => {
                     tourId={tour.id}
                     busCapacity={tour.bus_capacity}
                     courtesies={tour.courtesies}
-                    seatLayoutJson={busLayout} // Pass the fetched bus layout
-                    readOnly={false} // Allow public users to select seats
+                    seatLayoutJson={busLayout}
+                    readOnly={true} // Set to readOnly for display purposes here
                     adminMode={false}
                   />
-                  {selectedSeatsForBooking.length > 0 && (
-                    <p className="text-sm text-gray-600 mt-2">
-                      Asientos seleccionados: {selectedSeatsForBooking.join(', ')}
-                    </p>
-                  )}
                 </div>
               )}
-              <Button
-                className="w-full bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white font-semibold py-3 text-lg"
-                onClick={handleBookSeats}
-                disabled={selectedSeatsForBooking.length === 0}
-              >
-                Reservar Tour {selectedSeatsForBooking.length > 0 ? `(${selectedSeatsForBooking.length} asientos)` : ''}
-              </Button>
+              <Dialog open={isBookingFormOpen} onOpenChange={setIsBookingFormOpen}>
+                <DialogTrigger asChild>
+                  <Button
+                    className="w-full bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white font-semibold py-3 text-lg"
+                  >
+                    Reservar Tour
+                  </Button>
+                </DialogTrigger>
+                {tour && (
+                  <ClientBookingForm
+                    isOpen={isBookingFormOpen}
+                    onClose={() => setIsBookingFormOpen(false)}
+                    tourId={tour.id}
+                    tourTitle={tour.title}
+                    tourImage={tour.image_url}
+                    tourDescription={tour.description}
+                    tourSellingPrices={{
+                      double: tour.selling_price_double_occupancy,
+                      triple: tour.selling_price_triple_occupancy,
+                      quad: tour.selling_price_quad_occupancy,
+                      child: tour.selling_price_child,
+                    }}
+                    busDetails={{
+                      bus_id: tour.bus_id,
+                      bus_capacity: tour.bus_capacity,
+                      courtesies: tour.courtesies,
+                      seat_layout_json: busLayout,
+                    }}
+                  />
+                )}
+              </Dialog>
               <Button variant="outline" className="w-full mt-4 bg-white text-rosa-mexicano hover:bg-gray-100 border-rosa-mexicano hover:border-rosa-mexicano/90">
                 Contactar Asesor
               </Button>
-
-              {/* NEW: Financial Summary for Public View */}
-              <div className="mt-8 p-4 bg-white rounded-md shadow-sm border border-gray-200">
-                <h4 className="text-lg font-semibold mb-3 text-gray-800">Resumen Financiero del Tour</h4>
-                <ul className="space-y-2 text-sm text-gray-700">
-                  <li><span className="font-medium">Costo Base Total:</span> ${tour.total_base_cost?.toFixed(2) || '0.00'}</li>
-                  <li><span className="font-medium">Clientes Pagantes Potenciales:</span> {tour.paying_clients_count || 0}</li>
-                  <li><span className="font-medium">Costo por Persona Pagante:</span> ${tour.cost_per_paying_person?.toFixed(2) || '0.00'}</li>
-                  <li><span className="font-medium">Asientos Vendidos:</span> {totalSoldSeats}</li>
-                  <li><span className="font-medium">Total Vendido (Ingresos):</span> ${totalSoldRevenue.toFixed(2)}</li>
-                  <li><span className="font-medium">Total por Vender (Ingresos Potenciales):</span> ${totalToSellRevenue.toFixed(2)}</li>
-                  <li><span className="font-medium">Total por Pagar en Costos (Pendiente):</span> ${totalRemainingPayments.toFixed(2)}</li>
-                </ul>
-              </div>
             </div>
           </div>
         </div>
