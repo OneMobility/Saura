@@ -8,7 +8,7 @@ import SeoSettings from '@/components/admin/settings/SeoSettings';
 import SocialMediaSettings from '@/components/admin/settings/SocialMediaSettings';
 import AgencySettings from '@/components/admin/settings/AgencySettings'; // Import the new AgencySettings component
 import { useSession } from '@/components/SessionContextProvider';
-import { useNavigate } => 'react-router-dom';
+import { useNavigate } from 'react-router-dom'; // Corrected import statement
 import AdminHeader from '@/components/admin/AdminHeader'; // Import the new AdminHeader
 
 const AdminSettingsPage = () => {
