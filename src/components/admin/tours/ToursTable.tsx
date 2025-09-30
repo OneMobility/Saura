@@ -17,6 +17,7 @@ interface Tour {
   selling_price_per_person: number;
   cost_per_paying_person: number | null;
   created_at: string;
+  other_income: number; // NEW: Other income for the tour
   // Include all other fields for editing purposes
   full_content: string | null;
   includes: string[] | null;
@@ -28,6 +29,7 @@ interface Tour {
   provider_details: any[] | null; // JSONB type
   total_base_cost: number | null;
   paying_clients_count: number | null;
+  clients: Array<{ total_amount: number; status: string }> | null; // NEW: Clients data for revenue calculation
 }
 
 interface Companion {
@@ -71,14 +73,32 @@ const ToursTable: React.FC<ToursTableProps> = ({ onEditTour, onTourDeleted }) =>
     setLoading(true);
     const { data, error } = await supabase
       .from('tours')
-      .select('*') // Select all columns for editing
+      .select(`
+        *,
+        clients (
+          total_amount,
+          status
+        )
+      `) // Select all columns for editing, and clients' total_amount and status
       .order('created_at', { ascending: false });
 
     if (error) {
       console.error('Error fetching tours:', error);
       toast.error('Error al cargar los tours.');
     } else {
-      setTours(data || []);
+      const toursWithCalculatedRevenue = (data || []).map(tour => {
+        const clientsRevenue = (tour.clients || [])
+          .filter(client => client.status !== 'cancelled') // Only active clients
+          .reduce((sum, client) => sum + client.total_amount, 0);
+        
+        const totalSold = clientsRevenue + (tour.other_income || 0); // Sum clients revenue and other_income
+
+        return {
+          ...tour,
+          total_sold_revenue: totalSold, // Add calculated total sold revenue
+        };
+      });
+      setTours(toursWithCalculatedRevenue as Tour[]); // Cast back to Tour[]
     }
     setLoading(false);
   };
@@ -246,6 +266,7 @@ const ToursTable: React.FC<ToursTableProps> = ({ onEditTour, onTourDeleted }) =>
                 <TableHead>Costo por Persona</TableHead>
                 <TableHead>Capacidad Bus</TableHead>
                 <TableHead>Cortesías</TableHead>
+                <TableHead>Total Vendido</TableHead> {/* NEW COLUMN */}
                 <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -258,6 +279,7 @@ const ToursTable: React.FC<ToursTableProps> = ({ onEditTour, onTourDeleted }) =>
                   <TableCell>${tour.cost_per_paying_person?.toFixed(2) || 'N/A'}</TableCell>
                   <TableCell>{tour.bus_capacity}</TableCell>
                   <TableCell>{tour.courtesies}</TableCell>
+                  <TableCell>${(tour as any).total_sold_revenue?.toFixed(2) || '0.00'}</TableCell> {/* Display total sold revenue */}
                   <TableCell className="flex space-x-2">
                     <Button
                       variant="outline"

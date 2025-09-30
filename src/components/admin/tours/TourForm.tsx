@@ -85,6 +85,7 @@ interface Tour {
   selling_price_triple_occupancy: number;
   selling_price_quad_occupancy: number;
   selling_price_child: number; // NEW: Price for children under 12
+  other_income: number; // NEW: Other income for the tour
   user_id?: string;
 }
 
@@ -127,6 +128,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     selling_price_triple_occupancy: 0,
     selling_price_quad_occupancy: 0,
     selling_price_child: 0, // Initialize new field
+    other_income: 0, // Initialize new field
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrlPreview, setImageUrlPreview] = useState<string>('');
@@ -142,6 +144,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const [totalRemainingPayments, setTotalRemainingPayments] = useState(0);
   const [desiredProfitPercentage, setDesiredProfitPercentage] = useState(20); // Default 20%
   const [suggestedSellingPrice, setSuggestedSellingPrice] = useState(0); // This will be an average
+  const [totalClientsRevenue, setTotalClientsRevenue] = useState(0); // NEW: Sum of total_amount from active clients
 
   // NEW: Break-even analysis states
   const [expectedClientsForBreakeven, setExpectedClientsForBreakeven] = useState(0);
@@ -214,6 +217,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             selling_price_triple_occupancy: data.selling_price_triple_occupancy || 0,
             selling_price_quad_occupancy: data.selling_price_quad_occupancy || 0,
             selling_price_child: data.selling_price_child || 0, // Set new field
+            other_income: data.other_income || 0, // Set new field
           });
           setImageUrlPreview(data.image_url);
 
@@ -246,6 +250,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           selling_price_triple_occupancy: 0,
           selling_price_quad_occupancy: 0,
           selling_price_child: 0, // Reset new field
+          other_income: 0, // Reset new field
         });
         setImageFile(null);
         setImageUrlPreview('');
@@ -258,24 +263,45 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     fetchTourData();
   }, [tourId, availableBuses]); // Add availableBuses to dependencies to ensure layout is set on load
 
-  // NEW: Fetch total sold seats
+  // NEW: Fetch total sold seats and clients revenue
   useEffect(() => {
-    const fetchSoldSeats = async () => {
-      if (!tourId) return;
-      const { count, error } = await supabase
+    const fetchSoldData = async () => {
+      if (!tourId) {
+        setTotalSoldSeats(0);
+        setTotalClientsRevenue(0);
+        return;
+      }
+
+      // Fetch sold seats
+      const { count: seatsCount, error: seatsError } = await supabase
         .from('tour_seat_assignments')
         .select('id', { count: 'exact' })
         .eq('tour_id', tourId)
         .eq('status', 'booked');
 
-      if (error) {
-        console.error('Error fetching sold seats:', error);
+      if (seatsError) {
+        console.error('Error fetching sold seats:', seatsError);
         setTotalSoldSeats(0);
       } else {
-        setTotalSoldSeats(count || 0);
+        setTotalSoldSeats(seatsCount || 0);
+      }
+
+      // Fetch total revenue from active clients
+      const { data: clientsData, error: clientsError } = await supabase
+        .from('clients')
+        .select('total_amount')
+        .eq('tour_id', tourId)
+        .neq('status', 'cancelled'); // Only count active clients
+
+      if (clientsError) {
+        console.error('Error fetching clients revenue:', clientsError);
+        setTotalClientsRevenue(0);
+      } else {
+        const sumRevenue = (clientsData || []).reduce((sum, client) => sum + client.total_amount, 0);
+        setTotalClientsRevenue(sumRevenue);
       }
     };
-    fetchSoldSeats();
+    fetchSoldData();
   }, [tourId]);
 
   const calculateCosts = useCallback(() => {
@@ -740,6 +766,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       paying_clients_count: formData.paying_clients_count,
       cost_per_paying_person: formData.cost_per_paying_person,
       selling_price_per_person: calculatedSellingPricePerPerson, // Add this line
+      other_income: formData.other_income, // NEW: Save other_income
     };
 
     if (tourId) {
@@ -785,8 +812,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   // Calculate average selling price for display in financial summary
   const averageSellingPrice = (formData.selling_price_double_occupancy + formData.selling_price_triple_occupancy + formData.selling_price_quad_occupancy) / 3;
   const totalPotentialRevenue = (formData.paying_clients_count || 0) * averageSellingPrice;
-  const totalSoldRevenue = totalSoldSeats * averageSellingPrice;
-  const totalToSell = totalPotentialRevenue - totalSoldRevenue;
+  const totalSoldRevenue = totalClientsRevenue + formData.other_income; // NEW: Use totalClientsRevenue + other_income
+  const totalToSell = totalPotentialRevenue - totalClientsRevenue; // NEW: Only subtract client revenue
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
@@ -1024,6 +1051,22 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           <div>
             <Label className="font-semibold">Asientos Vendidos:</Label>
             <p>{totalSoldSeats}</p>
+          </div>
+          <div>
+            <Label className="font-semibold">Ingresos por Clientes Activos:</Label>
+            <p>${totalClientsRevenue.toFixed(2)}</p>
+          </div>
+          <div>
+            <Label htmlFor="other_income" className="font-semibold">Otros Ingresos:</Label>
+            <Input
+              id="other_income"
+              type="number"
+              value={formData.other_income}
+              onChange={(e) => handleNumberChange('other_income', e.target.value)}
+              className="w-full"
+              min={0}
+              step="0.01"
+            />
           </div>
           <div>
             <Label className="font-semibold">Total Vendido (Ingresos):</Label>
