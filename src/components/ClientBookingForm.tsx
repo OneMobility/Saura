@@ -78,7 +78,6 @@ interface ClientBookingFormProps {
   tourDescription: string;
   tourSellingPrices: TourSellingPrices;
   busDetails: BusDetails;
-  tourProviderServices: ClientProviderService[] | null; // NEW: Receive tour-specific provider services
 }
 
 // NEW: Helper function to calculate room allocation for a given number of people
@@ -122,7 +121,6 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
   tourDescription,
   tourSellingPrices,
   busDetails,
-  tourProviderServices, // NEW: Destructure new prop
 }) => {
   const [formData, setFormData] = useState({
     first_name: '',
@@ -138,26 +136,26 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
   const [totalAmount, setTotalAmount] = useState(0);
   const [roomDetails, setRoomDetails] = useState<RoomDetails>({ double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [availableProvidersForTour, setAvailableProvidersForTour] = useState<AvailableProvider[]>([]); // NEW: State for tour-specific providers
+  const [availableProviders, setAvailableProviders] = useState<AvailableProvider[]>([]); // NEW: State for available providers
 
-  // NEW: Initialize availableProvidersForTour from tourProviderServices prop
+  // NEW: Fetch available providers
   useEffect(() => {
-    if (tourProviderServices) {
-      // Map TourProviderService to AvailableProvider format for selection
-      const mappedProviders: AvailableProvider[] = tourProviderServices.map(service => ({
-        id: service.provider_id, // Use provider_id as the ID for selection
-        name: service.name_snapshot,
-        service_type: service.service_type_snapshot,
-        cost_per_unit: service.cost_per_unit_snapshot, // Not used in client form, but good to have
-        unit_type: service.unit_type_snapshot,
-        selling_price_per_unit: service.selling_price_per_unit_snapshot,
-        is_active: true, // Assume active if linked to tour
-      }));
-      setAvailableProvidersForTour(mappedProviders);
-    } else {
-      setAvailableProvidersForTour([]);
-    }
-  }, [tourProviderServices]);
+    const fetchAvailableProviders = async () => {
+      const { data, error } = await supabase
+        .from('providers')
+        .select('*')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error('Error al cargar proveedores disponibles:', error);
+        toast.error('Error al cargar la lista de proveedores disponibles.');
+      } else {
+        setAvailableProviders(data || []);
+      }
+    };
+    fetchAvailableProviders();
+  }, []);
 
   // Effect to calculate total_amount and room_details
   useEffect(() => {
@@ -252,7 +250,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
 
       if (index !== -1) {
         if (field === 'provider_id') {
-          const selectedProvider = availableProvidersForTour.find(p => p.id === value);
+          const selectedProvider = availableProviders.find(p => p.id === value);
           if (selectedProvider) {
             newExtraServices[index] = {
               ...newExtraServices[index],
@@ -496,55 +494,53 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
           </div>
 
           {/* NEW: Extra Services for Client */}
-          {availableProvidersForTour.length > 0 && (
-            <div className="space-y-2 col-span-full mt-6">
-              <Label className="text-lg font-semibold">Servicios Adicionales</Label>
-              {formData.extra_services.map((clientService) => {
-                const selectedProvider = availableProvidersForTour.find(p => p.id === clientService.provider_id);
-                const providerDisplay = selectedProvider
-                  ? `${selectedProvider.name} (${selectedProvider.service_type} - ${clientService.unit_type_snapshot})`
-                  : 'Seleccionar Servicio';
-                const totalSellingPrice = clientService.selling_price_per_unit_snapshot * clientService.quantity;
+          <div className="space-y-2 col-span-full mt-6">
+            <Label className="text-lg font-semibold">Servicios Adicionales</Label>
+            {formData.extra_services.map((clientService) => {
+              const selectedProvider = availableProviders.find(p => p.id === clientService.provider_id);
+              const providerDisplay = selectedProvider
+                ? `${selectedProvider.name} (${selectedProvider.service_type} - ${clientService.unit_type_snapshot})`
+                : 'Seleccionar Servicio';
+              const totalSellingPrice = clientService.selling_price_per_unit_snapshot * clientService.quantity;
 
-                return (
-                  <div key={clientService.id} className="flex flex-col md:flex-row items-center gap-2 border p-2 rounded-md">
-                    <Select
-                      value={clientService.provider_id}
-                      onValueChange={(value) => handleClientExtraServiceChange(clientService.id, 'provider_id', value)}
-                    >
-                      <SelectTrigger className="w-full md:w-1/2">
-                        <SelectValue placeholder={providerDisplay} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {availableProvidersForTour.map((provider) => (
-                          <SelectItem key={provider.id} value={provider.id}>
-                            {`${provider.name} (${provider.service_type} - ${provider.unit_type})`}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <Input
-                      type="number"
-                      value={clientService.quantity}
-                      onChange={(e) => handleClientExtraServiceChange(clientService.id, 'quantity', parseFloat(e.target.value) || 0)}
-                      placeholder="Cantidad"
-                      className="w-full md:w-1/6"
-                      min={1}
-                    />
-                    <span className="text-sm text-gray-600 md:w-1/4 text-center md:text-left">
-                      Precio Venta Total: ${totalSellingPrice.toFixed(2)}
-                    </span>
-                    <Button type="button" variant="destructive" size="icon" onClick={() => removeClientExtraService(clientService.id)}>
-                      <MinusCircle className="h-4 w-4" />
-                    </Button>
-                  </div>
-                );
-              })}
-              <Button type="button" variant="outline" onClick={addClientExtraService}>
-                <PlusCircle className="mr-2 h-4 w-4" /> Añadir Servicio Adicional
-              </Button>
-            </div>
-          )}
+              return (
+                <div key={clientService.id} className="flex flex-col md:flex-row items-center gap-2 border p-2 rounded-md">
+                  <Select
+                    value={clientService.provider_id}
+                    onValueChange={(value) => handleClientExtraServiceChange(clientService.id, 'provider_id', value)}
+                  >
+                    <SelectTrigger className="w-full md:w-1/2">
+                      <SelectValue placeholder={providerDisplay} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {availableProviders.map((provider) => (
+                        <SelectItem key={provider.id} value={provider.id}>
+                          {`${provider.name} (${provider.service_type} - ${provider.unit_type})`}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    type="number"
+                    value={clientService.quantity}
+                    onChange={(e) => handleClientExtraServiceChange(clientService.id, 'quantity', parseFloat(e.target.value) || 0)}
+                    placeholder="Cantidad"
+                    className="w-full md:w-1/6"
+                    min={1}
+                  />
+                  <span className="text-sm text-gray-600 md:w-1/4 text-center md:text-left">
+                    Precio Venta Total: ${totalSellingPrice.toFixed(2)}
+                  </span>
+                  <Button type="button" variant="destructive" size="icon" onClick={() => removeClientExtraService(clientService.id)}>
+                    <MinusCircle className="h-4 w-4" />
+                  </Button>
+                </div>
+              );
+            })}
+            <Button type="button" variant="outline" onClick={addClientExtraService}>
+              <PlusCircle className="mr-2 h-4 w-4" /> Añadir Servicio Adicional
+            </Button>
+          </div>
 
           {/* Seat Selection */}
           {busDetails.bus_capacity > 0 && (
