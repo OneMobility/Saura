@@ -9,9 +9,12 @@ const corsHeaders = {
 // Helper function to format room details
 const formatRoomDetails = (details: any) => {
   const parts = [];
-  if (details.quad_rooms > 0) parts.push(`${details.quad_rooms} Cuádruple(s)`);
-  if (details.triple_rooms > 0) parts.push(`${details.triple_rooms} Triple(s)`);
-  if (details.double_rooms > 0) parts.push(`${details.double_rooms} Doble(s)`);
+  // Ensure details is an object before accessing properties
+  const safeDetails = details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 };
+
+  if (safeDetails.quad_rooms > 0) parts.push(`${safeDetails.quad_rooms} Cuádruple(s)`);
+  if (safeDetails.triple_rooms > 0) parts.push(`${safeDetails.triple_rooms} Triple(s)`);
+  if (safeDetails.double_rooms > 0) parts.push(`${safeDetails.double_rooms} Doble(s)`);
   return parts.join(', ') || 'N/A';
 };
 
@@ -22,16 +25,20 @@ const generateBookingSheetHtml = (data: any) => {
   const seats = data.seats;
   const agency = data.agency;
 
-  const companionsList = client.companions && client.companions.length > 0
-    ? client.companions.map((c: any) => `<li>${c.name} ${c.age !== null ? `(${c.age} años)` : ''}</li>`).join('')
+  // Provide default empty arrays for companions and extra_services if they are null
+  const safeCompanions = client.companions || [];
+  const safeExtraServices = client.extra_services || [];
+
+  const companionsList = safeCompanions.length > 0
+    ? safeCompanions.map((c: any) => `<li>${c.name} ${c.age !== null ? `(${c.age} años)` : ''}</li>`).join('')
     : '<li>N/A</li>';
 
   const seatNumbers = seats && seats.length > 0
     ? seats.map((s: any) => s.seat_number).sort((a: number, b: number) => a - b).join(', ')
     : 'N/A';
 
-  const extraServicesList = client.extra_services && client.extra_services.length > 0
-    ? client.extra_services.map((s: any) => `<li>${s.name_snapshot} (${s.service_type_snapshot}) - Cantidad: ${s.quantity} - Precio: $${s.selling_price_per_unit_snapshot.toFixed(2)}</li>`).join('')
+  const extraServicesList = safeExtraServices.length > 0
+    ? safeExtraServices.map((s: any) => `<li>${s.name_snapshot} (${s.service_type_snapshot}) - Cantidad: ${s.quantity} - Precio: $${s.selling_price_per_unit_snapshot.toFixed(2)}</li>`).join('')
     : '<li>N/A</li>';
 
   const remainingPayment = (client.total_amount - client.total_paid).toFixed(2);
@@ -65,7 +72,7 @@ const generateBookingSheetHtml = (data: any) => {
 
             <div class="section">
                 <h2>Datos del Cliente</h2>
-                <p><span class="label">Nombre del Cliente:</span> ${client.first_name} ${client.last_name}</p>
+                <p><span class="label">Nombre del Cliente:</span> ${client.first_name || 'N/A'} ${client.last_name || 'N/A'}</p>
                 <p><span class="label">Teléfono:</span> ${client.phone || 'N/A'}</p>
                 <p><span class="label">Edad del Contratante:</span> ${client.contractor_age !== null ? client.contractor_age : 'N/A'}</p>
                 <p><span class="label">Acompañantes:</span></p>
@@ -76,7 +83,7 @@ const generateBookingSheetHtml = (data: any) => {
 
             <div class="section">
                 <h2>Detalles de la Reserva</h2>
-                <p><span class="label">Número de Reserva:</span> ${client.contract_number}</p>
+                <p><span class="label">Número de Reserva:</span> ${client.contract_number || 'N/A'}</p>
                 <p><span class="label">Tour:</span> ${tour?.title || 'N/A'}</p>
                 <p><span class="label">Distribución de Habitación:</span> ${formatRoomDetails(client.room_details)}</p>
                 <p><span class="label">Asientos Asignados:</span> ${seatNumbers}</p>
@@ -88,8 +95,8 @@ const generateBookingSheetHtml = (data: any) => {
 
             <div class="section payment-summary">
                 <h2>Resumen de Pagos</h2>
-                <p><span class="label">Monto Total del Contrato:</span> $${client.total_amount.toFixed(2)}</p>
-                <p><span class="label">Total Pagado:</span> $${client.total_paid.toFixed(2)}</p>
+                <p><span class="label">Monto Total del Contrato:</span> $${client.total_amount !== undefined ? client.total_amount.toFixed(2) : '0.00'}</p>
+                <p><span class="label">Total Pagado:</span> $${client.total_paid !== undefined ? client.total_paid.toFixed(2) : '0.00'}</p>
                 <p class="total-amount"><span class="label">Adeudo:</span> $${remainingPayment}</p>
             </div>
 
