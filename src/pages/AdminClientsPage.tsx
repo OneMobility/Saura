@@ -8,13 +8,26 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ClientsTable from '@/components/admin/clients/ClientsTable'; // Import the new ClientsTable
-// Removed ClientFormDialog import as it's now a page
+import ClientPaymentDialog from '@/components/admin/clients/ClientPaymentDialog'; // NEW: Import ClientPaymentDialog
+
+interface Client {
+  id: string;
+  first_name: string;
+  last_name: string;
+  total_amount: number;
+  total_paid: number;
+  remaining_payment: number;
+  // Add other necessary client properties here if needed by ClientPaymentDialog
+}
 
 const AdminClientsPage = () => {
   const { user, isAdmin, isLoading } = useSession();
   const navigate = useNavigate();
-  // Removed isCreateDialogOpen state
   const [refreshKey, setRefreshKey] = useState(0); // Key to force re-fetch of clients
+
+  // NEW: State for payment dialog
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
+  const [selectedClientForPayment, setSelectedClientForPayment] = useState<Client | null>(null);
 
   const handleClientSave = () => {
     setRefreshKey(prev => prev + 1); // Increment key to trigger re-fetch in ClientsTable
@@ -22,6 +35,12 @@ const AdminClientsPage = () => {
 
   const handleAddClient = () => {
     navigate('/admin/clients/new'); // Navigate to the new form page for creation
+  };
+
+  // NEW: Handler for opening payment dialog
+  const handleRegisterPayment = (client: Client) => {
+    setSelectedClientForPayment(client);
+    setIsPaymentDialogOpen(true);
   };
 
   if (isLoading) {
@@ -48,13 +67,21 @@ const AdminClientsPage = () => {
           </Button>
         </AdminHeader>
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
-          <ClientsTable refreshKey={refreshKey} />
+          <ClientsTable refreshKey={refreshKey} onRegisterPayment={handleRegisterPayment} /> {/* Pass new prop */}
         </main>
         <footer className="bg-gray-800 text-white py-4 text-center text-sm">
           <p>&copy; {new Date().getFullYear()} Saura Tours Admin. Todos los derechos reservados.</p>
         </footer>
       </div>
-      {/* Removed ClientFormDialog */}
+      {/* NEW: ClientPaymentDialog */}
+      {selectedClientForPayment && (
+        <ClientPaymentDialog
+          isOpen={isPaymentDialogOpen}
+          onClose={() => setIsPaymentDialogOpen(false)}
+          client={selectedClientForPayment}
+          onPaymentRegistered={handleClientSave} // Refresh clients table after payment
+        />
+      )}
     </div>
   );
 };

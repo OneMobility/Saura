@@ -5,8 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Edit, Trash2, Loader2 } from 'lucide-react';
-// Removed ClientFormDialog import as it's now a page
+import { Edit, Trash2, Loader2, DollarSign } from 'lucide-react'; // Import DollarSign icon
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
 interface Companion {
@@ -43,12 +42,12 @@ interface Client {
 
 interface ClientsTableProps {
   refreshKey: number; // Prop to trigger re-fetch
+  onRegisterPayment: (client: Client) => void; // NEW: Callback for registering payment
 }
 
-const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey }) => {
+const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayment }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
-  // Removed isEditDialogOpen and selectedClient states
   const navigate = useNavigate(); // Initialize useNavigate
 
   useEffect(() => {
@@ -164,7 +163,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey }) => {
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => handleEditClient(client)}
+                      onClick={() => onEditClient(client)}
                       className="text-blue-600 hover:bg-blue-50"
                     >
                       <Edit className="h-4 w-4" />
@@ -178,6 +177,15 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey }) => {
                       <Trash2 className="h-4 w-4" />
                       <span className="sr-only">Eliminar</span>
                     </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => onRegisterPayment(client)} // NEW: Register Payment button
+                      className="text-green-600 hover:bg-green-50"
+                    >
+                      <DollarSign className="h-4 w-4" />
+                      <span className="sr-only">Registrar Abono</span>
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
@@ -185,7 +193,6 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey }) => {
           </Table>
         </div>
       )}
-      {/* Removed ClientFormDialog */}
     </div>
   );
 };
