@@ -67,27 +67,48 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
       const fetchedAssignments = data || [];
       const allSeats: Seat[] = [];
 
-      // If seatLayoutJson is provided, use it to determine seat numbers
+      // Create a flat list of all potential seat numbers from the layout
+      const layoutSeatNumbers: number[] = [];
       if (seatLayoutJson) {
         seatLayoutJson.forEach(row => {
           row.forEach(item => {
             if (item.type === 'seat' && item.number !== undefined) {
-              const existingAssignment = fetchedAssignments.find(s => s.seat_number === item.number);
-              allSeats.push(existingAssignment || { seat_number: item.number, status: 'available', client_id: null });
+              layoutSeatNumbers.push(item.number);
             }
           });
         });
       } else {
         // Fallback to simple grid if no layout is provided (should not happen if bus has layout)
         for (let i = 1; i <= busCapacity; i++) {
-          const existingAssignment = fetchedAssignments.find(s => s.seat_number === i);
-          allSeats.push(existingAssignment || { seat_number: i, status: 'available', client_id: null });
+          layoutSeatNumbers.push(i);
         }
       }
-      setSeats(allSeats);
+
+      // Populate allSeats, merging with existing assignments
+      layoutSeatNumbers.forEach(seatNumber => {
+        const existingAssignment = fetchedAssignments.find(s => s.seat_number === seatNumber);
+        allSeats.push(existingAssignment || { seat_number: seatNumber, status: 'available', client_id: null });
+      });
+
+      // Sort seats by number to ensure "first available" is consistent
+      allSeats.sort((a, b) => a.seat_number - b.seat_number);
+
+      // Apply courtesy logic: mark the first 'courtesies' available seats as 'courtesy'
+      let courtesySeatsAssigned = 0;
+      const updatedSeats = allSeats.map(seat => {
+        // Only apply courtesy if it's currently 'available' and we still need to assign courtesies
+        // And if it's not already explicitly marked as courtesy in DB (though it shouldn't be if it's 'available')
+        if (seat.status === 'available' && courtesySeatsAssigned < courtesies) {
+          courtesySeatsAssigned++;
+          return { ...seat, status: 'courtesy' };
+        }
+        return seat;
+      });
+      
+      setSeats(updatedSeats);
     }
     setLoading(false);
-  }, [tourId, busCapacity, seatLayoutJson]);
+  }, [tourId, busCapacity, courtesies, seatLayoutJson]); // Added courtesies to dependencies
 
   useEffect(() => {
     fetchSeats();
@@ -113,16 +134,28 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
     const currentSeat = seats[seatIndex];
 
     if (adminMode && isAdmin) {
-      // Admin can toggle 'blocked' status
       setIsUpdatingSeats(true);
-      const newStatus = currentStatus === 'blocked' ? 'available' : 'blocked';
+      let newStatus: Seat['status'];
+      let newClientId: string | null = null; // Admin blocking/courtesy doesn't assign to a client
+
+      if (currentStatus === 'blocked' || currentStatus === 'courtesy') {
+        newStatus = 'available'; // Admin can unblock or unmark courtesy
+      } else if (currentStatus === 'available') {
+        newStatus = 'blocked'; // Admin can block an available seat
+      } else {
+        // Booked seats cannot be changed by admin directly here
+        toast.info('Este asiento ya está reservado por un cliente y no puede ser modificado directamente.');
+        setIsUpdatingSeats(false);
+        return;
+      }
+
       const { error } = await supabase
         .from('tour_seat_assignments')
         .upsert({
           tour_id: tourId,
           seat_number: seatNumber,
           status: newStatus,
-          client_id: null, // Admin blocking doesn't assign to a client
+          client_id: newClientId,
           id: currentSeat.id, // Include ID if updating existing
         }, { onConflict: 'tour_id,seat_number' });
 
@@ -130,7 +163,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
         console.error('Error updating seat status (admin):', error);
         toast.error('Error al actualizar el estado del asiento.');
       } else {
-        toast.success(`Asiento ${seatNumber} ${newStatus === 'blocked' ? 'bloqueado' : 'desbloqueado'}.`);
+        toast.success(`Asiento ${seatNumber} actualizado a ${newStatus}.`);
         fetchSeats(); // Re-fetch to update UI
       }
       setIsUpdatingSeats(false);
@@ -201,7 +234,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
       return cn(baseClasses, "bg-gray-400 text-gray-700 cursor-not-allowed", adminMode && "hover:bg-gray-500 cursor-pointer");
     }
     if (seat.status === 'courtesy') {
-      return cn(baseClasses, "bg-purple-500 text-white cursor-not-allowed");
+      return cn(baseClasses, "bg-purple-500 text-white cursor-not-allowed", adminMode && "hover:bg-purple-600 cursor-pointer");
     }
     if (isCurrentlySelected) {
       return cn(baseClasses, "bg-green-500 text-white hover:bg-green-600 cursor-pointer");
@@ -240,7 +273,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
       </h3>
       {adminMode && isAdmin && (
         <p className="text-sm text-gray-600 mb-4">
-          Modo Administrador: Haz clic en un asiento para bloquearlo/desbloquearlo.
+          Modo Administrador: Haz clic en un asiento bloqueado o de cortesía para liberarlo, o en uno disponible para bloquearlo.
         </p>
       )}
       {currentClientId && (
@@ -259,7 +292,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
                     <Button
                       className={getSeatClasses(seat, item.type)}
                       onClick={() => handleSeatClick(seat.seat_number, seat.status, seat.client_id)}
-                      disabled={isUpdatingSeats || (readOnly && !adminMode && !currentClientId) || (seat.status === 'booked' && seat.client_id !== currentClientId && !adminMode) || (seat.status === 'courtesy' && !adminMode) || (seat.status === 'blocked' && !adminMode)}
+                      disabled={isUpdatingSeats || (readOnly && !adminMode && !currentClientId) || (seat.status === 'booked' && seat.client_id !== currentClientId && !adminMode) || (seat.status === 'blocked' && !adminMode) || (seat.status === 'courtesy' && !adminMode)}
                     >
                       {item.number}
                     </Button>
