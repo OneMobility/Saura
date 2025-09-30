@@ -97,14 +97,9 @@ interface TourFormProps {
 
 // NEW: Interface for BreakevenResult
 interface BreakevenResult {
-  adjustedTotalBaseCost: number;
-  adjustedCostPerPayingPerson: number;
-  suggestedSellingPrice: number;
+  clientsNeededToBreakEven: number; // NEW: Number of clients needed to break even
   message: string;
-  simulatedDoubleRooms: number; // NEW
-  simulatedTripleRooms: number; // NEW
-  simulatedQuadRooms: number; // NEW
-  costCovered: boolean; // NEW: Indicates if costs are covered
+  recommendations: string[]; // NEW: Array of recommendations
 }
 
 const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
@@ -619,129 +614,72 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
 
   // NEW: Break-even analysis function
   const runBreakevenAnalysis = useCallback(() => {
+    const recommendations: string[] = [];
+    let message = '';
+
+    const totalBaseCost = formData.total_base_cost || 0;
+    const averageSellingPrice = (formData.selling_price_double_occupancy + formData.selling_price_triple_occupancy + formData.selling_price_quad_occupancy) / 3;
+    const costPerPayingPersonIfFull = formData.cost_per_paying_person || 0;
     const maxPayingCapacity = formData.bus_capacity - formData.courtesies;
-    if (expectedClientsForBreakeven <= 0 || expectedClientsForBreakeven > maxPayingCapacity) {
-      toast.error(`El número de clientes esperados debe ser mayor que 0 y no exceder la capacidad pagante del autobús (${maxPayingCapacity}).`);
-      setBreakevenResult(null);
+
+    if (totalBaseCost <= 0 || averageSellingPrice <= 0) {
+      message = 'Asegúrate de que el costo base total y el precio de venta promedio sean mayores que cero para calcular el punto de equilibrio.';
+      setBreakevenResult({
+        clientsNeededToBreakEven: 0,
+        message,
+        recommendations: [],
+      });
       return;
     }
 
-    let currentAdjustedTotalBaseCost = formData.bus_cost + formData.provider_details.reduce((sum, p) => sum + (p.cost_per_unit_snapshot * p.quantity), 0);
-    let remainingClientsToAccommodate = expectedClientsForBreakeven;
-    let hotelAdjustmentsMessage = '';
+    const clientsNeededToBreakEven = totalBaseCost / averageSellingPrice;
+    message = `Para cubrir el costo base total de $${totalBaseCost.toFixed(2)} con un precio de venta promedio de $${averageSellingPrice.toFixed(2)} por persona, necesitas aproximadamente ${Math.ceil(clientsNeededToBreakEven)} clientes.`;
 
-    // Deep copy of hotel quotes to simulate adjustments
-    const tempHotelQuotes = availableHotelQuotes.map(hq => ({ ...hq }));
-    const tourLinkedHotelQuotes = formData.hotel_details.map(td => ({ ...td }));
+    // --- Recommendations ---
 
-    // Reset room counts for linked hotels in the simulation
-    tourLinkedHotelQuotes.forEach(tourHotelDetail => {
-      const hotelQuote = tempHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
-      if (hotelQuote) {
-        hotelQuote.num_quad_rooms = 0;
-        hotelQuote.num_triple_rooms = 0;
-        hotelQuote.num_double_rooms = 0;
-        hotelQuote.num_courtesy_rooms = 0; // Reset courtesy rooms for simulation
+    // 1. Basic profitability check if tour fills up
+    if (costPerPayingPersonIfFull > averageSellingPrice) {
+      recommendations.push(`¡Alerta! El precio de venta promedio actual ($${averageSellingPrice.toFixed(2)}) es menor que el costo por persona si el tour se llena ($${costPerPayingPersonIfFull.toFixed(2)}). Considera aumentar tus precios para asegurar la rentabilidad.`);
+    } else if (costPerPayingPersonIfFull > 0 && averageSellingPrice > costPerPayingPersonIfFull) {
+      recommendations.push(`¡Bien! El precio de venta promedio cubre el costo por persona si el tour se llena. Tienes un margen de ganancia saludable.`);
+    }
+
+    // 2. Comparison with expected clients
+    if (expectedClientsForBreakeven > 0) {
+      if (expectedClientsForBreakeven < clientsNeededToBreakEven) {
+        const remainingToSell = Math.ceil(clientsNeededToBreakEven - expectedClientsForBreakeven);
+        recommendations.push(`Con ${expectedClientsForBreakeven} clientes esperados, aún necesitas vender aproximadamente ${remainingToSell} boletos más para cubrir los costos.`);
+        
+        const requiredPriceForExpectedClients = totalBaseCost / expectedClientsForBreakeven;
+        if (requiredPriceForExpectedClients > averageSellingPrice) {
+          recommendations.push(`Para alcanzar el punto de equilibrio con ${expectedClientsForBreakeven} clientes, el precio de venta promedio debería ser de $${requiredPriceForExpectedClients.toFixed(2)} por persona.`);
+        }
+      } else {
+        recommendations.push(`¡Excelente! Con ${expectedClientsForBreakeven} clientes esperados, ya estás por encima del punto de equilibrio.`);
+        recommendations.push(`Podrías considerar ofrecer descuentos o servicios adicionales para atraer más clientes y maximizar ganancias.`);
       }
-    });
+    }
 
-    // Sort linked hotel quotes by potential capacity (descending) to prioritize larger rooms
-    tourLinkedHotelQuotes.sort((a, b) => {
-      const quoteA = tempHotelQuotes.find(hq => hq.id === a.hotel_quote_id);
-      const quoteB = tempHotelQuotes.find(hq => hq.id === b.hotel_quote_id);
-      if (!quoteA || !quoteB) return 0;
-      const capacityA = (quoteA.capacity_quad * 4) + (quoteA.capacity_triple * 3) + (quoteA.capacity_double * 2);
-      const capacityB = (quoteB.capacity_quad * 4) + (quoteB.capacity_triple * 3) + (quoteB.capacity_double * 2);
-      return capacityB - capacityA;
-    });
-
-    let simulatedDoubleRooms = 0;
-    let simulatedTripleRooms = 0;
-    let simulatedQuadRooms = 0;
-
-    tourLinkedHotelQuotes.forEach(tourHotelDetail => {
-      const hotelQuote = tempHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
-      if (!hotelQuote || remainingClientsToAccommodate <= 0) return;
-
-      // Prioritize quad rooms
-      if (remainingClientsToAccommodate >= hotelQuote.capacity_quad && hotelQuote.capacity_quad > 0) {
-        const numRooms = Math.floor(remainingClientsToAccommodate / hotelQuote.capacity_quad);
-        hotelQuote.num_quad_rooms = numRooms;
-        simulatedQuadRooms += numRooms;
-        remainingClientsToAccommodate -= numRooms * hotelQuote.capacity_quad;
-        if (numRooms > 0) hotelAdjustmentsMessage += ` ${numRooms} hab. cuádruples en ${hotelQuote.name}.`;
-      }
-
-      // Then triple rooms
-      if (remainingClientsToAccommodate >= hotelQuote.capacity_triple && hotelQuote.capacity_triple > 0) {
-        const numRooms = Math.floor(remainingClientsToAccommodate / hotelQuote.capacity_triple);
-        hotelQuote.num_triple_rooms = numRooms;
-        simulatedTripleRooms += numRooms;
-        remainingClientsToAccommodate -= numRooms * hotelQuote.capacity_triple;
-        if (numRooms > 0) hotelAdjustmentsMessage += ` ${numRooms} hab. triples en ${hotelQuote.name}.`;
-      }
-
-      // Finally, double rooms (use ceil for any remaining clients)
-      if (remainingClientsToAccommodate > 0 && hotelQuote.capacity_double > 0) {
-        const numRooms = Math.ceil(remainingClientsToAccommodate / hotelQuote.capacity_double);
-        hotelQuote.num_double_rooms = numRooms;
-        simulatedDoubleRooms += numRooms;
-        remainingClientsToAccommodate -= numRooms * hotelQuote.capacity_double;
-        if (numRooms > 0) hotelAdjustmentsMessage += ` ${numRooms} hab. dobles en ${hotelQuote.name}.`;
-      }
-      
-      // For simulation, we assume no new courtesies are generated, but existing ones are considered.
-      // If the hotel quote already had courtesy rooms, their cost reduction is applied.
-      // For this simulation, we're calculating *needed* rooms, not necessarily using existing courtesies.
-      // The total hotel cost calculation below will handle the cost reduction.
-    });
-
-    // Recalculate hotel cost based on adjusted rooms
-    let adjustedHotelCost = 0;
-    tempHotelQuotes.forEach(hotelQuote => {
-      const costDouble = (hotelQuote.num_double_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
-      const costTriple = (hotelQuote.num_triple_rooms || 0) * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
-      const costQuad = (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
-      const totalContractedRoomsCost = costDouble + costTriple + costQuad;
-
-      // Subtract the value of courtesy rooms from the total contracted cost for the simulation
-      // Courtesy rooms are always valued at the quad occupancy rate
-      const costOfCourtesyRooms = (hotelQuote.num_courtesy_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
-      
-      adjustedHotelCost += totalContractedRoomsCost - costOfCourtesyRooms;
-    });
-    currentAdjustedTotalBaseCost += adjustedHotelCost;
-
-    const adjustedCostPerPayingPerson = expectedClientsForBreakeven > 0 ? currentAdjustedTotalBaseCost / expectedClientsForBreakeven : 0;
-    
-    // The selling price is fixed as per user request (average of the three selling prices)
-    const averageSellingPrice = (formData.selling_price_double_occupancy + formData.selling_price_triple_occupancy + formData.selling_price_quad_occupancy) / 3;
-
-    const message = `Análisis para ${expectedClientsForBreakeven} clientes: Para alojar a ${expectedClientsForBreakeven} personas, se necesitarían aproximadamente:${hotelAdjustmentsMessage || ' No se vincularon hoteles.'}`;
-    const costCovered = averageSellingPrice >= adjustedCostPerPayingPerson;
+    // 3. Room optimization (if expected clients are much lower than capacity)
+    if (expectedClientsForBreakeven > 0 && maxPayingCapacity > 0 && expectedClientsForBreakeven < maxPayingCapacity * 0.7) { // If less than 70% of paying capacity
+      recommendations.push(`Con solo ${expectedClientsForBreakeven} clientes esperados de una capacidad pagante de ${maxPayingCapacity}, podrías considerar ajustar las habitaciones de hotel contratadas para reducir costos fijos.`);
+    }
 
     setBreakevenResult({
-      adjustedTotalBaseCost: currentAdjustedTotalBaseCost,
-      adjustedCostPerPayingPerson: adjustedCostPerPayingPerson,
-      suggestedSellingPrice: averageSellingPrice, // Use the current average selling price as fixed
+      clientsNeededToBreakEven: clientsNeededToBreakEven,
       message: message,
-      simulatedDoubleRooms: simulatedDoubleRooms,
-      simulatedTripleRooms: simulatedTripleRooms,
-      simulatedQuadRooms: simulatedQuadRooms,
-      costCovered: costCovered,
+      recommendations: recommendations,
     });
 
   }, [
-    expectedClientsForBreakeven,
-    formData.bus_capacity,
-    formData.courtesies, // Use 'courtesies' here
-    formData.bus_cost,
-    formData.provider_details,
-    formData.hotel_details,
+    formData.total_base_cost,
     formData.selling_price_double_occupancy,
     formData.selling_price_triple_occupancy,
     formData.selling_price_quad_occupancy,
-    availableHotelQuotes
+    formData.cost_per_paying_person,
+    formData.bus_capacity,
+    formData.courtesies,
+    expectedClientsForBreakeven
   ]);
 
 
@@ -1186,19 +1124,19 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
 
         {/* Break-even Analysis Section */}
         <div className="col-span-full mt-4 p-4 bg-yellow-50 rounded-md">
-          <h3 className="text-xl font-semibold mb-4 text-yellow-800">Análisis de Punto de Equilibrio (Ajuste de Hoteles)</h3>
+          <h3 className="text-xl font-semibold mb-4 text-yellow-800">Análisis de Punto de Equilibrio</h3>
           <p className="text-sm text-gray-700 mb-4">
-            Usa esta herramienta para calcular un precio de venta por persona y posibles ajustes en las habitaciones de hotel si esperas menos clientes de la capacidad total.
+            Calcula cuántos clientes necesitas para cubrir los costos del tour y recibe recomendaciones.
           </p>
           <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
-            <Label htmlFor="expected_clients_for_breakeven" className="md:text-right">Clientes Esperados</Label>
+            <Label htmlFor="expected_clients_for_breakeven" className="md:text-right">Clientes Esperados (para análisis)</Label>
             <Input
               id="expected_clients_for_breakeven"
               type="number"
               value={expectedClientsForBreakeven}
               onChange={(e) => setExpectedClientsForBreakeven(parseFloat(e.target.value) || 0)}
               className="md:col-span-3"
-              min={1}
+              min={0}
               max={formData.bus_capacity - formData.courtesies} // Use 'courtesies' here
             />
           </div>
@@ -1213,29 +1151,18 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
               <h4 className="font-semibold text-lg text-yellow-900 mb-2">Resultado del Análisis:</h4>
               <p className="text-yellow-800 mb-2">{breakevenResult.message}</p>
               <p className="text-yellow-800">
-                Costo Base Total Ajustado: <span className="font-medium">${breakevenResult.adjustedTotalBaseCost.toFixed(2)}</span>
+                Clientes Necesarios para Punto de Equilibrio: <span className="font-bold">{Math.ceil(breakevenResult.clientsNeededToBreakEven)}</span>
               </p>
-              <p className="text-yellow-800">
-                Costo por Persona Pagante Ajustado: <span className="font-medium">${breakevenResult.adjustedCostPerPayingPerson.toFixed(2)}</span>
-              </p>
-              <p className="text-yellow-800">
-                Precio de Venta Fijo Utilizado (Promedio): <span className="font-bold">${breakevenResult.suggestedSellingPrice.toFixed(2)}</span>
-              </p>
-              <p className="text-yellow-800">
-                Habitaciones Dobles Simuladas: <span className="font-medium">{breakevenResult.simulatedDoubleRooms}</span>
-              </p>
-              <p className="text-yellow-800">
-                Habitaciones Triples Simuladas: <span className="font-medium">{breakevenResult.simulatedTripleRooms}</span>
-              </p>
-              <p className="text-yellow-800">
-                Habitaciones Cuádruples Simuladas: <span className="font-medium">{breakevenResult.simulatedQuadRooms}</span>
-              </p>
-              <p className={`text-lg font-bold mt-4 ${breakevenResult.costCovered ? 'text-green-700' : 'text-red-700'}`}>
-                {breakevenResult.costCovered ? '¡Los costos se cubren con el precio de venta actual!' : 'Advertencia: Los costos NO se cubren con el precio de venta actual.'}
-              </p>
-              <p className="text-sm text-gray-700 mt-2">
-                *Este es un cálculo simulado. Las habitaciones de hotel no se ajustan automáticamente.
-              </p>
+              {breakevenResult.recommendations.length > 0 && (
+                <div className="mt-4">
+                  <h5 className="font-semibold text-yellow-900">Recomendaciones:</h5>
+                  <ul className="list-disc list-inside text-yellow-800">
+                    {breakevenResult.recommendations.map((rec, idx) => (
+                      <li key={idx}>{rec}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
         </div>
