@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { v4 as uuidv4 } from 'uuid';
 import { format } from 'date-fns'; // Import format for dates
 import TourSeatMap from '@/components/TourSeatMap'; // Import the new TourSeatMap component
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
 // Hotel interface now represents a "hotel quote" from the 'hotels' table
 interface HotelQuote {
@@ -105,6 +106,7 @@ interface BreakevenResult {
 }
 
 const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
+  const navigate = useNavigate(); // Initialize useNavigate
   const [formData, setFormData] = useState<Tour>({
     title: '',
     slug: '',
@@ -899,17 +901,26 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
         </div>
 
         {/* Seat Map for Admin to block courtesies */}
-        {tourId && formData.bus_capacity > 0 && (
+        {formData.bus_id && formData.bus_capacity > 0 && (
           <div className="col-span-full mt-6">
-            <h3 className="text-xl font-semibold mb-4">Gestión de Asientos (Admin)</h3>
+            <h3 className="text-xl font-semibold mb-4">Visualización de Asientos</h3>
             <TourSeatMap
-              tourId={tourId}
+              tourId={tourId || 'new-tour'} // Pass a dummy ID for new tours, actual ID for existing
               busCapacity={formData.bus_capacity}
               courtesies={formData.courtesies}
               seatLayoutJson={selectedBusLayout} // Pass the selected bus layout
-              readOnly={false}
-              adminMode={true} // Enable admin mode for blocking seats
+              readOnly={true} // Set to readOnly
+              adminMode={false} // Disable admin mode here
             />
+            <div className="flex justify-end mt-4">
+              <Button
+                type="button"
+                onClick={() => navigate(`/admin/buses/edit/${formData.bus_id}`)}
+                className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white"
+              >
+                Gestionar Bus
+              </Button>
+            </div>
           </div>
         )}
 
