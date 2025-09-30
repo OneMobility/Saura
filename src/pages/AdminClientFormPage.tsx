@@ -270,9 +270,33 @@ const AdminClientFormPage = () => {
 
   // Effect to calculate total_amount, number_of_people, and room_details
   useEffect(() => {
-    const allPeopleAges = [formData.contractor_age, ...formData.companions.map(c => c.age)].filter((age): age is number => age !== null);
-    const numAdults = allPeopleAges.filter(age => age >= 12).length;
-    const numChildren = allPeopleAges.filter(age => age < 12).length;
+    let numAdults = 0;
+    let numChildren = 0;
+
+    // Contractor
+    if (formData.contractor_age !== null) {
+      if (formData.contractor_age >= 12) {
+        numAdults++;
+      } else {
+        numChildren++;
+      }
+    } else {
+      numAdults++; // Default to adult if age not specified for contractor
+    }
+
+    // Companions
+    formData.companions.forEach(c => {
+      if (c.age !== null) {
+        if (c.age >= 12) {
+          numAdults++;
+        } else {
+          numChildren++;
+        }
+      } else {
+        numAdults++; // Default to adult if age not specified for companion
+      }
+    });
+
     const totalPeople = numAdults + numChildren;
 
     const calculatedRoomDetails = allocateRoomsForPeople(numAdults); // Allocate rooms based on adults
