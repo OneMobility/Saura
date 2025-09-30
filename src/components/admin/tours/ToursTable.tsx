@@ -30,19 +30,31 @@ interface Tour {
   paying_clients_count: number | null;
 }
 
+interface Companion {
+  id: string;
+  name: string;
+  age: number | null;
+}
+
+interface RoomDetails {
+  double_rooms: number;
+  triple_rooms: number;
+  quad_rooms: number;
+}
+
+// Nueva interfaz para la exportación de clientes, agrupada por contrato
 interface ClientForExport {
   contract_number: string;
-  first_name: string;
-  last_name: string;
+  contractor_name: string;
+  companion_names: string;
   email: string;
   phone: string | null;
   total_amount: number;
   total_paid: number;
   remaining_payment: number;
   status: string;
-  seat_number: number | null;
-  seat_status: string | null;
-  room_details: { double_rooms: number; triple_rooms: number; quad_rooms: number };
+  room_details_formatted: string;
+  assigned_seat_numbers: string;
 }
 
 interface ToursTableProps {
@@ -95,7 +107,7 @@ const ToursTable: React.FC<ToursTableProps> = ({ onEditTour, onTourDeleted }) =>
     setLoading(false);
   };
 
-  const formatRoomDetails = (details: { double_rooms: number; triple_rooms: number; quad_rooms: number }) => {
+  const formatRoomDetails = (details: RoomDetails) => {
     const parts = [];
     if (details.quad_rooms > 0) parts.push(`${details.quad_rooms} Cuádruple(s)`);
     if (details.triple_rooms > 0) parts.push(`${details.triple_rooms} Triple(s)`);
@@ -111,6 +123,7 @@ const ToursTable: React.FC<ToursTableProps> = ({ onEditTour, onTourDeleted }) =>
       const { data: clientsData, error: clientsError } = await supabase
         .from('clients')
         .select(`
+          id,
           contract_number,
           first_name,
           last_name,
@@ -119,10 +132,10 @@ const ToursTable: React.FC<ToursTableProps> = ({ onEditTour, onTourDeleted }) =>
           total_amount,
           total_paid,
           status,
+          companions,
           room_details,
           tour_seat_assignments (
-            seat_number,
-            status
+            seat_number
           )
         `)
         .eq('tour_id', tourId);
@@ -138,41 +151,37 @@ const ToursTable: React.FC<ToursTableProps> = ({ onEditTour, onTourDeleted }) =>
       clientsData?.forEach(client => {
         const remainingPayment = client.total_amount - client.total_paid;
         
-        // If there are seat assignments, create a row for each seat
-        if (client.tour_seat_assignments && client.tour_seat_assignments.length > 0) {
-          client.tour_seat_assignments.forEach((seat: any) => {
-            clientsForExport.push({
-              contract_number: client.contract_number,
-              first_name: client.first_name,
-              last_name: client.last_name,
-              email: client.email,
-              phone: client.phone,
-              total_amount: client.total_amount,
-              total_paid: client.total_paid,
-              remaining_payment: remainingPayment,
-              status: client.status,
-              seat_number: seat.seat_number,
-              seat_status: seat.status,
-              room_details: client.room_details,
-            });
-          });
-        } else {
-          // If no seat assignments, add a single row for the client
-          clientsForExport.push({
-            contract_number: client.contract_number,
-            first_name: client.first_name,
-            last_name: client.last_name,
-            email: client.email,
-            phone: client.phone,
-            total_amount: client.total_amount,
-            total_paid: client.total_paid,
-            remaining_payment: remainingPayment,
-            status: client.status,
-            seat_number: null,
-            seat_status: null,
-            room_details: client.room_details,
-          });
-        }
+        // Contractor's full name
+        const contractorName = `${client.first_name} ${client.last_name}`;
+
+        // Companion names
+        const companionNames = (client.companions || [])
+          .map((c: Companion) => c.name)
+          .filter(Boolean) // Remove empty names
+          .join(', ');
+
+        // Formatted room details
+        const roomDetailsFormatted = formatRoomDetails(client.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
+
+        // All assigned seat numbers for this client
+        const assignedSeatNumbers = (client.tour_seat_assignments || [])
+          .map((seat: { seat_number: number }) => seat.seat_number)
+          .sort((a: number, b: number) => a - b)
+          .join(', ');
+
+        clientsForExport.push({
+          contract_number: client.contract_number,
+          contractor_name: contractorName,
+          companion_names: companionNames,
+          email: client.email,
+          phone: client.phone,
+          total_amount: client.total_amount,
+          total_paid: client.total_paid,
+          remaining_payment: remainingPayment,
+          status: client.status,
+          room_details_formatted: roomDetailsFormatted,
+          assigned_seat_numbers: assignedSeatNumbers,
+        });
       });
 
       if (clientsForExport.length === 0) {
@@ -182,27 +191,31 @@ const ToursTable: React.FC<ToursTableProps> = ({ onEditTour, onTourDeleted }) =>
 
       // Generate CSV
       const headers = [
-        'Número de Contrato', 'Nombre', 'Apellido', 'Email', 'Teléfono',
-        'Monto Total', 'Total Pagado', 'Adeudo', 'Estado',
-        'Habitaciones Dobles', 'Habitaciones Triples', 'Habitaciones Cuádruples',
-        'Número de Asiento', 'Estado del Asiento'
+        'Número de Contrato',
+        'Nombre del Contratante',
+        'Nombres de Acompañantes',
+        'Email',
+        'Teléfono',
+        'Monto Total del Contrato',
+        'Total Pagado',
+        'Adeudo',
+        'Estado del Contrato',
+        'Detalles de Habitaciones',
+        'Números de Asiento Asignados'
       ];
       
       const csvRows = clientsForExport.map(client => [
         client.contract_number,
-        client.first_name,
-        client.last_name,
+        client.contractor_name,
+        client.companion_names,
         client.email,
         client.phone || 'N/A',
         client.total_amount.toFixed(2),
         client.total_paid.toFixed(2),
         client.remaining_payment.toFixed(2),
         client.status,
-        client.room_details.double_rooms,
-        client.room_details.triple_rooms,
-        client.room_details.quad_rooms,
-        client.seat_number || 'N/A',
-        client.seat_status || 'N/A',
+        client.room_details_formatted,
+        client.assigned_seat_numbers || 'N/A',
       ].map(field => `"${String(field).replace(/"/g, '""')}"`).join(','));
 
       const csvContent = [headers.join(','), ...csvRows].join('\n');
