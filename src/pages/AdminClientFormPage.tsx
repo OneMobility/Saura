@@ -140,6 +140,7 @@ const AdminClientFormPage = () => {
   const [busDetails, setBusDetails] = useState<BusDetails | null>(null); // State for bus details
   const [clientSelectedSeats, setClientSelectedSeats] = useState<number[]>([]); // Seats selected for *this* client
   const [initialClientStatus, setInitialClientStatus] = useState<string>('pending'); // To track status change
+  const [roomDetails, setRoomDetails] = useState<RoomDetails>({ double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }); // Define roomDetails state
 
   useEffect(() => {
     if (!sessionLoading && (!user || !isAdmin)) {
@@ -210,6 +211,7 @@ const AdminClientFormPage = () => {
             room_details: data.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }, // Set room_details
           });
           setInitialClientStatus(data.status); // Store initial status
+          setRoomDetails(data.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }); // Initialize roomDetails state
 
           // Fetch existing seat assignments for this client and tour
           if (data.tour_id) {
@@ -248,6 +250,7 @@ const AdminClientFormPage = () => {
         });
         setClientSelectedSeats([]); // Clear selected seats for new client
         setInitialClientStatus('pending');
+        setRoomDetails({ double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }); // Reset roomDetails state
       }
       setLoadingInitialData(false);
     };
@@ -352,7 +355,7 @@ const AdminClientFormPage = () => {
       total_amount: calculatedTotalAmount,
       remaining_payment: calculatedTotalAmount - prev.total_paid,
     }));
-  }, [formData.companions.length, formData.total_paid, selectedTourPrices, formData.contractor_age, formData.companions, formData.extra_services]);
+  }, [formData.companions.length, formData.total_paid, selectedTourPrices, formData.contractor_age, formData.companions, formData.extra_services, setRoomDetails]);
 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -507,7 +510,7 @@ const AdminClientFormPage = () => {
       total_paid: formData.total_paid,
       status: formData.status,
       contractor_age: formData.contractor_age,
-      room_details: formData.room_details, // Save room_details
+      room_details: roomDetails, // Save room_details from state
       user_id: authUser.id, // Link to the admin user who created/updated it
     };
 
@@ -592,22 +595,9 @@ const AdminClientFormPage = () => {
     setIsSubmitting(false);
   };
 
-  if (sessionLoading || loadingInitialData) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <Loader2 className="h-12 w-12 animate-spin text-rosa-mexicano" />
-        <p className="ml-4 text-gray-700">Cargando formulario de cliente...</p>
-      </div>
-    );
-  }
-
-  if (!user || !isAdmin) {
-    return null; // Should be redirected by ProtectedRoute
-  }
-
-  const roomDetailsDisplay = `${formData.room_details.quad_rooms > 0 ? `${formData.room_details.quad_rooms} Cuádruple(s), ` : ''}` +
-                             `${formData.room_details.triple_rooms > 0 ? `${formData.room_details.triple_rooms} Triple(s), ` : ''}` +
-                             `${formData.room_details.double_rooms > 0 ? `${formData.room_details.double_rooms} Doble(s)` : ''}`;
+  const roomDetailsDisplay = `${roomDetails.quad_rooms > 0 ? `${roomDetails.quad_rooms} Cuádruple(s), ` : ''}` +
+                             `${roomDetails.triple_rooms > 0 ? `${roomDetails.triple_rooms} Triple(s), ` : ''}` +
+                             `${roomDetails.double_rooms > 0 ? `${roomDetails.double_rooms} Doble(s)` : ''}`;
 
   return (
     <div className="flex min-h-screen bg-gray-100">
