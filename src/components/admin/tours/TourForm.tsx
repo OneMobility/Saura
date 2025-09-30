@@ -97,9 +97,10 @@ interface TourFormProps {
 
 // NEW: Interface for BreakevenResult
 interface BreakevenResult {
-  clientsNeededToBreakEven: number; // NEW: Number of clients needed to break even
+  clientsNeededToBreakEven: number; // Number of clients needed to break even
   message: string;
-  recommendations: string[]; // NEW: Array of recommendations
+  recommendations: string[]; // Array of recommendations
+  potentialProfitAtExpectedClients: number | null; // NEW: Potential profit
 }
 
 // NEW: Helper function to calculate room allocation for a given number of people (simplified for analysis)
@@ -655,6 +656,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const runBreakevenAnalysis = useCallback(() => {
     const recommendations: string[] = [];
     let message = '';
+    let potentialProfitAtExpectedClients: number | null = null;
 
     const totalBaseCost = formData.total_base_cost || 0;
     const averageSellingPrice = (formData.selling_price_double_occupancy + formData.selling_price_triple_occupancy + formData.selling_price_quad_occupancy) / 3;
@@ -663,13 +665,20 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
 
     if (totalBaseCost <= 0 || averageSellingPrice <= 0) {
       message = 'Asegúrate de que el costo base total y el precio de venta promedio sean mayores que cero para calcular el punto de equilibrio.';
-      setBreakevenResult({ clientsNeededToBreakEven: 0, message, recommendations: [] });
+      setBreakevenResult({ clientsNeededToBreakEven: 0, message, recommendations: [], potentialProfitAtExpectedClients: null });
       return;
     }
 
     // --- Initial Break-even Calculation ---
     const initialClientsNeededToBreakEven = totalBaseCost / averageSellingPrice;
     message = `Para cubrir el costo base total de $${totalBaseCost.toFixed(2)} con un precio de venta promedio de $${averageSellingPrice.toFixed(2)} por persona, necesitas aproximadamente ${Math.ceil(initialClientsNeededToBreakEven)} clientes.`;
+
+    // Calculate potential profit at expected clients
+    if (expectedClientsForBreakeven > 0) {
+      const potentialRevenueAtExpectedClients = expectedClientsForBreakeven * averageSellingPrice;
+      potentialProfitAtExpectedClients = potentialRevenueAtExpectedClients - totalBaseCost;
+      recommendations.push(`Con ${expectedClientsForBreakeven} clientes esperados y el precio de venta promedio actual, la ganancia potencial sería de $${potentialProfitAtExpectedClients.toFixed(2)}.`);
+    }
 
     // --- Recommendations ---
 
@@ -767,7 +776,16 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       if (potentialRoomSavings > 0) {
         const newTotalBaseCostAfterRoomReduction = totalBaseCost - potentialRoomSavings;
         const newClientsNeededToBreakEven = newTotalBaseCostAfterRoomReduction / averageSellingPrice;
+        
+        let newEstimatedPriceWithReduction = 0;
+        if (expectedClientsForBreakeven > 0) {
+          newEstimatedPriceWithReduction = newTotalBaseCostAfterRoomReduction / expectedClientsForBreakeven;
+        }
+
         recommendations.push(`Considera reducir ${roomsToReduceMessage.join(', ')} para ahorrar $${potentialRoomSavings.toFixed(2)}. Con estos ahorros, el nuevo punto de equilibrio sería de ${Math.ceil(newClientsNeededToBreakEven)} clientes.`);
+        if (expectedClientsForBreakeven > 0) {
+          recommendations.push(`Con estos ahorros y ${expectedClientsForBreakeven} clientes esperados, el precio de venta promedio necesario para el punto de equilibrio sería de $${newEstimatedPriceWithReduction.toFixed(2)} por persona.`);
+        }
       }
     }
 
@@ -775,6 +793,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       clientsNeededToBreakEven: initialClientsNeededToBreakEven,
       message: message,
       recommendations: recommendations,
+      potentialProfitAtExpectedClients: potentialProfitAtExpectedClients,
     });
 
   }, [
@@ -1261,6 +1280,11 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
               <p className="text-yellow-800">
                 Clientes Necesarios para Punto de Equilibrio: <span className="font-bold">{Math.ceil(breakevenResult.clientsNeededToBreakEven)}</span>
               </p>
+              {breakevenResult.potentialProfitAtExpectedClients !== null && (
+                <p className="text-yellow-800">
+                  Ganancia Potencial con {expectedClientsForBreakeven} clientes: <span className="font-bold">${breakevenResult.potentialProfitAtExpectedClients.toFixed(2)}</span>
+                </p>
+              )}
               {breakevenResult.recommendations.length > 0 && (
                 <div className="mt-4">
                   <h5 className="font-semibold text-yellow-900">Recomendaciones:</h5>
