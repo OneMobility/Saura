@@ -395,10 +395,10 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     setIsUploadingImage(true);
     const fileExt = file.name.split('.').pop();
     const fileName = `${uuidv4()}.${fileExt}`;
-    const filePath = `tour-images/${fileName}`;
+    const filePath = `${fileName}`; // Store directly in the bucket root
 
     const { data, error } = await supabase.storage
-      .from('slideshow-images') // Reusing the existing bucket for simplicity
+      .from('tour-images') // *** Changed to the new 'tour-images' bucket ***
       .upload(filePath, file, {
         cacheControl: '3600',
         upsert: false,
@@ -413,7 +413,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     }
 
     const { data: publicUrlData } = supabase.storage
-      .from('slideshow-images')
+      .from('tour-images') // *** Changed to the new 'tour-images' bucket ***
       .getPublicUrl(filePath);
 
     return publicUrlData.publicUrl;
