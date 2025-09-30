@@ -163,10 +163,21 @@ const TourDetailsPage = () => {
         });
 
         // Set the bus layout from the fetched data
+        let currentBusForCalculation: Bus | null = null; // Use a local variable for immediate calculations
         if (tourData.bus_id) {
           const bus = busesMap.get(tourData.bus_id);
-          setSelectedBus(bus || null);
-          setBusLayout(bus?.seat_layout_json || null);
+          currentBusForCalculation = bus || null;
+          setSelectedBus(prevBus => {
+            // Only update if the bus ID has actually changed
+            if (prevBus?.id === currentBusForCalculation?.id) {
+              return prevBus;
+            }
+            return currentBusForCalculation;
+          });
+          setBusLayout(currentBusForCalculation?.seat_layout_json || null);
+        } else {
+          setSelectedBus(null);
+          setBusLayout(null);
         }
 
         // NEW: Fetch total sold seats
@@ -187,8 +198,8 @@ const TourDetailsPage = () => {
         let currentTotalRemainingPayments = 0;
 
         // Bus remaining payment
-        if (selectedBus) {
-          currentTotalRemainingPayments += (selectedBus.rental_cost || 0) - (selectedBus.total_paid || 0);
+        if (currentBusForCalculation) { // Use the local currentBusForCalculation variable
+          currentTotalRemainingPayments += (currentBusForCalculation.rental_cost || 0) - (currentBusForCalculation.total_paid || 0);
         }
 
         // Hotel remaining payments
@@ -219,7 +230,7 @@ const TourDetailsPage = () => {
     if (id) {
       fetchTourDetailsAndHotelQuotes();
     }
-  }, [id, selectedBus]); // Added selectedBus to dependencies
+  }, [id]); // Removed selectedBus from dependencies
 
   const handleSeatsSelection = (seats: number[]) => {
     setSelectedSeatsForBooking(seats);
