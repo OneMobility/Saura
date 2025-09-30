@@ -19,7 +19,7 @@ type SeatLayout = SeatLayoutRow[];
 interface Seat {
   seat_number: number;
   status: 'available' | 'booked' | 'blocked' | 'courtesy';
-  user_id: string | null;
+  client_id: string | null; // Changed from user_id to client_id
   id?: string; // Optional for existing assignments
 }
 
@@ -31,6 +31,8 @@ interface TourSeatMapProps {
   onSeatsSelected?: (selectedSeats: number[]) => void; // Callback for selected seats
   readOnly?: boolean; // If true, no interaction allowed (e.g., for public viewing without booking)
   adminMode?: boolean; // If true, admin can block/unblock seats
+  currentClientId?: string | null; // NEW: Client ID for booking/editing
+  initialSelectedSeats?: number[]; // NEW: For pre-selecting seats when editing a client
 }
 
 const TourSeatMap: React.FC<TourSeatMapProps> = ({
@@ -41,10 +43,12 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
   onSeatsSelected,
   readOnly = false,
   adminMode = false,
+  currentClientId = null, // Default to null
+  initialSelectedSeats = [], // Default to empty array
 }) => {
   const { user, isLoading: sessionLoading, isAdmin } = useSession();
   const [seats, setSeats] = useState<Seat[]>([]);
-  const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
+  const [selectedSeats, setSelectedSeats] = useState<number[]>(initialSelectedSeats);
   const [loading, setLoading] = useState(true);
   const [isUpdatingSeats, setIsUpdatingSeats] = useState(false);
 
@@ -69,7 +73,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
           row.forEach(item => {
             if (item.type === 'seat' && item.number !== undefined) {
               const existingAssignment = fetchedAssignments.find(s => s.seat_number === item.number);
-              allSeats.push(existingAssignment || { seat_number: item.number, status: 'available', user_id: null });
+              allSeats.push(existingAssignment || { seat_number: item.number, status: 'available', client_id: null });
             }
           });
         });
@@ -77,7 +81,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
         // Fallback to simple grid if no layout is provided (should not happen if bus has layout)
         for (let i = 1; i <= busCapacity; i++) {
           const existingAssignment = fetchedAssignments.find(s => s.seat_number === i);
-          allSeats.push(existingAssignment || { seat_number: i, status: 'available', user_id: null });
+          allSeats.push(existingAssignment || { seat_number: i, status: 'available', client_id: null });
         }
       }
       setSeats(allSeats);
@@ -89,14 +93,19 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
     fetchSeats();
   }, [fetchSeats]);
 
+  // Update selectedSeats when initialSelectedSeats prop changes (e.g., when editing a client)
+  useEffect(() => {
+    setSelectedSeats(initialSelectedSeats);
+  }, [initialSelectedSeats]);
+
   useEffect(() => {
     if (onSeatsSelected) {
       onSeatsSelected(selectedSeats);
     }
   }, [selectedSeats, onSeatsSelected]);
 
-  const handleSeatClick = async (seatNumber: number, currentStatus: Seat['status']) => {
-    if (readOnly && !adminMode) return; // No interaction for public read-only mode
+  const handleSeatClick = async (seatNumber: number, currentStatus: Seat['status'], assignedClientId: string | null) => {
+    if (readOnly && !adminMode && !currentClientId) return; // No interaction for public read-only mode
 
     const seatIndex = seats.findIndex(s => s.seat_number === seatNumber);
     if (seatIndex === -1) return;
@@ -113,7 +122,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
           tour_id: tourId,
           seat_number: seatNumber,
           status: newStatus,
-          user_id: null, // Admin blocking doesn't assign to a user
+          client_id: null, // Admin blocking doesn't assign to a client
           id: currentSeat.id, // Include ID if updating existing
         }, { onConflict: 'tour_id,seat_number' });
 
@@ -128,7 +137,27 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
       return;
     }
 
-    // Regular user selection logic (if not adminMode or not admin)
+    // Logic for client-specific selection (used in AdminClientFormPage)
+    if (currentClientId) {
+      // If the seat is already booked by THIS client, allow unselection
+      if (currentStatus === 'booked' && assignedClientId === currentClientId) {
+        setSelectedSeats(prev => prev.filter(s => s !== seatNumber));
+        return;
+      }
+      // If the seat is available, or booked by another client, or blocked/courtesy, handle accordingly
+      if (currentStatus === 'available') {
+        setSelectedSeats(prev => [...prev, seatNumber]);
+      } else if (currentStatus === 'booked' && assignedClientId !== currentClientId) {
+        toast.info(`Este asiento ya está reservado por otro cliente.`);
+      } else if (currentStatus === 'blocked') {
+        toast.info('Este asiento está bloqueado por el administrador.');
+      } else if (currentStatus === 'courtesy') {
+        toast.info('Este asiento es de cortesía.');
+      }
+      return;
+    }
+
+    // Regular public user selection logic (if not adminMode and no currentClientId)
     if (currentStatus === 'booked' || currentStatus === 'blocked' || currentStatus === 'courtesy') {
       toast.info('Este asiento no está disponible.');
       return;
@@ -160,10 +189,13 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
     // Only 'seat' type items proceed here
     if (!seat) return cn(baseClasses, "bg-gray-200 text-gray-500 cursor-not-allowed"); // Should not happen if logic is correct
 
-    const isSelected = selectedSeats.includes(seat.seat_number);
+    const isCurrentlySelected = selectedSeats.includes(seat.seat_number);
 
     if (seat.status === 'booked') {
-      return cn(baseClasses, "bg-red-500 text-white cursor-not-allowed");
+      if (currentClientId && seat.client_id === currentClientId) {
+        return cn(baseClasses, "bg-green-500 text-white hover:bg-green-600 cursor-pointer"); // Booked by this client, allow unselect
+      }
+      return cn(baseClasses, "bg-red-500 text-white cursor-not-allowed"); // Booked by another
     }
     if (seat.status === 'blocked') {
       return cn(baseClasses, "bg-gray-400 text-gray-700 cursor-not-allowed", adminMode && "hover:bg-gray-500 cursor-pointer");
@@ -171,7 +203,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
     if (seat.status === 'courtesy') {
       return cn(baseClasses, "bg-purple-500 text-white cursor-not-allowed");
     }
-    if (isSelected) {
+    if (isCurrentlySelected) {
       return cn(baseClasses, "bg-green-500 text-white hover:bg-green-600 cursor-pointer");
     }
     return cn(baseClasses, "bg-blue-500 text-white hover:bg-blue-600 cursor-pointer");
@@ -210,6 +242,11 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
           Modo Administrador: Haz clic en un asiento para bloquearlo/desbloquearlo.
         </p>
       )}
+      {currentClientId && (
+        <p className="text-sm text-gray-600 mb-4">
+          Modo Contrato: Selecciona los asientos para este cliente.
+        </p>
+      )}
       <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${maxCols}, minmax(0, 1fr))` }}>
         {seatLayoutJson.map((row, rowIndex) => (
           <React.Fragment key={rowIndex}>
@@ -220,8 +257,8 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
                   {item.type === 'seat' && seat ? (
                     <Button
                       className={getSeatClasses(seat, item.type)}
-                      onClick={() => handleSeatClick(seat.seat_number, seat.status)}
-                      disabled={isUpdatingSeats || (readOnly && !adminMode) || (seat.status === 'booked' && !adminMode) || (seat.status === 'courtesy' && !adminMode)}
+                      onClick={() => handleSeatClick(seat.seat_number, seat.status, seat.client_id)}
+                      disabled={isUpdatingSeats || (readOnly && !adminMode && !currentClientId) || (seat.status === 'booked' && seat.client_id !== currentClientId && !adminMode) || (seat.status === 'courtesy' && !adminMode) || (seat.status === 'blocked' && !adminMode)}
                     >
                       {item.number}
                     </Button>
@@ -251,10 +288,10 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
             <span className="w-5 h-5 bg-blue-500 rounded-sm mr-2"></span> Disponible
           </div>
           <div className="flex items-center">
-            <span className="w-5 h-5 bg-green-500 rounded-sm mr-2"></span> Seleccionado
+            <span className="w-5 h-5 bg-green-500 rounded-sm mr-2"></span> Seleccionado (o tuyo)
           </div>
           <div className="flex items-center">
-            <span className="w-5 h-5 bg-red-500 rounded-sm mr-2"></span> Ocupado
+            <span className="w-5 h-5 bg-red-500 rounded-sm mr-2"></span> Ocupado (otro cliente)
           </div>
           <div className="flex items-center">
             <span className="w-5 h-5 bg-gray-400 rounded-sm mr-2"></span> Bloqueado (Admin)

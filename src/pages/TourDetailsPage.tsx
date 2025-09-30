@@ -66,10 +66,10 @@ interface Tour {
   duration: string;
   includes: string[] | null;
   itinerary: { day: number; activity: string }[] | null;
-  // Removed selling_price_per_person
   selling_price_double_occupancy: number; // NEW
   selling_price_triple_occupancy: number; // NEW
   selling_price_quad_occupancy: number; // NEW
+  selling_price_child: number; // NEW: Price for children under 12
   cost_per_paying_person: number | null;
   bus_id: string | null; // Added bus_id
   bus_capacity: number; // Added bus_capacity
@@ -159,6 +159,7 @@ const TourDetailsPage = () => {
           selling_price_double_occupancy: tourData.selling_price_double_occupancy || 0,
           selling_price_triple_occupancy: tourData.selling_price_triple_occupancy || 0,
           selling_price_quad_occupancy: tourData.selling_price_quad_occupancy || 0,
+          selling_price_child: tourData.selling_price_child || 0, // Set new field
         });
 
         // Set the bus layout from the fetched data
@@ -313,6 +314,7 @@ const TourDetailsPage = () => {
                     <li><span className="font-medium">Precio por persona (Doble):</span> ${tour.selling_price_double_occupancy.toFixed(2)}</li>
                     <li><span className="font-medium">Precio por persona (Triple):</span> ${tour.selling_price_triple_occupancy.toFixed(2)}</li>
                     <li><span className="font-medium">Precio por persona (Cuádruple):</span> ${tour.selling_price_quad_occupancy.toFixed(2)}</li>
+                    <li><span className="font-medium">Precio por Menor (-12 años):</span> ${tour.selling_price_child.toFixed(2)}</li>
                     <li><span className="font-medium">Duración:</span> {tour.duration}</li>
                     <li><span className="font-medium">Capacidad del autobús:</span> {tour.bus_capacity} personas</li>
                     <li><span className="font-medium">Cortesías (Asientos Bus):</span> {tour.courtesies}</li>
@@ -357,8 +359,10 @@ const TourDetailsPage = () => {
                       const totalCostQuadRooms = (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
                       const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
                       
+                      // Subtract the value of courtesy rooms from the total contracted cost
                       // Courtesy rooms are always valued at the quad occupancy rate
                       const costOfCourtesyRooms = (hotelQuote.num_courtesy_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
+
                       const totalHotelBookingCostNet = totalContractedRoomsCost - costOfCourtesyRooms;
 
                       const totalHotelCapacity = 

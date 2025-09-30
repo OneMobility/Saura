@@ -79,10 +79,10 @@ interface Tour {
   total_base_cost?: number;
   paying_clients_count?: number;
   cost_per_paying_person?: number;
-  // Removed selling_price_per_person
-  selling_price_double_occupancy: number; // NEW
-  selling_price_triple_occupancy: number; // NEW
-  selling_price_quad_occupancy: number; // NEW
+  selling_price_double_occupancy: number;
+  selling_price_triple_occupancy: number;
+  selling_price_quad_occupancy: number;
+  selling_price_child: number; // NEW: Price for children under 12
   user_id?: string;
 }
 
@@ -122,6 +122,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     selling_price_double_occupancy: 0, // Initialize new fields
     selling_price_triple_occupancy: 0,
     selling_price_quad_occupancy: 0,
+    selling_price_child: 0, // Initialize new field
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrlPreview, setImageUrlPreview] = useState<string>('');
@@ -207,6 +208,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             selling_price_double_occupancy: data.selling_price_double_occupancy || 0,
             selling_price_triple_occupancy: data.selling_price_triple_occupancy || 0,
             selling_price_quad_occupancy: data.selling_price_quad_occupancy || 0,
+            selling_price_child: data.selling_price_child || 0, // Set new field
           });
           setImageUrlPreview(data.image_url);
 
@@ -237,6 +239,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           selling_price_double_occupancy: 0,
           selling_price_triple_occupancy: 0,
           selling_price_quad_occupancy: 0,
+          selling_price_child: 0, // Reset new field
         });
         setImageFile(null);
         setImageUrlPreview('');
@@ -311,7 +314,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     currentTotalRemainingPayments += busRentalCost - busTotalPaid;
 
     // Calculate average selling price for potential revenue calculations
-    const averageSellingPrice = (formData.selling_price_double_occupancy + formData.selling_price_triple_occupancy + formData.selling_price_quad_occupancy) / 3;
+    // This average is for adults only, as child pricing is separate
+    const averageAdultSellingPrice = (formData.selling_price_double_occupancy + formData.selling_price_triple_occupancy + formData.selling_price_quad_occupancy) / 3;
 
     setFormData((prev) => ({
       ...prev,
@@ -321,7 +325,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     }));
     setTotalRemainingPayments(currentTotalRemainingPayments);
 
-    // Calculate suggested selling price (average)
+    // Calculate suggested selling price (average adult price)
     if (costPerPayingPerson > 0 && desiredProfitPercentage >= 0) {
       const calculatedSuggestedPrice = costPerPayingPerson * (1 + desiredProfitPercentage / 100);
       setSuggestedSellingPrice(calculatedSuggestedPrice);
@@ -573,7 +577,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
 
     tourLinkedHotelQuotes.forEach(tourHotelDetail => {
       const hotelQuote = tempHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
-      if (!hotelQuote || remainingClientsToAccommodate <= 0) return;
+      if (hotelQuote || remainingClientsToAccommodate <= 0) return;
 
       // Prioritize quad rooms
       if (remainingClientsToAccommodate >= hotelQuote.capacity_quad && hotelQuote.capacity_quad > 0) {
@@ -699,6 +703,13 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       setIsSubmitting(false);
       return;
     }
+    
+    if (formData.selling_price_child < 0) {
+      toast.error('El precio de venta para menores no puede ser negativo.');
+      setIsSubmitting(false);
+      return;
+    }
+
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -1020,7 +1031,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4 mt-4">
-            <Label htmlFor="suggested_selling_price" className="md:text-right font-bold text-lg">Precio de Venta Sugerido por Persona (Promedio)</Label>
+            <Label htmlFor="suggested_selling_price" className="md:text-right font-bold text-lg">Precio de Venta Sugerido por Persona (Promedio Adulto)</Label>
             <Input id="suggested_selling_price" type="number" value={suggestedSellingPrice.toFixed(2)} readOnly className="md:col-span-3 text-lg font-bold bg-blue-100 cursor-not-allowed" title="Calculado en base al costo por persona pagante y la ganancia deseada" />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4 mt-4">
@@ -1034,6 +1045,10 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4 mt-4">
             <Label htmlFor="selling_price_quad_occupancy" className="md:text-right font-bold text-lg">Precio Venta por Persona (Cuádruple)</Label>
             <Input id="selling_price_quad_occupancy" type="number" value={formData.selling_price_quad_occupancy} onChange={(e) => handleNumberChange('selling_price_quad_occupancy', e.target.value)} className="md:col-span-3 text-lg font-bold" required min={0} step="0.01" />
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4 mt-4">
+            <Label htmlFor="selling_price_child" className="md:text-right font-bold text-lg">Precio Venta por Menor (-12 años)</Label>
+            <Input id="selling_price_child" type="number" value={formData.selling_price_child} onChange={(e) => handleNumberChange('selling_price_child', e.target.value)} className="md:col-span-3 text-lg font-bold" required min={0} step="0.01" />
           </div>
         </div>
 
