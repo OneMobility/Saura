@@ -1,15 +1,24 @@
 "use client";
 
-import React from 'react';
+import React, { useState } from 'react';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { Loader2, PlusCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import ClientsTable from '@/components/admin/clients/ClientsTable'; // Import the new ClientsTable
+import ClientFormDialog from '@/components/admin/clients/ClientFormDialog'; // Import the new ClientFormDialog
 
 const AdminClientsPage = () => {
   const { user, isAdmin, isLoading } = useSession();
   const navigate = useNavigate();
+  const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [refreshKey, setRefreshKey] = useState(0); // Key to force re-fetch of clients
+
+  const handleClientSave = () => {
+    setRefreshKey(prev => prev + 1); // Increment key to trigger re-fetch in ClientsTable
+  };
 
   if (isLoading) {
     return (
@@ -29,19 +38,23 @@ const AdminClientsPage = () => {
     <div className="flex min-h-screen bg-gray-100">
       <AdminSidebar />
       <div className="flex flex-col flex-grow">
-        <AdminHeader pageTitle="Gestión de Clientes" />
+        <AdminHeader pageTitle="Gestión de Clientes">
+          <Button onClick={() => setIsCreateDialogOpen(true)} className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white">
+            <PlusCircle className="mr-2 h-4 w-4" /> Añadir Nuevo Cliente
+          </Button>
+        </AdminHeader>
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Próximamente: Gestión de Clientes</h2>
-            <p className="text-gray-700">
-              Aquí podrás gestionar la información de tus clientes y sus reservas.
-            </p>
-          </div>
+          <ClientsTable refreshKey={refreshKey} />
         </main>
         <footer className="bg-gray-800 text-white py-4 text-center text-sm">
           <p>&copy; {new Date().getFullYear()} Saura Tours Admin. Todos los derechos reservados.</p>
         </footer>
       </div>
+      <ClientFormDialog
+        isOpen={isCreateDialogOpen}
+        onClose={() => setIsCreateDialogOpen(false)}
+        onSave={handleClientSave}
+      />
     </div>
   );
 };
