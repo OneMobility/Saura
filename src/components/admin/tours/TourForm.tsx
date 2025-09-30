@@ -61,6 +61,29 @@ interface Bus {
   total_paid: number; // NEW
 }
 
+// NEW: Interface for ProviderService linked to a tour
+interface TourProviderService {
+  id: string; // Unique ID for this entry in the tour's provider_details array
+  provider_id: string; // References an ID from the 'providers' table
+  quantity: number; // How many units of this service are needed for the tour
+  cost_per_unit_snapshot: number; // Snapshot of cost at time of linking
+  selling_price_per_unit_snapshot: number; // Snapshot of selling price at time of linking
+  name_snapshot: string; // Snapshot of provider name
+  service_type_snapshot: string; // Snapshot of service type
+  unit_type_snapshot: string; // Snapshot of unit type
+}
+
+// NEW: Interface for available providers (from the 'providers' table)
+interface AvailableProvider {
+  id: string;
+  name: string;
+  service_type: string;
+  cost_per_unit: number;
+  unit_type: string;
+  selling_price_per_unit: number;
+  is_active: boolean;
+}
+
 interface Tour {
   id?: string;
   title: string;
@@ -76,7 +99,7 @@ interface Tour {
   bus_cost: number; // Now derived from selected bus
   courtesies: number;
   hotel_details: TourHotelDetail[]; // Updated type
-  provider_details: { name: string; service: string; cost: number }[];
+  provider_details: TourProviderService[]; // Updated type to reference providers
   total_base_cost?: number;
   paying_clients_count?: number;
   cost_per_paying_person?: number;
@@ -122,7 +145,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     bus_cost: 0,
     courtesies: 0,
     hotel_details: [],
-    provider_details: [],
+    provider_details: [], // Initialize with new type
     selling_price_per_person: 0, // Initialize this field
     selling_price_double_occupancy: 0, // Initialize new fields
     selling_price_triple_occupancy: 0,
@@ -137,6 +160,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const [loadingInitialData, setLoadingInitialData] = useState(true);
   const [availableHotelQuotes, setAvailableHotelQuotes] = useState<HotelQuote[]>([]);
   const [availableBuses, setAvailableBuses] = useState<Bus[]>([]); // NEW: State for available buses
+  const [availableProviders, setAvailableProviders] = useState<AvailableProvider[]>([]); // NEW: State for available providers
   const [selectedBusLayout, setSelectedBusLayout] = useState<SeatLayout | null>(null); // NEW: State for selected bus layout
 
   // NEW: Financial states
@@ -187,6 +211,25 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     fetchAvailableBuses();
   }, []);
 
+  // NEW: Fetch available providers
+  useEffect(() => {
+    const fetchAvailableProviders = async () => {
+      const { data, error } = await supabase
+        .from('providers')
+        .select('*')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error('Error al cargar proveedores disponibles:', error);
+        toast.error('Error al cargar la lista de proveedores disponibles.');
+      } else {
+        setAvailableProviders(data || []);
+      }
+    };
+    fetchAvailableProviders();
+  }, []);
+
   useEffect(() => {
     const fetchTourData = async () => {
       if (tourId) {
@@ -210,7 +253,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             includes: data.includes || [],
             itinerary: data.itinerary || [],
             hotel_details: data.hotel_details || [],
-            provider_details: data.provider_details || [],
+            provider_details: data.provider_details || [], // Ensure provider_details is set
             bus_id: data.bus_id || null, // Ensure bus_id is set
             selling_price_per_person: data.selling_price_per_person || 0, // Set this field
             selling_price_double_occupancy: data.selling_price_double_occupancy || 0,
@@ -305,7 +348,11 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   }, [tourId]);
 
   const calculateCosts = useCallback(() => {
-    const totalProviderCost = formData.provider_details.reduce((sum, provider) => sum + provider.cost, 0);
+    // Calculate total provider cost from linked providers
+    const totalProviderCost = formData.provider_details.reduce((sum, providerService) => {
+      // Use the snapshot cost stored in the tour's provider_details
+      return sum + (providerService.cost_per_unit_snapshot * providerService.quantity);
+    }, 0);
     
     let totalHotelCost = 0; // Total cost for all rooms across all linked hotel quotes
     let currentTotalRemainingPayments = 0; // NEW: for total remaining payments
@@ -370,11 +417,11 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     formData.bus_capacity,
     formData.bus_id,
     formData.courtesies,
-    formData.provider_details,
+    formData.provider_details, // Added to dependencies
     formData.hotel_details,
-    formData.selling_price_double_occupancy, // Added to dependencies
-    formData.selling_price_triple_occupancy, // Added to dependencies
-    formData.selling_price_quad_occupancy, // Added to dependencies
+    formData.selling_price_double_occupancy,
+    formData.selling_price_triple_occupancy,
+    formData.selling_price_quad_occupancy,
     availableHotelQuotes,
     availableBuses,
     desiredProfitPercentage
@@ -527,31 +574,57 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     }));
   };
 
-  const handleProviderChange = (index: number, field: 'name' | 'service' | 'cost', value: string) => {
+  // NEW: Handle provider service changes
+  const handleProviderServiceChange = (id: string, field: 'provider_id' | 'quantity', value: string | number) => {
     setFormData((prev) => {
-      const newProviders = [...prev.provider_details];
-      if (field === 'cost') {
-        newProviders[index] = { ...newProviders[index], [field]: parseFloat(value) || 0 };
-      } else {
-        newProviders[index] = { ...newProviders[index], [field]: value };
+      const newProviderDetails = [...prev.provider_details];
+      const index = newProviderDetails.findIndex(pd => pd.id === id);
+
+      if (index !== -1) {
+        if (field === 'provider_id') {
+          const selectedProvider = availableProviders.find(p => p.id === value);
+          if (selectedProvider) {
+            newProviderDetails[index] = {
+              ...newProviderDetails[index],
+              provider_id: value as string,
+              cost_per_unit_snapshot: selectedProvider.cost_per_unit,
+              selling_price_per_unit_snapshot: selectedProvider.selling_price_per_unit,
+              name_snapshot: selectedProvider.name,
+              service_type_snapshot: selectedProvider.service_type,
+              unit_type_snapshot: selectedProvider.unit_type,
+            };
+          }
+        } else if (field === 'quantity') {
+          newProviderDetails[index] = { ...newProviderDetails[index], quantity: value as number };
+        }
       }
-      return { ...prev, provider_details: newProviders };
+      return { ...prev, provider_details: newProviderDetails };
     });
   };
 
-  const addProviderItem = () => {
+  // NEW: Add provider service to tour
+  const addTourProviderService = () => {
     setFormData((prev) => ({
       ...prev,
-      provider_details: [...prev.provider_details, { name: '', service: '', cost: 0 }],
+      provider_details: [...prev.provider_details, {
+        id: uuidv4(),
+        provider_id: '',
+        quantity: 1,
+        cost_per_unit_snapshot: 0,
+        selling_price_per_unit_snapshot: 0,
+        name_snapshot: '',
+        service_type_snapshot: '',
+        unit_type_snapshot: 'person',
+      }],
     }));
   };
 
-  const removeProviderItem = (index: number) => {
-    setFormData((prev) => {
-      const newProviders = [...prev.provider_details];
-      newProviders.splice(index, 1);
-      return { ...prev, provider_details: newProviders };
-    });
+  // NEW: Remove provider service from tour
+  const removeTourProviderService = (idToRemove: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      provider_details: prev.provider_details.filter((detail) => detail.id !== idToRemove),
+    }));
   };
 
   // NEW: Handle bus selection
@@ -575,7 +648,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       return;
     }
 
-    let currentAdjustedTotalBaseCost = formData.bus_cost + formData.provider_details.reduce((sum, p) => sum + p.cost, 0);
+    let currentAdjustedTotalBaseCost = formData.bus_cost + formData.provider_details.reduce((sum, p) => sum + (p.cost_per_unit_snapshot * p.quantity), 0);
     let remainingClientsToAccommodate = expectedClientsForBreakeven;
     let hotelAdjustmentsMessage = '';
 
@@ -685,7 +758,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     formData.bus_capacity,
     formData.courtesies,
     formData.bus_cost,
-    formData.provider_details,
+    formData.provider_details, // Added to dependencies
     formData.hotel_details,
     formData.selling_price_double_occupancy,
     formData.selling_price_triple_occupancy,
@@ -999,38 +1072,52 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           </Button>
         </div>
 
-        {/* Provider Details */}
+        {/* NEW: Provider Services */}
         <div className="space-y-2 col-span-full">
-          <Label className="text-lg font-semibold">Proveedores</Label>
-          {formData.provider_details.map((provider, index) => (
-            <div key={index} className="flex flex-col md:flex-row items-center gap-2">
-              <Input
-                value={provider.name}
-                onChange={(e) => handleProviderChange(index, 'name', e.target.value)}
-                placeholder="Nombre del Proveedor"
-                className="w-full md:w-1/3"
-              />
-              <Input
-                value={provider.service}
-                onChange={(e) => handleProviderChange(index, 'service', e.target.value)}
-                placeholder="Servicio Contratado"
-                className="w-full md:w-1/3"
-              />
-              <Input
-                type="number"
-                value={provider.cost}
-                onChange={(e) => handleProviderChange(index, 'cost', e.target.value)}
-                placeholder="Costo"
-                className="w-full md:w-1/3"
-                min={0} step="0.01"
-              />
-              <Button type="button" variant="destructive" size="icon" onClick={() => removeProviderItem(index)}>
-                <MinusCircle className="h-4 w-4" />
-              </Button>
-            </div>
-          ))}
-          <Button type="button" variant="outline" onClick={addProviderItem}>
-            <PlusCircle className="mr-2 h-4 w-4" /> Añadir Proveedor
+          <Label className="text-lg font-semibold">Servicios de Proveedores Vinculados</Label>
+          {formData.provider_details.map((tourProviderService) => {
+            const selectedProvider = availableProviders.find(p => p.id === tourProviderService.provider_id);
+            const providerDisplay = selectedProvider
+              ? `${selectedProvider.name} (${selectedProvider.service_type} - ${selectedProvider.unit_type})`
+              : 'Seleccionar Proveedor';
+            const totalCost = tourProviderService.cost_per_unit_snapshot * tourProviderService.quantity;
+
+            return (
+              <div key={tourProviderService.id} className="flex flex-col md:flex-row items-center gap-2 border p-2 rounded-md">
+                <Select
+                  value={tourProviderService.provider_id}
+                  onValueChange={(value) => handleProviderServiceChange(tourProviderService.id, 'provider_id', value)}
+                >
+                  <SelectTrigger className="w-full md:w-1/2">
+                    <SelectValue placeholder={providerDisplay} />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableProviders.map((provider) => (
+                      <SelectItem key={provider.id} value={provider.id}>
+                        {`${provider.name} (${provider.service_type} - ${provider.unit_type})`}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Input
+                  type="number"
+                  value={tourProviderService.quantity}
+                  onChange={(e) => handleProviderServiceChange(tourProviderService.id, 'quantity', parseFloat(e.target.value) || 0)}
+                  placeholder="Cantidad"
+                  className="w-full md:w-1/6"
+                  min={1}
+                />
+                <span className="text-sm text-gray-600 md:w-1/4 text-center md:text-left">
+                  Costo Total: ${totalCost.toFixed(2)}
+                </span>
+                <Button type="button" variant="destructive" size="icon" onClick={() => removeTourProviderService(tourProviderService.id)}>
+                  <MinusCircle className="h-4 w-4" />
+                </Button>
+              </div>
+            );
+          })}
+          <Button type="button" variant="outline" onClick={addTourProviderService}>
+            <PlusCircle className="mr-2 h-4 w-4" /> Añadir Servicio de Proveedor
           </Button>
         </div>
 

@@ -23,14 +23,15 @@ import AdminUsersPage from "./pages/AdminUsersPage";
 import AdminBlogPage from "./pages/AdminBlogPage";
 import AdminReviewsPage from "./pages/AdminReviewsPage";
 import AdminHotelsPage from "./pages/AdminHotelsPage";
-import AdminProvidersPage from "./pages/AdminProvidersPage";
+import AdminProvidersPage from "./pages/AdminProvidersPage"; // Import the new AdminProvidersPage
+import AdminProviderFormPage from "./pages/AdminProviderFormPage"; // Import the new AdminProviderFormPage
 import AdminClientsPage from "./pages/AdminClientsPage";
 import AdminBusesPage from "./pages/AdminBusesPage";
 import AdminBusFormPage from "./pages/AdminBusFormPage";
 import AdminToursPage from "./pages/AdminToursPage";
 import AdminTourFormPage from "./pages/AdminTourFormPage";
 import AdminHotelFormPage from "./pages/AdminHotelFormPage";
-import AdminClientFormPage from "./pages/AdminClientFormPage"; // Import the new AdminClientFormPage
+import AdminClientFormPage from "./pages/AdminClientFormPage";
 
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -147,6 +148,22 @@ const App = () => {
                 element={
                   <ProtectedRoute adminOnly>
                     <AdminProvidersPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/providers/new"
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminProviderFormPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/providers/edit/:id"
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminProviderFormPage />
                   </ProtectedRoute>
                 }
               />

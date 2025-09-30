@@ -36,6 +36,28 @@ interface RoomDetails {
   quad_rooms: number;
 }
 
+// NEW: Interface for ProviderService selected by a client
+interface ClientProviderService {
+  id: string; // Unique ID for this entry in the client's extra_services array
+  provider_id: string; // References an ID from the 'providers' table
+  quantity: number; // How many units of this service the client is purchasing
+  selling_price_per_unit_snapshot: number; // Snapshot of selling price at time of selection
+  name_snapshot: string; // Snapshot of provider name
+  service_type_snapshot: string; // Snapshot of service type
+  unit_type_snapshot: string; // Snapshot of unit type
+}
+
+// NEW: Interface for available providers (from the 'providers' table)
+interface AvailableProvider {
+  id: string;
+  name: string;
+  service_type: string;
+  cost_per_unit: number;
+  unit_type: string;
+  selling_price_per_unit: number;
+  is_active: boolean;
+}
+
 interface Client {
   id?: string;
   first_name: string;
@@ -47,6 +69,7 @@ interface Client {
   tour_id: string | null;
   number_of_people: number;
   companions: Companion[];
+  extra_services: ClientProviderService[]; // NEW: Array of selected provider services
   total_amount: number;
   advance_payment: number;
   total_paid: number;
@@ -121,6 +144,7 @@ const AdminClientFormPage = () => {
     tour_id: null,
     number_of_people: 1,
     companions: [],
+    extra_services: [], // Initialize new field
     total_amount: 0,
     advance_payment: 0,
     total_paid: 0,
@@ -131,6 +155,7 @@ const AdminClientFormPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
   const [availableTours, setAvailableTours] = useState<Tour[]>([]);
+  const [availableProviders, setAvailableProviders] = useState<AvailableProvider[]>([]); // NEW: State for available providers
   const [selectedTourPrices, setSelectedTourPrices] = useState<Tour | null>(null);
   const [busDetails, setBusDetails] = useState<BusDetails | null>(null); // State for bus details
   const [clientSelectedSeats, setClientSelectedSeats] = useState<number[]>([]); // Seats selected for *this* client
@@ -159,6 +184,25 @@ const AdminClientFormPage = () => {
     fetchTours();
   }, []);
 
+  // NEW: Fetch available providers
+  useEffect(() => {
+    const fetchAvailableProviders = async () => {
+      const { data, error } = await supabase
+        .from('providers')
+        .select('*')
+        .eq('is_active', true)
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error('Error al cargar proveedores disponibles:', error);
+        toast.error('Error al cargar la lista de proveedores disponibles.');
+      } else {
+        setAvailableProviders(data || []);
+      }
+    };
+    fetchAvailableProviders();
+  }, []);
+
   useEffect(() => {
     const fetchClientData = async () => {
       if (clientId) {
@@ -180,6 +224,7 @@ const AdminClientFormPage = () => {
           setFormData({
             ...data,
             companions: data.companions || [],
+            extra_services: data.extra_services || [], // Set extra_services
             contract_number: data.contract_number || uuidv4().substring(0, 8).toUpperCase(),
             contractor_age: data.contractor_age || null,
             room_details: data.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }, // Set room_details
@@ -213,6 +258,7 @@ const AdminClientFormPage = () => {
           tour_id: null,
           number_of_people: 1,
           companions: [],
+          extra_services: [], // Reset new field
           total_amount: 0,
           advance_payment: 0,
           total_paid: 0,
@@ -312,6 +358,12 @@ const AdminClientFormPage = () => {
       calculatedTotalAmount += numChildren * selectedTourPrices.selling_price_child;
     }
 
+    // NEW: Add cost of extra services
+    const extraServicesTotal = formData.extra_services.reduce((sum, service) => {
+      return sum + (service.selling_price_per_unit_snapshot * service.quantity);
+    }, 0);
+    calculatedTotalAmount += extraServicesTotal;
+
     setFormData(prev => ({
       ...prev,
       number_of_people: totalPeople, // Total people including children
@@ -319,7 +371,7 @@ const AdminClientFormPage = () => {
       total_amount: calculatedTotalAmount,
       remaining_payment: calculatedTotalAmount - prev.total_paid,
     }));
-  }, [formData.companions.length, formData.total_paid, selectedTourPrices, formData.contractor_age, formData.companions]);
+  }, [formData.companions.length, formData.total_paid, selectedTourPrices, formData.contractor_age, formData.companions, formData.extra_services]);
 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -356,6 +408,57 @@ const AdminClientFormPage = () => {
     setFormData((prev) => ({
       ...prev,
       companions: prev.companions.filter(c => c.id !== id),
+    }));
+  };
+
+  // NEW: Handle client extra service changes
+  const handleClientExtraServiceChange = (id: string, field: 'provider_id' | 'quantity', value: string | number) => {
+    setFormData((prev) => {
+      const newExtraServices = [...prev.extra_services];
+      const index = newExtraServices.findIndex(es => es.id === id);
+
+      if (index !== -1) {
+        if (field === 'provider_id') {
+          const selectedProvider = availableProviders.find(p => p.id === value);
+          if (selectedProvider) {
+            newExtraServices[index] = {
+              ...newExtraServices[index],
+              provider_id: value as string,
+              selling_price_per_unit_snapshot: selectedProvider.selling_price_per_unit,
+              name_snapshot: selectedProvider.name,
+              service_type_snapshot: selectedProvider.service_type,
+              unit_type_snapshot: selectedProvider.unit_type,
+            };
+          }
+        } else if (field === 'quantity') {
+          newExtraServices[index] = { ...newExtraServices[index], quantity: value as number };
+        }
+      }
+      return { ...prev, extra_services: newExtraServices };
+    });
+  };
+
+  // NEW: Add client extra service
+  const addClientExtraService = () => {
+    setFormData((prev) => ({
+      ...prev,
+      extra_services: [...prev.extra_services, {
+        id: uuidv4(),
+        provider_id: '',
+        quantity: 1,
+        selling_price_per_unit_snapshot: 0,
+        name_snapshot: '',
+        service_type_snapshot: '',
+        unit_type_snapshot: 'person',
+      }],
+    }));
+  };
+
+  // NEW: Remove client extra service
+  const removeClientExtraService = (idToRemove: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      extra_services: prev.extra_services.filter((service) => service.id !== idToRemove),
     }));
   };
 
@@ -417,6 +520,7 @@ const AdminClientFormPage = () => {
       tour_id: formData.tour_id,
       number_of_people: formData.number_of_people,
       companions: formData.companions,
+      extra_services: formData.extra_services, // Save extra_services
       total_amount: formData.total_amount,
       advance_payment: formData.advance_payment,
       total_paid: formData.total_paid,
@@ -627,6 +731,55 @@ const AdminClientFormPage = () => {
                 ))}
                 <Button type="button" variant="outline" onClick={addCompanion}>
                   <PlusCircle className="mr-2 h-4 w-4" /> Añadir Acompañante
+                </Button>
+              </div>
+
+              {/* NEW: Extra Services for Client */}
+              <div className="space-y-2 col-span-full mt-6">
+                <Label className="text-lg font-semibold">Servicios Adicionales para el Cliente</Label>
+                {formData.extra_services.map((clientService) => {
+                  const selectedProvider = availableProviders.find(p => p.id === clientService.provider_id);
+                  const providerDisplay = selectedProvider
+                    ? `${selectedProvider.name} (${selectedProvider.service_type} - ${clientService.unit_type_snapshot})`
+                    : 'Seleccionar Servicio';
+                  const totalSellingPrice = clientService.selling_price_per_unit_snapshot * clientService.quantity;
+
+                  return (
+                    <div key={clientService.id} className="flex flex-col md:flex-row items-center gap-2 border p-2 rounded-md">
+                      <Select
+                        value={clientService.provider_id}
+                        onValueChange={(value) => handleClientExtraServiceChange(clientService.id, 'provider_id', value)}
+                      >
+                        <SelectTrigger className="w-full md:w-1/2">
+                          <SelectValue placeholder={providerDisplay} />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableProviders.map((provider) => (
+                            <SelectItem key={provider.id} value={provider.id}>
+                              {`${provider.name} (${provider.service_type} - ${provider.unit_type})`}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Input
+                        type="number"
+                        value={clientService.quantity}
+                        onChange={(e) => handleClientExtraServiceChange(clientService.id, 'quantity', parseFloat(e.target.value) || 0)}
+                        placeholder="Cantidad"
+                        className="w-full md:w-1/6"
+                        min={1}
+                      />
+                      <span className="text-sm text-gray-600 md:w-1/4 text-center md:text-left">
+                        Precio Venta Total: ${totalSellingPrice.toFixed(2)}
+                      </span>
+                      <Button type="button" variant="destructive" size="icon" onClick={() => removeClientExtraService(clientService.id)}>
+                        <MinusCircle className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  );
+                })}
+                <Button type="button" variant="outline" onClick={addClientExtraService}>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Añadir Servicio Adicional
                 </Button>
               </div>
 
