@@ -14,6 +14,8 @@ const formatRoomDetails = (details: any) => {
 
   if (safeDetails.quad_rooms > 0) parts.push(`${safeDetails.quad_rooms} Cuádruple(s)`);
   if (safeDetails.triple_rooms > 0) parts.push(`${safeDetails.triple_rooms} Triple(s)`);
+  if (safeDetails.quad_rooms > 0) parts.push(`${safeDetails.quad_rooms} Cuádruple(s)`);
+  if (safeDetails.triple_rooms > 0) parts.push(`${safeDetails.triple_rooms} Triple(s)`);
   if (safeDetails.double_rooms > 0) parts.push(`${safeDetails.double_rooms} Doble(s)`);
   return parts.join(', ') || 'N/A';
 };
@@ -140,9 +142,8 @@ serve(async (req) => {
     headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' },
   });
 
-  // --- NEW LOGGING FOR HEADERS ---
   console.log('Edge Function: Request headers:', JSON.stringify(Object.fromEntries(req.headers.entries())));
-  // --- END NEW LOGGING ---
+  console.log('Edge Function: Content-Length header:', req.headers.get('Content-Length'));
 
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) {
@@ -186,12 +187,21 @@ serve(async (req) => {
 
   let clientId: string;
   try {
-    const requestBody = await req.json();
+    console.log('Edge Function: Attempting to read raw request body...');
+    const rawBody = await req.text();
+    console.log('Edge Function: Raw request body:', rawBody);
+
+    if (!rawBody) {
+      console.error('Edge Function: Raw body is empty.');
+      return jsonResponse({ error: 'Request body is empty.' }, 400);
+    }
+
+    const requestBody = JSON.parse(rawBody); // Manually parse the raw text
     clientId = requestBody.clientId;
-    console.log('Edge Function: Received clientId from request body:', clientId);
-  } catch (jsonParseError) {
-    console.error('Edge Function: Error parsing JSON body:', jsonParseError);
-    return jsonResponse({ error: 'Invalid JSON in request body.' }, 400);
+    console.log('Edge Function: Parsed clientId from request body:', clientId);
+  } catch (parseError: any) {
+    console.error('Edge Function: Error parsing JSON body:', parseError.message);
+    return jsonResponse({ error: `Invalid JSON in request body: ${parseError.message}` }, 400);
   }
 
   try {
