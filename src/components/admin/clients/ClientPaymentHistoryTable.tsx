@@ -43,9 +43,9 @@ const ClientPaymentHistoryTable: React.FC<ClientPaymentHistoryTableProps> = ({ c
 
   const fetchPayments = async () => {
     setLoading(true);
-    // NEW: Comprobación explícita justo antes de la invocación
+    // Comprobación explícita justo antes de la invocación
     if (!clientId || typeof clientId !== 'string' || clientId.trim() === '') {
-      console.error('ClientPaymentHistoryTable: clientId is invalid or empty immediately before invoke. Aborting fetch.');
+      console.error('ClientPaymentHistoryTable: clientId is invalid or empty immediately before fetch. Aborting fetch.');
       setLoading(false);
       setPayments([]);
       toast.error('Error: ID de cliente no válido para cargar pagos.');
@@ -53,19 +53,38 @@ const ClientPaymentHistoryTable: React.FC<ClientPaymentHistoryTableProps> = ({ c
     }
 
     try {
-      console.log('ClientPaymentHistoryTable: Invoking list-client-payments with clientId:', clientId); // NEW LOG
-      const { data, error } = await supabase.functions.invoke('list-client-payments', {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session?.access_token) {
+        toast.error('No estás autenticado. Por favor, inicia sesión de nuevo.');
+        setLoading(false);
+        return;
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const functionName = 'list-client-payments';
+      const edgeFunctionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
+
+      console.log('ClientPaymentHistoryTable: Calling Edge Function via fetch with clientId:', clientId); // NEW LOG
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionData.session.access_token}`,
+        },
         body: JSON.stringify({ clientId }),
-        headers: { 'Content-Type': 'application/json' },
       });
 
-      if (error) {
-        console.error('Error invoking list-client-payments function:', error);
-        toast.error(`Error al cargar el historial de pagos: ${data?.error || error.message || 'Error desconocido.'}`);
-      } else if (data && data.payments) {
-        setPayments(data.payments);
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error from Edge Function:', errorData);
+        toast.error(`Error al cargar el historial de pagos: ${errorData.error || 'Error desconocido.'}`);
       } else {
-        toast.error('Respuesta inesperada al cargar pagos.');
+        const data = await response.json();
+        if (data && data.payments) {
+          setPayments(data.payments);
+        } else {
+          toast.error('Respuesta inesperada al cargar pagos.');
+        }
       }
     } catch (error: any) {
       console.error('Unexpected error fetching payments:', error);
