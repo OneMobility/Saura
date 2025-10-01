@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Edit, Trash2, Loader2, DollarSign, FileText } from 'lucide-react'; // Import FileText icon
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
+import { useSession } from '@/components/SessionContextProvider'; // Import useSession to get access token
 
 interface Companion {
   id: string;
@@ -54,6 +55,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
   const [loading, setLoading] = useState(true);
   const [exportingClientId, setExportingClientId] = useState<string | null>(null); // For loading state on export button
   const navigate = useNavigate(); // Initialize useNavigate
+  const { session } = useSession(); // Get session to access token
 
   useEffect(() => {
     fetchClients();
@@ -119,29 +121,45 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
     setExportingClientId(clientId);
     toast.info(`Generando hoja de reserva para ${clientName}...`);
 
+    if (!session?.access_token) {
+      toast.error('No estás autenticado. Por favor, inicia sesión de nuevo.');
+      setExportingClientId(null);
+      return;
+    }
+
     try {
-      // Explicitly JSON.stringify the body
-      const { data, error } = await supabase.functions.invoke('generate-booking-sheet', {
-        body: JSON.stringify({ clientId }), 
-        headers: { 'Content-Type': 'application/json' },
+      // Construct the Edge Function URL directly
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const functionName = 'generate-booking-sheet';
+      const edgeFunctionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
+
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ clientId }), // Send clientId in the request body
       });
 
-      if (error) {
-        console.error('Error invoking generate-booking-sheet function:', error);
-        toast.error(`Error al generar la hoja de reserva: ${data?.error || error.message || 'Error desconocido.'}`);
-      } else if (data) {
-        // Open the HTML in a new tab
-        const newWindow = window.open('', '_blank');
-        if (newWindow) {
-          newWindow.document.write(data);
-          newWindow.document.close();
-          newWindow.focus();
-          toast.success('Hoja de reserva generada. Puedes imprimirla desde la nueva pestaña.');
-        } else {
-          toast.error('No se pudo abrir una nueva ventana. Por favor, permite pop-ups.');
-        }
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error from Edge Function:', errorData);
+        toast.error(`Error al generar la hoja de reserva: ${errorData.error || 'Error desconocido.'}`);
+        return;
+      }
+
+      const htmlContent = await response.text();
+
+      // Open the HTML in a new tab
+      const newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.document.write(htmlContent);
+        newWindow.document.close();
+        newWindow.focus();
+        toast.success('Hoja de reserva generada. Puedes imprimirla desde la nueva pestaña.');
       } else {
-        toast.error('Respuesta inesperada al generar la hoja de reserva.');
+        toast.error('No se pudo abrir una nueva ventana. Por favor, permite pop-ups.');
       }
     } catch (err: any) {
       console.error('Unexpected error during booking sheet generation:', err);

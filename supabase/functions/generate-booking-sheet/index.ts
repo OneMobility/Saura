@@ -210,6 +210,9 @@ serve(async (req) => {
           duration,
           includes,
           itinerary
+        ),
+        tour_seat_assignments (
+          seat_number
         )
       `)
       .eq('id', clientId)
@@ -224,26 +227,10 @@ serve(async (req) => {
     console.log('Edge Function: Client.tours object:', JSON.stringify(client.tours));
 
 
-    let seats: any[] = [];
-    if (client.tour_id) { // Only fetch seats if a tour_id is present
-      console.log('Edge Function: Fetching seat assignments for tour_id:', client.tour_id);
-      const { data: fetchedSeats, error: seatsError } = await supabaseAdmin
-        .from('tour_seat_assignments')
-        .select('seat_number')
-        .eq('client_id', clientId)
-        .eq('tour_id', client.tour_id);
-
-      if (seatsError) {
-        console.error('Edge Function: Error fetching seats:', seatsError.message);
-        // Continue without seats if there's an error, but log it
-      } else {
-        seats = fetchedSeats || [];
-        console.log('Edge Function: Fetched seats:', JSON.stringify(seats));
-      }
-    } else {
-      console.log('Edge Function: Client has no tour_id, skipping seat assignment fetch.');
-    }
-
+    // Seats are now directly fetched with the client data
+    const seats = client.tour_seat_assignments || [];
+    console.log('Edge Function: Fetched seats:', JSON.stringify(seats));
+    
     console.log('Edge Function: Fetching agency settings...');
     const { data: agency, error: agencyError } = await supabaseAdmin
       .from('agency_settings')
