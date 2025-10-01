@@ -30,10 +30,11 @@ const ClientPaymentHistoryTable: React.FC<ClientPaymentHistoryTableProps> = ({ c
   const [isGeneratingReceipt, setIsGeneratingReceipt] = useState(false);
 
   useEffect(() => {
-    if (clientId) { // Solo cargar pagos si clientId está presente
+    // Aseguramos que clientId sea una cadena no vacía antes de intentar cargar los pagos
+    if (clientId && clientId.trim() !== '') { 
       fetchPayments();
     } else {
-      setLoading(false); // Si no hay clientId, no hay pagos que cargar
+      setLoading(false); // Si no hay clientId válido, no hay pagos que cargar
       setPayments([]);
     }
   }, [clientId]);

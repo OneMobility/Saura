@@ -58,14 +58,17 @@ serve(async (req) => {
   try {
     const requestBody = await req.json();
     clientId = requestBody.clientId;
+    console.log('Edge Function: Received clientId in body:', clientId); // Log para depuración
   } catch (parseError: any) {
     console.error('Edge Function: Error parsing JSON body:', parseError.message);
     return jsonResponse({ error: `Invalid JSON in request body: ${parseError.message}` }, 400);
   }
 
   try {
-    if (!clientId) {
-      return jsonResponse({ error: 'Client ID is required.' }, 400);
+    // Validación más estricta para clientId
+    if (!clientId || typeof clientId !== 'string' || clientId.trim() === '') {
+      console.error('Edge Function: Client ID is missing, not a string, or empty after parsing.'); // Log para depuración
+      return jsonResponse({ error: 'Client ID is required and must be a non-empty string.' }, 400);
     }
 
     const { data: payments, error: paymentsError } = await supabaseAdmin
