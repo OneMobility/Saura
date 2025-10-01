@@ -9,7 +9,6 @@ const corsHeaders = {
 // Helper function to format room details
 const formatRoomDetails = (details: any) => {
   const parts = [];
-  // Ensure details is an object before accessing properties
   const safeDetails = details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 };
 
   if (safeDetails.quad_rooms > 0) parts.push(`${safeDetails.quad_rooms} Cuádruple(s)`);
@@ -21,11 +20,10 @@ const formatRoomDetails = (details: any) => {
 // Helper function to generate HTML for the booking sheet
 const generateBookingSheetHtml = (data: any) => {
   const client = data.client;
-  const tour = data.tour || {}; // Ensure tour is at least an empty object
+  const tour = data.tour || {};
   const seats = data.seats;
   const agency = data.agency;
 
-  // Provide default empty arrays for companions and extra_services if they are null or not arrays
   const safeCompanions = Array.isArray(client.companions) ? client.companions : [];
   const safeExtraServices = Array.isArray(client.extra_services) ? client.extra_services : [];
   const safeIncludes = Array.isArray(tour.includes) ? tour.includes : [];
@@ -56,7 +54,6 @@ const generateBookingSheetHtml = (data: any) => {
     ? safeIncludes.map((item: string) => `<li>${item}</li>`).join('')
     : '<li>N/A</li>';
 
-  // Ensure total_amount and total_paid are numbers before calling toFixed
   const clientTotalAmount = typeof client.total_amount === 'number' ? client.total_amount : 0;
   const clientTotalPaid = typeof client.total_paid === 'number' ? client.total_paid : 0;
   const remainingPayment = (clientTotalAmount - clientTotalPaid).toFixed(2);
@@ -68,28 +65,180 @@ const generateBookingSheetHtml = (data: any) => {
         <meta charset="UTF-8">
         <meta name="viewport" content="width=device-width, initial-scale=1.0">
         <title>Hoja de Reserva - ${client.contract_number || 'N/A'}</title>
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
         <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 20px; }
-            .container { max-width: 800px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
-            h1, h2, h3 { color: #E4007C; }
-            h1 { text-align: center; margin-bottom: 20px; }
-            .agency-header { background-color: #E4007C; color: white; padding: 20px; border-radius: 8px; text-align: center; margin-bottom: 30px; }
-            .agency-header img { max-width: 150px; height: auto; display: block; margin: 0 auto 10px auto; }
-            .agency-header h2 { color: white; margin-top: 0; margin-bottom: 5px; font-size: 1.8em; }
-            .agency-header p { margin: 0; font-size: 0.9em; }
-            .section { margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px dashed #eee; }
-            .section:last-child { border-bottom: none; }
-            .label { font-weight: bold; }
-            ul { list-style-type: none; padding: 0; }
-            ul li { margin-bottom: 5px; }
-            .payment-summary { background-color: #f9f9f9; padding: 15px; border-radius: 5px; border: 1px solid #eee; }
-            .payment-summary p { margin: 5px 0; }
-            .total-amount { font-size: 1.2em; font-weight: bold; color: #E4007C; }
-            .footer-info { text-align: center; margin-top: 30px; font-size: 0.9em; color: #666; }
+            body {
+                font-family: 'Poppins', sans-serif;
+                line-height: 1.6;
+                color: #333;
+                margin: 0;
+                padding: 0;
+                background-color: #f8f8f8;
+            }
+            .page-container {
+                max-width: 210mm; /* A4 width, close to Letter */
+                min-height: 297mm; /* A4 height, close to Letter */
+                margin: 20px auto;
+                background-color: white;
+                border-radius: 8px;
+                box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+                padding: 30px;
+                box-sizing: border-box;
+            }
+            h1, h2, h3 {
+                color: #E4007C; /* Rosa Mexicano */
+                font-weight: 700;
+                margin-top: 0;
+            }
+            h1 {
+                text-align: center;
+                font-size: 2.2em;
+                margin-bottom: 25px;
+                text-transform: uppercase;
+            }
+            h2 {
+                font-size: 1.5em;
+                margin-bottom: 15px;
+                border-bottom: 2px solid #E4007C;
+                padding-bottom: 5px;
+            }
+            h3 {
+                font-size: 1.2em;
+                margin-bottom: 10px;
+            }
+            .agency-header {
+                background-color: #E4007C;
+                color: white;
+                padding: 25px;
+                border-radius: 8px;
+                text-align: center;
+                margin-bottom: 30px;
+                position: relative;
+                overflow: hidden;
+            }
+            .agency-header::before {
+                content: '';
+                position: absolute;
+                top: -50%;
+                left: -50%;
+                width: 200%;
+                height: 200%;
+                background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0) 70%);
+                transform: rotate(45deg);
+                opacity: 0.3;
+            }
+            .agency-header img {
+                max-width: 120px;
+                height: auto;
+                display: block;
+                margin: 0 auto 15px auto;
+                border-radius: 50%;
+                border: 3px solid white;
+                box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+            }
+            .agency-header h2 {
+                color: white;
+                margin-top: 0;
+                margin-bottom: 8px;
+                font-size: 2em;
+                border-bottom: none;
+                padding-bottom: 0;
+            }
+            .agency-header p {
+                margin: 0;
+                font-size: 0.9em;
+                opacity: 0.9;
+            }
+            .section {
+                margin-bottom: 25px;
+                padding: 15px;
+                border: 1px solid #eee;
+                border-radius: 5px;
+                background-color: #fdfdfd;
+            }
+            .section p, .section ul {
+                margin-bottom: 8px;
+            }
+            .label {
+                font-weight: 600;
+                color: #555;
+            }
+            ul {
+                list-style-type: disc;
+                padding-left: 20px;
+                margin-top: 5px;
+            }
+            ul li {
+                margin-bottom: 3px;
+                font-size: 0.95em;
+            }
+            .payment-summary {
+                background-color: #fff0f5; /* Light pink */
+                padding: 20px;
+                border-radius: 8px;
+                border: 1px solid #E4007C;
+                margin-top: 30px;
+            }
+            .payment-summary p {
+                margin: 8px 0;
+                font-size: 1.05em;
+            }
+            .total-amount {
+                font-size: 1.4em;
+                font-weight: 700;
+                color: #E4007C;
+                border-top: 1px solid #E4007C;
+                padding-top: 10px;
+                margin-top: 15px;
+            }
+            .footer-info {
+                text-align: center;
+                margin-top: 40px;
+                font-size: 0.85em;
+                color: #888;
+            }
+
+            /* Print-specific styles */
+            @media print {
+                @page {
+                    size: letter; /* Set page size to Letter */
+                    margin: 0.5in; /* Smaller margins for print */
+                }
+                body {
+                    margin: 0;
+                    padding: 0;
+                    -webkit-print-color-adjust: exact; /* Ensure background colors are printed */
+                    print-color-adjust: exact;
+                    font-size: 10pt; /* Adjust base font size for print */
+                }
+                .page-container {
+                    width: 100%;
+                    margin: 0;
+                    box-shadow: none;
+                    border-radius: 0;
+                    border: none;
+                    padding: 0; /* Remove padding for print, rely on section padding */
+                }
+                .agency-header, .section, .payment-summary {
+                    page-break-inside: avoid; /* Prevent breaking these sections across pages */
+                    margin-bottom: 15px; /* Tighter spacing for print */
+                }
+                h1 { font-size: 1.8em; margin-bottom: 15px; }
+                h2 { font-size: 1.3em; margin-bottom: 10px; border-bottom: 1px solid #E4007C; }
+                h3 { font-size: 1.1em; margin-bottom: 8px; }
+                .agency-header { padding: 15px; margin-bottom: 20px; }
+                .agency-header img { max-width: 80px; margin-bottom: 10px; }
+                .agency-header h2 { font-size: 1.5em; }
+                .agency-header p { font-size: 0.8em; }
+                .section { padding: 10px; }
+                .payment-summary { padding: 15px; margin-top: 20px; }
+                .total-amount { font-size: 1.2em; }
+                .footer-info { margin-top: 20px; font-size: 0.75em; }
+            }
         </style>
     </head>
     <body>
-        <div class="container">
+        <div class="page-container">
             <div class="agency-header">
                 ${agency?.logo_url ? `<img src="${agency.logo_url}" alt="${agency?.agency_name || 'Logo de la Agencia'}">` : ''}
                 <h2>${agency?.agency_name || 'Tu Agencia de Viajes'}</h2>
@@ -105,7 +254,7 @@ const generateBookingSheetHtml = (data: any) => {
                 <p><span class="label">Nombre del Cliente:</span> ${client.first_name || 'N/A'} ${client.last_name || 'N/A'}</p>
                 <p><span class="label">Teléfono:</span> ${client.phone || 'N/A'}</p>
                 <p><span class="label">Edad del Contratante:</span> ${client.contractor_age !== null && typeof client.contractor_age === 'number' ? client.contractor_age : 'N/A'}</p>
-                <p><span class="label">Acompañantes:</span></p>
+                <h3>Acompañantes:</h3>
                 <ul>
                     ${companionsList}
                 </ul>
@@ -117,19 +266,19 @@ const generateBookingSheetHtml = (data: any) => {
                 <p><span class="label">Nombre del Tour:</span> ${tour?.title || 'N/A'}</p>
                 <p><span class="label">Duración:</span> ${tour?.duration || 'N/A'}</p>
                 <p><span class="label">Descripción del Tour:</span> ${tour?.description || 'N/A'}</p>
-                <p><span class="label">Incluye:</span></p>
+                <h3>Incluye:</h3>
                 <ul>
                     ${includesList}
                 </ul>
                 <p><span class="label">Distribución de Habitación:</span> ${formatRoomDetails(client.room_details)}</p>
                 <p><span class="label">Asientos Asignados:</span> ${seatNumbers}</p>
-                <p><span class="label">Servicios Adicionales:</span></p>
+                <h3>Servicios Adicionales:</h3>
                 <ul>
                     ${extraServicesList}
                 </ul>
             </div>
 
-            <div class="section payment-summary">
+            <div class="payment-summary">
                 <h2>Resumen de Pagos</h2>
                 <p><span class="label">Monto Total del Contrato:</span> $${clientTotalAmount.toFixed(2)}</p>
                 <p><span class="label">Total Pagado:</span> $${clientTotalPaid.toFixed(2)}</p>
@@ -207,7 +356,6 @@ serve(async (req) => {
 
   let clientId: string;
   try {
-    // Read clientId from the JSON body
     const requestBody = await req.json();
     clientId = requestBody.clientId;
     console.log('Edge Function: Parsed clientId from request body:', clientId);
@@ -249,26 +397,9 @@ serve(async (req) => {
     console.log('Edge Function: Client.tours object:', JSON.stringify(client.tours));
 
 
-    let seats: any[] = [];
-    if (client.tour_id) { // Only fetch seats if a tour_id is present
-      console.log('Edge Function: Fetching seat assignments for tour_id:', client.tour_id);
-      const { data: fetchedSeats, error: seatsError } = await supabaseAdmin
-        .from('tour_seat_assignments')
-        .select('seat_number')
-        .eq('client_id', clientId)
-        .eq('tour_id', client.tour_id);
-
-      if (seatsError) {
-        console.error('Edge Function: Error fetching seats:', seatsError.message);
-        // Continue without seats if there's an error, but log it
-      } else {
-        seats = fetchedSeats || [];
-        console.log('Edge Function: Fetched seats:', JSON.stringify(seats));
-      }
-    } else {
-      console.log('Edge Function: Client has no tour_id, skipping seat assignment fetch.');
-    }
-
+    const seats = client.tour_seat_assignments || [];
+    console.log('Edge Function: Fetched seats:', JSON.stringify(seats));
+    
     console.log('Edge Function: Fetching agency settings...');
     const { data: agency, error: agencyError } = await supabaseAdmin
       .from('agency_settings')
