@@ -191,81 +191,79 @@ const AdminClientFormPage = () => {
     fetchAvailableProviders();
   }, []);
 
-  useEffect(() => {
-    const fetchClientData = async () => {
-      if (clientIdFromParams) { // Use clientIdFromParams here
-        setLoadingInitialData(true);
-        const { data, error } = await supabase
-          .from('clients')
-          .select('*')
-          .eq('id', clientIdFromParams) // Use clientIdFromParams here
-          .single();
+  const refreshClientData = useCallback(async () => {
+    if (clientIdFromParams) {
+      setLoadingInitialData(true);
+      const { data, error } = await supabase
+        .from('clients')
+        .select('*')
+        .eq('id', clientIdFromParams)
+        .single();
 
-        if (error) {
-          console.error('Error fetching client for editing:', error);
-          toast.error('Error al cargar los datos del cliente para editar.');
-          setLoadingInitialData(false);
-          return;
-        }
+      if (error) {
+        console.error('Error fetching client for editing:', error);
+        toast.error('Error al cargar los datos del cliente para editar.');
+        setLoadingInitialData(false);
+        return;
+      }
 
-        if (data) {
-          setFormData({
-            ...data,
-            companions: data.companions || [],
-            extra_services: data.extra_services || [], // Set extra_services
-            contract_number: data.contract_number || uuidv4().substring(0, 8).toUpperCase(),
-            contractor_age: data.contractor_age || null,
-            room_details: data.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }, // Set room_details
-          });
-          setInitialClientStatus(data.status); // Store initial status
-          setRoomDetails(data.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }); // Initialize roomDetails state
+      if (data) {
+        setFormData({
+          ...data,
+          companions: data.companions || [],
+          extra_services: data.extra_services || [],
+          contract_number: data.contract_number || uuidv4().substring(0, 8).toUpperCase(),
+          contractor_age: data.contractor_age || null,
+          room_details: data.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
+        });
+        setInitialClientStatus(data.status);
+        setRoomDetails(data.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
 
-          // Fetch existing seat assignments for this client and tour
-          if (data.tour_id) {
-            const { data: seatAssignments, error: seatsError } = await supabase
-              .from('tour_seat_assignments')
-              .select('seat_number')
-              .eq('client_id', data.id)
-              .eq('tour_id', data.tour_id);
+        if (data.tour_id) {
+          const { data: seatAssignments, error: seatsError } = await supabase
+            .from('tour_seat_assignments')
+            .select('seat_number')
+            .eq('client_id', data.id)
+            .eq('tour_id', data.tour_id);
 
-            if (seatsError) {
-              console.error('Error fetching client seat assignments:', seatsError);
-            } else {
-              setClientSelectedSeats(seatAssignments?.map(s => s.seat_number) || []);
-            }
+          if (seatsError) {
+            console.error('Error fetching client seat assignments:', seatsError);
+          } else {
+            setClientSelectedSeats(seatAssignments?.map(s => s.seat_number) || []);
           }
         }
-      } else {
-        // Reset form for new client
-        setFormData({
-          first_name: '',
-          last_name: '',
-          email: '',
-          phone: '',
-          address: '',
-          contract_number: uuidv4().substring(0, 8).toUpperCase(),
-          tour_id: null,
-          number_of_people: 1,
-          companions: [],
-          extra_services: [], // Reset new field
-          total_amount: 0,
-          advance_payment: 0,
-          total_paid: 0,
-          status: 'pending',
-          contractor_age: null,
-          room_details: { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
-        });
-        setClientSelectedSeats([]); // Clear selected seats for new client
-        setInitialClientStatus('pending');
-        setRoomDetails({ double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }); // Reset roomDetails state
       }
-      setLoadingInitialData(false);
-    };
-
-    if (!sessionLoading) { // Only fetch client data once session is loaded
-      fetchClientData();
+    } else {
+      setFormData({
+        first_name: '',
+        last_name: '',
+        email: '',
+        phone: '',
+        address: '',
+        contract_number: uuidv4().substring(0, 8).toUpperCase(),
+        tour_id: null,
+        number_of_people: 1,
+        companions: [],
+        extra_services: [],
+        total_amount: 0,
+        advance_payment: 0,
+        total_paid: 0,
+        status: 'pending',
+        contractor_age: null,
+        room_details: { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
+      });
+      setClientSelectedSeats([]);
+      setInitialClientStatus('pending');
+      setRoomDetails({ double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
     }
-  }, [clientIdFromParams, sessionLoading]);
+    setLoadingInitialData(false);
+  }, [clientIdFromParams]);
+
+  useEffect(() => {
+    if (!sessionLoading) {
+      refreshClientData();
+    }
+  }, [sessionLoading, refreshClientData]);
 
   // Effect to update selectedTourPrices and busDetails when formData.tour_id changes
   useEffect(() => {
@@ -525,14 +523,14 @@ const AdminClientFormPage = () => {
       user_id: authUser.id, // Link to the admin user who created/updated it
     };
 
-    let currentClientIdToUse = clientIdFromParams; // Use clientIdFromParams here
+    let currentClientIdToUse = clientIdFromParams;
 
-    if (clientIdFromParams) { // Use clientIdFromParams here
+    if (clientIdFromParams) {
       // Update existing client
       const { error } = await supabase
         .from('clients')
         .update({ ...clientDataToSave, updated_at: new Date().toISOString() })
-        .eq('id', clientIdFromParams); // Use clientIdFromParams here
+        .eq('id', clientIdFromParams);
 
       if (error) {
         console.error('Error updating client:', error);
@@ -556,7 +554,7 @@ const AdminClientFormPage = () => {
         return;
       }
       toast.success('Cliente creado con éxito.');
-      currentClientIdToUse = newClientData.id; // Get the ID of the newly created client
+      currentClientIdToUse = newClientData.id;
     }
 
     // Handle seat assignments based on status and selected seats
@@ -868,9 +866,9 @@ const AdminClientFormPage = () => {
           </div>
 
           {/* NEW: Payment History Table */}
-          {formData.id && ( // Usar formData.id para renderizar ClientPaymentHistoryTable
+          {formData.id && (
             <div className="mt-8">
-              <ClientPaymentHistoryTable clientId={formData.id} key={refreshPaymentsKey} onPaymentsUpdated={() => setRefreshPaymentsKey(prev => prev + 1)} />
+              <ClientPaymentHistoryTable clientId={formData.id} key={refreshPaymentsKey} onPaymentsUpdated={refreshClientData} />
             </div>
           )}
         </main>

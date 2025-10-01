@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Printer, Checkbox } from 'lucide-react';
+import { Loader2, Printer, Trash2 } from 'lucide-react'; // Import Trash2 icon
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Checkbox as ShadcnCheckbox } from '@/components/ui/checkbox'; // Renamed to avoid conflict
@@ -28,22 +28,21 @@ const ClientPaymentHistoryTable: React.FC<ClientPaymentHistoryTableProps> = ({ c
   const [loading, setLoading] = useState(true);
   const [selectedPaymentIds, setSelectedPaymentIds] = useState<string[]>([]);
   const [isGeneratingReceipt, setIsGeneratingReceipt] = useState(false);
+  const [isDeletingPayment, setIsDeletingPayment] = useState(false); // New state for delete loading
 
   useEffect(() => {
-    // Aseguramos que clientId sea una cadena no vacía antes de intentar cargar los pagos
     if (clientId && clientId.trim() !== '') { 
       console.log('ClientPaymentHistoryTable: Attempting to fetch payments for clientId:', clientId);
       fetchPayments();
     } else {
       console.log('ClientPaymentHistoryTable: clientId is invalid or empty, skipping fetchPayments.');
-      setLoading(false); // Si no hay clientId válido, no hay pagos que cargar
+      setLoading(false);
       setPayments([]);
     }
   }, [clientId]);
 
   const fetchPayments = async () => {
     setLoading(true);
-    // Comprobación explícita justo antes de la invocación
     if (!clientId || typeof clientId !== 'string' || clientId.trim() === '') {
       console.error('ClientPaymentHistoryTable: clientId is invalid or empty immediately before fetch. Aborting fetch.');
       setLoading(false);
@@ -64,7 +63,7 @@ const ClientPaymentHistoryTable: React.FC<ClientPaymentHistoryTableProps> = ({ c
       const functionName = 'list-client-payments';
       const edgeFunctionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
 
-      console.log('ClientPaymentHistoryTable: Calling Edge Function via fetch with clientId:', clientId); // NEW LOG
+      console.log('ClientPaymentHistoryTable: Calling Edge Function via fetch with clientId:', clientId);
       const response = await fetch(edgeFunctionUrl, {
         method: 'POST',
         headers: {
@@ -164,6 +163,74 @@ const ClientPaymentHistoryTable: React.FC<ClientPaymentHistoryTableProps> = ({ c
     }
   };
 
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!window.confirm('¿Estás seguro de que quieres eliminar este pago? Esto afectará el total pagado del cliente.')) {
+      return;
+    }
+
+    setIsDeletingPayment(true);
+    try {
+      // First, get the payment amount to subtract it from the client's total_paid
+      const { data: paymentToDelete, error: fetchError } = await supabase
+        .from('client_payments')
+        .select('amount')
+        .eq('id', paymentId)
+        .single();
+
+      if (fetchError || !paymentToDelete) {
+        console.error('Error fetching payment to delete:', fetchError);
+        toast.error('Error al obtener el detalle del pago para eliminar.');
+        setIsDeletingPayment(false);
+        return;
+      }
+
+      const paymentAmount = paymentToDelete.amount;
+
+      // Delete the payment record
+      const { error: deleteError } = await supabase
+        .from('client_payments')
+        .delete()
+        .eq('id', paymentId);
+
+      if (deleteError) {
+        console.error('Error deleting payment:', deleteError);
+        toast.error('Error al eliminar el pago.');
+      } else {
+        // Update the client's total_paid amount
+        const { data: clientData, error: clientFetchError } = await supabase
+          .from('clients')
+          .select('total_paid')
+          .eq('id', clientId)
+          .single();
+
+        if (clientFetchError || !clientData) {
+          console.error('Error fetching client total_paid after payment deletion:', clientFetchError);
+          toast.error('Error al actualizar el total pagado del cliente.');
+        } else {
+          const newTotalPaid = clientData.total_paid - paymentAmount;
+          const { error: clientUpdateError } = await supabase
+            .from('clients')
+            .update({ total_paid: newTotalPaid, updated_at: new Date().toISOString() })
+            .eq('id', clientId);
+
+          if (clientUpdateError) {
+            console.error('Error updating client total_paid after payment deletion:', clientUpdateError);
+            toast.error('Error al actualizar el total pagado del cliente.');
+          } else {
+            toast.success('Pago eliminado y total pagado del cliente actualizado con éxito.');
+            fetchPayments(); // Refresh the local payment list
+            onPaymentsUpdated(); // Notify parent to refresh client data
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error('Unexpected error during payment deletion:', error);
+      toast.error(`Error inesperado: ${error.message}`);
+    } finally {
+      setIsDeletingPayment(false);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -194,6 +261,7 @@ const ClientPaymentHistoryTable: React.FC<ClientPaymentHistoryTableProps> = ({ c
                   <TableHead>Fecha</TableHead>
                   <TableHead>Monto</TableHead>
                   <TableHead>ID de Pago</TableHead>
+                  <TableHead>Acciones</TableHead> {/* New column for actions */}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -209,6 +277,17 @@ const ClientPaymentHistoryTable: React.FC<ClientPaymentHistoryTableProps> = ({ c
                     <TableCell>{format(parseISO(payment.payment_date), 'dd/MM/yyyy', { locale: es })}</TableCell>
                     <TableCell>${payment.amount.toFixed(2)}</TableCell>
                     <TableCell className="text-xs text-gray-500">{payment.id}</TableCell>
+                    <TableCell>
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        onClick={() => handleDeletePayment(payment.id)}
+                        disabled={isDeletingPayment}
+                      >
+                        {isDeletingPayment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                        <span className="sr-only">Eliminar Pago</span>
+                      </Button>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
