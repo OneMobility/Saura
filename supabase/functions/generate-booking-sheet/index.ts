@@ -69,11 +69,12 @@ const generateBookingSheetHtml = (data: any) => {
         <style>
             body {
                 font-family: 'Poppins', sans-serif;
-                line-height: 1.6;
+                line-height: 1.5;
                 color: #333;
                 margin: 0;
                 padding: 0;
                 background-color: #f8f8f8;
+                font-size: 10pt; /* Base font size for screen */
             }
             .page-container {
                 max-width: 210mm; /* A4 width, close to Letter */
@@ -82,7 +83,7 @@ const generateBookingSheetHtml = (data: any) => {
                 background-color: white;
                 border-radius: 8px;
                 box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
-                padding: 30px;
+                padding: 25px; /* Slightly reduced padding */
                 box-sizing: border-box;
             }
             h1, h2, h3 {
@@ -92,27 +93,27 @@ const generateBookingSheetHtml = (data: any) => {
             }
             h1 {
                 text-align: center;
-                font-size: 2.2em;
-                margin-bottom: 25px;
+                font-size: 2em; /* Slightly smaller */
+                margin-bottom: 20px;
                 text-transform: uppercase;
             }
             h2 {
-                font-size: 1.5em;
-                margin-bottom: 15px;
+                font-size: 1.3em; /* Slightly smaller */
+                margin-bottom: 12px;
                 border-bottom: 2px solid #E4007C;
-                padding-bottom: 5px;
+                padding-bottom: 4px;
             }
             h3 {
-                font-size: 1.2em;
-                margin-bottom: 10px;
+                font-size: 1.1em; /* Slightly smaller */
+                margin-bottom: 8px;
             }
             .agency-header {
                 background-color: #E4007C;
                 color: white;
-                padding: 25px;
+                padding: 20px; /* Slightly reduced padding */
                 border-radius: 8px;
                 text-align: center;
-                margin-bottom: 30px;
+                margin-bottom: 25px; /* Slightly reduced margin */
                 position: relative;
                 overflow: hidden;
             }
@@ -128,10 +129,10 @@ const generateBookingSheetHtml = (data: any) => {
                 opacity: 0.3;
             }
             .agency-header img {
-                max-width: 120px;
+                max-width: 100px; /* Slightly smaller logo */
                 height: auto;
                 display: block;
-                margin: 0 auto 15px auto;
+                margin: 0 auto 10px auto;
                 border-radius: 50%;
                 border: 3px solid white;
                 box-shadow: 0 2px 8px rgba(0,0,0,0.2);
@@ -139,25 +140,32 @@ const generateBookingSheetHtml = (data: any) => {
             .agency-header h2 {
                 color: white;
                 margin-top: 0;
-                margin-bottom: 8px;
-                font-size: 2em;
+                margin-bottom: 6px;
+                font-size: 1.8em; /* Slightly smaller */
                 border-bottom: none;
                 padding-bottom: 0;
             }
             .agency-header p {
                 margin: 0;
-                font-size: 0.9em;
+                font-size: 0.85em; /* Slightly smaller */
                 opacity: 0.9;
             }
-            .section {
+            .main-content-grid {
+                display: grid;
+                grid-template-columns: 1fr 1fr;
+                gap: 20px; /* Gap between columns */
                 margin-bottom: 25px;
-                padding: 15px;
+            }
+            .section {
+                padding: 12px; /* Slightly reduced padding */
                 border: 1px solid #eee;
                 border-radius: 5px;
                 background-color: #fdfdfd;
+                height: 100%; /* Ensure columns stretch */
+                box-sizing: border-box;
             }
             .section p, .section ul {
-                margin-bottom: 8px;
+                margin-bottom: 6px; /* Reduced margin */
             }
             .label {
                 font-weight: 600;
@@ -165,36 +173,36 @@ const generateBookingSheetHtml = (data: any) => {
             }
             ul {
                 list-style-type: disc;
-                padding-left: 20px;
-                margin-top: 5px;
+                padding-left: 18px; /* Reduced padding */
+                margin-top: 4px;
             }
             ul li {
-                margin-bottom: 3px;
-                font-size: 0.95em;
+                margin-bottom: 2px; /* Reduced margin */
+                font-size: 0.9em; /* Slightly smaller */
             }
             .payment-summary {
                 background-color: #fff0f5; /* Light pink */
-                padding: 20px;
+                padding: 18px; /* Slightly reduced padding */
                 border-radius: 8px;
                 border: 1px solid #E4007C;
-                margin-top: 30px;
+                margin-top: 25px; /* Slightly reduced margin */
             }
             .payment-summary p {
-                margin: 8px 0;
-                font-size: 1.05em;
+                margin: 6px 0; /* Reduced margin */
+                font-size: 1em;
             }
             .total-amount {
-                font-size: 1.4em;
+                font-size: 1.3em; /* Slightly smaller */
                 font-weight: 700;
                 color: #E4007C;
                 border-top: 1px solid #E4007C;
-                padding-top: 10px;
-                margin-top: 15px;
+                padding-top: 8px; /* Reduced padding */
+                margin-top: 12px; /* Reduced margin */
             }
             .footer-info {
                 text-align: center;
-                margin-top: 40px;
-                font-size: 0.85em;
+                margin-top: 30px; /* Slightly reduced margin */
+                font-size: 0.8em; /* Slightly smaller */
                 color: #888;
             }
 
@@ -202,14 +210,15 @@ const generateBookingSheetHtml = (data: any) => {
             @media print {
                 @page {
                     size: letter; /* Set page size to Letter */
-                    margin: 0.5in; /* Smaller margins for print */
+                    margin: 0.4in; /* Even smaller margins for print */
                 }
                 body {
                     margin: 0;
                     padding: 0;
                     -webkit-print-color-adjust: exact; /* Ensure background colors are printed */
                     print-color-adjust: exact;
-                    font-size: 10pt; /* Adjust base font size for print */
+                    font-size: 8.5pt; /* Aggressively reduced base font size for print */
+                    line-height: 1.3; /* Tighter line height */
                 }
                 .page-container {
                     width: 100%;
@@ -217,23 +226,27 @@ const generateBookingSheetHtml = (data: any) => {
                     box-shadow: none;
                     border-radius: 0;
                     border: none;
-                    padding: 0; /* Remove padding for print, rely on section padding */
+                    padding: 15px; /* Minimal padding for print */
                 }
-                .agency-header, .section, .payment-summary {
-                    page-break-inside: avoid; /* Prevent breaking these sections across pages */
-                    margin-bottom: 15px; /* Tighter spacing for print */
+                h1 { font-size: 1.6em; margin-bottom: 15px; }
+                h2 { font-size: 1.2em; margin-bottom: 8px; border-bottom: 1px solid #E4007C; padding-bottom: 3px; }
+                h3 { font-size: 1em; margin-bottom: 6px; }
+                .agency-header { padding: 15px; margin-bottom: 15px; }
+                .agency-header img { max-width: 70px; margin-bottom: 8px; }
+                .agency-header h2 { font-size: 1.4em; }
+                .agency-header p { font-size: 0.75em; }
+                .main-content-grid {
+                    gap: 15px; /* Reduced gap */
+                    margin-bottom: 15px;
                 }
-                h1 { font-size: 1.8em; margin-bottom: 15px; }
-                h2 { font-size: 1.3em; margin-bottom: 10px; border-bottom: 1px solid #E4007C; }
-                h3 { font-size: 1.1em; margin-bottom: 8px; }
-                .agency-header { padding: 15px; margin-bottom: 20px; }
-                .agency-header img { max-width: 80px; margin-bottom: 10px; }
-                .agency-header h2 { font-size: 1.5em; }
-                .agency-header p { font-size: 0.8em; }
-                .section { padding: 10px; }
-                .payment-summary { padding: 15px; margin-top: 20px; }
-                .total-amount { font-size: 1.2em; }
-                .footer-info { margin-top: 20px; font-size: 0.75em; }
+                .section { padding: 8px; margin-bottom: 0; } /* Minimal section padding */
+                .section p, .section ul { margin-bottom: 4px; }
+                ul { padding-left: 15px; margin-top: 3px; }
+                ul li { font-size: 0.85em; margin-bottom: 1px; }
+                .payment-summary { padding: 12px; margin-top: 15px; }
+                .payment-summary p { margin: 4px 0; }
+                .total-amount { font-size: 1.1em; padding-top: 6px; margin-top: 10px; }
+                .footer-info { margin-top: 15px; font-size: 0.7em; }
             }
         </style>
     </head>
@@ -249,32 +262,43 @@ const generateBookingSheetHtml = (data: any) => {
 
             <h1>Hoja de Reserva</h1>
 
+            <div class="main-content-grid">
+                <div class="client-details-column">
+                    <div class="section">
+                        <h2>Datos del Cliente</h2>
+                        <p><span class="label">Nombre:</span> ${client.first_name || 'N/A'} ${client.last_name || 'N/A'}</p>
+                        <p><span class="label">Teléfono:</span> ${client.phone || 'N/A'}</p>
+                        <p><span class="label">Edad Contratante:</span> ${client.contractor_age !== null && typeof client.contractor_age === 'number' ? client.contractor_age : 'N/A'}</p>
+                        <h3>Acompañantes:</h3>
+                        <ul>
+                            ${companionsList}
+                        </ul>
+                    </div>
+                </div>
+                <div class="booking-details-column">
+                    <div class="section">
+                        <h2>Detalles de la Reserva</h2>
+                        <p><span class="label">Número de Reserva:</span> ${client.contract_number || 'N/A'}</p>
+                        <p><span class="label">Tour:</span> ${tour?.title || 'N/A'}</p>
+                        <p><span class="label">Duración:</span> ${tour?.duration || 'N/A'}</p>
+                        <p><span class="label">Personas:</span> ${client.number_of_people || 'N/A'}</p>
+                        <p><span class="label">Habitación:</span> ${formatRoomDetails(client.room_details)}</p>
+                        <p><span class="label">Asientos:</span> ${seatNumbers}</p>
+                    </div>
+                </div>
+            </div>
+
             <div class="section">
-                <h2>Datos del Cliente</h2>
-                <p><span class="label">Nombre del Cliente:</span> ${client.first_name || 'N/A'} ${client.last_name || 'N/A'}</p>
-                <p><span class="label">Teléfono:</span> ${client.phone || 'N/A'}</p>
-                <p><span class="label">Edad del Contratante:</span> ${client.contractor_age !== null && typeof client.contractor_age === 'number' ? client.contractor_age : 'N/A'}</p>
-                <h3>Acompañantes:</h3>
+                <h2>Servicios Adicionales:</h2>
                 <ul>
-                    ${companionsList}
+                    ${extraServicesList}
                 </ul>
             </div>
 
             <div class="section">
-                <h2>Detalles de la Reserva</h2>
-                <p><span class="label">Número de Reserva:</span> ${client.contract_number || 'N/A'}</p>
-                <p><span class="label">Nombre del Tour:</span> ${tour?.title || 'N/A'}</p>
-                <p><span class="label">Duración:</span> ${tour?.duration || 'N/A'}</p>
-                <p><span class="label">Descripción del Tour:</span> ${tour?.description || 'N/A'}</p>
-                <h3>Incluye:</h3>
+                <h2>Incluye el Tour:</h2>
                 <ul>
                     ${includesList}
-                </ul>
-                <p><span class="label">Distribución de Habitación:</span> ${formatRoomDetails(client.room_details)}</p>
-                <p><span class="label">Asientos Asignados:</span> ${seatNumbers}</p>
-                <h3>Servicios Adicionales:</h3>
-                <ul>
-                    ${extraServicesList}
                 </ul>
             </div>
 
@@ -297,15 +321,18 @@ const generateBookingSheetHtml = (data: any) => {
 serve(async (req) => {
   console.log('Edge Function: generate-booking-sheet invoked.');
 
+  // Handle CORS OPTIONS request
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
+  // Helper function to standardize JSON error responses
   const jsonResponse = (body: any, status: number) => new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 
+  // Helper function to standardize HTML responses
   const htmlResponse = (html: string, status: number) => new Response(html, {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' },
@@ -314,6 +341,7 @@ serve(async (req) => {
   console.log('Edge Function: Request headers:', JSON.stringify(Object.fromEntries(req.headers.entries())));
   console.log('Edge Function: Content-Length header:', req.headers.get('Content-Length'));
 
+  // Verify JWT token to ensure request comes from an authenticated user (admin)
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) {
     console.error('Edge Function: Unauthorized: Missing Authorization header.');
@@ -322,6 +350,7 @@ serve(async (req) => {
 
   const token = authHeader.replace('Bearer ', '');
   
+  // Initialize Supabase client with service role key for admin operations
   const supabaseAdmin = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -331,6 +360,7 @@ serve(async (req) => {
       },
     }
   );
+  console.log('Edge Function: Supabase admin client initialized.');
 
   console.log('Edge Function: Verifying user token with admin client...');
   const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
@@ -341,6 +371,7 @@ serve(async (req) => {
   }
   console.log('Edge Function: User authenticated:', authUser.id);
 
+  // Check if the authenticated user is an admin using the supabaseAdmin client
   console.log('Edge Function: Checking invoking user role with admin client...');
   const { data: profile, error: profileError } = await supabaseAdmin
     .from('profiles')
@@ -356,6 +387,7 @@ serve(async (req) => {
 
   let clientId: string;
   try {
+    // Read clientId from the JSON body
     const requestBody = await req.json();
     clientId = requestBody.clientId;
     console.log('Edge Function: Parsed clientId from request body:', clientId);
@@ -397,9 +429,26 @@ serve(async (req) => {
     console.log('Edge Function: Client.tours object:', JSON.stringify(client.tours));
 
 
-    const seats = client.tour_seat_assignments || [];
-    console.log('Edge Function: Fetched seats:', JSON.stringify(seats));
-    
+    let seats: any[] = [];
+    if (client.tour_id) { // Only fetch seats if a tour_id is present
+      console.log('Edge Function: Fetching seat assignments for tour_id:', client.tour_id);
+      const { data: fetchedSeats, error: seatsError } = await supabaseAdmin
+        .from('tour_seat_assignments')
+        .select('seat_number')
+        .eq('client_id', clientId)
+        .eq('tour_id', client.tour_id);
+
+      if (seatsError) {
+        console.error('Edge Function: Error fetching seats:', seatsError.message);
+        // Continue without seats if there's an error, but log it
+      } else {
+        seats = fetchedSeats || [];
+        console.log('Edge Function: Fetched seats:', JSON.stringify(seats));
+      }
+    } else {
+      console.log('Edge Function: Client has no tour_id, skipping seat assignment fetch.');
+    }
+
     console.log('Edge Function: Fetching agency settings...');
     const { data: agency, error: agencyError } = await supabaseAdmin
       .from('agency_settings')
