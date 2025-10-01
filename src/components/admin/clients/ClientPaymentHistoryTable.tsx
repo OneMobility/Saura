@@ -37,7 +37,7 @@ const ClientPaymentHistoryTable: React.FC<ClientPaymentHistoryTableProps> = ({ c
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('list-client-payments', {
-        body: JSON.stringify({ clientId }),
+        body: JSON.stringify({ clientId }), // <-- Aseguramos que clientId se envía en el cuerpo
         headers: { 'Content-Type': 'application/json' },
       });
 
