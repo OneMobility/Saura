@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react'; // Import useRef
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, DollarSign } from 'lucide-react'; // Import DollarSign
+import { Loader2, Save, DollarSign } from 'lucide-react';
 import SeatLayoutEditor from './SeatLayoutEditor';
 
 // Definición de tipos para el layout de asientos
@@ -32,8 +32,8 @@ interface Bus {
 interface BusFormProps {
   busId?: string;
   onSave: () => void;
-  onBusDataLoaded?: (busData: Bus) => void; // NEW: Callback for when bus data is loaded
-  onRegisterPayment?: (busData: Bus) => void; // NEW: Callback for opening payment dialog
+  onBusDataLoaded?: (busData: Bus) => void;
+  onRegisterPayment?: (busData: Bus) => void;
 }
 
 const BusForm: React.FC<BusFormProps> = ({ busId, onSave, onBusDataLoaded, onRegisterPayment }) => {
@@ -51,6 +51,7 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave, onBusDataLoaded, onReg
   const [currentSeatCount, setCurrentSeatCount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
+  const loadedBusIdRef = useRef<string | undefined>(undefined); // NEW: Ref to track if onBusDataLoaded was called for this ID
 
   const calculatePayment = useCallback(() => {
     const remaining = formData.rental_cost - formData.total_paid;
@@ -74,6 +75,7 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave, onBusDataLoaded, onReg
           console.error('Error al obtener autobús para editar:', error);
           toast.error('Error al cargar los datos del autobús para editar.');
           setLoadingInitialData(false);
+          loadedBusIdRef.current = undefined; // Reset ref on error
           return;
         }
 
@@ -88,9 +90,15 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave, onBusDataLoaded, onReg
           setCurrentSeatLayout(data.seat_layout_json);
           const count = data.seat_layout_json?.flat().filter(item => item.type === 'seat').length || 0;
           setCurrentSeatCount(count);
-          onBusDataLoaded?.(loadedData); // NEW: Call callback with loaded data
+          
+          // NEW: Only call onBusDataLoaded if it hasn't been called for this specific busId yet
+          if (loadedBusIdRef.current !== busId) {
+            onBusDataLoaded?.(loadedData);
+            loadedBusIdRef.current = busId;
+          }
         }
       } else {
+        // Reset form for new bus
         setFormData({
           name: '',
           license_plate: '',
@@ -103,12 +111,13 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave, onBusDataLoaded, onReg
         });
         setCurrentSeatLayout(null);
         setCurrentSeatCount(0);
+        loadedBusIdRef.current = undefined; // Reset for new form
       }
       setLoadingInitialData(false);
     };
 
     fetchBusData();
-  }, [busId, onBusDataLoaded]);
+  }, [busId, onBusDataLoaded]); // onBusDataLoaded is still a dependency, but its invocation is guarded.
 
   useEffect(() => {
     calculatePayment();

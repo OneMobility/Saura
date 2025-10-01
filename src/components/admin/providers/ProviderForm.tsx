@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, DollarSign } from 'lucide-react'; // Import DollarSign
+import { Loader2, Save, DollarSign } from 'lucide-react';
 
 interface Provider {
   id?: string;
@@ -42,6 +42,7 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave, onProvi
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
+  const loadedProviderIdRef = useRef<string | undefined>(undefined); // NEW: Ref to track if onProviderDataLoaded was called for this ID
 
   useEffect(() => {
     const fetchProviderData = async () => {
@@ -57,6 +58,7 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave, onProvi
           console.error('Error fetching provider for editing:', error);
           toast.error('Error al cargar los datos del proveedor para editar.');
           setLoadingInitialData(false);
+          loadedProviderIdRef.current = undefined; // Reset ref on error
           return;
         }
 
@@ -67,7 +69,11 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave, onProvi
             total_paid: data.total_paid || 0,
           };
           setFormData(loadedData);
-          onProviderDataLoaded?.(loadedData); // NEW: Call callback with loaded data
+          // NEW: Only call onProviderDataLoaded if it hasn't been called for this specific providerId yet
+          if (loadedProviderIdRef.current !== providerId) {
+            onProviderDataLoaded?.(loadedData);
+            loadedProviderIdRef.current = providerId;
+          }
         }
       } else {
         setFormData({
@@ -80,12 +86,13 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave, onProvi
           advance_payment: 0,
           total_paid: 0,
         });
+        loadedProviderIdRef.current = undefined; // Reset for new form
       }
       setLoadingInitialData(false);
     };
 
     fetchProviderData();
-  }, [providerId, onProviderDataLoaded]);
+  }, [providerId, onProviderDataLoaded]); // onProviderDataLoaded is still a dependency, but its invocation is guarded.
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value, type } = e.target;

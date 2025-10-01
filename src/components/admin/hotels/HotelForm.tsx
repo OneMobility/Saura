@@ -1,13 +1,13 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react'; // Import useRef
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, CalendarIcon, DollarSign } from 'lucide-react'; // Import DollarSign
+import { Loader2, Save, CalendarIcon, DollarSign } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
 import { format, parse, isValid, parseISO } from 'date-fns';
@@ -40,8 +40,8 @@ interface Hotel {
 interface HotelFormProps {
   hotelId?: string;
   onSave: () => void;
-  onHotelDataLoaded?: (hotelData: Hotel) => void; // NEW: Callback for when hotel data is loaded
-  onRegisterPayment?: (hotelData: Hotel) => void; // NEW: Callback for opening payment dialog
+  onHotelDataLoaded?: (hotelData: Hotel) => void;
+  onRegisterPayment?: (hotelData: Hotel) => void;
 }
 
 const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoaded, onRegisterPayment }) => {
@@ -69,6 +69,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
   const [dateInput, setDateInput] = useState<string>(''); 
+  const loadedHotelIdRef = useRef<string | undefined>(undefined); // NEW: Ref to track if onHotelDataLoaded was called for this ID
 
   const calculateQuoteCosts = useCallback(() => {
     const totalCostDoubleRooms = formData.num_double_rooms * formData.cost_per_night_double * formData.num_nights_quoted;
@@ -113,6 +114,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
           console.error('Error fetching hotel for editing:', error);
           toast.error('Error al cargar los datos de la cotización del hotel para editar.');
           setLoadingInitialData(false);
+          loadedHotelIdRef.current = undefined; // Reset ref on error
           return;
         }
 
@@ -137,9 +139,15 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
           };
           setFormData(loadedData);
           setDateInput(data.quoted_date ? format(new Date(data.quoted_date), 'dd/MM/yy') : '');
-          onHotelDataLoaded?.(loadedData); // NEW: Call callback with loaded data
+          
+          // NEW: Only call onHotelDataLoaded if it hasn't been called for this specific hotelId yet
+          if (loadedHotelIdRef.current !== hotelId) {
+            onHotelDataLoaded?.(loadedData);
+            loadedHotelIdRef.current = hotelId;
+          }
         }
       } else {
+        // Reset form for new hotel
         setFormData({
           name: '',
           location: '',
@@ -162,12 +170,13 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
           remaining_payment: 0,
         });
         setDateInput('');
+        loadedHotelIdRef.current = undefined; // Reset for new form
       }
       setLoadingInitialData(false);
     };
 
     fetchHotelData();
-  }, [hotelId, onHotelDataLoaded]);
+  }, [hotelId, onHotelDataLoaded]); // onHotelDataLoaded is still a dependency, but its invocation is guarded.
 
   useEffect(() => {
     calculateQuoteCosts();
