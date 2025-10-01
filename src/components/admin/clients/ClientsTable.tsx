@@ -120,10 +120,10 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
     toast.info(`Generando hoja de reserva para ${clientName}...`);
 
     try {
-      // Pass the object directly, let supabase.functions.invoke handle JSON.stringify
+      // Sending clientId as a query parameter instead of in the body
       const { data, error } = await supabase.functions.invoke('generate-booking-sheet', {
-        body: { clientId }, 
-        headers: { 'Content-Type': 'application/json' },
+        query: { clientId }, // Changed from body: { clientId } to query: { clientId }
+        headers: { 'Content-Type': 'application/json' }, // Content-Type is less critical for query params but good practice
       });
 
       if (error) {

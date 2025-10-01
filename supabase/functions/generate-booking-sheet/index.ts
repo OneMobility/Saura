@@ -14,8 +14,6 @@ const formatRoomDetails = (details: any) => {
 
   if (safeDetails.quad_rooms > 0) parts.push(`${safeDetails.quad_rooms} Cuádruple(s)`);
   if (safeDetails.triple_rooms > 0) parts.push(`${safeDetails.triple_rooms} Triple(s)`);
-  if (safeDetails.quad_rooms > 0) parts.push(`${safeDetails.quad_rooms} Cuádruple(s)`);
-  if (safeDetails.triple_rooms > 0) parts.push(`${safeDetails.triple_rooms} Triple(s)`);
   if (safeDetails.double_rooms > 0) parts.push(`${safeDetails.double_rooms} Doble(s)`);
   return parts.join(', ') || 'N/A';
 };
@@ -185,24 +183,10 @@ serve(async (req) => {
   }
   console.log('Edge Function: Invoking user is an administrator.');
 
-  let clientId: string;
-  try {
-    console.log('Edge Function: Attempting to read raw request body...');
-    const rawBody = await req.text();
-    console.log('Edge Function: Raw request body:', rawBody);
-
-    if (!rawBody) {
-      console.error('Edge Function: Raw body is empty.');
-      return jsonResponse({ error: 'Request body is empty.' }, 400);
-    }
-
-    const requestBody = JSON.parse(rawBody); // Manually parse the raw text
-    clientId = requestBody.clientId;
-    console.log('Edge Function: Parsed clientId from request body:', clientId);
-  } catch (parseError: any) {
-    console.error('Edge Function: Error parsing JSON body:', parseError.message);
-    return jsonResponse({ error: `Invalid JSON in request body: ${parseError.message}` }, 400);
-  }
+  // Read clientId from query parameters
+  const url = new URL(req.url);
+  const clientId = url.searchParams.get('clientId');
+  console.log('Edge Function: Parsed clientId from query parameters:', clientId);
 
   try {
     if (!clientId) {
