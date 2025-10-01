@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -38,6 +38,7 @@ interface ClientContract {
   tour_title: string;
   tour_description: string;
   tour_image_url: string;
+  assigned_seat_numbers: number[]; // NEW: Added for displaying assigned seats
 }
 
 const TourInquirySection = () => {
@@ -77,6 +78,9 @@ const TourInquirySection = () => {
             title,
             description,
             image_url
+          ),
+          tour_seat_assignments (
+            seat_number
           )
         `)
         .eq('contract_number', contractNumber.trim())
@@ -91,6 +95,7 @@ const TourInquirySection = () => {
         }
         toast.error(error.code === 'PGRST116' ? 'Número de contrato no encontrado.' : 'Error al consultar el contrato.');
       } else if (data) {
+        const assignedSeats = (data.tour_seat_assignments || []).map((s: { seat_number: number }) => s.seat_number).sort((a: number, b: number) => a - b);
         setContractDetails({
           ...data,
           tour_title: data.tours?.title || 'N/A',
@@ -99,6 +104,7 @@ const TourInquirySection = () => {
           companions: data.companions || [],
           contractor_age: data.contractor_age || null,
           room_details: data.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
+          assigned_seat_numbers: assignedSeats, // Set the assigned seats
         });
         toast.success('¡Contrato encontrado!');
       } else {
@@ -173,6 +179,7 @@ const TourInquirySection = () => {
                 <p><span className="font-semibold">Tour:</span> {contractDetails.tour_title}</p>
                 <p><span className="font-semibold">Personas:</span> {contractDetails.number_of_people}</p>
                 <p><span className="font-semibold">Habitaciones:</span> {formatRoomDetails(contractDetails.room_details)}</p>
+                <p><span className="font-semibold">Asientos Asignados:</span> {contractDetails.assigned_seat_numbers.length > 0 ? contractDetails.assigned_seat_numbers.join(', ') : 'N/A'}</p>
                 <p><span className="font-semibold">Estado:</span> {contractDetails.status}</p>
               </div>
             </div>
