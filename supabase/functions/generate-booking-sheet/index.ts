@@ -180,9 +180,17 @@ serve(async (req) => {
   }
   console.log('Edge Function: Invoking user is an administrator.');
 
+  let clientId: string;
   try {
-    const { clientId } = await req.json();
-    console.log('Edge Function: Received clientId:', clientId);
+    const requestBody = await req.json();
+    clientId = requestBody.clientId;
+    console.log('Edge Function: Received clientId from request body:', clientId);
+  } catch (jsonParseError) {
+    console.error('Edge Function: Error parsing JSON body:', jsonParseError);
+    return jsonResponse({ error: 'Invalid JSON in request body.' }, 400);
+  }
+
+  try {
     if (!clientId) {
       return jsonResponse({ error: 'Client ID is required.' }, 400);
     }
