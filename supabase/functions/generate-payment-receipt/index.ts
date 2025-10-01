@@ -1,7 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { format, parseISO } from 'https://esm.sh/date-fns@2.30.0'; // Import date-fns for formatting
-import { es } from 'https://esm.sh/date-fns@2.30.0/locale/es'; // Import Spanish locale
+import es from 'https://esm.sh/date-fns@2.30.0/locale/es'; // Corregido: Importación por defecto para 'es'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -259,7 +259,7 @@ const generatePaymentReceiptHtml = (data: any) => {
 };
 
 serve(async (req) => {
-  console.log('Edge Function: generate-payment-receipt invoked (start of serve).'); // Log al inicio de la función
+  console.log('Edge Function: generate-payment-receipt invoked (start of serve).');
 
   if (req.method === 'OPTIONS') {
     console.log('Edge Function: OPTIONS request received for generate-payment-receipt. Responding with 200 OK and full CORS headers.');
