@@ -120,10 +120,9 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
     toast.info(`Generando hoja de reserva para ${clientName}...`);
 
     try {
-      const requestBody = JSON.stringify({ clientId });
-      console.log('Client: Request body being sent:', requestBody); // NEW LOG HERE
+      // Pass the object directly, let supabase.functions.invoke handle JSON.stringify
       const { data, error } = await supabase.functions.invoke('generate-booking-sheet', {
-        body: requestBody,
+        body: { clientId }, // Changed from JSON.stringify({ clientId }) to { clientId }
         headers: { 'Content-Type': 'application/json' },
       });
 
