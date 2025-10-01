@@ -122,7 +122,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
     try {
       // Pass the object directly, let supabase.functions.invoke handle JSON.stringify
       const { data, error } = await supabase.functions.invoke('generate-booking-sheet', {
-        body: { clientId }, // Changed from JSON.stringify({ clientId }) to { clientId }
+        body: { clientId }, 
         headers: { 'Content-Type': 'application/json' },
       });
 
