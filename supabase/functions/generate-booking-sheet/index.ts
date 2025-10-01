@@ -217,8 +217,8 @@ const generateBookingSheetHtml = (data: any) => {
                     padding: 0;
                     -webkit-print-color-adjust: exact; /* Ensure background colors are printed */
                     print-color-adjust: exact;
-                    font-size: 8.5pt; /* Aggressively reduced base font size for print */
-                    line-height: 1.3; /* Tighter line height */
+                    font-size: 9.5pt; /* Increased base font size for print */
+                    line-height: 1.4; /* Tighter line height */
                 }
                 .page-container {
                     width: 100%;
@@ -228,25 +228,25 @@ const generateBookingSheetHtml = (data: any) => {
                     border: none;
                     padding: 15px; /* Minimal padding for print */
                 }
-                h1 { font-size: 1.6em; margin-bottom: 15px; }
-                h2 { font-size: 1.2em; margin-bottom: 8px; border-bottom: 1px solid #E4007C; padding-bottom: 3px; }
-                h3 { font-size: 1em; margin-bottom: 6px; }
-                .agency-header { padding: 15px; margin-bottom: 15px; }
-                .agency-header img { max-width: 70px; margin-bottom: 8px; }
-                .agency-header h2 { font-size: 1.4em; }
-                .agency-header p { font-size: 0.75em; }
+                h1 { font-size: 1.8em; margin-bottom: 18px; } /* Slightly larger and more margin */
+                h2 { font-size: 1.3em; margin-bottom: 10px; border-bottom: 1px solid #E4007C; padding-bottom: 4px; } /* Slightly larger */
+                h3 { font-size: 1.05em; margin-bottom: 7px; } /* Slightly larger */
+                .agency-header { padding: 18px; margin-bottom: 20px; } /* Slightly more padding */
+                .agency-header img { max-width: 85px; margin-bottom: 10px; } /* Slightly larger logo */
+                .agency-header h2 { font-size: 1.6em; } /* Slightly larger */
+                .agency-header p { font-size: 0.8em; } /* Slightly larger */
                 .main-content-grid {
-                    gap: 15px; /* Reduced gap */
-                    margin-bottom: 15px;
+                    gap: 18px; /* Slightly larger gap */
+                    margin-bottom: 20px; /* Slightly more margin */
                 }
-                .section { padding: 8px; margin-bottom: 0; } /* Minimal section padding */
-                .section p, .section ul { margin-bottom: 4px; }
-                ul { padding-left: 15px; margin-top: 3px; }
-                ul li { font-size: 0.85em; margin-bottom: 1px; }
-                .payment-summary { padding: 12px; margin-top: 15px; }
-                .payment-summary p { margin: 4px 0; }
-                .total-amount { font-size: 1.1em; padding-top: 6px; margin-top: 10px; }
-                .footer-info { margin-top: 15px; font-size: 0.7em; }
+                .section { padding: 10px; margin-bottom: 8px; } /* Slightly more padding and margin */
+                .section p, .section ul { margin-bottom: 5px; } /* Slightly more margin */
+                ul { padding-left: 18px; margin-top: 4px; } /* Slightly more padding */
+                ul li { font-size: 0.9em; margin-bottom: 2px; } /* Slightly larger */
+                .payment-summary { padding: 15px; margin-top: 20px; } /* Slightly more padding and margin */
+                .payment-summary p { margin: 5px 0; } /* Slightly more margin */
+                .total-amount { font-size: 1.2em; padding-top: 8px; margin-top: 12px; } /* Slightly larger */
+                .footer-info { margin-top: 25px; font-size: 0.75em; } /* Slightly more margin and larger font */
             }
         </style>
     </head>
