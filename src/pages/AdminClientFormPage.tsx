@@ -16,6 +16,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
 import TourSeatMap from '@/components/TourSeatMap'; // Import TourSeatMap
 import { TourProviderService, AvailableProvider } from '@/types/shared'; // NEW: Import shared types
+import ClientPaymentHistoryTable from '@/components/admin/clients/ClientPaymentHistoryTable'; // NEW: Import ClientPaymentHistoryTable
 
 // Definición de tipos para el layout de asientos
 type SeatLayoutItem = {
@@ -141,6 +142,7 @@ const AdminClientFormPage = () => {
   const [clientSelectedSeats, setClientSelectedSeats] = useState<number[]>([]); // Seats selected for *this* client
   const [initialClientStatus, setInitialClientStatus] = useState<string>('pending'); // To track status change
   const [roomDetails, setRoomDetails] = useState<RoomDetails>({ double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }); // Define roomDetails state
+  const [refreshPaymentsKey, setRefreshPaymentsKey] = useState(0); // NEW: Key to refresh payment history
 
   // NEW: States for breakdown display
   const [numAdults, setNumAdults] = useState(0);
@@ -864,6 +866,13 @@ const AdminClientFormPage = () => {
               </div>
             </form>
           </div>
+
+          {/* NEW: Payment History Table */}
+          {clientId && (
+            <div className="mt-8">
+              <ClientPaymentHistoryTable clientId={clientId} key={refreshPaymentsKey} onPaymentsUpdated={() => setRefreshPaymentsKey(prev => prev + 1)} />
+            </div>
+          )}
         </main>
         <footer className="bg-gray-800 text-white py-4 text-center text-sm">
           <p>&copy; {new Date().getFullYear()} Saura Tours Admin. Todos los derechos reservados.</p>
