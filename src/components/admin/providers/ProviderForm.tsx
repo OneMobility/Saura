@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save } from 'lucide-react';
+import { Loader2, Save, DollarSign } from 'lucide-react'; // Import DollarSign
 
 interface Provider {
   id?: string;
@@ -18,14 +18,18 @@ interface Provider {
   unit_type: string;
   selling_price_per_unit: number;
   is_active: boolean;
+  advance_payment: number; // Ensure this is part of the interface
+  total_paid: number; // Ensure this is part of the interface
 }
 
 interface ProviderFormProps {
-  providerId?: string; // Optional providerId for editing existing providers
-  onSave: () => void; // Callback to redirect after saving
+  providerId?: string;
+  onSave: () => void;
+  onProviderDataLoaded?: (providerData: Provider) => void; // NEW: Callback for when provider data is loaded
+  onRegisterPayment?: (providerData: Provider) => void; // NEW: Callback for opening payment dialog
 }
 
-const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave }) => {
+const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave, onProviderDataLoaded, onRegisterPayment }) => {
   const [formData, setFormData] = useState<Provider>({
     name: '',
     service_type: '',
@@ -33,6 +37,8 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave }) => {
     unit_type: 'person',
     selling_price_per_unit: 0,
     is_active: true,
+    advance_payment: 0, // Initialize
+    total_paid: 0, // Initialize
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
@@ -55,10 +61,15 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave }) => {
         }
 
         if (data) {
-          setFormData(data);
+          const loadedData = {
+            ...data,
+            advance_payment: data.advance_payment || 0,
+            total_paid: data.total_paid || 0,
+          };
+          setFormData(loadedData);
+          onProviderDataLoaded?.(loadedData); // NEW: Call callback with loaded data
         }
       } else {
-        // Reset form for new provider
         setFormData({
           name: '',
           service_type: '',
@@ -66,13 +77,15 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave }) => {
           unit_type: 'person',
           selling_price_per_unit: 0,
           is_active: true,
+          advance_payment: 0,
+          total_paid: 0,
         });
       }
       setLoadingInitialData(false);
     };
 
     fetchProviderData();
-  }, [providerId]);
+  }, [providerId, onProviderDataLoaded]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value, type } = e.target;
@@ -113,10 +126,11 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave }) => {
       unit_type: formData.unit_type,
       selling_price_per_unit: formData.selling_price_per_unit,
       is_active: formData.is_active,
+      advance_payment: formData.advance_payment,
+      total_paid: formData.total_paid,
     };
 
     if (providerId) {
-      // Update existing provider
       const { error } = await supabase
         .from('providers')
         .update({ ...dataToSave, updated_at: new Date().toISOString() })
@@ -130,7 +144,6 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave }) => {
         onSave();
       }
     } else {
-      // Insert new provider
       const { error } = await supabase
         .from('providers')
         .insert(dataToSave);
@@ -247,7 +260,58 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave }) => {
           </div>
         </div>
 
-        <div className="flex justify-end mt-6">
+        <h3 className="col-span-4 text-lg font-semibold mt-4">Gestión de Pagos</h3>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="advance_payment" className="text-right">
+            Anticipo Dado
+          </Label>
+          <Input
+            id="advance_payment"
+            type="number"
+            value={formData.advance_payment}
+            onChange={handleChange}
+            className="col-span-3"
+            min={0}
+            step="0.01"
+          />
+        </div>
+        <div className="grid grid-cols-4 items-center gap-4">
+          <Label htmlFor="total_paid" className="text-right">
+            Total Pagado
+          </Label>
+          <Input
+            id="total_paid"
+            type="number"
+            value={formData.total_paid}
+            onChange={handleChange}
+            className="col-span-3"
+            min={0}
+            step="0.01"
+          />
+        </div>
+
+        <div className="col-span-4 grid grid-cols-2 gap-4 mt-4 bg-gray-50 p-4 rounded-md">
+          <div>
+            <Label className="font-semibold">Costo por Unidad (Agencia):</Label>
+            <p>${formData.cost_per_unit.toFixed(2)}</p>
+          </div>
+          <div>
+            <Label className="font-semibold">Total Pagado:</Label>
+            <p>${formData.total_paid.toFixed(2)}</p>
+          </div>
+        </div>
+
+        <div className="flex justify-end mt-6 space-x-2">
+          {providerId && onRegisterPayment && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onRegisterPayment(formData as Provider)}
+              className="text-green-600 hover:bg-green-50"
+            >
+              <DollarSign className="mr-2 h-4 w-4" /> Registrar Abono
+            </Button>
+          )}
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             {providerId ? 'Guardar Cambios' : 'Añadir Proveedor'}

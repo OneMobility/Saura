@@ -6,8 +6,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save } from 'lucide-react';
-import SeatLayoutEditor from './SeatLayoutEditor'; // Import the new SeatLayoutEditor
+import { Loader2, Save, DollarSign } from 'lucide-react'; // Import DollarSign
+import SeatLayoutEditor from './SeatLayoutEditor';
 
 // Definición de tipos para el layout de asientos
 type SeatLayoutItem = {
@@ -23,27 +23,29 @@ interface Bus {
   license_plate: string;
   rental_cost: number;
   total_capacity: number;
-  seat_layout_json: SeatLayout | null; // Nueva columna para la disposición de asientos
-  advance_payment: number; // NEW
-  total_paid: number; // NEW
-  remaining_payment: number; // Calculated field
+  seat_layout_json: SeatLayout | null;
+  advance_payment: number;
+  total_paid: number;
+  remaining_payment: number;
 }
 
 interface BusFormProps {
-  busId?: string; // Optional busId for editing existing buses
-  onSave: () => void; // Callback to redirect after saving
+  busId?: string;
+  onSave: () => void;
+  onBusDataLoaded?: (busData: Bus) => void; // NEW: Callback for when bus data is loaded
+  onRegisterPayment?: (busData: Bus) => void; // NEW: Callback for opening payment dialog
 }
 
-const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
+const BusForm: React.FC<BusFormProps> = ({ busId, onSave, onBusDataLoaded, onRegisterPayment }) => {
   const [formData, setFormData] = useState<Bus>({
     name: '',
     license_plate: '',
     rental_cost: 0,
     total_capacity: 0,
     seat_layout_json: null,
-    advance_payment: 0, // Initialize
-    total_paid: 0, // Initialize
-    remaining_payment: 0, // Initialize
+    advance_payment: 0,
+    total_paid: 0,
+    remaining_payment: 0,
   });
   const [currentSeatLayout, setCurrentSeatLayout] = useState<SeatLayout | null>(null);
   const [currentSeatCount, setCurrentSeatCount] = useState(0);
@@ -76,19 +78,19 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
         }
 
         if (data) {
-          setFormData({
+          const loadedData = {
             ...data,
             advance_payment: data.advance_payment || 0,
             total_paid: data.total_paid || 0,
-            remaining_payment: (data.rental_cost || 0) - (data.total_paid || 0), // Calculate initial remaining
-          });
+            remaining_payment: (data.rental_cost || 0) - (data.total_paid || 0),
+          };
+          setFormData(loadedData);
           setCurrentSeatLayout(data.seat_layout_json);
-          // Calculate initial seat count from fetched layout
           const count = data.seat_layout_json?.flat().filter(item => item.type === 'seat').length || 0;
           setCurrentSeatCount(count);
+          onBusDataLoaded?.(loadedData); // NEW: Call callback with loaded data
         }
       } else {
-        // Reset form for new bus
         setFormData({
           name: '',
           license_plate: '',
@@ -106,7 +108,7 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
     };
 
     fetchBusData();
-  }, [busId]);
+  }, [busId, onBusDataLoaded]);
 
   useEffect(() => {
     calculatePayment();
@@ -122,7 +124,6 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
 
   const handleLayoutChange = useCallback((layout: SeatLayout | null, seatCount: number) => {
     setCurrentSeatLayout(prevLayout => {
-      // Deep comparison to prevent unnecessary state updates
       if (JSON.stringify(layout) !== JSON.stringify(prevLayout)) {
         return layout;
       }
@@ -134,7 +135,7 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
       }
       return prevCount;
     });
-  }, []); // Empty dependency array makes this callback stable
+  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -181,13 +182,12 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
       license_plate: formData.license_plate,
       rental_cost: formData.rental_cost,
       total_capacity: formData.total_capacity,
-      seat_layout_json: currentSeatLayout, // Guardar el JSON del layout generado por el editor
-      advance_payment: formData.advance_payment, // NEW
-      total_paid: formData.total_paid, // NEW
+      seat_layout_json: currentSeatLayout,
+      advance_payment: formData.advance_payment,
+      total_paid: formData.total_paid,
     };
 
     if (busId) {
-      // Update existing bus
       const { error } = await supabase
         .from('buses')
         .update({ ...busDataToSave, updated_at: new Date().toISOString() })
@@ -201,7 +201,6 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
         onSave();
       }
     } else {
-      // Insert new bus
       const { error } = await supabase
         .from('buses')
         .insert(busDataToSave);
@@ -284,7 +283,6 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
           />
         </div>
         
-        {/* Payment Details */}
         <h3 className="col-span-4 text-lg font-semibold mt-4">Gestión de Pagos</h3>
         <div className="grid grid-cols-4 items-center gap-4">
           <Label htmlFor="advance_payment" className="text-right">
@@ -335,7 +333,17 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave }) => {
           />
         </div>
 
-        <div className="flex justify-end mt-6">
+        <div className="flex justify-end mt-6 space-x-2">
+          {busId && onRegisterPayment && (
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onRegisterPayment(formData as Bus)}
+              className="text-green-600 hover:bg-green-50"
+            >
+              <DollarSign className="mr-2 h-4 w-4" /> Registrar Abono
+            </Button>
+          )}
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
             {busId ? 'Guardar Cambios' : 'Añadir Autobús'}

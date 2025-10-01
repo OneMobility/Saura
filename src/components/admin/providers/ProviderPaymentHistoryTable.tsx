@@ -1,0 +1,209 @@
+"use client";
+
+import React, { useState, useEffect } from 'react';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Button } from '@/components/ui/button';
+import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client';
+import { Loader2, Trash2 } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
+
+interface Payment {
+  id: string;
+  provider_id: string;
+  amount: number;
+  payment_date: string;
+  created_at: string;
+}
+
+interface ProviderPaymentHistoryTableProps {
+  providerId: string;
+  onPaymentsUpdated: () => void; // Callback to refresh parent provider data
+}
+
+const ProviderPaymentHistoryTable: React.FC<ProviderPaymentHistoryTableProps> = ({ providerId, onPaymentsUpdated }) => {
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [isDeletingPayment, setIsDeletingPayment] = useState(false);
+
+  useEffect(() => {
+    if (providerId && providerId.trim() !== '') { 
+      fetchPayments();
+    } else {
+      setLoading(false);
+      setPayments([]);
+    }
+  }, [providerId]);
+
+  const fetchPayments = async () => {
+    setLoading(true);
+    if (!providerId || typeof providerId !== 'string' || providerId.trim() === '') {
+      setLoading(false);
+      setPayments([]);
+      toast.error('Error: ID de proveedor no válido para cargar pagos.');
+      return;
+    }
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session?.access_token) {
+        toast.error('No estás autenticado. Por favor, inicia sesión de nuevo.');
+        setLoading(false);
+        return;
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const functionName = 'list-provider-payments';
+      const edgeFunctionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
+
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionData.session.access_token}`,
+        },
+        body: JSON.stringify({ providerId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error from Edge Function:', errorData);
+        toast.error(`Error al cargar el historial de pagos del proveedor: ${errorData.error || 'Error desconocido.'}`);
+      } else {
+        const data = await response.json();
+        if (data && data.payments) {
+          setPayments(data.payments);
+        } else {
+          toast.error('Respuesta inesperada al cargar pagos del proveedor.');
+        }
+      }
+    } catch (error: any) {
+      console.error('Unexpected error fetching provider payments:', error);
+      toast.error(`Error inesperado al cargar pagos del proveedor: ${error.message}`);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDeletePayment = async (paymentId: string) => {
+    if (!window.confirm('¿Estás seguro de que quieres eliminar este pago? Esto afectará el total pagado del proveedor.')) {
+      return;
+    }
+
+    setIsDeletingPayment(true);
+    try {
+      // First, get the payment amount to subtract it from the provider's total_paid
+      const { data: paymentToDelete, error: fetchError } = await supabase
+        .from('provider_payments')
+        .select('amount')
+        .eq('id', paymentId)
+        .single();
+
+      if (fetchError || !paymentToDelete) {
+        console.error('Error fetching payment to delete:', fetchError);
+        toast.error('Error al obtener el detalle del pago para eliminar.');
+        setIsDeletingPayment(false);
+        return;
+      }
+
+      const paymentAmount = paymentToDelete.amount;
+
+      // Delete the payment record
+      const { error: deleteError } = await supabase
+        .from('provider_payments')
+        .delete()
+        .eq('id', paymentId);
+
+      if (deleteError) {
+        console.error('Error deleting payment:', deleteError);
+        toast.error('Error al eliminar el pago.');
+      } else {
+        // Update the provider's total_paid amount
+        const { data: providerData, error: providerFetchError } = await supabase
+          .from('providers')
+          .select('total_paid')
+          .eq('id', providerId)
+          .single();
+
+        if (providerFetchError || !providerData) {
+          console.error('Error fetching provider total_paid after payment deletion:', providerFetchError);
+          toast.error('Error al actualizar el total pagado del proveedor.');
+        } else {
+          const newTotalPaid = providerData.total_paid - paymentAmount;
+          const { error: providerUpdateError } = await supabase
+            .from('providers')
+            .update({ total_paid: newTotalPaid, updated_at: new Date().toISOString() })
+            .eq('id', providerId);
+
+          if (providerUpdateError) {
+            console.error('Error updating provider total_paid after payment deletion:', providerUpdateError);
+            toast.error('Error al actualizar el total pagado del proveedor.');
+          } else {
+            toast.success('Pago eliminado y total pagado del proveedor actualizado con éxito.');
+            fetchPayments(); // Refresh the local payment list
+            onPaymentsUpdated(); // Notify parent to refresh provider data
+          }
+        }
+      }
+    } catch (error: any) {
+      console.error('Unexpected error during payment deletion:', error);
+      toast.error(`Error inesperado: ${error.message}`);
+    } finally {
+      setIsDeletingPayment(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center p-8">
+        <Loader2 className="h-8 w-8 animate-spin text-rosa-mexicano" />
+        <p className="ml-4 text-gray-700">Cargando historial de pagos del proveedor...</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-lg shadow-lg p-6">
+      <h3 className="text-xl font-semibold mb-4">Historial de Pagos a Proveedor</h3>
+      {payments.length === 0 ? (
+        <p className="text-gray-600">No hay pagos registrados para este proveedor.</p>
+      ) : (
+        <div className="overflow-x-auto">
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Fecha</TableHead>
+                <TableHead>Monto</TableHead>
+                <TableHead>ID de Pago</TableHead>
+                <TableHead>Acciones</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {payments.map((payment) => (
+                <TableRow key={payment.id}>
+                  <TableCell>{format(parseISO(payment.payment_date), 'dd/MM/yyyy', { locale: es })}</TableCell>
+                  <TableCell>${payment.amount.toFixed(2)}</TableCell>
+                  <TableCell className="text-xs text-gray-500">{payment.id}</TableCell>
+                  <TableCell>
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => handleDeletePayment(payment.id)}
+                      disabled={isDeletingPayment}
+                    >
+                      {isDeletingPayment ? <Loader2 className="h-4 w-4 animate-spin" /> : <Trash2 className="h-4 w-4" />}
+                      <span className="sr-only">Eliminar Pago</span>
+                    </Button>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default ProviderPaymentHistoryTable;

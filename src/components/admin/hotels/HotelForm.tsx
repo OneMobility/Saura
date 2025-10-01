@@ -7,10 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, CalendarIcon } from 'lucide-react';
+import { Loader2, Save, CalendarIcon, DollarSign } from 'lucide-react'; // Import DollarSign
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar } from '@/components/ui/calendar';
-import { format, parse, isValid, parseISO } from 'date-fns'; // Import parse
+import { format, parse, isValid, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 interface Hotel {
@@ -28,7 +28,7 @@ interface Hotel {
   num_double_rooms: number;
   num_triple_rooms: number;
   num_quad_rooms: number;
-  num_courtesy_rooms: number; // NEW: Added courtesy rooms
+  num_courtesy_rooms: number;
   is_active: boolean;
   advance_payment: number;
   total_paid: number;
@@ -40,9 +40,11 @@ interface Hotel {
 interface HotelFormProps {
   hotelId?: string;
   onSave: () => void;
+  onHotelDataLoaded?: (hotelData: Hotel) => void; // NEW: Callback for when hotel data is loaded
+  onRegisterPayment?: (hotelData: Hotel) => void; // NEW: Callback for opening payment dialog
 }
 
-const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
+const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoaded, onRegisterPayment }) => {
   const [formData, setFormData] = useState<Hotel>({
     name: '',
     location: '',
@@ -57,7 +59,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
     num_double_rooms: 0,
     num_triple_rooms: 0,
     num_quad_rooms: 0,
-    num_courtesy_rooms: 0, // Initialize new field
+    num_courtesy_rooms: 0,
     is_active: true,
     advance_payment: 0,
     total_paid: 0,
@@ -75,7 +77,6 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
     
     const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
 
-    // Calculate cost of courtesy rooms (always using quad occupancy rate)
     const costOfCourtesyRooms = formData.num_courtesy_rooms * formData.cost_per_night_quad * formData.num_nights_quoted;
 
     const totalQuoteCost = totalContractedRoomsCost - costOfCourtesyRooms;
@@ -95,7 +96,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
     formData.cost_per_night_quad,
     formData.num_nights_quoted,
     formData.total_paid,
-    formData.num_courtesy_rooms // Added to dependencies
+    formData.num_courtesy_rooms
   ]);
 
   useEffect(() => {
@@ -121,25 +122,24 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
           const totalCostQuadRooms = (data.num_quad_rooms || 0) * data.cost_per_night_quad * data.num_nights_quoted;
           const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
 
-          // Calculate cost of courtesy rooms (always using quad occupancy rate)
           const costOfCourtesyRooms = (data.num_courtesy_rooms || 0) * data.cost_per_night_quad * data.num_nights_quoted;
 
           const totalQuoteCost = totalContractedRoomsCost - costOfCourtesyRooms;
 
-          setFormData({
+          const loadedData = {
             ...data,
             num_double_rooms: data.num_double_rooms || 0,
             num_triple_rooms: data.num_triple_rooms || 0,
             num_quad_rooms: data.num_quad_rooms || 0,
-            num_courtesy_rooms: data.num_courtesy_rooms || 0, // Set new field
+            num_courtesy_rooms: data.num_courtesy_rooms || 0,
             total_quote_cost: totalQuoteCost,
             remaining_payment: totalQuoteCost - (data.total_paid || 0),
-          });
-          // Set dateInput to the formatted date from fetched data
+          };
+          setFormData(loadedData);
           setDateInput(data.quoted_date ? format(new Date(data.quoted_date), 'dd/MM/yy') : '');
+          onHotelDataLoaded?.(loadedData); // NEW: Call callback with loaded data
         }
       } else {
-        // Reset form for new hotel
         setFormData({
           name: '',
           location: '',
@@ -154,26 +154,25 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
           num_double_rooms: 0,
           num_triple_rooms: 0,
           num_quad_rooms: 0,
-          num_courtesy_rooms: 0, // Reset new field
+          num_courtesy_rooms: 0,
           is_active: true,
           advance_payment: 0,
           total_paid: 0,
           total_quote_cost: 0,
           remaining_payment: 0,
         });
-        setDateInput(''); // Clear dateInput for new form
+        setDateInput('');
       }
       setLoadingInitialData(false);
     };
 
     fetchHotelData();
-  }, [hotelId]);
+  }, [hotelId, onHotelDataLoaded]);
 
   useEffect(() => {
     calculateQuoteCosts();
   }, [calculateQuoteCosts]);
 
-  // This useEffect ensures dateInput always reflects formData.quoted_date
   useEffect(() => {
     if (formData.quoted_date) {
       setDateInput(format(parseISO(formData.quoted_date), 'dd/MM/yy'));
@@ -194,23 +193,18 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
   const handleDateSelect = (date: Date | undefined) => {
     const formattedDate = date ? format(date, 'dd/MM/yy') : null;
     setFormData((prev) => ({ ...prev, quoted_date: formattedDate }));
-    // dateInput will be updated by the useEffect above
   };
 
   const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
-    setDateInput(value); // Update dateInput immediately for user typing experience
+    setDateInput(value);
 
-    // Try to parse the date using the expected format 'dd/MM/yy'
     const parsedDate = parse(value, 'dd/MM/yy', new Date());
     
     if (isValid(parsedDate)) {
-      setFormData((prev) => ({ ...prev, quoted_date: format(parsedDate, 'yyyy-MM-dd') })); // Store as ISO for Supabase
+      setFormData((prev) => ({ ...prev, quoted_date: format(parsedDate, 'yyyy-MM-dd') }));
     } else {
-      // If invalid, set quoted_date to null. The useEffect will then clear dateInput.
       setFormData((prev) => ({ ...prev, quoted_date: null }));
-      // Optionally, provide user feedback here about invalid format
-      // toast.error('Formato de fecha inválido. Usa DD/MM/AA.');
     }
   };
 
@@ -269,14 +263,13 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
       num_double_rooms: formData.num_double_rooms,
       num_triple_rooms: formData.num_triple_rooms,
       num_quad_rooms: formData.num_quad_rooms,
-      num_courtesy_rooms: formData.num_courtesy_rooms, // Save new field
+      num_courtesy_rooms: formData.num_courtesy_rooms,
       is_active: formData.is_active,
       advance_payment: formData.advance_payment,
       total_paid: formData.total_paid,
     };
 
     if (hotelId) {
-      // Update existing hotel quote
       const { error } = await supabase
         .from('hotels')
         .update({
@@ -293,7 +286,6 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
         onSave();
       }
     } else {
-      // Insert new hotel quote
       const { error } = await supabase
         .from('hotels')
         .insert(dataToSave);
@@ -367,7 +359,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
                   <Button
                     variant={"ghost"}
                     className="absolute right-0 top-0 h-full px-3 py-2"
-                    onClick={(e) => e.preventDefault()} // Prevent form submission
+                    onClick={(e) => e.preventDefault()}
                   >
                     <CalendarIcon className="h-4 w-4" />
                     <span className="sr-only">Seleccionar fecha</span>
@@ -562,7 +554,17 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave }) => {
             </div>
           </div>
 
-          <div className="flex justify-end mt-6">
+          <div className="flex justify-end mt-6 space-x-2">
+            {hotelId && onRegisterPayment && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => onRegisterPayment(formData as Hotel)}
+                className="text-green-600 hover:bg-green-50"
+              >
+                <DollarSign className="mr-2 h-4 w-4" /> Registrar Abono
+              </Button>
+            )}
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               {hotelId ? 'Guardar Cambios' : 'Añadir Cotización'}
