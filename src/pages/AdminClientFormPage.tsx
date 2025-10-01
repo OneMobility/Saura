@@ -111,7 +111,7 @@ const allocateRoomsForPeople = (totalPeople: number): RoomDetails => {
 };
 
 const AdminClientFormPage = () => {
-  const { id: clientId } = useParams<{ id: string }>(); // Get client ID from URL for editing
+  const { id: clientIdFromParams } = useParams<{ id: string }>(); // Get client ID from URL for editing
   const navigate = useNavigate();
   const { user, isAdmin, isLoading: sessionLoading } = useSession();
 
@@ -193,12 +193,12 @@ const AdminClientFormPage = () => {
 
   useEffect(() => {
     const fetchClientData = async () => {
-      if (clientId) {
+      if (clientIdFromParams) { // Use clientIdFromParams here
         setLoadingInitialData(true);
         const { data, error } = await supabase
           .from('clients')
           .select('*')
-          .eq('id', clientId)
+          .eq('id', clientIdFromParams) // Use clientIdFromParams here
           .single();
 
         if (error) {
@@ -265,7 +265,7 @@ const AdminClientFormPage = () => {
     if (!sessionLoading) { // Only fetch client data once session is loaded
       fetchClientData();
     }
-  }, [clientId, sessionLoading]);
+  }, [clientIdFromParams, sessionLoading]);
 
   // Effect to update selectedTourPrices and busDetails when formData.tour_id changes
   useEffect(() => {
@@ -525,14 +525,14 @@ const AdminClientFormPage = () => {
       user_id: authUser.id, // Link to the admin user who created/updated it
     };
 
-    let currentClientIdToUse = clientId;
+    let currentClientIdToUse = clientIdFromParams; // Use clientIdFromParams here
 
-    if (clientId) {
+    if (clientIdFromParams) { // Use clientIdFromParams here
       // Update existing client
       const { error } = await supabase
         .from('clients')
         .update({ ...clientDataToSave, updated_at: new Date().toISOString() })
-        .eq('id', clientId);
+        .eq('id', clientIdFromParams); // Use clientIdFromParams here
 
       if (error) {
         console.error('Error updating client:', error);
@@ -614,11 +614,11 @@ const AdminClientFormPage = () => {
     <div className="flex min-h-screen bg-gray-100">
       <AdminSidebar />
       <div className="flex flex-col flex-grow">
-        <AdminHeader pageTitle={clientId ? 'Editar Cliente' : 'Añadir Nuevo Cliente'} />
+        <AdminHeader pageTitle={clientIdFromParams ? 'Editar Cliente' : 'Añadir Nuevo Cliente'} />
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <div className="bg-white rounded-lg shadow-lg p-6">
             <h2 className="text-2xl font-bold text-gray-800 mb-6">
-              {clientId ? 'Editar Cliente' : 'Añadir Nuevo Cliente'}
+              {clientIdFromParams ? 'Editar Cliente' : 'Añadir Nuevo Cliente'}
             </h2>
             <form onSubmit={handleSubmit} className="grid gap-6 py-4">
               {/* Client Basic Info */}
@@ -777,7 +777,7 @@ const AdminClientFormPage = () => {
                     onSeatsSelected={handleSeatsSelected}
                     readOnly={false}
                     adminMode={false} // Client mode, not admin blocking mode
-                    currentClientId={clientId || undefined} // Pass client ID if editing, or undefined for new
+                    currentClientId={formData.id || undefined} // Pass client ID if editing, or undefined for new
                     initialSelectedSeats={clientSelectedSeats}
                   />
                   {clientSelectedSeats.length > 0 && (
@@ -861,16 +861,16 @@ const AdminClientFormPage = () => {
               <div className="flex justify-end mt-6">
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  {clientId ? 'Guardar Cambios' : 'Añadir Cliente'}
+                  {clientIdFromParams ? 'Guardar Cambios' : 'Añadir Cliente'}
                 </Button>
               </div>
             </form>
           </div>
 
           {/* NEW: Payment History Table */}
-          {clientId && (
+          {formData.id && ( // Usar formData.id para renderizar ClientPaymentHistoryTable
             <div className="mt-8">
-              <ClientPaymentHistoryTable clientId={clientId} key={refreshPaymentsKey} onPaymentsUpdated={() => setRefreshPaymentsKey(prev => prev + 1)} />
+              <ClientPaymentHistoryTable clientId={formData.id} key={refreshPaymentsKey} onPaymentsUpdated={() => setRefreshPaymentsKey(prev => prev + 1)} />
             </div>
           )}
         </main>
