@@ -68,6 +68,9 @@ const generateBookingSheetHtml = (data: any) => {
             .container { max-width: 800px; margin: auto; padding: 20px; border: 1px solid #ddd; border-radius: 8px; }
             h1, h2, h3 { color: #E4007C; }
             h1 { text-align: center; margin-bottom: 20px; }
+            .header-section { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #E4007C; }
+            .header-section img { max-width: 150px; height: auto; margin-bottom: 10px; }
+            .header-section p { margin: 0; font-size: 0.9em; color: #555; }
             .section { margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px dashed #eee; }
             .section:last-child { border-bottom: none; }
             .label { font-weight: bold; }
@@ -76,11 +79,19 @@ const generateBookingSheetHtml = (data: any) => {
             .payment-summary { background-color: #f9f9f9; padding: 15px; border-radius: 5px; border: 1px solid #eee; }
             .payment-summary p { margin: 5px 0; }
             .total-amount { font-size: 1.2em; font-weight: bold; color: #E4007C; }
-            .agency-info { text-align: center; margin-top: 30px; font-size: 0.9em; color: #666; }
+            .footer-info { text-align: center; margin-top: 30px; font-size: 0.9em; color: #666; }
         </style>
     </head>
     <body>
         <div class="container">
+            <div class="header-section">
+                ${agency?.logo_url ? `<img src="${agency.logo_url}" alt="${agency?.agency_name || 'Logo de la Agencia'}">` : ''}
+                <h2>${agency?.agency_name || 'Tu Agencia de Viajes'}</h2>
+                <p>Teléfono: ${agency?.agency_phone || 'N/A'}</p>
+                <p>Email: ${agency?.agency_email || 'N/A'}</p>
+                <p>Dirección: ${agency?.agency_address || 'N/A'}</p>
+            </div>
+
             <h1>Hoja de Reserva</h1>
 
             <div class="section">
@@ -113,9 +124,8 @@ const generateBookingSheetHtml = (data: any) => {
                 <p class="total-amount"><span class="label">Adeudo:</span> $${remainingPayment}</p>
             </div>
 
-            <div class="agency-info">
-                <p><span class="label">${agency?.agency_name || 'Tu Agencia de Viajes'}</span></p>
-                <p>Teléfono: ${agency?.agency_phone || 'N/A'} | Email: ${agency?.agency_email || 'N/A'} | Dirección: ${agency?.agency_address || 'N/A'}</p>
+            <div class="footer-info">
+                <p>&copy; ${new Date().getFullYear()} ${agency?.agency_name || 'Tu Agencia de Viajes'}. Todos los derechos reservados.</p>
             </div>
         </div>
     </body>
@@ -227,10 +237,26 @@ serve(async (req) => {
     console.log('Edge Function: Client.tours object:', JSON.stringify(client.tours));
 
 
-    // Seats are now directly fetched with the client data
-    const seats = client.tour_seat_assignments || [];
-    console.log('Edge Function: Fetched seats:', JSON.stringify(seats));
-    
+    let seats: any[] = [];
+    if (client.tour_id) { // Only fetch seats if a tour_id is present
+      console.log('Edge Function: Fetching seat assignments for tour_id:', client.tour_id);
+      const { data: fetchedSeats, error: seatsError } = await supabaseAdmin
+        .from('tour_seat_assignments')
+        .select('seat_number')
+        .eq('client_id', clientId)
+        .eq('tour_id', client.tour_id);
+
+      if (seatsError) {
+        console.error('Edge Function: Error fetching seats:', seatsError.message);
+        // Continue without seats if there's an error, but log it
+      } else {
+        seats = fetchedSeats || [];
+        console.log('Edge Function: Fetched seats:', JSON.stringify(seats));
+      }
+    } else {
+      console.log('Edge Function: Client has no tour_id, skipping seat assignment fetch.');
+    }
+
     console.log('Edge Function: Fetching agency settings...');
     const { data: agency, error: agencyError } = await supabaseAdmin
       .from('agency_settings')

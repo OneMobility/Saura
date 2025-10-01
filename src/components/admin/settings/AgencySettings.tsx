@@ -16,6 +16,7 @@ interface AgencySetting {
   agency_phone: string;
   agency_email: string;
   agency_address: string;
+  logo_url: string | null; // NEW: Added logo_url
 }
 
 const AgencySettings = () => {
@@ -24,6 +25,7 @@ const AgencySettings = () => {
     agency_phone: '',
     agency_email: '',
     agency_address: '',
+    logo_url: null, // Initialize new field
   });
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -72,6 +74,7 @@ const AgencySettings = () => {
           agency_phone: agencyInfo.agency_phone,
           agency_email: agencyInfo.agency_email,
           agency_address: agencyInfo.agency_address,
+          logo_url: agencyInfo.logo_url, // NEW: Update logo_url
           updated_at: new Date().toISOString(),
         })
         .eq('id', agencyInfo.id);
@@ -91,6 +94,7 @@ const AgencySettings = () => {
           agency_phone: agencyInfo.agency_phone,
           agency_email: agencyInfo.agency_email,
           agency_address: agencyInfo.agency_address,
+          logo_url: agencyInfo.logo_url, // NEW: Insert logo_url
         })
         .select()
         .single();
@@ -162,6 +166,21 @@ const AgencySettings = () => {
               placeholder="Ej: Calle Falsa 123, Colonia Centro, Ciudad de México"
               rows={3}
             />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="logo_url">URL del Logo de la Agencia</Label>
+            <Input
+              id="logo_url"
+              type="url"
+              value={agencyInfo.logo_url || ''}
+              onChange={handleChange}
+              placeholder="https://tu-dominio.com/logo.png"
+            />
+            {agencyInfo.logo_url && (
+              <div className="mt-2">
+                <img src={agencyInfo.logo_url} alt="Vista previa del logo" className="w-32 h-auto object-contain rounded-md" />
+              </div>
+            )}
           </div>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
