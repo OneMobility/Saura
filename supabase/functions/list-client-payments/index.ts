@@ -56,9 +56,12 @@ serve(async (req) => {
 
   let clientId: string;
   try {
-    const requestBody = await req.json();
+    // NEW LOG: Log raw request body before parsing
+    const rawBody = await req.text();
+    console.log('Edge Function: Raw request body received:', rawBody);
+    const requestBody = JSON.parse(rawBody);
     clientId = requestBody.clientId;
-    console.log('Edge Function: Received clientId in body:', clientId); // Log para depuración
+    console.log('Edge Function: Parsed clientId from body:', clientId); // Log para depuración
   } catch (parseError: any) {
     console.error('Edge Function: Error parsing JSON body:', parseError.message);
     return jsonResponse({ error: `Invalid JSON in request body: ${parseError.message}` }, 400);

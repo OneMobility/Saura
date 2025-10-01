@@ -32,8 +32,10 @@ const ClientPaymentHistoryTable: React.FC<ClientPaymentHistoryTableProps> = ({ c
   useEffect(() => {
     // Aseguramos que clientId sea una cadena no vacía antes de intentar cargar los pagos
     if (clientId && clientId.trim() !== '') { 
+      console.log('ClientPaymentHistoryTable: Attempting to fetch payments for clientId:', clientId); // NEW LOG
       fetchPayments();
     } else {
+      console.log('ClientPaymentHistoryTable: clientId is invalid or empty, skipping fetchPayments.'); // NEW LOG
       setLoading(false); // Si no hay clientId válido, no hay pagos que cargar
       setPayments([]);
     }
