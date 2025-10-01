@@ -183,10 +183,16 @@ serve(async (req) => {
   }
   console.log('Edge Function: Invoking user is an administrator.');
 
-  // Read clientId from query parameters
-  const url = new URL(req.url);
-  const clientId = url.searchParams.get('clientId');
-  console.log('Edge Function: Parsed clientId from query parameters:', clientId);
+  let clientId: string;
+  try {
+    // Read clientId from the JSON body
+    const requestBody = await req.json();
+    clientId = requestBody.clientId;
+    console.log('Edge Function: Parsed clientId from request body:', clientId);
+  } catch (parseError: any) {
+    console.error('Edge Function: Error parsing JSON body:', parseError.message);
+    return jsonResponse({ error: `Invalid JSON in request body: ${parseError.message}` }, 400);
+  }
 
   try {
     if (!clientId) {
