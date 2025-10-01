@@ -140,6 +140,10 @@ serve(async (req) => {
     headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' },
   });
 
+  // --- NEW LOGGING FOR HEADERS ---
+  console.log('Edge Function: Request headers:', JSON.stringify(Object.fromEntries(req.headers.entries())));
+  // --- END NEW LOGGING ---
+
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) {
     console.error('Edge Function: Unauthorized: Missing Authorization header.');
