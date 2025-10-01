@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Save, Loader2 } from 'lucide-react';
+import { Save, Loader2, Upload } from 'lucide-react'; // Added Upload icon
+import { v4 as uuidv4 } from 'uuid'; // For unique file names
 
 interface AgencySetting {
   id?: string;
@@ -16,7 +17,7 @@ interface AgencySetting {
   agency_phone: string;
   agency_email: string;
   agency_address: string;
-  logo_url: string | null; // NEW: Added logo_url
+  logo_url: string | null;
 }
 
 const AgencySettings = () => {
@@ -25,14 +26,26 @@ const AgencySettings = () => {
     agency_phone: '',
     agency_email: '',
     agency_address: '',
-    logo_url: null, // Initialize new field
+    logo_url: null,
   });
+  const [logoFile, setLogoFile] = useState<File | null>(null); // NEW: State for the selected logo file
+  const [logoUrlPreview, setLogoUrlPreview] = useState<string>(''); // NEW: State for logo preview
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploadingImage, setIsUploadingImage] = useState(false); // NEW: State for image upload loading
 
   useEffect(() => {
     fetchAgencySettings();
   }, []);
+
+  useEffect(() => {
+    // Update preview when agencyInfo.logo_url changes (e.g., after fetching or saving)
+    if (agencyInfo.logo_url) {
+      setLogoUrlPreview(agencyInfo.logo_url);
+    } else if (!logoFile) { // Clear preview if no logo_url and no file selected
+      setLogoUrlPreview('');
+    }
+  }, [agencyInfo.logo_url, logoFile]);
 
   const fetchAgencySettings = async () => {
     setLoading(true);
@@ -46,6 +59,7 @@ const AgencySettings = () => {
       toast.error('Error al cargar la información de la agencia.');
     } else if (data) {
       setAgencyInfo(data);
+      setLogoUrlPreview(data.logo_url || ''); // Set initial preview from fetched data
     }
     setLoading(false);
   };
@@ -53,6 +67,47 @@ const AgencySettings = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
     setAgencyInfo((prev) => ({ ...prev, [id]: value }));
+  };
+
+  // NEW: Handle file input change
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setLogoFile(file);
+      setLogoUrlPreview(URL.createObjectURL(file)); // Show local preview
+    } else {
+      setLogoFile(null);
+      setLogoUrlPreview(agencyInfo.logo_url || ''); // Revert to existing logo or clear
+    }
+  };
+
+  // NEW: Function to upload image to Supabase Storage
+  const uploadImage = async (file: File): Promise<string | null> => {
+    setIsUploadingImage(true);
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${uuidv4()}.${fileExt}`;
+    const filePath = `agency-logos/${fileName}`; // Store in a 'agency-logos' folder within the bucket
+
+    const { data, error } = await supabase.storage
+      .from('tour-images') // Using the existing 'tour-images' bucket
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false,
+      });
+
+    setIsUploadingImage(false);
+
+    if (error) {
+      console.error('Error uploading logo image:', error);
+      toast.error('Error al subir la imagen del logo.');
+      return null;
+    }
+
+    const { data: publicUrlData } = supabase.storage
+      .from('tour-images')
+      .getPublicUrl(filePath);
+
+    return publicUrlData.publicUrl;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -65,16 +120,35 @@ const AgencySettings = () => {
       return;
     }
 
+    let finalLogoUrl = agencyInfo.logo_url;
+
+    // NEW: Handle logo file upload if a new file is selected
+    if (logoFile) {
+      const uploadedUrl = await uploadImage(logoFile);
+      if (!uploadedUrl) {
+        setIsSubmitting(false);
+        return; // Image upload failed
+      }
+      finalLogoUrl = uploadedUrl;
+    } else if (logoUrlPreview === '' && agencyInfo.logo_url) {
+      // If logoUrlPreview is cleared but there was an existing logo_url, it means user wants to remove it
+      finalLogoUrl = null;
+    }
+
+    const dataToSave = {
+      agency_name: agencyInfo.agency_name,
+      agency_phone: agencyInfo.agency_phone,
+      agency_email: agencyInfo.agency_email,
+      agency_address: agencyInfo.agency_address,
+      logo_url: finalLogoUrl, // Use the final URL (uploaded, existing, or null)
+    };
+
     if (agencyInfo.id) {
       // Update existing setting
       const { error } = await supabase
         .from('agency_settings')
         .update({
-          agency_name: agencyInfo.agency_name,
-          agency_phone: agencyInfo.agency_phone,
-          agency_email: agencyInfo.agency_email,
-          agency_address: agencyInfo.agency_address,
-          logo_url: agencyInfo.logo_url, // NEW: Update logo_url
+          ...dataToSave,
           updated_at: new Date().toISOString(),
         })
         .eq('id', agencyInfo.id);
@@ -84,18 +158,14 @@ const AgencySettings = () => {
         toast.error('Error al actualizar la información de la agencia.');
       } else {
         toast.success('Información de la agencia actualizada con éxito.');
+        // Re-fetch to ensure state is consistent with DB, especially if logo_url changed
+        fetchAgencySettings(); 
       }
     } else {
       // Insert new setting
       const { data, error } = await supabase
         .from('agency_settings')
-        .insert({
-          agency_name: agencyInfo.agency_name,
-          agency_phone: agencyInfo.agency_phone,
-          agency_email: agencyInfo.agency_email,
-          agency_address: agencyInfo.agency_address,
-          logo_url: agencyInfo.logo_url, // NEW: Insert logo_url
-        })
+        .insert(dataToSave)
         .select()
         .single();
 
@@ -167,24 +237,28 @@ const AgencySettings = () => {
               rows={3}
             />
           </div>
+          {/* NEW: Logo Upload Section */}
           <div className="space-y-2">
-            <Label htmlFor="logo_url">URL del Logo de la Agencia</Label>
+            <Label htmlFor="logo_file">Logo de la Agencia</Label>
             <Input
-              id="logo_url"
-              type="url"
-              value={agencyInfo.logo_url || ''}
-              onChange={handleChange}
-              placeholder="https://tu-dominio.com/logo.png"
+              id="logo_file"
+              type="file"
+              accept="image/*"
+              onChange={handleLogoFileChange}
+              className="file:text-rosa-mexicano file:font-semibold file:border-0 file:bg-transparent file:mr-4"
             />
-            {agencyInfo.logo_url && (
+            {logoUrlPreview && (
               <div className="mt-2">
-                <img src={agencyInfo.logo_url} alt="Vista previa del logo" className="w-32 h-auto object-contain rounded-md" />
+                <img src={logoUrlPreview} alt="Vista previa del logo" className="w-32 h-auto object-contain rounded-md" />
               </div>
             )}
+            {!logoFile && !logoUrlPreview && (
+              <p className="text-sm text-gray-500">Sube una imagen para el logo de tu agencia.</p>
+            )}
           </div>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            Guardar Información de Agencia
+          <Button type="submit" disabled={isSubmitting || isUploadingImage}>
+            {isSubmitting || isUploadingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            {isUploadingImage ? 'Subiendo logo...' : 'Guardar Información de Agencia'}
           </Button>
         </form>
       </CardContent>
