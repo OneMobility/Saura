@@ -28,6 +28,7 @@ const generateBookingSheetHtml = (data: any) => {
   // Provide default empty arrays for companions and extra_services if they are null or not arrays
   const safeCompanions = Array.isArray(client.companions) ? client.companions : [];
   const safeExtraServices = Array.isArray(client.extra_services) ? client.extra_services : [];
+  const safeIncludes = Array.isArray(tour.includes) ? tour.includes : [];
 
   const companionsList = safeCompanions.length > 0
     ? safeCompanions.map((c: any) => `<li>${c.name || 'Acompañante sin nombre'} ${c.age !== null && typeof c.age === 'number' ? `(${c.age} años)` : ''}</li>`).join('')
@@ -51,6 +52,10 @@ const generateBookingSheetHtml = (data: any) => {
       }).join('')
     : '<li>N/A</li>';
 
+  const includesList = safeIncludes.length > 0
+    ? safeIncludes.map((item: string) => `<li>${item}</li>`).join('')
+    : '<li>N/A</li>';
+
   // Ensure total_amount and total_paid are numbers before calling toFixed
   const clientTotalAmount = typeof client.total_amount === 'number' ? client.total_amount : 0;
   const clientTotalPaid = typeof client.total_paid === 'number' ? client.total_paid : 0;
@@ -69,7 +74,8 @@ const generateBookingSheetHtml = (data: any) => {
             h1, h2, h3 { color: #E4007C; }
             h1 { text-align: center; margin-bottom: 20px; }
             .header-section { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #E4007C; }
-            .header-section img { max-width: 150px; height: auto; margin-bottom: 10px; }
+            .logo-box { background-color: #E4007C; padding: 10px; border-radius: 8px; display: inline-block; margin-bottom: 10px; }
+            .logo-box img { max-width: 100px; height: auto; display: block; margin: auto; }
             .header-section p { margin: 0; font-size: 0.9em; color: #555; }
             .section { margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px dashed #eee; }
             .section:last-child { border-bottom: none; }
@@ -85,7 +91,7 @@ const generateBookingSheetHtml = (data: any) => {
     <body>
         <div class="container">
             <div class="header-section">
-                ${agency?.logo_url ? `<img src="${agency.logo_url}" alt="${agency?.agency_name || 'Logo de la Agencia'}">` : ''}
+                ${agency?.logo_url ? `<div class="logo-box"><img src="${agency.logo_url}" alt="${agency?.agency_name || 'Logo de la Agencia'}"></div>` : ''}
                 <h2>${agency?.agency_name || 'Tu Agencia de Viajes'}</h2>
                 <p>Teléfono: ${agency?.agency_phone || 'N/A'}</p>
                 <p>Email: ${agency?.agency_email || 'N/A'}</p>
@@ -108,7 +114,13 @@ const generateBookingSheetHtml = (data: any) => {
             <div class="section">
                 <h2>Detalles de la Reserva</h2>
                 <p><span class="label">Número de Reserva:</span> ${client.contract_number || 'N/A'}</p>
-                <p><span class="label">Tour:</span> ${tour?.title || 'N/A'}</p>
+                <p><span class="label">Nombre del Tour:</span> ${tour?.title || 'N/A'}</p>
+                <p><span class="label">Duración:</span> ${tour?.duration || 'N/A'}</p>
+                <p><span class="label">Descripción del Tour:</span> ${tour?.description || 'N/A'}</p>
+                <p><span class="label">Incluye:</span></p>
+                <ul>
+                    ${includesList}
+                </ul>
                 <p><span class="label">Distribución de Habitación:</span> ${formatRoomDetails(client.room_details)}</p>
                 <p><span class="label">Asientos Asignados:</span> ${seatNumbers}</p>
                 <p><span class="label">Servicios Adicionales:</span></p>
@@ -237,26 +249,10 @@ serve(async (req) => {
     console.log('Edge Function: Client.tours object:', JSON.stringify(client.tours));
 
 
-    let seats: any[] = [];
-    if (client.tour_id) { // Only fetch seats if a tour_id is present
-      console.log('Edge Function: Fetching seat assignments for tour_id:', client.tour_id);
-      const { data: fetchedSeats, error: seatsError } = await supabaseAdmin
-        .from('tour_seat_assignments')
-        .select('seat_number')
-        .eq('client_id', clientId)
-        .eq('tour_id', client.tour_id);
-
-      if (seatsError) {
-        console.error('Edge Function: Error fetching seats:', seatsError.message);
-        // Continue without seats if there's an error, but log it
-      } else {
-        seats = fetchedSeats || [];
-        console.log('Edge Function: Fetched seats:', JSON.stringify(seats));
-      }
-    } else {
-      console.log('Edge Function: Client has no tour_id, skipping seat assignment fetch.');
-    }
-
+    // Seats are now directly fetched with the client data
+    const seats = client.tour_seat_assignments || [];
+    console.log('Edge Function: Fetched seats:', JSON.stringify(seats));
+    
     console.log('Edge Function: Fetching agency settings...');
     const { data: agency, error: agencyError } = await supabaseAdmin
       .from('agency_settings')
