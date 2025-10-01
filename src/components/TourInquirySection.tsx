@@ -7,6 +7,8 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner'; // Using sonner for toasts
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
+import { format, parseISO } from 'date-fns'; // Import format and parseISO
+import { es } from 'date-fns/locale'; // Import Spanish locale
 
 interface Companion {
   id: string;
@@ -18,6 +20,13 @@ interface RoomDetails {
   double_rooms: number;
   triple_rooms: number;
   quad_rooms: number;
+}
+
+interface Payment {
+  id: string;
+  amount: number;
+  payment_date: string;
+  created_at: string;
 }
 
 interface ClientContract {
@@ -39,6 +48,7 @@ interface ClientContract {
   tour_description: string;
   tour_image_url: string;
   assigned_seat_numbers: number[]; // NEW: Added for displaying assigned seats
+  payments_history: Payment[]; // NEW: Added for displaying payment history
 }
 
 const TourInquirySection = () => {
@@ -57,7 +67,8 @@ const TourInquirySection = () => {
     setContractDetails(null);
 
     try {
-      const { data, error } = await supabase
+      // Fetch client data
+      const { data: clientData, error: clientError } = await supabase
         .from('clients')
         .select(`
           first_name,
@@ -86,25 +97,54 @@ const TourInquirySection = () => {
         .eq('contract_number', contractNumber.trim())
         .single();
 
-      if (error) {
-        console.error('Error fetching contract:', error);
-        if (error.code === 'PGRST116') { // No rows found
+      if (clientError) {
+        console.error('Error fetching contract:', clientError);
+        if (clientError.code === 'PGRST116') { // No rows found
           setError('Número de contrato no encontrado. Por favor, verifica e intenta de nuevo.');
         } else {
           setError('Error al consultar el contrato. Intenta de nuevo más tarde.');
         }
-        toast.error(error.code === 'PGRST116' ? 'Número de contrato no encontrado.' : 'Error al consultar el contrato.');
-      } else if (data) {
-        const assignedSeats = (data.tour_seat_assignments || []).map((s: { seat_number: number }) => s.seat_number).sort((a: number, b: number) => a - b);
+        toast.error(clientError.code === 'PGRST116' ? 'Número de contrato no encontrado.' : 'Error al consultar el contrato.');
+        setLoading(false);
+        return;
+      }
+
+      if (clientData) {
+        const assignedSeats = (clientData.tour_seat_assignments || []).map((s: { seat_number: number }) => s.seat_number).sort((a: number, b: number) => a - b);
+        
+        // Fetch payments using the new Edge Function
+        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+        const functionName = 'get-public-client-payments';
+        const edgeFunctionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
+
+        const paymentsResponse = await fetch(edgeFunctionUrl, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ contractNumber: contractNumber.trim() }),
+        });
+
+        let paymentsHistory: Payment[] = [];
+        if (paymentsResponse.ok) {
+          const paymentsData = await paymentsResponse.json();
+          paymentsHistory = paymentsData.payments || [];
+        } else {
+          const errorData = await paymentsResponse.json();
+          console.error('Error fetching public payments from Edge Function:', errorData);
+          toast.error(`Error al cargar el historial de pagos: ${errorData.error || 'Error desconocido.'}`);
+        }
+
         setContractDetails({
-          ...data,
-          tour_title: data.tours?.title || 'N/A',
-          tour_description: data.tours?.description || 'N/A',
-          tour_image_url: data.tours?.image_url || 'https://via.placeholder.com/400x200?text=Tour+Image',
-          companions: data.companions || [],
-          contractor_age: data.contractor_age || null,
-          room_details: data.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
-          assigned_seat_numbers: assignedSeats, // Set the assigned seats
+          ...clientData,
+          tour_title: clientData.tours?.title || 'N/A',
+          tour_description: clientData.tours?.description || 'N/A',
+          tour_image_url: clientData.tours?.image_url || 'https://via.placeholder.com/400x200?text=Tour+Image',
+          companions: clientData.companions || [],
+          contractor_age: clientData.contractor_age || null,
+          room_details: clientData.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
+          assigned_seat_numbers: assignedSeats,
+          payments_history: paymentsHistory, // Set the fetched payments history
         });
         toast.success('¡Contrato encontrado!');
       } else {
@@ -205,6 +245,33 @@ const TourInquirySection = () => {
               <p className="text-lg font-bold text-red-600">
                 <span className="font-semibold">Falta por Pagar:</span> ${(contractDetails.total_amount - contractDetails.total_paid).toFixed(2)}
               </p>
+            </div>
+
+            {/* NEW: Payment History Table */}
+            <div className="mb-6">
+              <h4 className="text-xl font-semibold mb-2">Historial de Abonos:</h4>
+              {contractDetails.payments_history.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full bg-white border border-gray-200 rounded-md">
+                    <thead>
+                      <tr>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-700">Fecha</th>
+                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-700">Monto</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {contractDetails.payments_history.map((payment) => (
+                        <tr key={payment.id}>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">{format(parseISO(payment.payment_date), 'dd/MM/yyyy', { locale: es })}</td>
+                          <td className="py-2 px-4 border-b text-sm text-gray-800">${payment.amount.toFixed(2)}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <p>No hay abonos registrados para este contrato.</p>
+              )}
             </div>
 
             <div className="mb-6">
