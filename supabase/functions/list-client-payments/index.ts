@@ -56,9 +56,18 @@ serve(async (req) => {
 
   let clientId: string;
   try {
-    // NEW LOG: Log raw request body before parsing
+    // NEW LOGS: Check headers related to body
+    console.log('Edge Function: Request Content-Type:', req.headers.get('Content-Type'));
+    console.log('Edge Function: Request Content-Length:', req.headers.get('Content-Length'));
+
     const rawBody = await req.text();
     console.log('Edge Function: Raw request body received:', rawBody);
+    
+    if (!rawBody) {
+      console.error('Edge Function: Raw body is empty. Cannot parse JSON.');
+      return jsonResponse({ error: 'Request body is empty. Client ID is required.' }, 400);
+    }
+
     const requestBody = JSON.parse(rawBody);
     clientId = requestBody.clientId;
     console.log('Edge Function: Parsed clientId from body:', clientId); // Log para depuración

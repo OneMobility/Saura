@@ -32,10 +32,10 @@ const ClientPaymentHistoryTable: React.FC<ClientPaymentHistoryTableProps> = ({ c
   useEffect(() => {
     // Aseguramos que clientId sea una cadena no vacía antes de intentar cargar los pagos
     if (clientId && clientId.trim() !== '') { 
-      console.log('ClientPaymentHistoryTable: Attempting to fetch payments for clientId:', clientId); // NEW LOG
+      console.log('ClientPaymentHistoryTable: Attempting to fetch payments for clientId:', clientId);
       fetchPayments();
     } else {
-      console.log('ClientPaymentHistoryTable: clientId is invalid or empty, skipping fetchPayments.'); // NEW LOG
+      console.log('ClientPaymentHistoryTable: clientId is invalid or empty, skipping fetchPayments.');
       setLoading(false); // Si no hay clientId válido, no hay pagos que cargar
       setPayments([]);
     }
@@ -43,7 +43,17 @@ const ClientPaymentHistoryTable: React.FC<ClientPaymentHistoryTableProps> = ({ c
 
   const fetchPayments = async () => {
     setLoading(true);
+    // NEW: Comprobación explícita justo antes de la invocación
+    if (!clientId || typeof clientId !== 'string' || clientId.trim() === '') {
+      console.error('ClientPaymentHistoryTable: clientId is invalid or empty immediately before invoke. Aborting fetch.');
+      setLoading(false);
+      setPayments([]);
+      toast.error('Error: ID de cliente no válido para cargar pagos.');
+      return;
+    }
+
     try {
+      console.log('ClientPaymentHistoryTable: Invoking list-client-payments with clientId:', clientId); // NEW LOG
       const { data, error } = await supabase.functions.invoke('list-client-payments', {
         body: JSON.stringify({ clientId }),
         headers: { 'Content-Type': 'application/json' },
