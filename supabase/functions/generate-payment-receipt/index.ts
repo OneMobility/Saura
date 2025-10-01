@@ -6,6 +6,7 @@ import { es } from 'https://esm.sh/date-fns@2.30.0/locale/es'; // Import Spanish
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS', // NEW: Explicitly allow POST and OPTIONS
 };
 
 // Helper function to generate HTML for the payment receipt
@@ -257,11 +258,14 @@ const generatePaymentReceiptHtml = (data: any) => {
 };
 
 serve(async (req) => {
-  console.log('Edge Function: generate-payment-receipt invoked.');
+  console.log('Edge Function: generate-payment-receipt invoked (start of serve).'); // NEW LOG
 
   if (req.method === 'OPTIONS') {
-    console.log('Edge Function: OPTIONS request received for generate-payment-receipt. Responding with 200 OK.'); // NEW LOG
-    return new Response(null, { headers: corsHeaders, status: 200 }); // Explicitly set status 200
+    console.log('Edge Function: OPTIONS request received for generate-payment-receipt. Responding with 200 OK and full CORS headers.'); // NEW LOG
+    return new Response(null, {
+      status: 200,
+      headers: corsHeaders,
+    });
   }
 
   const jsonResponse = (body: any, status: number) => new Response(JSON.stringify(body), {
