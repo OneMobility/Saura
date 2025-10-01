@@ -30,14 +30,19 @@ const ClientPaymentHistoryTable: React.FC<ClientPaymentHistoryTableProps> = ({ c
   const [isGeneratingReceipt, setIsGeneratingReceipt] = useState(false);
 
   useEffect(() => {
-    fetchPayments();
+    if (clientId) { // Solo cargar pagos si clientId está presente
+      fetchPayments();
+    } else {
+      setLoading(false); // Si no hay clientId, no hay pagos que cargar
+      setPayments([]);
+    }
   }, [clientId]);
 
   const fetchPayments = async () => {
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('list-client-payments', {
-        body: JSON.stringify({ clientId }), // <-- Aseguramos que clientId se envía en el cuerpo
+        body: JSON.stringify({ clientId }),
         headers: { 'Content-Type': 'application/json' },
       });
 
@@ -89,7 +94,7 @@ const ClientPaymentHistoryTable: React.FC<ClientPaymentHistoryTableProps> = ({ c
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const functionName = 'generate-payment-receipt'; // This Edge Function will be created next
+      const functionName = 'generate-payment-receipt';
       const edgeFunctionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
 
       const response = await fetch(edgeFunctionUrl, {

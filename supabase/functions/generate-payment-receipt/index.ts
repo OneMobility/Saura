@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 import { format, parseISO } from 'https://esm.sh/date-fns@2.30.0'; // Import date-fns for formatting
+import { es } from 'https://esm.sh/date-fns@2.30.0/locale/es'; // Import Spanish locale
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,15 +18,11 @@ const generatePaymentReceiptHtml = (data: any) => {
   const clientFullName = `${client.first_name || ''} ${client.last_name || ''}`.trim();
   const tourTitle = tour?.title || 'N/A';
 
-  const paymentsList = payments.map((p: any) => `
-    <div class="payment-item">
-      <p><span class="label">Fecha:</span> ${format(parseISO(p.payment_date), 'dd/MM/yyyy')}</p>
-      <p><span class="label">Monto:</span> $${(typeof p.amount === 'number' ? p.amount : 0).toFixed(2)}</p>
-      <p class="payment-id"><span class="label">ID de Pago:</span> ${p.id}</p>
-    </div>
-  `).join('');
-
   const totalAmountPaidInReceipt = payments.reduce((sum: number, p: any) => sum + (typeof p.amount === 'number' ? p.amount : 0), 0);
+  const clientTotalAmount = typeof client.total_amount === 'number' ? client.total_amount : 0;
+  const clientTotalPaid = typeof client.total_paid === 'number' ? client.total_paid : 0; // This is the total paid by the client, not just in this receipt
+  const remainingPayment = (clientTotalAmount - clientTotalPaid).toFixed(2);
+  const receiptDate = format(new Date(), 'dd/MM/yyyy', { locale: es });
 
   return `
     <!DOCTYPE html>
@@ -133,37 +130,38 @@ const generatePaymentReceiptHtml = (data: any) => {
                 font-weight: 600;
                 color: #555;
             }
-            .payment-details-grid {
-                display: grid;
-                grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-                gap: 15px;
-                margin-top: 15px;
+            .receipt-text {
+                font-size: 1.2em;
+                margin-bottom: 20px;
+                text-align: justify;
             }
-            .payment-item {
-                border: 1px solid #E4007C;
-                border-radius: 5px;
-                padding: 10px;
+            .receipt-summary {
                 background-color: #fff0f5; /* Light pink */
-            }
-            .payment-item p {
-                margin: 4px 0;
-            }
-            .payment-id {
-                font-size: 0.8em;
-                color: #777;
-            }
-            .total-receipt-amount {
-                background-color: #E4007C;
-                color: white;
                 padding: 18px;
                 border-radius: 8px;
-                text-align: center;
+                border: 1px solid #E4007C;
                 margin-top: 25px;
             }
-            .total-receipt-amount p {
-                margin: 0;
-                font-size: 1.5em;
+            .receipt-summary p {
+                margin: 6px 0;
+                font-size: 1em;
+            }
+            .total-amount {
+                font-size: 1.3em;
                 font-weight: 700;
+                color: #E4007C;
+                border-top: 1px solid #E4007C;
+                padding-top: 8px;
+                margin-top: 12px;
+            }
+            .signature-section {
+                margin-top: 50px;
+                text-align: center;
+            }
+            .signature-line {
+                border-top: 1px solid #ccc;
+                width: 250px;
+                margin: 0 auto 5px auto;
             }
             .footer-info {
                 text-align: center;
@@ -203,10 +201,12 @@ const generatePaymentReceiptHtml = (data: any) => {
                 .agency-header p { font-size: 0.8em; }
                 .section { padding: 10px; margin-bottom: 15px; }
                 .section p { margin-bottom: 5px; }
-                .payment-details-grid { gap: 10px; margin-top: 10px; }
-                .payment-item { padding: 8px; }
-                .total-receipt-amount { padding: 15px; margin-top: 20px; }
-                .total-receipt-amount p { font-size: 1.3em; }
+                .receipt-text { font-size: 1.1em; margin-bottom: 15px; }
+                .receipt-summary { padding: 15px; margin-top: 20px; }
+                .receipt-summary p { margin: 5px 0; }
+                .total-amount { font-size: 1.2em; padding-top: 8px; margin-top: 12px; }
+                .signature-section { margin-top: 40px; }
+                .signature-line { width: 200px; }
                 .footer-info { margin-top: 25px; font-size: 0.75em; }
             }
         </style>
@@ -224,21 +224,26 @@ const generatePaymentReceiptHtml = (data: any) => {
             <h1>Recibo de Pago</h1>
 
             <div class="section">
-                <h2>Información del Cliente</h2>
-                <p><span class="label">Cliente:</span> ${clientFullName}</p>
-                <p><span class="label">Número de Contrato:</span> ${client.contract_number || 'N/A'}</p>
-                <p><span class="label">Tour Asociado:</span> ${tourTitle}</p>
+                <p class="receipt-text">
+                    Recibí de <span class="label">${clientFullName}</span> la cantidad de 
+                    <span class="label">$${totalAmountPaidInReceipt.toFixed(2)}</span> 
+                    con fecha del <span class="label">${receiptDate}</span> por concepto de pago del tour 
+                    <span class="label">${tourTitle}</span>, quedando un adeudo de 
+                    <span class="label">$${remainingPayment}</span>.
+                </p>
             </div>
 
-            <div class="section">
-                <h2>Detalles de los Pagos Recibidos</h2>
-                <div class="payment-details-grid">
-                    ${paymentsList}
-                </div>
+            <div class="receipt-summary">
+                <h2>Resumen del Contrato</h2>
+                <p><span class="label">Monto Total del Contrato:</span> $${clientTotalAmount.toFixed(2)}</p>
+                <p><span class="label">Total Pagado (acumulado):</span> $${clientTotalPaid.toFixed(2)}</p>
+                <p class="total-amount"><span class="label">Adeudo Actual:</span> $${remainingPayment}</p>
             </div>
 
-            <div class="total-receipt-amount">
-                <p><span class="label">Monto Total Recibido:</span> $${totalAmountPaidInReceipt.toFixed(2)}</p>
+            <div class="signature-section">
+                <p>Fecha: ${receiptDate}</p>
+                <div class="signature-line"></div>
+                <p>Firma del Agente</p>
             </div>
 
             <div class="footer-info">
@@ -320,7 +325,7 @@ serve(async (req) => {
       return jsonResponse({ error: 'Client ID and at least one Payment ID are required.' }, 400);
     }
 
-    // Fetch client data
+    // Fetch client data including total_amount and total_paid
     const { data: client, error: clientError } = await supabaseAdmin
       .from('clients')
       .select(`
@@ -328,7 +333,9 @@ serve(async (req) => {
         first_name,
         last_name,
         contract_number,
-        tour_id
+        tour_id,
+        total_amount,
+        total_paid
       `)
       .eq('id', clientId)
       .single();
