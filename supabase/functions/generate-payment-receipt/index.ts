@@ -260,7 +260,8 @@ serve(async (req) => {
   console.log('Edge Function: generate-payment-receipt invoked.');
 
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    console.log('Edge Function: OPTIONS request received for generate-payment-receipt. Responding with 200 OK.'); // NEW LOG
+    return new Response(null, { headers: corsHeaders, status: 200 }); // Explicitly set status 200
   }
 
   const jsonResponse = (body: any, status: number) => new Response(JSON.stringify(body), {
@@ -350,7 +351,7 @@ serve(async (req) => {
     if (client.tour_id) {
       const { data: fetchedTour, error: tourError } = await supabaseAdmin
         .from('tours')
-        .select('title')
+        .select('title, includes') // Also fetch includes for the receipt
         .eq('id', client.tour_id)
         .single();
       if (tourError) {
