@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, FileText, FileSignature } from 'lucide-react'; // Added FileSignature icon
+import { Loader2, Save, PlusCircle, MinusCircle, FileText } from 'lucide-react'; // Removed FileSignature icon
 import { v4 as uuidv4 } from 'uuid'; // For generating contract numbers
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
@@ -143,14 +143,13 @@ const AdminClientFormPage = () => {
   const [initialClientStatus, setInitialClientStatus] = useState<string>('pending'); // To track status change
   const [roomDetails, setRoomDetails] = useState<RoomDetails>({ double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }); // Define roomDetails state
   const [refreshPaymentsKey, setRefreshPaymentsKey] = useState(0); // NEW: Key to refresh payment history
-  const [isGeneratingContract, setIsGeneratingContract] = useState(false); // NEW: Loading state for contract button
+  // Removed isGeneratingContract state
 
   // NEW: States for breakdown display
   const [numAdults, setNumAdults] = useState(0);
   const [numChildren, setNumChildren] = useState(0);
   const [extraServicesTotal, setExtraServicesTotal] = useState(0);
 
-  // Moved this definition here so it's available before JSX usage
   const roomDetailsDisplay = `${roomDetails.quad_rooms > 0 ? `${roomDetails.quad_rooms} Cuádruple(s), ` : ''}` +
                              `${roomDetails.triple_rooms > 0 ? `${roomDetails.triple_rooms} Triple(s), ` : ''}` +
                              `${roomDetails.double_rooms > 0 ? `${roomDetails.double_rooms} Doble(s)` : ''}`;
@@ -610,57 +609,6 @@ const AdminClientFormPage = () => {
     setIsSubmitting(false);
   };
 
-  // NEW: Function to handle downloading the service contract
-  const handleDownloadServiceContract = async (clientId: string, clientName: string) => {
-    setIsGeneratingContract(true);
-    toast.info(`Generando contrato de servicio para ${clientName}...`);
-
-    if (!session?.access_token) {
-      toast.error('No estás autenticado. Por favor, inicia sesión de nuevo.');
-      setIsGeneratingContract(false);
-      return;
-    }
-
-    try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const functionName = 'generate-service-contract';
-      const edgeFunctionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
-
-      const response = await fetch(edgeFunctionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
-        },
-        body: JSON.stringify({ clientId }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error from Edge Function (contract):', errorData);
-        toast.error(`Error al generar el contrato de servicio: ${errorData.error || 'Error desconocido.'}`);
-        return;
-      }
-
-      const htmlContent = await response.text();
-
-      const newWindow = window.open('', '_blank');
-      if (newWindow) {
-        newWindow.document.write(htmlContent);
-        newWindow.document.close();
-        newWindow.focus();
-        toast.success('Contrato de servicio generado. Puedes imprimirlo desde la nueva pestaña.');
-      } else {
-        toast.error('No se pudo abrir una nueva ventana. Por favor, permite pop-ups.');
-      }
-    } catch (err: any) {
-      console.error('Unexpected error during contract generation:', err);
-      toast.error(`Error inesperado: ${err.message}`);
-    } finally {
-      setIsGeneratingContract(false);
-    }
-  };
-
   return (
     <div className="flex min-h-screen bg-gray-100">
       <AdminSidebar />
@@ -910,22 +858,7 @@ const AdminClientFormPage = () => {
               </div>
 
               <div className="flex justify-end mt-6 space-x-2">
-                {clientIdFromParams && (
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => handleDownloadServiceContract(clientIdFromParams, `${formData.first_name} ${formData.last_name}`)}
-                    disabled={isGeneratingContract}
-                    className="text-purple-600 hover:bg-purple-50"
-                  >
-                    {isGeneratingContract ? (
-                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                    ) : (
-                      <FileSignature className="mr-2 h-4 w-4" />
-                    )}
-                    Descargar Contrato
-                  </Button>
-                )}
+                {/* Removed the contract button from here */}
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                   {clientIdFromParams ? 'Guardar Cambios' : 'Añadir Cliente'}

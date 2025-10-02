@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Edit, Trash2, Loader2, DollarSign, FileText } from 'lucide-react'; // Import FileText icon
+import { Edit, Trash2, Loader2, DollarSign, FileText, FileSignature } from 'lucide-react'; // Import FileSignature icon
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { useSession } from '@/components/SessionContextProvider'; // Import useSession to get access token
 
@@ -54,6 +54,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
   const [exportingClientId, setExportingClientId] = useState<string | null>(null); // For loading state on export button
+  const [generatingContractId, setGeneratingContractId] = useState<string | null>(null); // NEW: For loading state on contract button
   const navigate = useNavigate(); // Initialize useNavigate
   const { session } = useSession(); // Get session to access token
 
@@ -169,6 +170,57 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
     }
   };
 
+  // NEW: Function to handle downloading the service contract
+  const handleDownloadServiceContract = async (clientId: string, clientName: string) => {
+    setGeneratingContractId(clientId);
+    toast.info(`Generando contrato de servicio para ${clientName}...`);
+
+    if (!session?.access_token) {
+      toast.error('No estás autenticado. Por favor, inicia sesión de nuevo.');
+      setGeneratingContractId(null);
+      return;
+    }
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const functionName = 'generate-service-contract';
+      const edgeFunctionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
+
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ clientId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error from Edge Function (contract):', errorData);
+        toast.error(`Error al generar el contrato de servicio: ${errorData.error || 'Error desconocido.'}`);
+        return;
+      }
+
+      const htmlContent = await response.text();
+
+      const newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.document.write(htmlContent);
+        newWindow.document.close();
+        newWindow.focus();
+        toast.success('Contrato de servicio generado. Puedes imprimirlo desde la nueva pestaña.');
+      } else {
+        toast.error('No se pudo abrir una nueva ventana. Por favor, permite pop-ups.');
+      }
+    } catch (err: any) {
+      console.error('Unexpected error during contract generation:', err);
+      toast.error(`Error inesperado: ${err.message}`);
+    } finally {
+      setGeneratingContractId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex items-center justify-center p-8">
@@ -254,6 +306,20 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                         <FileText className="h-4 w-4" />
                       )}
                       <span className="sr-only">Descargar Hoja de Reserva</span>
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="icon"
+                      onClick={() => handleDownloadServiceContract(client.id, `${client.first_name} ${client.last_name}`)}
+                      disabled={generatingContractId === client.id}
+                      className="text-orange-600 hover:bg-orange-50" // NEW: Different color for contract
+                    >
+                      {generatingContractId === client.id ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <FileSignature className="h-4 w-4" />
+                      )}
+                      <span className="sr-only">Descargar Contrato</span>
                     </Button>
                   </TableCell>
                 </TableRow>
