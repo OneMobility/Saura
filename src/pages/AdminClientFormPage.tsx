@@ -113,7 +113,7 @@ const allocateRoomsForPeople = (totalPeople: number): RoomDetails => {
 const AdminClientFormPage = () => {
   const { id: clientIdFromParams } = useParams<{ id: string }>(); // Get client ID from URL for editing
   const navigate = useNavigate();
-  const { user, isAdmin, isLoading: sessionLoading } = useSession();
+  const { user, isAdmin, isLoading: sessionLoading, session } = useSession(); // Added session to useSession
 
   const [formData, setFormData] = useState<Client>({
     first_name: '',
@@ -608,6 +608,57 @@ const AdminClientFormPage = () => {
 
     navigate('/admin/clients'); // Redirect back to clients list
     setIsSubmitting(false);
+  };
+
+  // NEW: Function to handle downloading the service contract
+  const handleDownloadServiceContract = async (clientId: string, clientName: string) => {
+    setIsGeneratingContract(true);
+    toast.info(`Generando contrato de servicio para ${clientName}...`);
+
+    if (!session?.access_token) {
+      toast.error('No estás autenticado. Por favor, inicia sesión de nuevo.');
+      setIsGeneratingContract(false);
+      return;
+    }
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const functionName = 'generate-service-contract';
+      const edgeFunctionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
+
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ clientId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error from Edge Function (contract):', errorData);
+        toast.error(`Error al generar el contrato de servicio: ${errorData.error || 'Error desconocido.'}`);
+        return;
+      }
+
+      const htmlContent = await response.text();
+
+      const newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.document.write(htmlContent);
+        newWindow.document.close();
+        newWindow.focus();
+        toast.success('Contrato de servicio generado. Puedes imprimirlo desde la nueva pestaña.');
+      } else {
+        toast.error('No se pudo abrir una nueva ventana. Por favor, permite pop-ups.');
+      }
+    } catch (err: any) {
+      console.error('Unexpected error during contract generation:', err);
+      toast.error(`Error inesperado: ${err.message}`);
+    } finally {
+      setIsGeneratingContract(false);
+    }
   };
 
   return (
