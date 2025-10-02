@@ -277,86 +277,141 @@ const generateServiceContractHtml = (data: any) => {
                 <p>Dirección: ${agency?.agency_address || 'N/A'}</p>
             </div>
 
-            <h1>Contrato de Servicio de Viaje</h1>
+            <h1>CONTRATO DE VENTA DE TOUR</h1>
 
             <div class="section">
-                <p>Este contrato de servicio de viaje ("Contrato") se celebra y entra en vigor el día <strong>${contractDate}</strong>, entre:</p>
-                <p><strong>La Agencia:</strong> ${agency?.agency_name || 'N/A'}</p>
-                <p><strong>El Cliente:</strong> ${clientFullName} con número de contrato <strong>${client.contract_number || 'N/A'}</strong>.</p>
+                <p>Número de Contrato: <strong>${client.contract_number || 'N/A'}</strong></p>
+                <p>En la ciudad de Saltillo, Coahuila, México, a <strong>${contractDate}</strong>, se celebra el presente contrato de prestación de servicios turísticos entre:</p>
+                <p><strong>${agency?.agency_name || 'LA AGENCIA'},</strong> con domicilio en <strong>${agency?.agency_address || 'N/A'}</strong>, representada por el C. Juan De Dios Saucedo Cortés, en adelante “LA AGENCIA”; y</p>
+                <p><strong>${clientFullName},</strong> con domicilio en <strong>${client.address || 'N/A'}</strong>, identificado con <strong>[CAMPO NO DISPONIBLE EN DB]</strong>, en adelante “EL CLIENTE”.</p>
             </div>
 
             <div class="section">
-                <h2>Detalles del Cliente</h2>
-                <p><span class="label">Nombre Completo:</span> ${clientFullName}</p>
-                <p><span class="label">Email:</span> ${client.email || 'N/A'}</p>
-                <p><span class="label">Teléfono:</span> ${client.phone || 'N/A'}</p>
-                <p><span class="label">Dirección:</span> ${client.address || 'N/A'}</p>
-                <p><span class="label">Edad del Contratante:</span> ${client.contractor_age !== null && typeof client.contractor_age === 'number' ? client.contractor_age : 'N/A'}</p>
-                <h3>Acompañantes (${client.number_of_people - 1}):</h3>
-                <ul>
-                    ${companionsList}
-                </ul>
-            </div>
-
-            <div class="section">
-                <h2>Detalles del Tour Contratado</h2>
-                <p><span class="label">Nombre del Tour:</span> ${tourTitle}</p>
-                <p><span class="label">Descripción:</span> ${tour?.description || 'N/A'}</p>
-                <p><span class="label">Duración:</span> ${tour?.duration || 'N/A'}</p>
-                <p><span class="label">Número de Personas:</span> ${client.number_of_people || 'N/A'}</p>
-                <p><span class="label">Distribución de Habitaciones:</span> ${formatRoomDetails(client.room_details)}</p>
-                <p><span class="label">Asientos Asignados:</span> ${seatNumbers}</p>
-                <h3>Servicios Incluidos en el Tour:</h3>
-                <ul>
-                    ${includesList}
-                </ul>
-                <h3>Itinerario Resumido:</h3>
+                <h2>1. OBJETO DEL CONTRATO</h2>
+                <p>LA AGENCIA se compromete a coordinar y poner a disposición de EL CLIENTE el tour denominado <strong>${tourTitle}</strong>, que se llevará a cabo el día <strong>[FECHA DEL TOUR NO DISPONIBLE EN DB]</strong>, con las siguientes características:</p>
+                <p><span class="label">Destino / Itinerario:</span></p>
                 <ol>
                     ${itineraryList}
                 </ol>
+                <p><span class="label">Duración:</span> ${tour?.duration || 'N/A'}</p>
+                <p><span class="label">Incluye:</span></p>
+                <ul>
+                    ${includesList}
+                </ul>
+                <p><span class="label">No incluye:</span> [SERVICIOS NO INCLUIDOS NO DISPONIBLES EN DB]</p>
+                <p><span class="label">Precio Total:</span> $${clientTotalAmount.toFixed(2)} MXN</p>
             </div>
 
             <div class="section">
-                <h2>Servicios Adicionales Contratados</h2>
+                <h2>2. NATURALEZA DEL SERVICIO</h2>
+                <p>LA AGENCIA actúa únicamente como coordinadora de servicios turísticos, contratando servicios con proveedores independientes de transporte, hospedaje, alimentación, guías, accesos y demás.</p>
+                <p>EL CLIENTE acepta que cada servicio está sujeto a los términos y condiciones de dichos proveedores, debiendo respetar sus contratos en lo individual y grupal.</p>
+                <p>LA AGENCIA no será responsable de fallas, retrasos o incumplimientos atribuibles a terceros.</p>
+            </div>
+
+            <div class="section">
+                <h2>3. EXCLUSIÓN DE RESPONSABILIDAD</h2>
+                <p>LA AGENCIA no será responsable por situaciones de fuerza mayor o ajenas a su control, tales como:</p>
                 <ul>
-                    ${extraServicesList}
+                    <li>Desastres naturales, fenómenos meteorológicos, pandemias, accidentes, disturbios sociales, cierres de carreteras, restricciones gubernamentales.</li>
+                    <li>Averías mecánicas, fallas en transportes, problemas en hospedajes o cancelaciones por parte de proveedores.</li>
+                </ul>
+                <p>LA AGENCIA solo responderá por lo contratado expresamente en este documento.</p>
+                <p>EL CLIENTE libera a LA AGENCIA de cualquier responsabilidad por daños, pérdidas, lesiones, enfermedades o fallecimientos ocurridos durante el tour, salvo negligencia comprobada y directa de LA AGENCIA.</p>
+            </div>
+
+            <div class="section">
+                <h2>4. CANCELACIONES Y REEMBOLSOS</h2>
+                <h3>Por parte del CLIENTE:</h3>
+                <ul>
+                    <li>No habrá reembolso en caso de cancelación.</li>
+                    <li>EL CLIENTE podrá traspasar su lugar a otra persona, notificándolo con al menos 48 horas de anticipación.</li>
+                </ul>
+                <h3>Por parte de LA AGENCIA:</h3>
+                <ul>
+                    <li>En caso de cancelación por causas imputables a LA AGENCIA, se ofrecerán dos opciones:</li>
+                    <ol type="a">
+                        <li>Reembolso dentro de 90 días naturales.</li>
+                        <li>Reprogramación del viaje válida hasta por 1 año.</li>
+                    </ol>
+                    <li>En caso de fuerza mayor o causas externas, LA AGENCIA no está obligada a reembolsar ni reprogramar.</li>
                 </ul>
             </div>
 
-            <div class="payment-summary">
-                <h2>Resumen Financiero</h2>
-                <p><span class="label">Monto Total del Contrato:</span> $${clientTotalAmount.toFixed(2)}</p>
-                <p><span class="label">Total Pagado (acumulado):</span> $${clientTotalPaid.toFixed(2)}</p>
-                <p class="total-amount"><span class="label">Adeudo Pendiente:</span> $${remainingPayment}</p>
+            <div class="section">
+                <h2>5. PAGOS Y PENALIZACIONES</h2>
+                <p>El servicio deberá estar pagado en su totalidad en la fecha límite establecida.</p>
+                <p>En caso de incumplimiento de pago, LA AGENCIA podrá cancelar la reserva sin obligación de reembolso.</p>
+                <p>Los anticipos realizados son no reembolsables bajo ninguna circunstancia.</p>
+                <p>Los pagos deberán realizarse únicamente a las cuentas oficiales de LA AGENCIA.</p>
             </div>
 
             <div class="section">
-                <h2>Términos y Condiciones</h2>
-                <p>
-                    <strong>[INSERTA AQUÍ TUS TÉRMINOS Y CONDICIONES LEGALES ESPECÍFICOS]</strong>
-                </p>
-                <p>
-                    Esto puede incluir políticas de cancelación, políticas de reembolso, responsabilidades de la agencia,
-                    responsabilidades del cliente, información sobre seguros de viaje, cambios en el itinerario,
-                    fuerza mayor, etc. Es crucial que esta sección sea legalmente sólida y adaptada a tu negocio.
-                </p>
-                <p>
-                    <em>Ejemplo de cláusula:</em> "El Cliente acepta que cualquier cancelación o modificación de la reserva
-                    estará sujeta a las políticas de cancelación de la Agencia y de los proveedores de servicios,
-                    pudiendo incurrir en cargos adicionales. Se recomienda encarecidamente la contratación de un seguro de viaje."
-                </p>
+                <h2>6. OBLIGACIONES DEL CLIENTE</h2>
+                <ul>
+                    <li>Presentarse en el lugar y hora indicados.</li>
+                    <li>Contar con la documentación requerida (identificaciones, permisos, visas, certificados médicos, etc.).</li>
+                    <li>Respetar las normas de seguridad y convivencia durante el tour.</li>
+                    <li>Asumir los gastos personales no incluidos en el contrato.</li>
+                </ul>
+            </div>
+
+            <div class="section">
+                <h2>7. CESIÓN DE DERECHOS Y USO DE IMAGEN</h2>
+                <p>EL CLIENTE autoriza a LA AGENCIA a utilizar fotografías o videos tomados durante el tour con fines publicitarios o promocionales.</p>
+                <p>En caso de cesión de lugar a otra persona, LA AGENCIA no asume responsabilidades adicionales.</p>
+            </div>
+
+            <div class="section">
+                <h2>8. SEGUROS Y COBERTURA</h2>
+                <p>EL CLIENTE reconoce que los servicios no incluyen seguros médicos, de accidentes ni de viaje, salvo que se especifique en un anexo.</p>
+                <p>EL CLIENTE es responsable de contratar seguros adicionales si así lo requiere.</p>
+            </div>
+
+            <div class="section">
+                <h2>9. CONFIDENCIALIDAD Y PROTECCIÓN DE DATOS</h2>
+                <p>LA AGENCIA se compromete a proteger los datos personales de EL CLIENTE conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares.</p>
+                <p>Los datos serán usados únicamente para la gestión del servicio contratado.</p>
+            </div>
+
+            <div class="section">
+                <h2>10. COMUNICACIÓN OFICIAL</h2>
+                <p>Toda comunicación válida deberá realizarse por escrito, vía correo electrónico, WhatsApp corporativo o documento físico con acuse de recibido.</p>
+                <p>Las comunicaciones verbales carecen de valor contractual.</p>
+            </div>
+
+            <div class="section">
+                <h2>11. SUCESIÓN Y CESIÓN DE DERECHOS</h2>
+                <p>EL CLIENTE no podrá ceder ni transferir derechos u obligaciones derivados del presente contrato sin autorización por escrito de LA AGENCIA.</p>
+                <p>LA AGENCIA podrá ceder sus derechos a terceros en caso de fusión, venta o reestructuración de la empresa.</p>
+            </div>
+
+            <div class="section">
+                <h2>12. PROPIEDAD INTELECTUAL</h2>
+                <p>Todo material informativo, publicitario, imágenes, marcas y logotipos relacionados con el tour son propiedad de LA AGENCIA y no podrán ser reproducidos sin su autorización.</p>
+            </div>
+
+            <div class="section">
+                <h2>13. LEY APLICABLE Y JURISDICCIÓN</h2>
+                <p>Para la interpretación y cumplimiento del presente contrato, las partes se someten a las leyes y tribunales de la ciudad de Saltillo, Coahuila, México, renunciando expresamente a cualquier otro fuero.</p>
+            </div>
+
+            <div class="section">
+                <h2>14. CLAÚSULA SUPLETORIA</h2>
+                <p>En caso de que alguna disposición del presente contrato sea declarada nula, inválida o inaplicable, las demás cláusulas conservarán su plena validez y obligatoriedad.</p>
             </div>
 
             <div class="signature-section">
                 <div class="signature-block">
                     <div class="signature-line"></div>
-                    <p>Firma del Cliente</p>
-                    <p>${clientFullName}</p>
+                    <p>Juan De Dios Saucedo Cortés</p>
+                    <p>Representante Legal</p>
+                    <p>“LA AGENCIA”</p>
                 </div>
                 <div class="signature-block">
                     <div class="signature-line"></div>
-                    <p>Firma de la Agencia</p>
-                    <p>${agency?.agency_name || 'N/A'}</p>
+                    <p>${clientFullName}</p>
+                    <p>“EL CLIENTE”</p>
                 </div>
             </div>
 
