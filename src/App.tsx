@@ -39,7 +39,7 @@ import PrivacyPolicyPage from "./pages/bus-tickets/PrivacyPolicyPage";
 import TermsAndConditionsPage from "./pages/bus-tickets/TermsAndConditionsPage";
 import FaqPage from "./pages/bus-tickets/FaqPage";
 import BillingCenterPage from "./pages/bus-tickets/BillingCenterPage";
-import BusTicketsContactPage from "./pages/bus-tickets/ContactPage";
+import BusTicketsContactPage from "./components/bus-tickets/BusContactSection"; // Corrected import to the new component
 import AdditionalServicesPage from "./pages/bus-tickets/AdditionalServicesPage";
 import HelpCenterPage from "./pages/bus-tickets/HelpCenterPage";
 
@@ -77,7 +77,7 @@ const App = () => {
               <Route path="/bus-tickets/faq" element={<FaqPage />} />
               <Route path="/bus-tickets/billing-center" element={<BillingCenterPage />} />
               <Route path="/bus-tickets/help-center" element={<HelpCenterPage />} />
-              <Route path="/bus-tickets/contact" element={<BusTicketsContactPage />} />
+              <Route path="/bus-tickets/contact" element={<BusTicketsContactPage />} /> {/* Updated route */}
 
               <Route path="/login" element={<Login />} />
               <Route
