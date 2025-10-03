@@ -51,9 +51,9 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
 
     /* NEW: Bus Tickets Theme Colors */
-    --bus-primary: 220 100% 19%; /* Dark Royal Blue */
+    --bus-primary: 217.2 32.6% 17.5%; /* #1e293b (Dark Blue) */
     --bus-primary-foreground: 0 0% 100%; /* White text on blue */
-    --bus-secondary: 50 100% 50%; /* Yellow */
+    --bus-secondary: 50.6 100% 50%; /* #ffd700 (Yellow) */
     --bus-secondary-foreground: 222.2 47.4% 11.2%; /* Dark text on yellow */
     --bus-background: 0 0% 100%; /* White background */
     --bus-foreground: 222.2 84% 4.9%; /* Dark text */
@@ -97,9 +97,9 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
 
     /* NEW: Bus Tickets Theme Colors for Dark Mode (can be adjusted) */
-    --bus-primary: 220 100% 30%; /* Lighter dark blue for dark mode */
+    --bus-primary: 217.2 32.6% 25%; /* Lighter dark blue for dark mode */
     --bus-primary-foreground: 0 0% 100%;
-    --bus-secondary: 50 100% 60%; /* Lighter yellow for dark mode */
+    --bus-secondary: 50.6 100% 60%; /* Lighter yellow for dark mode */
     --bus-secondary-foreground: 222.2 47.4% 11.2%;
     --bus-background: 222.2 84% 4.9%; /* Dark background */
     --bus-foreground: 210 40% 98%; /* Light text */

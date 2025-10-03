@@ -65,11 +65,11 @@ export default {
         "rosa-mexicano": "#E4007C", // Nuevo color Rosa Mexicano
         // NEW: Colores para el tema de boletos de autobús
         "bus-primary": {
-          DEFAULT: "hsl(var(--bus-primary))",
+          DEFAULT: "#1e293b", // Dark Blue
           foreground: "hsl(var(--bus-primary-foreground))",
         },
         "bus-secondary": {
-          DEFAULT: "hsl(var(--bus-secondary))",
+          DEFAULT: "#ffd700", // Yellow
           foreground: "hsl(var(--bus-secondary-foreground))",
         },
         "bus-background": "hsl(var(--bus-background))",
