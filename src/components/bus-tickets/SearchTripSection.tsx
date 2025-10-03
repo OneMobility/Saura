@@ -35,8 +35,8 @@ const SearchTripSection = () => {
   };
 
   return (
-    <section className="relative z-10 py-12 px-4 md:px-8 lg:px-16 bg-bus-primary text-bus-primary-foreground">
-      <div className="max-w-2xl mx-auto bg-card p-8 rounded-lg shadow-xl -mt-24 relative z-20">
+    <section className="relative z-10 py-12 px-4 md:px-8 lg:px-16 bg-background text-bus-foreground">
+      <div className="max-w-2xl mx-auto bg-card p-8 rounded-lg shadow-xl relative z-20">
         <h2 className="text-3xl md:text-4xl font-bold text-center text-bus-primary mb-8">
           Busca tu <span className="text-bus-secondary">Viaje</span> en Autobús
         </h2>
