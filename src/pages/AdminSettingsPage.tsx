@@ -6,10 +6,12 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import SlideshowSettings from '@/components/admin/settings/SlideshowSettings';
 import SeoSettings from '@/components/admin/settings/SeoSettings';
 import SocialMediaSettings from '@/components/admin/settings/SocialMediaSettings';
-import AgencySettings from '@/components/admin/settings/AgencySettings'; // Import the new AgencySettings component
+import AgencySettings from '@/components/admin/settings/AgencySettings';
+import AboutUsSettings from '@/components/admin/settings/AboutUsSettings'; // NEW: Import AboutUsSettings
+import PolicyTermsSettings from '@/components/admin/settings/PolicyTermsSettings'; // NEW: Import PolicyTermsSettings
 import { useSession } from '@/components/SessionContextProvider';
-import { useNavigate } from 'react-router-dom'; // Corrected import statement
-import AdminHeader from '@/components/admin/AdminHeader'; // Import the new AdminHeader
+import { useNavigate } from 'react-router-dom';
+import AdminHeader from '@/components/admin/AdminHeader';
 
 const AdminSettingsPage = () => {
   const { user, isAdmin, isLoading } = useSession();
@@ -32,14 +34,16 @@ const AdminSettingsPage = () => {
     <div className="flex min-h-screen bg-gray-100">
       <AdminSidebar />
       <div className="flex flex-col flex-grow">
-        <AdminHeader pageTitle="Configuración del Sitio" /> {/* Usando el nuevo AdminHeader */}
+        <AdminHeader pageTitle="Configuración del Sitio" />
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <Tabs defaultValue="slideshow" className="w-full">
-            <TabsList className="grid w-full grid-cols-4"> {/* Adjusted grid-cols to 4 */}
+            <TabsList className="grid w-full grid-cols-6"> {/* Adjusted grid-cols to 6 */}
               <TabsTrigger value="slideshow">Slideshow</TabsTrigger>
               <TabsTrigger value="seo">SEO</TabsTrigger>
               <TabsTrigger value="social-media">Redes Sociales</TabsTrigger>
-              <TabsTrigger value="agency-info">Agencia</TabsTrigger> {/* New tab trigger */}
+              <TabsTrigger value="agency-info">Agencia</TabsTrigger>
+              <TabsTrigger value="about-us">Sobre Nosotros</TabsTrigger> {/* NEW: Tab trigger */}
+              <TabsTrigger value="policies-terms">Políticas y Términos</TabsTrigger> {/* NEW: Tab trigger */}
             </TabsList>
             <TabsContent value="slideshow">
               <SlideshowSettings />
@@ -50,8 +54,14 @@ const AdminSettingsPage = () => {
             <TabsContent value="social-media">
               <SocialMediaSettings />
             </TabsContent>
-            <TabsContent value="agency-info"> {/* New tab content */}
+            <TabsContent value="agency-info">
               <AgencySettings />
+            </TabsContent>
+            <TabsContent value="about-us"> {/* NEW: Tab content */}
+              <AboutUsSettings />
+            </TabsContent>
+            <TabsContent value="policies-terms"> {/* NEW: Tab content */}
+              <PolicyTermsSettings />
             </TabsContent>
           </Tabs>
         </main>

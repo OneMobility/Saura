@@ -1,75 +1,88 @@
 "use client";
 
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import BusTicketsNavbar from '@/components/BusTicketsNavbar';
-import BusTicketsFooter from '@/components/BusTicketsFooter'; // NEW: Import BusTicketsFooter
+import BusTicketsFooter from '@/components/BusTicketsFooter';
 import BusTicketsThemeProvider from '@/components/BusTicketsThemeProvider';
+import { supabase } from '@/integrations/supabase/client';
+import { Loader2 } from 'lucide-react';
+
+interface PolicyTermContent {
+  title: string;
+  content: string;
+}
 
 const PrivacyPolicyPage = () => {
+  const [policyContent, setPolicyContent] = useState<PolicyTermContent | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchPolicyContent = async () => {
+      setLoading(true);
+      setError(null);
+      const { data, error } = await supabase
+        .from('policy_terms_settings')
+        .select('title, content')
+        .eq('page_type', 'privacy_policy')
+        .single();
+
+      if (error && error.code !== 'PGRST116') {
+        console.error('Error fetching Privacy Policy content:', error);
+        setError('Error al cargar la Política de Privacidad.');
+      } else if (data) {
+        setPolicyContent(data);
+      } else {
+        setError('No hay Política de Privacidad disponible en este momento.');
+      }
+      setLoading(false);
+    };
+    fetchPolicyContent();
+  }, []);
+
+  if (loading) {
+    return (
+      <BusTicketsThemeProvider>
+        <div className="min-h-screen flex flex-col bg-bus-background text-bus-foreground">
+          <BusTicketsNavbar />
+          <main className="flex-grow container mx-auto px-4 py-8 md:py-12 flex items-center justify-center">
+            <Loader2 className="h-12 w-12 animate-spin text-bus-primary" />
+            <p className="ml-4 text-xl">Cargando política de privacidad...</p>
+          </main>
+          <BusTicketsFooter />
+        </div>
+      </BusTicketsThemeProvider>
+    );
+  }
+
+  if (error || !policyContent) {
+    return (
+      <BusTicketsThemeProvider>
+        <div className="min-h-screen flex flex-col bg-bus-background text-bus-foreground">
+          <BusTicketsNavbar />
+          <main className="flex-grow container mx-auto px-4 py-8 md:py-12 text-center text-red-600">
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">Error</h1>
+            <p className="text-xl">{error || 'No se pudo cargar la Política de Privacidad.'}</p>
+          </main>
+          <BusTicketsFooter />
+        </div>
+      </BusTicketsThemeProvider>
+    );
+  }
+
   return (
     <BusTicketsThemeProvider>
       <div className="min-h-screen flex flex-col bg-bus-background text-bus-foreground">
         <BusTicketsNavbar />
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <h1 className="text-4xl md:text-5xl font-bold text-center mb-6">
-            Política de Privacidad de Saura Bus
+            {policyContent.title}
           </h1>
-          <p className="text-lg text-center mb-10">
-            Tu privacidad es importante para nosotros. Conoce cómo manejamos tus datos.
-          </p>
-          <div className="bg-card p-8 rounded-lg shadow-lg prose max-w-none">
-            <h2>Introducción</h2>
-            <p>
-              En Saura Bus (parte de Saura Tours), nos comprometemos a proteger tu privacidad.
-              Esta Política de Privacidad describe cómo recopilamos, usamos y compartimos tu información
-              personal cuando utilizas nuestros servicios de reserva de boletos de autobús.
-            </p>
-
-            <h2>Información que Recopilamos</h2>
-            <p>Podemos recopilar la siguiente información personal:</p>
-            <ul>
-              <li><strong>Información de Contacto:</strong> Nombre, dirección de correo electrónico, número de teléfono, dirección postal.</li>
-              <li><strong>Información de Reserva:</strong> Detalles del tour, asientos seleccionados, información de acompañantes (nombres, edades).</li>
-              <li><strong>Información de Pago:</strong> Detalles de transacciones (no almacenamos información completa de tarjetas de crédito).</li>
-              <li><strong>Información de Identificación:</strong> Número de identificación (INE, pasaporte, etc.) si es requerido para la reserva.</li>
-            </ul>
-
-            <h2>Cómo Usamos tu Información</h2>
-            <p>Utilizamos tu información para:</p>
-            <ul>
-              <li>Procesar y confirmar tus reservas de boletos de autobús.</li>
-              <li>Comunicarnos contigo sobre tu viaje, cambios o actualizaciones.</li>
-              <li>Mejorar nuestros servicios y personalizar tu experiencia.</li>
-              <li>Cumplir con nuestras obligaciones legales y reglamentarias.</li>
-            </ul>
-
-            <h2>Compartir tu Información</h2>
-            <p>Podemos compartir tu información con:</p>
-            <ul>
-              <li>Proveedores de servicios de transporte (líneas de autobús) para la gestión de tu viaje.</li>
-              <li>Proveedores de servicios de pago para procesar transacciones.</li>
-              <li>Autoridades legales si es requerido por ley.</li>
-            </ul>
-
-            <h2>Seguridad de Datos</h2>
-            <p>
-              Implementamos medidas de seguridad técnicas y organizativas para proteger tu información
-              personal contra el acceso no autorizado, la divulgación, la alteración o la destrucción.
-            </p>
-
-            <h2>Tus Derechos</h2>
-            <p>Tienes derecho a acceder, corregir o eliminar tu información personal.
-              Para ejercer estos derechos, por favor contáctanos a través de los canales de soporte.
-            </p>
-
-            <h2>Cambios a esta Política</h2>
-            <p>
-              Podemos actualizar esta Política de Privacidad ocasionalmente. Te notificaremos sobre
-              cualquier cambio significativo publicando la nueva política en nuestro sitio web.
-            </p>
+          <div className="bg-card p-8 rounded-lg shadow-lg prose max-w-none mx-auto">
+            <div dangerouslySetInnerHTML={{ __html: policyContent.content }} />
           </div>
         </main>
-        <BusTicketsFooter /> {/* NEW: Use BusTicketsFooter */}
+        <BusTicketsFooter />
       </div>
     </BusTicketsThemeProvider>
   );
