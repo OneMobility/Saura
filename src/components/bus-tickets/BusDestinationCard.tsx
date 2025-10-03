@@ -22,6 +22,9 @@ const BusDestinationCard: React.FC<BusDestinationCardProps> = ({
   gradientFromClass,
   gradientToClass,
 }) => {
+  const isYellowGradient = gradientToClass.includes('to-bus-secondary');
+  const textColorClass = isYellowGradient ? 'text-bus-primary' : 'text-white';
+
   return (
     <div className="relative h-64 rounded-lg overflow-hidden shadow-lg group">
       <img
@@ -36,9 +39,9 @@ const BusDestinationCard: React.FC<BusDestinationCardProps> = ({
           gradientToClass
         )}
       >
-        <h3 className="text-2xl font-bold text-white mb-2">{title}</h3>
-        <p className="text-white text-sm mb-4 line-clamp-2">{subtitle}</p>
-        <Button asChild className="bg-white text-bus-primary hover:bg-gray-100">
+        <h3 className={cn("text-2xl font-bold mb-2", textColorClass)}>{title}</h3>
+        <p className={cn("text-sm mb-4 line-clamp-2", textColorClass)}>{subtitle}</p>
+        <Button asChild className="w-1/2 self-start bg-white text-bus-primary hover:bg-gray-100">
           <Link to={link}>Más Información</Link>
         </Button>
       </div>
