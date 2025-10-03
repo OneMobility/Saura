@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner'; // Using sonner for toasts
-import { Mail, Phone, MapPin } from 'lucide-react'; // Icons for contact info
+import { Mail, Phone, MapPin, Clock } from 'lucide-react'; // Icons for contact info, added Clock
 
 const BusContactSection = () => {
   const [formData, setFormData] = useState({
@@ -37,11 +37,11 @@ const BusContactSection = () => {
 
   return (
     <section className="py-12 px-4 md:px-8 lg:px-16 bg-bus-background text-bus-foreground">
-      <div className="max-w-6xl mx-auto lg:grid lg:grid-cols-2 lg:gap-12 items-center">
+      <div className="max-w-6xl mx-auto lg:grid lg:grid-cols-2 lg:gap-12 items-start"> {/* Changed items-center to items-start */}
         {/* Columna del Formulario */}
-        <div>
+        <div className="bg-card p-8 rounded-lg shadow-lg mb-8 lg:mb-0"> {/* Added bg-card, padding, rounded, shadow */}
           <h2 className="text-3xl md:text-4xl font-bold text-center lg:text-left mb-8 text-bus-primary">
-            Contáctanos
+            Contáctanos Hoy
           </h2>
           <p className="text-center lg:text-left text-lg mb-10 text-bus-foreground">
             ¿Tienes alguna pregunta o necesitas ayuda con tu reserva de autobús? Envíanos un mensaje.
@@ -89,8 +89,8 @@ const BusContactSection = () => {
           </form>
         </div>
 
-        {/* Columna de Información de Contacto */}
-        <div className="mt-12 lg:mt-0 flex flex-col justify-center items-center lg:items-start space-y-6 p-6 bg-card rounded-lg shadow-lg">
+        {/* Columna de Información de Contacto y Horarios */}
+        <div className="flex flex-col justify-start items-center lg:items-start space-y-6 p-8 bg-card rounded-lg shadow-lg">
           <h3 className="text-2xl font-bold text-bus-primary mb-4">Nuestra Información</h3>
           <div className="flex items-center space-x-3">
             <Mail className="h-6 w-6 text-bus-primary" />
@@ -103,6 +103,16 @@ const BusContactSection = () => {
           <div className="flex items-center space-x-3">
             <MapPin className="h-6 w-6 text-bus-primary" />
             <p className="text-lg text-bus-foreground">Calle Falsa 123, Ciudad de México</p>
+          </div>
+
+          <h3 className="text-2xl font-bold text-bus-primary mt-8 mb-4">Horarios de Atención</h3>
+          <div className="flex items-center space-x-3">
+            <Clock className="h-6 w-6 text-bus-primary" />
+            <div className="text-lg text-bus-foreground">
+              <p>Lunes a Viernes: 9:00 AM - 6:00 PM</p>
+              <p>Sábados: 10:00 AM - 2:00 PM</p>
+              <p>Domingos: Cerrado</p>
+            </div>
           </div>
           <img
             src="https://tse3.mm.bing.net/th/id/OIP.tB2ifJ5D_V1kcDQkRItOvAHaEK?rs=1&pid=ImgDetMain&o=7&rm=3"
