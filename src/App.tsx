@@ -13,6 +13,7 @@ import BlogPage from "./pages/BlogPage";
 import BlogPostPage from "./pages/BlogPostPage";
 import ToursPage from "./pages/ToursPage";
 import ContactPage from "./pages/ContactPage";
+import BusTicketsPage from "./pages/BusTicketsPage"; // NEW: Import BusTicketsPage
 import ScrollToTop from "./components/ScrollToTop";
 import Login from "./pages/Login";
 
@@ -23,8 +24,8 @@ import AdminUsersPage from "./pages/AdminUsersPage";
 import AdminBlogPage from "./pages/AdminBlogPage";
 import AdminReviewsPage from "./pages/AdminReviewsPage";
 import AdminHotelsPage from "./pages/AdminHotelsPage";
-import AdminProvidersPage from "./pages/AdminProvidersPage"; // Import the new AdminProvidersPage
-import AdminProviderFormPage from "./pages/AdminProviderFormPage"; // Import the new AdminProviderFormPage
+import AdminProvidersPage from "./pages/AdminProvidersPage";
+import AdminProviderFormPage from "./pages/AdminProviderFormPage";
 import AdminClientsPage from "./pages/AdminClientsPage";
 import AdminBusesPage from "./pages/AdminBusesPage";
 import AdminBusFormPage from "./pages/AdminBusFormPage";
@@ -54,6 +55,7 @@ const App = () => {
               <Route path="/blog" element={<BlogPage />} />
               <Route path="/blog/:id" element={<BlogPostPage />} />
               <Route path="/contact" element={<ContactPage />} />
+              <Route path="/bus-tickets" element={<BusTicketsPage />} /> {/* NEW: Bus Tickets Page */}
               <Route path="/login" element={<Login />} />
               <Route
                 path="/admin/dashboard"
