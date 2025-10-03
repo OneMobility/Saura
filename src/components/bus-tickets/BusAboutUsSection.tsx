@@ -9,13 +9,8 @@ const BusAboutUsSection = () => {
   return (
     <section className="py-12 px-4 md:px-8 lg:px-16 bg-white text-bus-foreground">
       <div className="max-w-6xl mx-auto lg:grid lg:grid-cols-2 lg:gap-12 items-center">
-        {/* Columna del Contenido de Texto y Imagen (ahora a la izquierda, dentro de la caja amarilla) */}
-        <div className="text-center lg:text-left mb-8 lg:mb-0 p-6 bg-bus-secondary rounded-lg shadow-md">
-          <img
-            src="https://images.unsplash.com/photo-1544620347-c4fd4a8d462c?q=80&w=2069&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-            alt="Autobús de Saura Bus"
-            className="w-full h-64 md:h-80 object-cover rounded-lg shadow-lg mb-6" // Añadido mb-6 para espaciado
-          />
+        {/* Columna del Contenido de Texto (la caja amarilla) */}
+        <div className="text-center lg:text-left p-6 bg-bus-secondary rounded-lg shadow-md">
           <h2 className="text-3xl md:text-4xl font-bold text-bus-primary mb-6">
             Sobre Saura Bus
           </h2>
@@ -30,8 +25,14 @@ const BusAboutUsSection = () => {
             </Link>
           </Button>
         </div>
-        {/* La segunda columna ahora estará vacía en el diseño de cuadrícula */}
-        <div className="hidden lg:block"></div>
+        {/* Columna de la Imagen (a la derecha) */}
+        <div className="mt-8 lg:mt-0"> {/* Añadido margen superior para móviles/tabletas */}
+          <img
+            src="https://images.unsplash.com/photo-1544620347-c4fd4a8d462c?q=80&w=2069&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+            alt="Autobús de Saura Bus"
+            className="w-full h-64 md:h-80 object-cover rounded-lg shadow-lg"
+          />
+        </div>
       </div>
     </section>
   );
