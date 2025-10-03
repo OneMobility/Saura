@@ -35,13 +35,13 @@ const SearchTripSection = () => {
   };
 
   return (
-    <section className="py-12 px-4 md:px-8 lg:px-16 bg-bus-primary text-bus-primary-foreground">
-      <div className="max-w-2xl mx-auto bg-card p-8 rounded-lg shadow-lg">
+    <section className="relative z-10 py-12 px-4 md:px-8 lg:px-16 bg-bus-primary text-bus-primary-foreground">
+      <div className="max-w-2xl mx-auto bg-card p-8 rounded-lg shadow-xl -mt-24 relative z-20">
         <h2 className="text-3xl md:text-4xl font-bold text-center text-bus-primary mb-8">
           Busca tu Viaje en Autobús
         </h2>
         <form onSubmit={handleSearch} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="space-y-1.5"> {/* Adjusted spacing */}
+          <div className="space-y-1.5">
             <Label htmlFor="origin" className="text-lg">Origen</Label>
             <Input
               type="text"
@@ -54,7 +54,7 @@ const SearchTripSection = () => {
               disabled={loading}
             />
           </div>
-          <div className="space-y-1.5"> {/* Adjusted spacing */}
+          <div className="space-y-1.5">
             <Label htmlFor="destination" className="text-lg">Destino</Label>
             <Input
               type="text"
@@ -67,14 +67,14 @@ const SearchTripSection = () => {
               disabled={loading}
             />
           </div>
-          <div className="space-y-1.5"> {/* Adjusted spacing */}
+          <div className="space-y-1.5">
             <Label htmlFor="date" className="text-lg">Fecha</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant={"outline"}
                   className={cn(
-                    "w-full justify-start text-left font-normal p-3", // Removed mt-2
+                    "w-full justify-start text-left font-normal p-3",
                     !date && "text-muted-foreground",
                     "focus-visible:ring-bus-primary"
                   )}
@@ -96,13 +96,13 @@ const SearchTripSection = () => {
               </PopoverContent>
             </Popover>
           </div>
-          <div className="space-y-1.5"> {/* Adjusted spacing */}
+          <div className="space-y-1.5">
             <Label htmlFor="passengers" className="text-lg">Pasajeros</Label>
             <Input
               type="number"
               id="passengers"
               placeholder="Número de Pasajeros"
-              className="p-3 focus-visible:ring-bus-primary" // Removed mt-2
+              className="p-3 focus-visible:ring-bus-primary"
               value={passengers}
               onChange={(e) => setPassengers(parseInt(e.target.value) || 1)}
               min={1}
