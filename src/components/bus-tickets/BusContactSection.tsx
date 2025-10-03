@@ -37,15 +37,21 @@ const BusContactSection = () => {
 
   return (
     <section className="py-12 px-4 md:px-8 lg:px-16 bg-bus-background text-bus-foreground">
-      <div className="max-w-6xl mx-auto lg:grid lg:grid-cols-2 lg:gap-12 items-start"> {/* Changed items-center to items-start */}
+      <div className="max-w-6xl mx-auto text-center mb-10"> {/* Título fuera de las cajas */}
+        <h2 className="text-3xl md:text-4xl font-bold text-bus-primary">
+          Contáctanos <span className="text-bus-secondary">Hoy</span>
+        </h2>
+        <p className="text-lg mt-4">
+          ¿Tienes alguna pregunta o necesitas ayuda con tu reserva de autobús? Envíanos un mensaje.
+        </p>
+      </div>
+
+      <div className="max-w-6xl mx-auto lg:grid lg:grid-cols-2 lg:gap-12 items-start">
         {/* Columna del Formulario */}
-        <div className="bg-card p-8 rounded-lg shadow-lg mb-8 lg:mb-0"> {/* Added bg-card, padding, rounded, shadow */}
-          <h2 className="text-3xl md:text-4xl font-bold text-center lg:text-left mb-8 text-bus-primary">
-            Contáctanos Hoy
-          </h2>
-          <p className="text-center lg:text-left text-lg mb-10 text-bus-foreground">
-            ¿Tienes alguna pregunta o necesitas ayuda con tu reserva de autobús? Envíanos un mensaje.
-          </p>
+        <div className="bg-bus-primary p-8 rounded-lg shadow-lg mb-8 lg:mb-0 text-bus-primary-foreground"> {/* Fondo azul */}
+          <h3 className="text-2xl font-bold text-center lg:text-left mb-8 text-bus-secondary">
+            Envíanos un Mensaje
+          </h3>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
               <Label htmlFor="name" className="text-lg">Nombre</Label>
@@ -53,7 +59,7 @@ const BusContactSection = () => {
                 type="text"
                 id="name"
                 placeholder="Tu Nombre"
-                className="mt-2 p-3 border border-gray-300 rounded-md focus-visible:ring-bus-primary"
+                className="mt-2 p-3 border border-gray-300 rounded-md focus-visible:ring-bus-secondary bg-bus-background text-bus-foreground"
                 value={formData.name}
                 onChange={handleChange}
               />
@@ -64,7 +70,7 @@ const BusContactSection = () => {
                 type="email"
                 id="email"
                 placeholder="tu.correo@ejemplo.com"
-                className="mt-2 p-3 border border-gray-300 rounded-md focus-visible:ring-bus-primary"
+                className="mt-2 p-3 border border-gray-300 rounded-md focus-visible:ring-bus-secondary bg-bus-background text-bus-foreground"
                 value={formData.email}
                 onChange={handleChange}
               />
@@ -75,14 +81,14 @@ const BusContactSection = () => {
                 id="message"
                 placeholder="Escribe tu mensaje aquí..."
                 rows={5}
-                className="mt-2 p-3 border border-gray-300 rounded-md focus-visible:ring-bus-primary"
+                className="mt-2 p-3 border border-gray-300 rounded-md focus-visible:ring-bus-secondary bg-bus-background text-bus-foreground"
                 value={formData.message}
                 onChange={handleChange}
               />
             </div>
             <Button
               type="submit"
-              className="w-full bg-bus-primary hover:bg-bus-primary/90 text-bus-primary-foreground font-semibold py-3 text-lg"
+              className="w-full bg-bus-secondary hover:bg-bus-secondary/90 text-bus-secondary-foreground font-semibold py-3 text-lg"
             >
               Enviar Mensaje
             </Button>
@@ -90,25 +96,25 @@ const BusContactSection = () => {
         </div>
 
         {/* Columna de Información de Contacto y Horarios */}
-        <div className="flex flex-col justify-start items-center lg:items-start space-y-6 p-8 bg-card rounded-lg shadow-lg">
-          <h3 className="text-2xl font-bold text-bus-primary mb-4">Nuestra Información</h3>
+        <div className="flex flex-col justify-start items-center lg:items-start space-y-6 p-8 bg-bus-primary rounded-lg shadow-lg text-bus-primary-foreground"> {/* Fondo azul */}
+          <h3 className="text-2xl font-bold text-bus-secondary mb-4">Nuestra Información</h3>
           <div className="flex items-center space-x-3">
-            <Mail className="h-6 w-6 text-bus-primary" />
-            <p className="text-lg text-bus-foreground">info@saurabus.com</p>
+            <Mail className="h-6 w-6 text-bus-secondary" />
+            <p className="text-lg">info@saurabus.com</p>
           </div>
           <div className="flex items-center space-x-3">
-            <Phone className="h-6 w-6 text-bus-primary" />
-            <p className="text-lg text-bus-foreground">+52 55 1234 5678</p>
+            <Phone className="h-6 w-6 text-bus-secondary" />
+            <p className="text-lg">+52 55 1234 5678</p>
           </div>
           <div className="flex items-center space-x-3">
-            <MapPin className="h-6 w-6 text-bus-primary" />
-            <p className="text-lg text-bus-foreground">Calle Falsa 123, Ciudad de México</p>
+            <MapPin className="h-6 w-6 text-bus-secondary" />
+            <p className="text-lg">Calle Falsa 123, Ciudad de México</p>
           </div>
 
-          <h3 className="text-2xl font-bold text-bus-primary mt-8 mb-4">Horarios de Atención</h3>
+          <h3 className="text-2xl font-bold text-bus-secondary mt-8 mb-4">Horarios de Atención</h3>
           <div className="flex items-center space-x-3">
-            <Clock className="h-6 w-6 text-bus-primary" />
-            <div className="text-lg text-bus-foreground">
+            <Clock className="h-6 w-6 text-bus-secondary" />
+            <div className="text-lg">
               <p>Lunes a Viernes: 9:00 AM - 6:00 PM</p>
               <p>Sábados: 10:00 AM - 2:00 PM</p>
               <p>Domingos: Cerrado</p>
