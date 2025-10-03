@@ -1,15 +1,15 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import BusTicketsNavbar from '@/components/BusTicketsNavbar'; // NEW: Import BusTicketsNavbar
-import Footer from '@/components/Footer';
+import BusTicketsNavbar from '@/components/BusTicketsNavbar';
+import BusTicketsFooter from '@/components/BusTicketsFooter'; // NEW: Import BusTicketsFooter
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Loader2, Bus } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 import BusTicketBookingForm from '@/components/BusTicketBookingForm';
-import BusTicketsThemeProvider from '@/components/BusTicketsThemeProvider'; // NEW: Import BusTicketsThemeProvider
+import BusTicketsThemeProvider from '@/components/BusTicketsThemeProvider';
 
 interface Tour {
   id: string;
@@ -68,7 +68,7 @@ const BusTicketsPage = () => {
             <Loader2 className="h-12 w-12 animate-spin text-bus-primary" />
             <p className="ml-4 text-xl">Cargando tours de autobús...</p>
           </main>
-          <Footer />
+          <BusTicketsFooter /> {/* NEW: Use BusTicketsFooter */}
         </div>
       </BusTicketsThemeProvider>
     );
@@ -83,7 +83,7 @@ const BusTicketsPage = () => {
             <h1 className="text-4xl md:text-5xl font-bold mb-4">Error</h1>
             <p className="text-xl">{error}</p>
           </main>
-          <Footer />
+          <BusTicketsFooter /> {/* NEW: Use BusTicketsFooter */}
         </div>
       </BusTicketsThemeProvider>
     );
@@ -95,7 +95,7 @@ const BusTicketsPage = () => {
         <BusTicketsNavbar />
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <h1 className="text-4xl md:text-5xl font-bold text-center mb-6">
-            Boletos de Autobús
+            Boletos de Autobús Saura Bus
           </h1>
           <p className="text-lg text-center mb-10">
             Encuentra y reserva tus boletos de autobús para nuestros tours.
@@ -140,7 +140,7 @@ const BusTicketsPage = () => {
             </Button>
           </div>
         </main>
-        <Footer />
+        <BusTicketsFooter /> {/* NEW: Use BusTicketsFooter */}
 
         {selectedTour && (
           <BusTicketBookingForm

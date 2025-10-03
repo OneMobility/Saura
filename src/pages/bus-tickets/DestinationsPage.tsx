@@ -2,7 +2,7 @@
 
 import React from 'react';
 import BusTicketsNavbar from '@/components/BusTicketsNavbar';
-import Footer from '@/components/Footer';
+import BusTicketsFooter from '@/components/BusTicketsFooter'; // NEW: Import BusTicketsFooter
 import BusTicketsThemeProvider from '@/components/BusTicketsThemeProvider';
 
 const DestinationsPage = () => {
@@ -12,7 +12,7 @@ const DestinationsPage = () => {
         <BusTicketsNavbar />
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <h1 className="text-4xl md:text-5xl font-bold text-center mb-6">
-            Nuestros Destinos de Autobús
+            Nuestros Destinos de Saura Bus
           </h1>
           <p className="text-lg text-center mb-10">
             Descubre los increíbles lugares a los que puedes viajar con nuestros boletos de autobús.
@@ -30,11 +30,11 @@ const DestinationsPage = () => {
               <li>Grandes Metrópolis: Ciudad de México, Guadalajara, Monterrey</li>
             </ul>
             <p className="mt-6">
-              ¡Prepárate para una experiencia de viaje cómoda y segura!
+              ¡Prepárate para una experiencia de viaje cómoda y segura con Saura Bus!
             </p>
           </div>
         </main>
-        <Footer />
+        <BusTicketsFooter /> {/* NEW: Use BusTicketsFooter */}
       </div>
     </BusTicketsThemeProvider>
   );

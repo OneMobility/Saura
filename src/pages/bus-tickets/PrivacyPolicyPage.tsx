@@ -2,7 +2,7 @@
 
 import React from 'react';
 import BusTicketsNavbar from '@/components/BusTicketsNavbar';
-import Footer from '@/components/Footer';
+import BusTicketsFooter from '@/components/BusTicketsFooter'; // NEW: Import BusTicketsFooter
 import BusTicketsThemeProvider from '@/components/BusTicketsThemeProvider';
 
 const PrivacyPolicyPage = () => {
@@ -12,7 +12,7 @@ const PrivacyPolicyPage = () => {
         <BusTicketsNavbar />
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <h1 className="text-4xl md:text-5xl font-bold text-center mb-6">
-            Política de Privacidad
+            Política de Privacidad de Saura Bus
           </h1>
           <p className="text-lg text-center mb-10">
             Tu privacidad es importante para nosotros. Conoce cómo manejamos tus datos.
@@ -20,7 +20,7 @@ const PrivacyPolicyPage = () => {
           <div className="bg-card p-8 rounded-lg shadow-lg prose max-w-none">
             <h2>Introducción</h2>
             <p>
-              En Boletos de Autobús (parte de Saura Tours), nos comprometemos a proteger tu privacidad.
+              En Saura Bus (parte de Saura Tours), nos comprometemos a proteger tu privacidad.
               Esta Política de Privacidad describe cómo recopilamos, usamos y compartimos tu información
               personal cuando utilizas nuestros servicios de reserva de boletos de autobús.
             </p>
@@ -69,7 +69,7 @@ const PrivacyPolicyPage = () => {
             </p>
           </div>
         </main>
-        <Footer />
+        <BusTicketsFooter /> {/* NEW: Use BusTicketsFooter */}
       </div>
     </BusTicketsThemeProvider>
   );

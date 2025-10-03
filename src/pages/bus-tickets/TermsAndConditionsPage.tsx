@@ -2,7 +2,7 @@
 
 import React from 'react';
 import BusTicketsNavbar from '@/components/BusTicketsNavbar';
-import Footer from '@/components/Footer';
+import BusTicketsFooter from '@/components/BusTicketsFooter'; // NEW: Import BusTicketsFooter
 import BusTicketsThemeProvider from '@/components/BusTicketsThemeProvider';
 
 const TermsAndConditionsPage = () => {
@@ -12,7 +12,7 @@ const TermsAndConditionsPage = () => {
         <BusTicketsNavbar />
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <h1 className="text-4xl md:text-5xl font-bold text-center mb-6">
-            Términos y Condiciones
+            Términos y Condiciones de Saura Bus
           </h1>
           <p className="text-lg text-center mb-10">
             Lee atentamente nuestros términos antes de reservar tus boletos.
@@ -20,7 +20,7 @@ const TermsAndConditionsPage = () => {
           <div className="bg-card p-8 rounded-lg shadow-lg prose max-w-none">
             <h2>1. Aceptación de los Términos</h2>
             <p>
-              Al reservar boletos de autobús a través de nuestro sitio web (parte de Saura Tours),
+              Al reservar boletos de autobús a través de nuestro sitio web (Saura Bus, parte de Saura Tours),
               aceptas los siguientes términos y condiciones. Si no estás de acuerdo con ellos,
               te pedimos que no utilices nuestros servicios.
             </p>
@@ -82,7 +82,7 @@ const TermsAndConditionsPage = () => {
             </p>
           </div>
         </main>
-        <Footer />
+        <BusTicketsFooter /> {/* NEW: Use BusTicketsFooter */}
       </div>
     </BusTicketsThemeProvider>
   );

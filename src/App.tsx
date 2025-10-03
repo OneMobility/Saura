@@ -41,6 +41,7 @@ import PrivacyPolicyPage from "./pages/bus-tickets/PrivacyPolicyPage";
 import TermsAndConditionsPage from "./pages/bus-tickets/TermsAndConditionsPage";
 import FaqPage from "./pages/bus-tickets/FaqPage";
 import BillingCenterPage from "./pages/bus-tickets/BillingCenterPage";
+import BusTicketsContactPage from "./pages/bus-tickets/ContactPage"; // NEW: Import BusTicketsContactPage
 
 
 import { SessionContextProvider } from "./components/SessionContextProvider";
@@ -73,7 +74,7 @@ const App = () => {
               <Route path="/bus-tickets/terms-and-conditions" element={<TermsAndConditionsPage />} />
               <Route path="/bus-tickets/faq" element={<FaqPage />} />
               <Route path="/bus-tickets/billing-center" element={<BillingCenterPage />} />
-              <Route path="/bus-tickets/contact" element={<ContactPage />} /> {/* Reusing existing ContactPage */}
+              <Route path="/bus-tickets/contact" element={<BusTicketsContactPage />} /> {/* NEW: Use BusTicketsContactPage */}
 
               <Route path="/login" element={<Login />} />
               <Route

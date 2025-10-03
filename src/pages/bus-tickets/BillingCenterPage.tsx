@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import BusTicketsNavbar from '@/components/BusTicketsNavbar';
-import Footer from '@/components/Footer';
+import BusTicketsFooter from '@/components/BusTicketsFooter'; // NEW: Import BusTicketsFooter
 import BusTicketsThemeProvider from '@/components/BusTicketsThemeProvider';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
@@ -36,7 +36,7 @@ const BillingCenterPage = () => {
         <BusTicketsNavbar />
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <h1 className="text-4xl md:text-5xl font-bold text-center mb-6">
-            Centro de Facturación
+            Centro de Facturación de Saura Bus
           </h1>
           <p className="text-lg text-center mb-10">
             Solicita tu factura electrónica para tus boletos de autobús.
@@ -82,7 +82,7 @@ const BillingCenterPage = () => {
             </p>
           </div>
         </main>
-        <Footer />
+        <BusTicketsFooter /> {/* NEW: Use BusTicketsFooter */}
       </div>
     </BusTicketsThemeProvider>
   );

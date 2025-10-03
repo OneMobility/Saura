@@ -30,7 +30,7 @@ const BusTicketsNavbar = () => {
       >
         <Link to="/bus-tickets" className="flex items-center space-x-2">
           <Bus className="text-bus-primary h-6 w-6" />
-          <div className="text-lg font-bold text-bus-primary">Boletos de Autobús</div>
+          <div className="text-lg font-bold text-bus-primary">Saura Bus</div>
         </Link>
       </div>
 

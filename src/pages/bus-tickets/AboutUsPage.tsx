@@ -2,7 +2,7 @@
 
 import React from 'react';
 import BusTicketsNavbar from '@/components/BusTicketsNavbar';
-import Footer from '@/components/Footer';
+import BusTicketsFooter from '@/components/BusTicketsFooter'; // NEW: Import BusTicketsFooter
 import BusTicketsThemeProvider from '@/components/BusTicketsThemeProvider';
 
 const AboutUsPage = () => {
@@ -12,7 +12,7 @@ const AboutUsPage = () => {
         <BusTicketsNavbar />
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <h1 className="text-4xl md:text-5xl font-bold text-center mb-6">
-            Sobre Nosotros
+            Sobre Saura Bus
           </h1>
           <p className="text-lg text-center mb-10">
             Conoce más sobre nuestra misión y compromiso con tus viajes.
@@ -20,7 +20,7 @@ const AboutUsPage = () => {
           <div className="bg-card p-8 rounded-lg shadow-lg">
             <h2 className="text-2xl font-semibold mb-4">Nuestra Historia</h2>
             <p className="mb-4">
-              En Boletos de Autobús, somos parte de Saura Tours, una agencia dedicada a hacer tus sueños de viaje realidad.
+              En Saura Bus, somos parte de Saura Tours, una agencia dedicada a hacer tus sueños de viaje realidad.
               Con años de experiencia en la industria turística, hemos expandido nuestros servicios para ofrecerte
               la mejor experiencia en transporte terrestre, conectándote con los destinos más bellos de México.
             </p>
@@ -37,7 +37,7 @@ const AboutUsPage = () => {
             </p>
           </div>
         </main>
-        <Footer />
+        <BusTicketsFooter /> {/* NEW: Use BusTicketsFooter */}
       </div>
     </BusTicketsThemeProvider>
   );

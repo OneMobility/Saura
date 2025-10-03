@@ -2,7 +2,7 @@
 
 import React from 'react';
 import BusTicketsNavbar from '@/components/BusTicketsNavbar';
-import Footer from '@/components/Footer';
+import BusTicketsFooter from '@/components/BusTicketsFooter'; // NEW: Import BusTicketsFooter
 import BusTicketsThemeProvider from '@/components/BusTicketsThemeProvider';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 
@@ -48,7 +48,7 @@ const FaqPage = () => {
         <BusTicketsNavbar />
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <h1 className="text-4xl md:text-5xl font-bold text-center mb-6">
-            Preguntas Frecuentes (FAQ)
+            Preguntas Frecuentes (FAQ) de Saura Bus
           </h1>
           <p className="text-lg text-center mb-10">
             Encuentra respuestas a las preguntas más comunes sobre la reserva de boletos de autobús.
@@ -68,7 +68,7 @@ const FaqPage = () => {
             </Accordion>
           </div>
         </main>
-        <Footer />
+        <BusTicketsFooter /> {/* NEW: Use BusTicketsFooter */}
       </div>
     </BusTicketsThemeProvider>
   );
