@@ -7,7 +7,7 @@ import { Info } from 'lucide-react';
 
 const BusAboutUsSection = () => {
   return (
-    <section className="py-12 px-4 md:px-8 lg:px-16 bg-bus-secondary text-bus-secondary-foreground">
+    <section className="py-12 px-4 md:px-8 lg:px-16 bg-white text-bus-foreground">
       <div className="max-w-6xl mx-auto lg:grid lg:grid-cols-2 lg:gap-12 items-center">
         {/* Columna del Contenido de Texto (ahora a la izquierda) */}
         <div className="text-center lg:text-left mb-8 lg:mb-0">
