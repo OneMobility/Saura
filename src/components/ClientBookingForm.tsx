@@ -12,12 +12,11 @@ import { Loader2, Save, PlusCircle, MinusCircle } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import TourSeatMap from '@/components/TourSeatMap';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TourProviderService, AvailableProvider } from '@/types/shared'; // NEW: Import shared types
+import { TourProviderService, AvailableProvider } from '@/types/shared';
 
-// Definición de tipos para el layout de asientos
 type SeatLayoutItem = {
   type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty' | 'entry';
-  number?: number; // Solo para asientos
+  number?: number;
 };
 type SeatLayoutRow = SeatLayoutItem[];
 type SeatLayout = SeatLayoutRow[];
@@ -25,7 +24,7 @@ type SeatLayout = SeatLayoutRow[];
 interface Companion {
   id: string;
   name: string;
-  age: number | null; // Added age for companions
+  age: number | null;
 }
 
 interface RoomDetails {
@@ -57,10 +56,9 @@ interface ClientBookingFormProps {
   tourDescription: string;
   tourSellingPrices: TourSellingPrices;
   busDetails: BusDetails;
-  tourAvailableExtraServices: TourProviderService[]; // NEW: Prop for tour's linked provider services
+  tourAvailableExtraServices: TourProviderService[];
 }
 
-// NEW: Helper function to calculate room allocation for a given number of people
 const allocateRoomsForPeople = (totalPeople: number): RoomDetails => {
   let double = 0;
   let triple = 0;
@@ -69,18 +67,15 @@ const allocateRoomsForPeople = (totalPeople: number): RoomDetails => {
 
   if (remaining <= 0) return { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 };
 
-  // Prioritize quad rooms
   quad = Math.floor(remaining / 4);
   remaining %= 4;
 
-  // Handle remaining people
   if (remaining === 1) {
     if (quad > 0) {
-      quad--; // Convert one quad to a triple and a double
+      quad--;
       triple++;
       double++;
     } else {
-      // If no quad rooms, for 1 person, assign a double (paying for 2)
       double++;
     }
   } else if (remaining === 2) {
@@ -101,7 +96,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
   tourDescription,
   tourSellingPrices,
   busDetails,
-  tourAvailableExtraServices, // NEW: Destructure prop
+  tourAvailableExtraServices,
 }) => {
   const [formData, setFormData] = useState({
     first_name: '',
@@ -109,26 +104,24 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     email: '',
     phone: '',
     address: '',
+    identification_number: null as string | null, // NEW: Initialize identification_number
     contractor_age: null as number | null,
     companions: [] as Companion[],
-    extra_services: [] as TourProviderService[], // Initialize new field with TourProviderService type
+    extra_services: [] as TourProviderService[],
   });
   const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
   const [totalAmount, setTotalAmount] = useState(0);
   const [roomDetails, setRoomDetails] = useState<RoomDetails>({ double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // NEW: States for breakdown display
   const [numAdults, setNumAdults] = useState(0);
   const [numChildren, setNumChildren] = useState(0);
   const [extraServicesTotal, setExtraServicesTotal] = useState(0);
 
-  // Effect to calculate total_amount and room_details
   useEffect(() => {
     let currentNumAdults = 0;
     let currentNumChildren = 0;
 
-    // Contractor
     if (formData.contractor_age !== null) {
       if (formData.contractor_age >= 12) {
         currentNumAdults++;
@@ -136,10 +129,9 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
         currentNumChildren++;
       }
     } else {
-      currentNumAdults++; // Default to adult if age not specified for contractor
+      currentNumAdults++;
     }
 
-    // Companions
     formData.companions.forEach(c => {
       if (c.age !== null) {
         if (c.age >= 12) {
@@ -148,7 +140,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
           currentNumChildren++;
         }
       } else {
-        currentNumAdults++; // Default to adult if age not specified for companion
+        currentNumAdults++;
       }
     });
 
@@ -157,19 +149,17 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
 
     const totalPeople = currentNumAdults + currentNumChildren;
 
-    const calculatedRoomDetails = allocateRoomsForPeople(currentNumAdults); // Allocate rooms based on adults
-    setRoomDetails(calculatedRoomDetails); // Update roomDetails state
+    const calculatedRoomDetails = allocateRoomsForPeople(currentNumAdults);
+    setRoomDetails(calculatedRoomDetails);
 
     let calculatedTotalAmount = 0;
-    // Cost for adults based on room distribution
+    
     calculatedTotalAmount += calculatedRoomDetails.double_rooms * ((tourSellingPrices.double || 0) * 2);
     calculatedTotalAmount += calculatedRoomDetails.triple_rooms * ((tourSellingPrices.triple || 0) * 3);
     calculatedTotalAmount += calculatedRoomDetails.quad_rooms * ((tourSellingPrices.quad || 0) * 4);
     
-    // Add cost for children
     calculatedTotalAmount += currentNumChildren * (tourSellingPrices.child || 0);
 
-    // NEW: Add cost of extra services
     const currentExtraServicesTotal = formData.extra_services.reduce((sum, service) => {
       return sum + (service.selling_price_per_unit_snapshot * service.quantity);
     }, 0);
@@ -177,7 +167,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     calculatedTotalAmount += currentExtraServicesTotal;
 
     setTotalAmount(calculatedTotalAmount);
-  }, [formData.contractor_age, formData.companions, tourSellingPrices, formData.extra_services, setRoomDetails]); // Added setRoomDetails to dependencies
+  }, [formData.contractor_age, formData.companions, tourSellingPrices, formData.extra_services, setRoomDetails]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
@@ -212,7 +202,6 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     }));
   };
 
-  // NEW: Handle client extra service changes
   const handleClientExtraServiceChange = (id: string, field: 'provider_id' | 'quantity', value: string | number) => {
     setFormData((prev) => {
       const newExtraServices = [...prev.extra_services];
@@ -239,7 +228,6 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     });
   };
 
-  // NEW: Add client extra service
   const addClientExtraService = () => {
     setFormData((prev) => ({
       ...prev,
@@ -255,7 +243,6 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     }));
   };
 
-  // NEW: Remove client extra service
   const removeClientExtraService = (idToRemove: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -271,7 +258,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     e.preventDefault();
     setIsSubmitting(true);
 
-    const totalPeople = 1 + formData.companions.length; // Contractor + companions
+    const totalPeople = 1 + formData.companions.length;
 
     if (!formData.first_name || !formData.last_name || !formData.email) {
       toast.error('Por favor, rellena los campos obligatorios (Nombre, Apellido, Email).');
@@ -300,7 +287,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     }
 
     try {
-      const contract_number = uuidv4().substring(0, 8).toUpperCase(); // Generate unique contract number
+      const contract_number = uuidv4().substring(0, 8).toUpperCase();
 
       const clientDataToSave = {
         first_name: formData.first_name,
@@ -308,18 +295,18 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
         email: formData.email,
         phone: formData.phone || null,
         address: formData.address || null,
+        identification_number: formData.identification_number || null, // NEW: Save identification_number
         contract_number: contract_number,
         tour_id: tourId,
         number_of_people: totalPeople,
         companions: formData.companions,
-        extra_services: formData.extra_services, // Save extra_services
+        extra_services: formData.extra_services,
         total_amount: totalAmount,
-        advance_payment: 0, // Initial booking has 0 advance payment
-        total_paid: 0, // Initial booking has 0 paid
-        status: 'pending', // Initial status
+        advance_payment: 0,
+        total_paid: 0,
+        status: 'pending',
         contractor_age: formData.contractor_age,
         room_details: roomDetails,
-        // user_id is null for public bookings unless user is logged in
       };
 
       const { data: newClientData, error: clientError } = await supabase
@@ -335,7 +322,6 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
         return;
       }
 
-      // Insert seat assignments
       const newSeatAssignments = selectedSeats.map(seatNumber => ({
         tour_id: tourId,
         seat_number: seatNumber,
@@ -351,15 +337,13 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
         if (seatsError) {
           console.error('Error inserting new seat assignments:', seatsError);
           toast.error('Error al asignar los asientos. Contacta a soporte.');
-          // Consider rolling back client creation here if seats fail
           setIsSubmitting(false);
           return;
         }
       }
 
       toast.success(`¡Reserva exitosa! Tu número de contrato es: ${contract_number}.`);
-      onClose(); // Close the dialog
-      // Optionally, redirect to a confirmation page or show more details
+      onClose();
     } catch (error) {
       console.error('Unexpected error during booking:', error);
       toast.error('Ocurrió un error inesperado al procesar tu reserva.');
@@ -417,9 +401,15 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
             <Label htmlFor="address">Dirección</Label>
             <Textarea id="address" value={formData.address} onChange={handleChange} rows={2} />
           </div>
-          <div>
-            <Label htmlFor="contractor_age">Edad del Contratante</Label>
-            <Input id="contractor_age" type="number" value={formData.contractor_age || ''} onChange={(e) => handleNumberChange('contractor_age', e.target.value)} min={0} max={120} />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <Label htmlFor="contractor_age">Edad del Contratante</Label>
+              <Input id="contractor_age" type="number" value={formData.contractor_age || ''} onChange={(e) => handleNumberChange('contractor_age', e.target.value)} min={0} max={120} />
+            </div>
+            <div>
+              <Label htmlFor="identification_number">Número de Identificación</Label>
+              <Input id="identification_number" value={formData.identification_number || ''} onChange={handleChange} placeholder="Ej: INE, Pasaporte, etc." />
+            </div>
           </div>
 
           {/* Occupancy and Companions */}

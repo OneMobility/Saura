@@ -5,14 +5,14 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Edit, Trash2, Loader2, DollarSign, FileText, FileSignature } from 'lucide-react'; // Import FileSignature icon
-import { useNavigate } from 'react-router-dom'; // Import useNavigate
-import { useSession } from '@/components/SessionContextProvider'; // Import useSession to get access token
+import { Edit, Trash2, Loader2, DollarSign, FileText, FileSignature } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { useSession } from '@/components/SessionContextProvider';
 
 interface Companion {
   id: string;
   name: string;
-  age: number | null; // Added age for companions
+  age: number | null;
 }
 
 interface RoomDetails {
@@ -26,41 +26,42 @@ interface Client {
   first_name: string;
   last_name: string;
   email: string;
-  phone: string | null; // Allow null
-  address: string | null; // Allow null
+  phone: string | null;
+  address: string | null;
   contract_number: string;
+  identification_number: string | null; // NEW: Added identification_number
   tour_id: string | null;
   number_of_people: number;
   companions: Companion[];
-  extra_services: any[]; // Assuming any for now, will be TourProviderService[]
+  extra_services: any[];
   total_amount: number;
   advance_payment: number;
   total_paid: number;
   status: string;
   created_at: string;
-  contractor_age: number | null; // Added contractor_age
-  room_details: RoomDetails; // NEW: Stores calculated room breakdown
-  remaining_payment?: number; // Calculated field
-  tour_title?: string; // Added for display
+  contractor_age: number | null;
+  room_details: RoomDetails;
+  remaining_payment?: number;
+  tour_title?: string;
 }
 
 interface ClientsTableProps {
-  refreshKey: number; // Prop to trigger re-fetch
-  onRegisterPayment: (client: Client) => void; // NEW: Callback for registering payment
-  onEditClient: (client: Client) => void; // NEW: Callback for editing client
+  refreshKey: number;
+  onRegisterPayment: (client: Client) => void;
+  onEditClient: (client: Client) => void;
 }
 
 const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayment, onEditClient }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
-  const [exportingClientId, setExportingClientId] = useState<string | null>(null); // For loading state on export button
-  const [generatingContractId, setGeneratingContractId] = useState<string | null>(null); // NEW: For loading state on contract button
-  const navigate = useNavigate(); // Initialize useNavigate
-  const { session } = useSession(); // Get session to access token
+  const [exportingClientId, setExportingClientId] = useState<string | null>(null);
+  const [generatingContractId, setGeneratingContractId] = useState<string | null>(null);
+  const navigate = useNavigate();
+  const { session } = useSession();
 
   useEffect(() => {
     fetchClients();
-  }, [refreshKey]); // Re-fetch when refreshKey changes
+  }, [refreshKey]);
 
   const fetchClients = async () => {
     setLoading(true);
@@ -81,8 +82,8 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
       const clientsWithTourTitles = (data || []).map(client => ({
         ...client,
         tour_title: client.tours?.title || 'N/A',
-        companions: client.companions || [], // Ensure companions is an array
-        room_details: client.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }, // Ensure room_details
+        companions: client.companions || [],
+        room_details: client.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
         remaining_payment: client.total_amount - client.total_paid,
       }));
       setClients(clientsWithTourTitles);
@@ -105,7 +106,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
       toast.error('Error al eliminar el cliente.');
     } else {
       toast.success('Cliente eliminado con éxito. Los asientos asignados han sido liberados.');
-      fetchClients(); // Refresh the list
+      fetchClients();
     }
     setLoading(false);
   };
@@ -129,7 +130,6 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
     }
 
     try {
-      // Construct the Edge Function URL directly
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
       const functionName = 'generate-booking-sheet';
       const edgeFunctionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
@@ -140,7 +140,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ clientId }), // Send clientId in the request body
+        body: JSON.stringify({ clientId }),
       });
 
       if (!response.ok) {
@@ -152,7 +152,6 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
 
       const htmlContent = await response.text();
 
-      // Open the HTML in a new tab
       const newWindow = window.open('', '_blank');
       if (newWindow) {
         newWindow.document.write(htmlContent);
@@ -170,7 +169,6 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
     }
   };
 
-  // NEW: Function to handle downloading the service contract
   const handleDownloadServiceContract = async (clientId: string, clientName: string) => {
     setGeneratingContractId(clientId);
     toast.info(`Generando contrato de servicio para ${clientName}...`);
@@ -243,6 +241,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                 <TableHead>Contrato</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Email</TableHead>
+                <TableHead>Identificación</TableHead> {/* NEW: Column for identification_number */}
                 <TableHead>Tour</TableHead>
                 <TableHead>Personas</TableHead>
                 <TableHead>Habitaciones</TableHead>
@@ -259,6 +258,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                   <TableCell className="font-medium">{client.contract_number}</TableCell>
                   <TableCell>{client.first_name} {client.last_name}</TableCell>
                   <TableCell>{client.email}</TableCell>
+                  <TableCell>{client.identification_number || 'N/A'}</TableCell> {/* NEW: Display identification_number */}
                   <TableCell>{client.tour_title}</TableCell>
                   <TableCell>{client.number_of_people}</TableCell>
                   <TableCell>{formatRoomDetails(client.room_details)}</TableCell>
@@ -312,7 +312,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                       size="icon"
                       onClick={() => handleDownloadServiceContract(client.id, `${client.first_name} ${client.last_name}`)}
                       disabled={generatingContractId === client.id}
-                      className="text-orange-600 hover:bg-orange-50" // NEW: Different color for contract
+                      className="text-orange-600 hover:bg-orange-50"
                     >
                       {generatingContractId === client.id ? (
                         <Loader2 className="h-4 w-4 animate-spin" />

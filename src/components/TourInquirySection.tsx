@@ -4,16 +4,16 @@ import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
-import { toast } from 'sonner'; // Using sonner for toasts
+import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
-import { format, parseISO } from 'date-fns'; // Import format and parseISO
-import { es } from 'date-fns/locale'; // Import Spanish locale
+import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface Companion {
   id: string;
   name: string;
-  age: number | null; // Added age for companions
+  age: number | null;
 }
 
 interface RoomDetails {
@@ -36,19 +36,20 @@ interface ClientContract {
   phone: string | null;
   address: string | null;
   contract_number: string;
+  identification_number: string | null; // NEW: Added identification_number
   number_of_people: number;
   companions: Companion[];
   total_amount: number;
   advance_payment: number;
   total_paid: number;
   status: string;
-  contractor_age: number | null; // Added contractor_age
-  room_details: RoomDetails; // NEW: Stores calculated room breakdown
+  contractor_age: number | null;
+  room_details: RoomDetails;
   tour_title: string;
   tour_description: string;
   tour_image_url: string;
-  assigned_seat_numbers: number[]; // NEW: Added for displaying assigned seats
-  payments_history: Payment[]; // NEW: Added for displaying payment history
+  assigned_seat_numbers: number[];
+  payments_history: Payment[];
 }
 
 const TourInquirySection = () => {
@@ -67,7 +68,6 @@ const TourInquirySection = () => {
     setContractDetails(null);
 
     try {
-      // Fetch client data
       const { data: clientData, error: clientError } = await supabase
         .from('clients')
         .select(`
@@ -77,6 +77,7 @@ const TourInquirySection = () => {
           phone,
           address,
           contract_number,
+          identification_number,
           number_of_people,
           companions,
           total_amount,
@@ -99,7 +100,7 @@ const TourInquirySection = () => {
 
       if (clientError) {
         console.error('Error fetching contract:', clientError);
-        if (clientError.code === 'PGRST116') { // No rows found
+        if (clientError.code === 'PGRST116') {
           setError('Número de contrato no encontrado. Por favor, verifica e intenta de nuevo.');
         } else {
           setError('Error al consultar el contrato. Intenta de nuevo más tarde.');
@@ -112,7 +113,6 @@ const TourInquirySection = () => {
       if (clientData) {
         const assignedSeats = (clientData.tour_seat_assignments || []).map((s: { seat_number: number }) => s.seat_number).sort((a: number, b: number) => a - b);
         
-        // Fetch payments using the new Edge Function
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         const functionName = 'get-public-client-payments';
         const edgeFunctionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
@@ -141,10 +141,11 @@ const TourInquirySection = () => {
           tour_description: clientData.tours?.description || 'N/A',
           tour_image_url: clientData.tours?.image_url || 'https://via.placeholder.com/400x200?text=Tour+Image',
           companions: clientData.companions || [],
+          identification_number: clientData.identification_number || null, // NEW: Set identification_number
           contractor_age: clientData.contractor_age || null,
           room_details: clientData.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
           assigned_seat_numbers: assignedSeats,
-          payments_history: paymentsHistory, // Set the fetched payments history
+          payments_history: paymentsHistory,
         });
         toast.success('¡Contrato encontrado!');
       } else {
@@ -211,6 +212,7 @@ const TourInquirySection = () => {
                 <p><span className="font-semibold">Contrato:</span> {contractDetails.contract_number}</p>
                 <p><span className="font-semibold">Cliente:</span> {contractDetails.first_name} {contractDetails.last_name}</p>
                 {contractDetails.contractor_age !== null && <p><span className="font-semibold">Edad Contratante:</span> {contractDetails.contractor_age}</p>}
+                {contractDetails.identification_number && <p><span className="font-semibold">Identificación:</span> {contractDetails.identification_number}</p>} {/* NEW: Display identification_number */}
                 <p><span className="font-semibold">Email:</span> {contractDetails.email}</p>
                 {contractDetails.phone && <p><span className="font-semibold">Teléfono:</span> {contractDetails.phone}</p>}
                 {contractDetails.address && <p><span className="font-semibold">Dirección:</span> {contractDetails.address}</p>}
@@ -247,7 +249,6 @@ const TourInquirySection = () => {
               </p>
             </div>
 
-            {/* NEW: Payment History Table */}
             <div className="mb-6">
               <h4 className="text-xl font-semibold mb-2">Historial de Abonos:</h4>
               {contractDetails.payments_history.length > 0 ? (

@@ -8,20 +8,20 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, FileText } from 'lucide-react'; // Removed FileSignature icon
-import { v4 as uuidv4 } from 'uuid'; // For generating contract numbers
+import { Loader2, Save, PlusCircle, MinusCircle, FileText } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
-import TourSeatMap from '@/components/TourSeatMap'; // Import TourSeatMap
-import { TourProviderService, AvailableProvider } from '@/types/shared'; // NEW: Import shared types
-import ClientPaymentHistoryTable from '@/components/admin/clients/ClientPaymentHistoryTable'; // NEW: Import ClientPaymentHistoryTable
+import TourSeatMap from '@/components/TourSeatMap';
+import { TourProviderService, AvailableProvider } from '@/types/shared';
+import ClientPaymentHistoryTable from '@/components/admin/clients/ClientPaymentHistoryTable';
 
 // Definición de tipos para el layout de asientos
 type SeatLayoutItem = {
   type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty' | 'entry';
-  number?: number; // Solo para asientos
+  number?: number;
 };
 type SeatLayoutRow = SeatLayoutItem[];
 type SeatLayout = SeatLayoutRow[];
@@ -29,7 +29,7 @@ type SeatLayout = SeatLayoutRow[];
 interface Companion {
   id: string;
   name: string;
-  age: number | null; // Added age for companions
+  age: number | null;
 }
 
 interface RoomDetails {
@@ -46,17 +46,18 @@ interface Client {
   phone: string;
   address: string;
   contract_number: string;
+  identification_number: string | null; // NEW: Added identification_number
   tour_id: string | null;
   number_of_people: number;
   companions: Companion[];
-  extra_services: TourProviderService[]; // NEW: Array of selected provider services
+  extra_services: TourProviderService[];
   total_amount: number;
   advance_payment: number;
   total_paid: number;
   status: string;
-  contractor_age: number | null; // Added contractor_age
-  room_details: RoomDetails; // NEW: Stores calculated room breakdown
-  remaining_payment?: number; // Calculated field
+  contractor_age: number | null;
+  room_details: RoomDetails;
+  remaining_payment?: number;
 }
 
 interface Tour {
@@ -65,19 +66,18 @@ interface Tour {
   selling_price_double_occupancy: number;
   selling_price_triple_occupancy: number;
   selling_price_quad_occupancy: number;
-  selling_price_child: number; // NEW: Price for children under 12
+  selling_price_child: number;
   bus_id: string | null;
-  courtesies: number; // Tour's courtesies
+  courtesies: number;
 }
 
 interface BusDetails {
   bus_id: string | null;
   bus_capacity: number;
-  courtesies: number; // Tour's courtesies, not bus's
+  courtesies: number;
   seat_layout_json: SeatLayout | null;
 }
 
-// NEW: Helper function to calculate room allocation for a given number of people
 const allocateRoomsForPeople = (totalPeople: number): RoomDetails => {
   let double = 0;
   let triple = 0;
@@ -86,18 +86,14 @@ const allocateRoomsForPeople = (totalPeople: number): RoomDetails => {
 
   if (remaining <= 0) return { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 };
 
-  // Prioritize quad rooms
   quad = Math.floor(remaining / 4);
   remaining %= 4;
 
-  // Handle remaining people
   if (remaining === 3) {
     triple++;
   } else if (remaining === 2) {
     double++;
   } else if (remaining === 1) {
-    // If 1 person remains, try to convert a quad to a triple + double if possible
-    // Otherwise, assign a double room (paying for 2)
     if (quad > 0) {
       quad--;
       triple++;
@@ -111,9 +107,9 @@ const allocateRoomsForPeople = (totalPeople: number): RoomDetails => {
 };
 
 const AdminClientFormPage = () => {
-  const { id: clientIdFromParams } = useParams<{ id: string }>(); // Get client ID from URL for editing
+  const { id: clientIdFromParams } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { user, isAdmin, isLoading: sessionLoading, session } = useSession(); // Added session to useSession
+  const { user, isAdmin, isLoading: sessionLoading, session } = useSession();
 
   const [formData, setFormData] = useState<Client>({
     first_name: '',
@@ -121,31 +117,30 @@ const AdminClientFormPage = () => {
     email: '',
     phone: '',
     address: '',
-    contract_number: uuidv4().substring(0, 8).toUpperCase(), // Generate a short UUID for contract
+    contract_number: uuidv4().substring(0, 8).toUpperCase(),
+    identification_number: null, // NEW: Initialize identification_number
     tour_id: null,
     number_of_people: 1,
     companions: [],
-    extra_services: [], // Initialize new field
+    extra_services: [],
     total_amount: 0,
     advance_payment: 0,
     total_paid: 0,
     status: 'pending',
-    contractor_age: null, // Initialize contractor_age
-    room_details: { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }, // Initialize room_details
+    contractor_age: null,
+    room_details: { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
   const [availableTours, setAvailableTours] = useState<Tour[]>([]);
-  const [availableProviders, setAvailableProviders] = useState<AvailableProvider[]>([]); // NEW: State for available providers
+  const [availableProviders, setAvailableProviders] = useState<AvailableProvider[]>([]);
   const [selectedTourPrices, setSelectedTourPrices] = useState<Tour | null>(null);
-  const [busDetails, setBusDetails] = useState<BusDetails | null>(null); // State for bus details
-  const [clientSelectedSeats, setClientSelectedSeats] = useState<number[]>([]); // Seats selected for *this* client
-  const [initialClientStatus, setInitialClientStatus] = useState<string>('pending'); // To track status change
-  const [roomDetails, setRoomDetails] = useState<RoomDetails>({ double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }); // Define roomDetails state
-  const [refreshPaymentsKey, setRefreshPaymentsKey] = useState(0); // NEW: Key to refresh payment history
-  // Removed isGeneratingContract state
+  const [busDetails, setBusDetails] = useState<BusDetails | null>(null);
+  const [clientSelectedSeats, setClientSelectedSeats] = useState<number[]>([]);
+  const [initialClientStatus, setInitialClientStatus] = useState<string>('pending');
+  const [roomDetails, setRoomDetails] = useState<RoomDetails>({ double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
+  const [refreshPaymentsKey, setRefreshPaymentsKey] = useState(0);
 
-  // NEW: States for breakdown display
   const [numAdults, setNumAdults] = useState(0);
   const [numChildren, setNumChildren] = useState(0);
   const [extraServicesTotal, setExtraServicesTotal] = useState(0);
@@ -177,7 +172,6 @@ const AdminClientFormPage = () => {
     fetchTours();
   }, []);
 
-  // NEW: Fetch available providers
   useEffect(() => {
     const fetchAvailableProviders = async () => {
       const { data, error } = await supabase
@@ -218,6 +212,7 @@ const AdminClientFormPage = () => {
           companions: data.companions || [],
           extra_services: data.extra_services || [],
           contract_number: data.contract_number || uuidv4().substring(0, 8).toUpperCase(),
+          identification_number: data.identification_number || null, // NEW: Set identification_number
           contractor_age: data.contractor_age || null,
           room_details: data.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
         });
@@ -246,6 +241,7 @@ const AdminClientFormPage = () => {
         phone: '',
         address: '',
         contract_number: uuidv4().substring(0, 8).toUpperCase(),
+        identification_number: null, // NEW: Reset identification_number
         tour_id: null,
         number_of_people: 1,
         companions: [],
@@ -270,13 +266,11 @@ const AdminClientFormPage = () => {
     }
   }, [sessionLoading, refreshClientData]);
 
-  // Effect to update selectedTourPrices and busDetails when formData.tour_id changes
   useEffect(() => {
     if (formData.tour_id) {
       const tour = availableTours.find(t => t.id === formData.tour_id);
       setSelectedTourPrices(tour || null);
 
-      // Fetch bus details for the selected tour
       const fetchBusForTour = async () => {
         if (tour?.bus_id) {
           const { data: busData, error: busError } = await supabase
@@ -292,7 +286,7 @@ const AdminClientFormPage = () => {
             setBusDetails({
               bus_id: busData.id,
               bus_capacity: busData.total_capacity,
-              courtesies: tour.courtesies, // Use tour's courtesies, not bus's
+              courtesies: tour.courtesies,
               seat_layout_json: busData.seat_layout_json,
             });
           }
@@ -307,12 +301,10 @@ const AdminClientFormPage = () => {
     }
   }, [formData.tour_id, availableTours]);
 
-  // Effect to calculate total_amount, number_of_people, and room_details
   useEffect(() => {
     let currentNumAdults = 0;
     let currentNumChildren = 0;
 
-    // Contractor
     if (formData.contractor_age !== null) {
       if (formData.contractor_age >= 12) {
         currentNumAdults++;
@@ -320,10 +312,9 @@ const AdminClientFormPage = () => {
         currentNumChildren++;
       }
     } else {
-      currentNumAdults++; // Default to adult if age not specified for contractor
+      currentNumAdults++;
     }
 
-    // Companions
     formData.companions.forEach(c => {
       if (c.age !== null) {
         if (c.age >= 12) {
@@ -332,7 +323,7 @@ const AdminClientFormPage = () => {
           currentNumChildren++;
         }
       } else {
-        currentNumAdults++; // Default to adult if age not specified for companion
+        currentNumAdults++;
       }
     });
 
@@ -341,21 +332,17 @@ const AdminClientFormPage = () => {
 
     const totalPeople = currentNumAdults + currentNumChildren;
 
-    // Allocate rooms based on total people (adults + children)
     const calculatedRoomDetails = allocateRoomsForPeople(currentNumAdults);
-    setRoomDetails(calculatedRoomDetails); // Update roomDetails state
+    setRoomDetails(calculatedRoomDetails);
 
     let calculatedTotalAmount = 0;
     
-    // Cost for rooms based on their occupancy type
     calculatedTotalAmount += calculatedRoomDetails.double_rooms * ((selectedTourPrices?.selling_price_double_occupancy || 0) * 2);
     calculatedTotalAmount += calculatedRoomDetails.triple_rooms * ((selectedTourPrices?.selling_price_triple_occupancy || 0) * 3);
     calculatedTotalAmount += calculatedRoomDetails.quad_rooms * ((selectedTourPrices?.selling_price_quad_occupancy || 0) * 4);
     
-    // Add cost for children
     calculatedTotalAmount += currentNumChildren * (selectedTourPrices?.selling_price_child || 0);
 
-    // Add cost of extra services
     const currentExtraServicesTotal = formData.extra_services.reduce((sum, service) => {
       return sum + (service.selling_price_per_unit_snapshot * service.quantity);
     }, 0);
@@ -364,8 +351,8 @@ const AdminClientFormPage = () => {
 
     setFormData(prev => ({
       ...prev,
-      number_of_people: totalPeople, // Total people including children
-      room_details: calculatedRoomDetails, // Room details based on adults
+      number_of_people: totalPeople,
+      room_details: calculatedRoomDetails,
       total_amount: calculatedTotalAmount,
       remaining_payment: calculatedTotalAmount - prev.total_paid,
     }));
@@ -380,7 +367,7 @@ const AdminClientFormPage = () => {
   const handleNumberChange = (id: keyof Client, value: string) => {
     setFormData((prev) => ({
       ...prev,
-      [id]: parseFloat(value) || null, // Allow null for empty number inputs
+      [id]: parseFloat(value) || null,
     }));
   };
 
@@ -409,7 +396,6 @@ const AdminClientFormPage = () => {
     }));
   };
 
-  // NEW: Handle client extra service changes
   const handleClientExtraServiceChange = (id: string, field: 'provider_id' | 'quantity', value: string | number) => {
     setFormData((prev) => {
       const newExtraServices = [...prev.extra_services];
@@ -436,7 +422,6 @@ const AdminClientFormPage = () => {
     });
   };
 
-  // NEW: Add client extra service
   const addClientExtraService = () => {
     setFormData((prev) => ({
       ...prev,
@@ -452,7 +437,6 @@ const AdminClientFormPage = () => {
     }));
   };
 
-  // NEW: Remove client extra service
   const removeClientExtraService = (idToRemove: string) => {
     setFormData((prev) => ({
       ...prev,
@@ -515,23 +499,23 @@ const AdminClientFormPage = () => {
       phone: formData.phone || null,
       address: formData.address || null,
       contract_number: formData.contract_number,
+      identification_number: formData.identification_number || null, // NEW: Save identification_number
       tour_id: formData.tour_id,
       number_of_people: formData.number_of_people,
       companions: formData.companions,
-      extra_services: formData.extra_services, // Save extra_services
+      extra_services: formData.extra_services,
       total_amount: formData.total_amount,
       advance_payment: formData.advance_payment,
       total_paid: formData.total_paid,
       status: formData.status,
       contractor_age: formData.contractor_age,
-      room_details: roomDetails, // Save room_details from state
-      user_id: authUser.id, // Link to the admin user who created/updated it
+      room_details: roomDetails,
+      user_id: authUser.id,
     };
 
     let currentClientIdToUse = clientIdFromParams;
 
     if (clientIdFromParams) {
-      // Update existing client
       const { error } = await supabase
         .from('clients')
         .update({ ...clientDataToSave, updated_at: new Date().toISOString() })
@@ -545,7 +529,6 @@ const AdminClientFormPage = () => {
       }
       toast.success('Cliente actualizado con éxito.');
     } else {
-      // Insert new client
       const { data: newClientData, error } = await supabase
         .from('clients')
         .insert(clientDataToSave)
@@ -562,9 +545,7 @@ const AdminClientFormPage = () => {
       currentClientIdToUse = newClientData.id;
     }
 
-    // Handle seat assignments based on status and selected seats
     if (currentClientIdToUse && formData.tour_id) {
-      // 1. Delete existing assignments for this client on this tour
       const { error: deleteError } = await supabase
         .from('tour_seat_assignments')
         .delete()
@@ -578,7 +559,6 @@ const AdminClientFormPage = () => {
         return;
       }
 
-      // 2. Insert new assignments ONLY if status is NOT 'cancelled'
       if (formData.status !== 'cancelled') {
         const newSeatAssignments = clientSelectedSeats.map(seatNumber => ({
           tour_id: formData.tour_id,
@@ -605,7 +585,7 @@ const AdminClientFormPage = () => {
       }
     }
 
-    navigate('/admin/clients'); // Redirect back to clients list
+    navigate('/admin/clients');
     setIsSubmitting(false);
   };
 
@@ -645,9 +625,15 @@ const AdminClientFormPage = () => {
                 <Label htmlFor="address">Dirección</Label>
                 <Textarea id="address" value={formData.address} onChange={handleChange} rows={2} />
               </div>
-              <div>
-                <Label htmlFor="contractor_age">Edad del Contratante</Label>
-                <Input id="contractor_age" type="number" value={formData.contractor_age || ''} onChange={(e) => handleNumberChange('contractor_age', e.target.value)} min={0} max={120} />
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="contractor_age">Edad del Contratante</Label>
+                  <Input id="contractor_age" type="number" value={formData.contractor_age || ''} onChange={(e) => handleNumberChange('contractor_age', e.target.value)} min={0} max={120} />
+                </div>
+                <div>
+                  <Label htmlFor="identification_number">Número de Identificación</Label>
+                  <Input id="identification_number" value={formData.identification_number || ''} onChange={handleChange} placeholder="Ej: INE, Pasaporte, etc." />
+                </div>
               </div>
 
               {/* Contract and Tour Info */}
@@ -771,12 +757,12 @@ const AdminClientFormPage = () => {
                   <TourSeatMap
                     tourId={formData.tour_id}
                     busCapacity={busDetails.bus_capacity}
-                    courtesies={busDetails.courtesies} // Use 'courtesies' here
+                    courtesies={busDetails.courtesies}
                     seatLayoutJson={busDetails.seat_layout_json}
                     onSeatsSelected={handleSeatsSelected}
                     readOnly={false}
-                    adminMode={false} // Client mode, not admin blocking mode
-                    currentClientId={formData.id || undefined} // Pass client ID if editing, or undefined for new
+                    adminMode={false}
+                    currentClientId={formData.id || undefined}
                     initialSelectedSeats={clientSelectedSeats}
                   />
                   {clientSelectedSeats.length > 0 && (
@@ -858,7 +844,6 @@ const AdminClientFormPage = () => {
               </div>
 
               <div className="flex justify-end mt-6 space-x-2">
-                {/* Removed the contract button from here */}
                 <Button type="submit" disabled={isSubmitting}>
                   {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
                   {clientIdFromParams ? 'Guardar Cambios' : 'Añadir Cliente'}
@@ -867,7 +852,6 @@ const AdminClientFormPage = () => {
             </form>
           </div>
 
-          {/* NEW: Payment History Table */}
           {formData.id && (
             <div className="mt-8">
               <ClientPaymentHistoryTable clientId={formData.id} key={refreshPaymentsKey} onPaymentsUpdated={refreshClientData} />

@@ -13,7 +13,7 @@ const formatRoomDetails = (details: any) => {
 
   if (safeDetails.quad_rooms > 0) parts.push(`${safeDetails.quad_rooms} Cuádruple(s)`);
   if (safeDetails.triple_rooms > 0) parts.push(`${safeDetails.triple_rooms} Triple(s)`);
-  if (safeDetails.double_rooms > 0) parts.push(`${safeDetails.double_rooms} Doble(s)`);
+  if (safeDetails.quad_rooms > 0) parts.push(`${safeDetails.double_rooms} Doble(s)`);
   return parts.join(', ') || 'N/A';
 };
 
@@ -178,7 +178,7 @@ const generateBookingSheetHtml = (data: any) => {
             }
             ul li {
                 margin-bottom: 2px; /* Reduced margin */
-                font-size: 0.9em; /* Slightly smaller */
+                font-size: 0.9em;
             }
             .payment-summary {
                 background-color: #fff0f5; /* Light pink */
@@ -269,6 +269,7 @@ const generateBookingSheetHtml = (data: any) => {
                         <p><span class="label">Nombre:</span> ${client.first_name || 'N/A'} ${client.last_name || 'N/A'}</p>
                         <p><span class="label">Teléfono:</span> ${client.phone || 'N/A'}</p>
                         <p><span class="label">Edad Contratante:</span> ${client.contractor_age !== null && typeof client.contractor_age === 'number' ? client.contractor_age : 'N/A'}</p>
+                        <p><span class="label">Identificación:</span> ${client.identification_number || 'N/A'}</p> {/* NEW: Display identification_number */}
                         <h3>Acompañantes:</h3>
                         <ul>
                             ${companionsList}
@@ -321,18 +322,15 @@ const generateBookingSheetHtml = (data: any) => {
 serve(async (req) => {
   console.log('Edge Function: generate-booking-sheet invoked.');
 
-  // Handle CORS OPTIONS request
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  // Helper function to standardize JSON error responses
   const jsonResponse = (body: any, status: number) => new Response(JSON.stringify(body), {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'application/json' },
   });
 
-  // Helper function to standardize HTML responses
   const htmlResponse = (html: string, status: number) => new Response(html, {
     status,
     headers: { ...corsHeaders, 'Content-Type': 'text/html; charset=utf-8' },
@@ -341,7 +339,6 @@ serve(async (req) => {
   console.log('Edge Function: Request headers:', JSON.stringify(Object.fromEntries(req.headers.entries())));
   console.log('Edge Function: Content-Length header:', req.headers.get('Content-Length'));
 
-  // Verify JWT token to ensure request comes from an authenticated user (admin)
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) {
     console.error('Edge Function: Unauthorized: Missing Authorization header.');
@@ -350,7 +347,6 @@ serve(async (req) => {
 
   const token = authHeader.replace('Bearer ', '');
   
-  // Initialize Supabase client with service role key for admin operations
   const supabaseAdmin = createClient(
     Deno.env.get('SUPABASE_URL') ?? '',
     Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -371,7 +367,6 @@ serve(async (req) => {
   }
   console.log('Edge Function: User authenticated:', authUser.id);
 
-  // Check if the authenticated user is an admin using the supabaseAdmin client
   console.log('Edge Function: Checking invoking user role with admin client...');
   const { data: profile, error: profileError } = await supabaseAdmin
     .from('profiles')
@@ -387,7 +382,6 @@ serve(async (req) => {
 
   let clientId: string;
   try {
-    // Read clientId from the JSON body
     const requestBody = await req.json();
     clientId = requestBody.clientId;
     console.log('Edge Function: Parsed clientId from request body:', clientId);
@@ -430,7 +424,7 @@ serve(async (req) => {
 
 
     let seats: any[] = [];
-    if (client.tour_id) { // Only fetch seats if a tour_id is present
+    if (client.tour_id) {
       console.log('Edge Function: Fetching seat assignments for tour_id:', client.tour_id);
       const { data: fetchedSeats, error: seatsError } = await supabaseAdmin
         .from('tour_seat_assignments')
@@ -440,7 +434,6 @@ serve(async (req) => {
 
       if (seatsError) {
         console.error('Edge Function: Error fetching seats:', seatsError.message);
-        // Continue without seats if there's an error, but log it
       } else {
         seats = fetchedSeats || [];
         console.log('Edge Function: Fetched seats:', JSON.stringify(seats));
