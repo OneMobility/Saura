@@ -1,23 +1,24 @@
 "use client";
 
 import React, { useState } from 'react';
-import { Bus, Menu, ChevronDown, LifeBuoy } from 'lucide-react'; // Import LifeBuoy for collapsible
+import { Bus, Menu, ChevronDown, LifeBuoy } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'; // Import Collapsible components
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'; // Import DropdownMenu components
 
 interface NavItem {
   name: string;
   href?: string;
   type: 'link' | 'collapsible';
-  icon?: React.ElementType; // Optional icon for collapsible items
+  icon?: React.ElementType;
   children?: { name: string; href: string; }[];
 }
 
 const BusTicketsNavbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [collapsedStates, setCollapsedStates] = useState<Record<string, boolean>>({}); // State for multiple collapsibles
+  const [collapsedStates, setCollapsedStates] = useState<Record<string, boolean>>({});
 
   const handleCollapsibleToggle = (itemName: string) => {
     setCollapsedStates(prev => ({
@@ -39,18 +40,17 @@ const BusTicketsNavbar = () => {
       ],
     },
     { name: 'Destinos', href: '/bus-tickets/destinations', type: 'link' },
+    { name: 'Tours', href: '/tours', type: 'link' }, // Changed name and moved
     { name: 'Contacto', href: '/bus-tickets/contact', type: 'link' },
     {
-      name: 'Centro de Ayuda', // This is the new collapsible parent
+      name: 'Centro de Ayuda',
       type: 'collapsible',
-      icon: LifeBuoy, // Icon for Help Center
+      icon: LifeBuoy,
       children: [
         { name: 'FAQ', href: '/bus-tickets/faq' },
         { name: 'Centro de Facturación', href: '/bus-tickets/billing-center' },
-        // The general HelpCenterPage can be linked here too if desired, or accessed via FAQ/Contact
       ],
     },
-    { name: 'Tours Principales', href: '/tours', type: 'link' }, // Link back to main tours page
   ];
 
   return (
@@ -66,8 +66,42 @@ const BusTicketsNavbar = () => {
         </Link>
       </div>
 
-      {/* Hamburger Menu (always visible) */}
-      <div className="flex items-center justify-end flex-grow pr-4">
+      {/* Desktop Navigation Links */}
+      <div className="hidden md:flex flex-grow items-center justify-center space-x-6">
+        {navLinks.map((item) => (
+          item.type === 'link' ? (
+            <Link
+              key={item.name}
+              to={item.href || '#'}
+              className="text-lg font-medium hover:text-bus-secondary transition-colors"
+            >
+              {item.name}
+            </Link>
+          ) : (
+            <DropdownMenu key={item.name}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="text-lg font-medium hover:text-bus-secondary">
+                  {item.icon && <item.icon className="h-5 w-5 mr-2" />}
+                  <span>{item.name}</span>
+                  <ChevronDown className="ml-2 h-4 w-4 transition-transform duration-200 data-[state=open]:rotate-180" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56 bg-bus-background text-bus-foreground">
+                {item.children?.map((child) => (
+                  <DropdownMenuItem key={child.name} asChild>
+                    <Link to={child.href} onClick={() => setIsMobileMenuOpen(false)}>
+                      {child.name}
+                    </Link>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+          )
+        ))}
+      </div>
+
+      {/* Mobile Hamburger Menu (hidden on md and larger) */}
+      <div className="md:hidden flex items-center justify-end flex-grow pr-4">
         <Sheet open={isMobileMenuOpen} onOpenChange={setIsMobileMenuOpen}>
           <SheetTrigger asChild>
             <Button variant="ghost" size="icon" className="text-bus-primary-foreground hover:bg-bus-primary/90">
@@ -98,7 +132,7 @@ const BusTicketsNavbar = () => {
                         variant="ghost"
                         className="w-full justify-start text-lg font-medium text-bus-foreground hover:text-bus-primary transition-colors"
                       >
-                        {item.icon && <item.icon className="h-5 w-5 mr-2" />} {/* Render icon */}
+                        {item.icon && <item.icon className="h-5 w-5 mr-2" />}
                         <span>{item.name}</span>
                         <ChevronDown className="ml-auto h-4 w-4 transition-transform duration-200 data-[state=open]:rotate-180" />
                       </Button>
