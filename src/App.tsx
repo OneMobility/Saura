@@ -13,9 +13,7 @@ import BlogPage from "./pages/BlogPage";
 import BlogPostPage from "./pages/BlogPostPage";
 import ToursPage from "./pages/ToursPage";
 import ContactPage from "./pages/ContactPage";
-import BusTicketsPage from "./pages/BusTicketsPage"; // NEW: Import BusTicketsPage
-import ScrollToTop from "./components/ScrollToTop";
-import Login from "./pages/Login";
+import BusTicketsPage from "./pages/BusTicketsPage";
 
 // Admin Pages
 import AdminDashboard from "./pages/AdminDashboard";
@@ -41,7 +39,9 @@ import PrivacyPolicyPage from "./pages/bus-tickets/PrivacyPolicyPage";
 import TermsAndConditionsPage from "./pages/bus-tickets/TermsAndConditionsPage";
 import FaqPage from "./pages/bus-tickets/FaqPage";
 import BillingCenterPage from "./pages/bus-tickets/BillingCenterPage";
-import BusTicketsContactPage from "./pages/bus-tickets/ContactPage"; // NEW: Import BusTicketsContactPage
+import BusTicketsContactPage from "./pages/bus-tickets/ContactPage";
+import AdditionalServicesPage from "./pages/bus-tickets/AdditionalServicesPage"; // NEW: Import AdditionalServicesPage
+import HelpCenterPage from "./pages/bus-tickets/HelpCenterPage"; // NEW: Import HelpCenterPage
 
 
 import { SessionContextProvider } from "./components/SessionContextProvider";
@@ -72,9 +72,11 @@ const App = () => {
               <Route path="/bus-tickets/about" element={<AboutUsPage />} />
               <Route path="/bus-tickets/privacy-policy" element={<PrivacyPolicyPage />} />
               <Route path="/bus-tickets/terms-and-conditions" element={<TermsAndConditionsPage />} />
+              <Route path="/bus-tickets/additional-services" element={<AdditionalServicesPage />} /> {/* NEW: Route for AdditionalServicesPage */}
               <Route path="/bus-tickets/faq" element={<FaqPage />} />
               <Route path="/bus-tickets/billing-center" element={<BillingCenterPage />} />
-              <Route path="/bus-tickets/contact" element={<BusTicketsContactPage />} /> {/* NEW: Use BusTicketsContactPage */}
+              <Route path="/bus-tickets/help-center" element={<HelpCenterPage />} /> {/* NEW: Route for HelpCenterPage */}
+              <Route path="/bus-tickets/contact" element={<BusTicketsContactPage />} />
 
               <Route path="/login" element={<Login />} />
               <Route
