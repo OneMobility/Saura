@@ -91,7 +91,7 @@ const BusDestinationsSection = () => {
           Desde playas soleadas hasta ciudades históricas, tu próxima aventura te espera.
         </p>
 
-        <div className="relative">
+        <div className="relative overflow-hidden"> {/* Añadido overflow-hidden aquí */}
           <div className="embla" ref={emblaRef}>
             <div className="embla__container flex -ml-4">
               {destinations.map((dest, index) => (
