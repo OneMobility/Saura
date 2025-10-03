@@ -2,6 +2,8 @@
 
 import React from 'react';
 import { MapPin, Bus } from 'lucide-react';
+import { Button } from '@/components/ui/button'; // Corrected: Added missing import
+import { Link } from 'react-router-dom';
 
 const BusDestinationsSection = () => {
   const destinations = [
