@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { TourProviderService, AvailableProvider } from '@/types/shared';
 
 type SeatLayoutItem = {
-  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty' | 'entry';
+  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty';
   number?: number;
 };
 type SeatLayoutRow = SeatLayoutItem[];
