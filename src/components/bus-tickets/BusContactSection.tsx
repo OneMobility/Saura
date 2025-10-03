@@ -46,7 +46,7 @@ const BusContactSection = () => {
         </p>
       </div>
 
-      <div className="max-w-6xl mx-auto lg:grid lg:grid-cols-2 lg:gap-12 items-start">
+      <div className="max-w-6xl mx-auto lg:grid lg:grid-cols-2 lg:gap-12 items-stretch"> {/* Changed items-start to items-stretch */}
         {/* Columna del Formulario */}
         <div className="bg-bus-primary p-8 rounded-lg shadow-lg mb-8 lg:mb-0 text-bus-primary-foreground"> {/* Fondo azul */}
           <h3 className="text-2xl font-bold text-center lg:text-left mb-8 text-bus-secondary">
@@ -120,11 +120,7 @@ const BusContactSection = () => {
               <p>Domingos: Cerrado</p>
             </div>
           </div>
-          <img
-            src="https://tse3.mm.bing.net/th/id/OIP.tB2ifJ5D_V1kcDQkRItOvAHaEK?rs=1&pid=ImgDetMain&o=7&rm=3"
-            alt="Oficina de Saura Bus"
-            className="w-full max-w-sm h-auto rounded-lg mt-8 shadow-md"
-          />
+          {/* Se eliminó la imagen de la caja de información */}
         </div>
       </div>
     </section>
