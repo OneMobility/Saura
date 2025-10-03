@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner'; // Using sonner for toasts
 import { Mail, Phone, MapPin } from 'lucide-react'; // Icons for contact info
 
-const BusContactSection: React.FC = () => {
+const BusContactSection = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
@@ -37,72 +37,72 @@ const BusContactSection: React.FC = () => {
 
   return (
     <section className="py-12 px-4 md:px-8 lg:px-16 bg-bus-background text-bus-foreground">
-      <div className="max-w-6xl mx-auto lg:grid lg:grid-cols-2 lg:gap-12 items-start"> {/* Cambiado a items-start para alinear arriba */}
-        {/* Columna del Formulario en caja azul */}
-        <div className="bg-bus-primary p-8 rounded-lg shadow-lg mb-8 lg:mb-0"> {/* Caja azul para el formulario */}
-          <h2 className="text-3xl md:text-4xl font-bold text-center lg:text-left mb-8 text-bus-primary-foreground"> {/* Título en blanco */}
-            Contáctanos <span className="text-bus-secondary">Hoy</span> {/* Énfasis en amarillo */}
+      <div className="max-w-6xl mx-auto lg:grid lg:grid-cols-2 lg:gap-12 items-center">
+        {/* Columna del Formulario */}
+        <div>
+          <h2 className="text-3xl md:text-4xl font-bold text-center lg:text-left mb-8 text-bus-primary">
+            Contáctanos
           </h2>
-          <p className="text-center lg:text-left text-lg mb-10 text-bus-primary-foreground"> {/* Texto en blanco */}
+          <p className="text-center lg:text-left text-lg mb-10 text-bus-foreground">
             ¿Tienes alguna pregunta o necesitas ayuda con tu reserva de autobús? Envíanos un mensaje.
           </p>
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <Label htmlFor="name" className="text-lg text-bus-primary-foreground">Nombre</Label> {/* Label en blanco */}
+              <Label htmlFor="name" className="text-lg">Nombre</Label>
               <Input
                 type="text"
                 id="name"
                 placeholder="Tu Nombre"
-                className="mt-2 p-3 border border-gray-300 rounded-md focus-visible:ring-bus-secondary bg-white text-bus-foreground" {/* Input en blanco con ring amarillo */}
+                className="mt-2 p-3 border border-gray-300 rounded-md focus-visible:ring-bus-primary"
                 value={formData.name}
                 onChange={handleChange}
               />
             </div>
             <div>
-              <Label htmlFor="email" className="text-lg text-bus-primary-foreground">Correo Electrónico</Label> {/* Label en blanco */}
+              <Label htmlFor="email" className="text-lg">Correo Electrónico</Label>
               <Input
                 type="email"
                 id="email"
                 placeholder="tu.correo@ejemplo.com"
-                className="mt-2 p-3 border border-gray-300 rounded-md focus-visible:ring-bus-secondary bg-white text-bus-foreground" {/* Input en blanco con ring amarillo */}
+                className="mt-2 p-3 border border-gray-300 rounded-md focus-visible:ring-bus-primary"
                 value={formData.email}
                 onChange={handleChange}
               />
             </div>
             <div>
-              <Label htmlFor="message" className="text-lg text-bus-primary-foreground">Mensaje</Label> {/* Label en blanco */}
+              <Label htmlFor="message" className="text-lg">Mensaje</Label>
               <Textarea
                 id="message"
                 placeholder="Escribe tu mensaje aquí..."
                 rows={5}
-                className="mt-2 p-3 border border-gray-300 rounded-md focus-visible:ring-bus-secondary bg-white text-bus-foreground" {/* Textarea en blanco con ring amarillo */}
+                className="mt-2 p-3 border border-gray-300 rounded-md focus-visible:ring-bus-primary"
                 value={formData.message}
                 onChange={handleChange}
               />
             </div>
             <Button
               type="submit"
-              className="w-full bg-bus-secondary hover:bg-bus-secondary/90 text-bus-secondary-foreground font-semibold py-3 text-lg" {/* Botón amarillo */}
+              className="w-full bg-bus-primary hover:bg-bus-primary/90 text-bus-primary-foreground font-semibold py-3 text-lg"
             >
               Enviar Mensaje
             </Button>
           </form>
         </div>
 
-        {/* Columna de Información de Contacto en caja azul */}
-        <div className="bg-bus-primary p-8 rounded-lg shadow-lg flex flex-col justify-center items-center lg:items-start space-y-6"> {/* Caja azul para la información */}
-          <h3 className="text-2xl font-bold text-bus-secondary mb-4">Nuestra Información</h3> {/* Título en amarillo */}
+        {/* Columna de Información de Contacto */}
+        <div className="mt-12 lg:mt-0 flex flex-col justify-center items-center lg:items-start space-y-6 p-6 bg-card rounded-lg shadow-lg">
+          <h3 className="text-2xl font-bold text-bus-primary mb-4">Nuestra Información</h3>
           <div className="flex items-center space-x-3">
-            <Mail className="h-6 w-6 text-bus-secondary" /> {/* Icono en amarillo */}
-            <p className="text-lg text-bus-primary-foreground">info@saurabus.com</p> {/* Texto en blanco */}
+            <Mail className="h-6 w-6 text-bus-primary" />
+            <p className="text-lg text-bus-foreground">info@saurabus.com</p>
           </div>
           <div className="flex items-center space-x-3">
-            <Phone className="h-6 w-6 text-bus-secondary" /> {/* Icono en amarillo */}
-            <p className="text-lg text-bus-primary-foreground">+52 55 1234 5678</p> {/* Texto en blanco */}
+            <Phone className="h-6 w-6 text-bus-primary" />
+            <p className="text-lg text-bus-foreground">+52 55 1234 5678</p>
           </div>
           <div className="flex items-center space-x-3">
-            <MapPin className="h-6 w-6 text-bus-secondary" /> {/* Icono en amarillo */}
-            <p className="text-lg text-bus-primary-foreground">Calle Falsa 123, Ciudad de México</p> {/* Texto en blanco */}
+            <MapPin className="h-6 w-6 text-bus-primary" />
+            <p className="text-lg text-bus-foreground">Calle Falsa 123, Ciudad de México</p>
           </div>
           <img
             src="https://tse3.mm.bing.net/th/id/OIP.tB2ifJ5D_V1kcDQkRItOvAHaEK?rs=1&pid=ImgDetMain&o=7&rm=3"
