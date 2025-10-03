@@ -41,40 +41,40 @@ const SearchTripSection = () => {
           Busca tu Viaje en Autobús
         </h2>
         <form onSubmit={handleSearch} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-          <div>
+          <div className="space-y-1.5"> {/* Adjusted spacing */}
             <Label htmlFor="origin" className="text-lg">Origen</Label>
             <Input
               type="text"
               id="origin"
               placeholder="Ciudad de Origen"
-              className="mt-2 p-3 focus-visible:ring-bus-primary"
+              className="p-3 focus-visible:ring-bus-primary"
               value={origin}
               onChange={(e) => setOrigin(e.target.value)}
               required
               disabled={loading}
             />
           </div>
-          <div>
+          <div className="space-y-1.5"> {/* Adjusted spacing */}
             <Label htmlFor="destination" className="text-lg">Destino</Label>
             <Input
               type="text"
               id="destination"
               placeholder="Ciudad de Destino"
-              className="mt-2 p-3 focus-visible:ring-bus-primary"
+              className="p-3 focus-visible:ring-bus-primary"
               value={destination}
               onChange={(e) => setDestination(e.target.value)}
               required
               disabled={loading}
             />
           </div>
-          <div>
+          <div className="space-y-1.5"> {/* Adjusted spacing */}
             <Label htmlFor="date" className="text-lg">Fecha</Label>
             <Popover>
               <PopoverTrigger asChild>
                 <Button
                   variant={"outline"}
                   className={cn(
-                    "w-full justify-start text-left font-normal mt-2 p-3",
+                    "w-full justify-start text-left font-normal p-3", // Removed mt-2
                     !date && "text-muted-foreground",
                     "focus-visible:ring-bus-primary"
                   )}
@@ -96,13 +96,13 @@ const SearchTripSection = () => {
               </PopoverContent>
             </Popover>
           </div>
-          <div>
+          <div className="space-y-1.5"> {/* Adjusted spacing */}
             <Label htmlFor="passengers" className="text-lg">Pasajeros</Label>
             <Input
               type="number"
               id="passengers"
               placeholder="Número de Pasajeros"
-              className="mt-2 p-3 focus-visible:ring-bus-primary"
+              className="p-3 focus-visible:ring-bus-primary" // Removed mt-2
               value={passengers}
               onChange={(e) => setPassengers(parseInt(e.target.value) || 1)}
               min={1}
