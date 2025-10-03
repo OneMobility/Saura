@@ -5,11 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Save, Loader2 } from 'lucide-react';
+import RichTextEditor from '@/components/RichTextEditor'; // Import the new RichTextEditor
 
 interface PolicyTermSetting {
   id?: string;
@@ -55,11 +55,19 @@ const PolicyTermsSettings = () => {
     setLoading(false);
   };
 
-  const handleChange = (pageType: 'privacy_policy' | 'terms_and_conditions', field: 'title' | 'content', value: string) => {
+  const handleChange = (pageType: 'privacy_policy' | 'terms_and_conditions', field: 'title', value: string) => {
     if (pageType === 'privacy_policy') {
       setPrivacyPolicy(prev => ({ ...prev, [field]: value }));
     } else {
       setTermsAndConditions(prev => ({ ...prev, [field]: value }));
+    }
+  };
+
+  const handleRichTextChange = (pageType: 'privacy_policy' | 'terms_and_conditions', content: string) => {
+    if (pageType === 'privacy_policy') {
+      setPrivacyPolicy(prev => ({ ...prev, content }));
+    } else {
+      setTermsAndConditions(prev => ({ ...prev, content }));
     }
   };
 
@@ -152,13 +160,11 @@ const PolicyTermsSettings = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="privacy_content">Contenido de la Política de Privacidad</Label>
-                <Textarea
-                  id="privacy_content"
+                <RichTextEditor
                   value={privacyPolicy.content || ''}
-                  onChange={(e) => handleChange('privacy_policy', 'content', e.target.value)}
-                  placeholder="Escribe aquí el contenido completo de tu política de privacidad. Puedes usar HTML básico."
-                  rows={15}
-                  required
+                  onChange={(content) => handleRichTextChange('privacy_policy', content)}
+                  placeholder="Escribe aquí el contenido completo de tu política de privacidad."
+                  className="min-h-[200px]"
                 />
               </div>
               <Button type="submit" disabled={isSubmitting}>
@@ -181,13 +187,11 @@ const PolicyTermsSettings = () => {
               </div>
               <div className="space-y-2">
                 <Label htmlFor="terms_content">Contenido de los Términos y Condiciones</Label>
-                <Textarea
-                  id="terms_content"
+                <RichTextEditor
                   value={termsAndConditions.content || ''}
-                  onChange={(e) => handleChange('terms_and_conditions', 'content', e.target.value)}
-                  placeholder="Escribe aquí el contenido completo de tus términos y condiciones. Puedes usar HTML básico."
-                  rows={15}
-                  required
+                  onChange={(content) => handleRichTextChange('terms_and_conditions', content)}
+                  placeholder="Escribe aquí el contenido completo de tus términos y condiciones."
+                  className="min-h-[200px]"
                 />
               </div>
               <Button type="submit" disabled={isSubmitting}>

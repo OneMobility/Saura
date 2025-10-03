@@ -5,11 +5,11 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Save, Upload } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import RichTextEditor from '@/components/RichTextEditor'; // Import the new RichTextEditor
 
 interface BlogPost {
   id?: string;
@@ -18,7 +18,7 @@ interface BlogPost {
   description: string;
   image_url: string;
   full_content: string;
-  video_url?: string | null; // NEW: Added video_url
+  video_url?: string | null;
   user_id?: string;
 }
 
@@ -36,7 +36,7 @@ const BlogFormDialog: React.FC<BlogFormDialogProps> = ({ isOpen, onClose, onSave
     description: '',
     image_url: '',
     full_content: '',
-    video_url: '', // Initialize video_url
+    video_url: '',
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrlPreview, setImageUrlPreview] = useState<string>('');
@@ -61,13 +61,17 @@ const BlogFormDialog: React.FC<BlogFormDialogProps> = ({ isOpen, onClose, onSave
     }
   }, [initialData, isOpen]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setFormData((prev) => ({ ...prev, [id]: value }));
 
     if (id === 'title') {
       setFormData((prev) => ({ ...prev, slug: generateSlug(value) }));
     }
+  };
+
+  const handleRichTextChange = (field: 'description' | 'full_content', content: string) => {
+    setFormData((prev) => ({ ...prev, [field]: content }));
   };
 
   const generateSlug = (title: string) => {
@@ -222,18 +226,18 @@ const BlogFormDialog: React.FC<BlogFormDialogProps> = ({ isOpen, onClose, onSave
               required
             />
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="description" className="text-right">
+          <div className="grid grid-cols-4 items-start gap-4">
+            <Label htmlFor="description" className="text-right pt-2">
               Descripción Corta
             </Label>
-            <Textarea
-              id="description"
-              value={formData.description}
-              onChange={handleChange}
-              className="col-span-3"
-              rows={3}
-              required
-            />
+            <div className="col-span-3">
+              <RichTextEditor
+                value={formData.description}
+                onChange={(content) => handleRichTextChange('description', content)}
+                placeholder="Escribe una descripción breve para la entrada del blog."
+                className="min-h-[100px]"
+              />
+            </div>
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="image_file" className="text-right">
@@ -274,14 +278,14 @@ const BlogFormDialog: React.FC<BlogFormDialogProps> = ({ isOpen, onClose, onSave
             <Label htmlFor="full_content" className="text-right pt-2">
               Contenido Completo
             </Label>
-            <Textarea
-              id="full_content"
-              value={formData.full_content}
-              onChange={handleChange}
-              className="col-span-3 min-h-[200px]"
-              placeholder="Escribe el contenido completo de tu entrada de blog aquí. Puedes usar HTML básico."
-              required
-            />
+            <div className="col-span-3">
+              <RichTextEditor
+                value={formData.full_content}
+                onChange={(content) => handleRichTextChange('full_content', content)}
+                placeholder="Escribe el contenido completo de tu entrada de blog aquí."
+                className="min-h-[200px]"
+              />
+            </div>
           </div>
           <DialogFooter>
             <Button type="submit" disabled={isSubmitting || isUploadingImage}>

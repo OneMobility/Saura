@@ -5,10 +5,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { PlusCircle, Trash2, Loader2, Edit, ChevronUp, ChevronDown } from 'lucide-react';
+import RichTextEditor from '@/components/RichTextEditor'; // Import the new RichTextEditor
 
 interface FaqItem {
   id: string;
@@ -45,14 +45,22 @@ const FaqSettings = () => {
     setLoading(false);
   };
 
-  const handleNewFaqChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleNewFaqChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setNewFaq((prev) => ({ ...prev, [id]: value }));
   };
 
-  const handleEditingFaqChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleNewFaqRichTextChange = (content: string) => {
+    setNewFaq((prev) => ({ ...prev, answer: content }));
+  };
+
+  const handleEditingFaqChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setEditingFaqData((prev) => (prev ? { ...prev, [id]: value } : null));
+  };
+
+  const handleEditingFaqRichTextChange = (content: string) => {
+    setEditingFaqData((prev) => (prev ? { ...prev, answer: content } : null));
   };
 
   const addFaq = async () => {
@@ -209,12 +217,11 @@ const FaqSettings = () => {
           </div>
           <div className="space-y-2">
             <Label htmlFor="answer">Respuesta</Label>
-            <Textarea
-              id="answer"
+            <RichTextEditor
               value={newFaq.answer}
-              onChange={handleNewFaqChange}
+              onChange={handleNewFaqRichTextChange}
               placeholder="Ej: Puedes reservar tus boletos directamente en nuestra página..."
-              rows={4}
+              className="min-h-[150px]"
             />
           </div>
           <Button onClick={addFaq} disabled={isSubmitting}>
@@ -243,11 +250,11 @@ const FaqSettings = () => {
                       </div>
                       <div>
                         <Label htmlFor="edit_answer">Respuesta</Label>
-                        <Textarea
-                          id="answer"
+                        <RichTextEditor
                           value={editingFaqData?.answer || ''}
-                          onChange={handleEditingFaqChange}
-                          rows={4}
+                          onChange={handleEditingFaqRichTextChange}
+                          placeholder="Escribe aquí la respuesta."
+                          className="min-h-[150px]"
                         />
                       </div>
                       <div className="flex justify-end space-x-2">
@@ -286,7 +293,7 @@ const FaqSettings = () => {
                       </div>
                       <div className="flex-grow">
                         <p className="font-semibold text-lg">{faq.question}</p>
-                        <p className="text-sm text-gray-700 mt-1">{faq.answer}</p>
+                        <div className="text-sm text-gray-700 mt-1" dangerouslySetInnerHTML={{ __html: faq.answer }} />
                       </div>
                       <div className="flex space-x-2">
                         <Button variant="outline" size="icon" onClick={() => startEditing(faq)} disabled={isSubmitting}>

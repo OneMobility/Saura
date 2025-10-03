@@ -139,4 +139,31 @@
     --ring: var(--bus-primary);
     --border: 217.2 32.6% 17.5%;
   }
+
+  /* Quill Editor Customizations */
+  .ql-toolbar {
+    @apply bg-gray-100 border-b border-gray-200 rounded-t-md;
+  }
+
+  .ql-container {
+    @apply border-t-0 border-gray-200 rounded-b-md;
+    min-height: 150px; /* Default min-height for content area */
+  }
+
+  .ql-editor {
+    @apply text-gray-800;
+    min-height: 150px; /* Ensure content area has min height */
+  }
+
+  .dark .ql-toolbar {
+    @apply bg-gray-800 border-gray-700;
+  }
+
+  .dark .ql-container {
+    @apply border-gray-700;
+  }
+
+  .dark .ql-editor {
+    @apply text-gray-200;
+  }
 }

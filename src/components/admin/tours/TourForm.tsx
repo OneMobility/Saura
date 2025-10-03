@@ -4,7 +4,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Save, PlusCircle, MinusCircle } from 'lucide-react';
@@ -14,6 +13,7 @@ import { format } from 'date-fns'; // Import format for dates
 import TourSeatMap from '@/components/TourSeatMap'; // Import the new TourSeatMap component
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { TourProviderService, AvailableProvider } from '@/types/shared'; // NEW: Import shared types
+import RichTextEditor from '@/components/RichTextEditor'; // Import the new RichTextEditor
 
 // Hotel interface now represents a "hotel quote" from the 'hotels' table
 interface HotelQuote {
@@ -444,7 +444,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     calculateCosts();
   }, [calculateCosts]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value, type } = e.target;
     setFormData((prev) => {
       const newValue = type === 'number' ? parseFloat(value) : value;
@@ -455,6 +455,10 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       }
       return updatedData;
     });
+  };
+
+  const handleRichTextChange = (field: 'description' | 'full_content', content: string) => {
+    setFormData((prev) => ({ ...prev, [field]: content }));
   };
 
   const handleNumberChange = (id: keyof Tour, value: string) => {
@@ -946,11 +950,25 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 items-start gap-4">
           <Label htmlFor="description" className="md:text-right pt-2">Descripción Corta</Label>
-          <Textarea id="description" value={formData.description} onChange={handleChange} className="md:col-span-3" rows={3} required />
+          <div className="md:col-span-3">
+            <RichTextEditor
+              value={formData.description}
+              onChange={(content) => handleRichTextChange('description', content)}
+              placeholder="Escribe una descripción breve para el tour."
+              className="min-h-[100px]"
+            />
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 items-start gap-4">
           <Label htmlFor="full_content" className="md:text-right pt-2">Contenido Completo</Label>
-          <Textarea id="full_content" value={formData.full_content} onChange={handleChange} className="md:col-span-3 min-h-[150px]" placeholder="Descripción detallada del tour. Puedes usar HTML básico." />
+          <div className="md:col-span-3">
+            <RichTextEditor
+              value={formData.full_content}
+              onChange={(content) => handleRichTextChange('full_content', content)}
+              placeholder="Descripción detallada del tour. Puedes usar HTML básico."
+              className="min-h-[150px]"
+            />
+          </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
           <Label htmlFor="image_file" className="md:text-right">Imagen de Portada</Label>

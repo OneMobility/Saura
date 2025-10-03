@@ -5,11 +5,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Save, Loader2, Upload } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
+import RichTextEditor from '@/components/RichTextEditor'; // Import the new RichTextEditor
 
 interface AboutUsSetting {
   id?: string;
@@ -59,9 +59,13 @@ const AboutUsSettings = () => {
     setLoading(false);
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
     setAboutUsInfo((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const handleRichTextChange = (content: string) => {
+    setAboutUsInfo((prev) => ({ ...prev, content }));
   };
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -196,13 +200,11 @@ const AboutUsSettings = () => {
           </div>
           <div className="space-y-2">
             <Label htmlFor="content">Contenido</Label>
-            <Textarea
-              id="content"
+            <RichTextEditor
               value={aboutUsInfo.content || ''}
-              onChange={handleChange}
-              placeholder="Escribe aquí el contenido detallado de la sección 'Sobre Nosotros'. Puedes usar HTML básico."
-              rows={8}
-              required
+              onChange={handleRichTextChange}
+              placeholder="Escribe aquí el contenido detallado de la sección 'Sobre Nosotros'."
+              className="min-h-[200px]"
             />
           </div>
           <div className="space-y-2">
