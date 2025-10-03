@@ -10,9 +10,15 @@ const BusTicketsNavbar = () => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navLinks = [
-    { name: 'Inicio (Tours)', href: '/tours' }, // Link back to main tours page
-    { name: 'Boletos de Autobús', href: '/bus-tickets' },
-    { name: 'Contacto', href: '/contact' },
+    { name: 'Inicio', href: '/bus-tickets' },
+    { name: 'Destinos', href: '/bus-tickets/destinations' },
+    { name: 'Sobre Nosotros', href: '/bus-tickets/about' },
+    { name: 'Política de Privacidad', href: '/bus-tickets/privacy-policy' },
+    { name: 'Términos y Condiciones', href: '/bus-tickets/terms-and-conditions' },
+    { name: 'FAQ', href: '/bus-tickets/faq' },
+    { name: 'Centro de Facturación', href: '/bus-tickets/billing-center' },
+    { name: 'Contacto', href: '/bus-tickets/contact' },
+    { name: 'Tours Principales', href: '/tours' }, // Link back to main tours page
   ];
 
   return (

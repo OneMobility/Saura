@@ -34,6 +34,15 @@ import AdminTourFormPage from "./pages/AdminTourFormPage";
 import AdminHotelFormPage from "./pages/AdminHotelFormPage";
 import AdminClientFormPage from "./pages/AdminClientFormPage";
 
+// Bus Tickets Subdomain Pages
+import DestinationsPage from "./pages/bus-tickets/DestinationsPage";
+import AboutUsPage from "./pages/bus-tickets/AboutUsPage";
+import PrivacyPolicyPage from "./pages/bus-tickets/PrivacyPolicyPage";
+import TermsAndConditionsPage from "./pages/bus-tickets/TermsAndConditionsPage";
+import FaqPage from "./pages/bus-tickets/FaqPage";
+import BillingCenterPage from "./pages/bus-tickets/BillingCenterPage";
+
+
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
 
@@ -55,7 +64,17 @@ const App = () => {
               <Route path="/blog" element={<BlogPage />} />
               <Route path="/blog/:id" element={<BlogPostPage />} />
               <Route path="/contact" element={<ContactPage />} />
-              <Route path="/bus-tickets" element={<BusTicketsPage />} /> {/* NEW: Bus Tickets Page */}
+              
+              {/* NEW: Bus Tickets Subdomain Routes */}
+              <Route path="/bus-tickets" element={<BusTicketsPage />} />
+              <Route path="/bus-tickets/destinations" element={<DestinationsPage />} />
+              <Route path="/bus-tickets/about" element={<AboutUsPage />} />
+              <Route path="/bus-tickets/privacy-policy" element={<PrivacyPolicyPage />} />
+              <Route path="/bus-tickets/terms-and-conditions" element={<TermsAndConditionsPage />} />
+              <Route path="/bus-tickets/faq" element={<FaqPage />} />
+              <Route path="/bus-tickets/billing-center" element={<BillingCenterPage />} />
+              <Route path="/bus-tickets/contact" element={<ContactPage />} /> {/* Reusing existing ContactPage */}
+
               <Route path="/login" element={<Login />} />
               <Route
                 path="/admin/dashboard"
