@@ -51,12 +51,12 @@
     --sidebar-ring: 217.2 91.2% 59.8%;
 
     /* NEW: Bus Tickets Theme Colors */
-    --bus-primary: 220 100% 25%; /* Dark Blue for primary actions */
-    --bus-primary-foreground: 0 0% 100%; /* White text on dark blue */
-    --bus-secondary: 50 100% 50%; /* Vibrant Yellow for accents */
+    --bus-primary: 220 100% 19%; /* Dark Royal Blue */
+    --bus-primary-foreground: 0 0% 100%; /* White text on blue */
+    --bus-secondary: 50 100% 50%; /* Yellow */
     --bus-secondary-foreground: 222.2 47.4% 11.2%; /* Dark text on yellow */
-    --bus-background: 220 10% 10%; /* Very dark blue-gray background */
-    --bus-foreground: 0 0% 100%; /* White text */
+    --bus-background: 0 0% 100%; /* White background */
+    --bus-foreground: 222.2 84% 4.9%; /* Dark text */
   }
 
   .dark {
