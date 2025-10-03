@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText, ChevronDown, Hotel, Truck, UserRound, Bus, Handshake, Ticket } from 'lucide-react'; // Added Handshake and Ticket icon for Bus Tickets
+import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText, ChevronDown, Hotel, Truck, UserRound, Bus, Handshake, Ticket, MapPin } from 'lucide-react'; // Added MapPin icon for Destinations
 import { useSession } from '@/components/SessionContextProvider';
 
 interface NavItem {
@@ -18,7 +18,14 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/admin/bus-tickets', icon: Ticket, label: 'Boletos de Autobús' }, // MOVED: Bus Tickets entry to top level
+  {
+    icon: Ticket,
+    label: 'Boletos de Autobús',
+    children: [
+      { href: '/admin/bus-tickets', icon: Ticket, label: 'General' },
+      { href: '/admin/bus-tickets/destinations', icon: MapPin, label: 'Destinos' }, // NEW: Link to Bus Destinations
+    ],
+  },
   {
     icon: Package,
     label: 'Gestión de Viajes',
