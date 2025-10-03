@@ -2,22 +2,22 @@
 
 import React from 'react';
 import BusTicketsNavbar from '@/components/BusTicketsNavbar';
-import BusTicketsFooter from '@/components/BusTicketsFooter'; // NEW: Import BusTicketsFooter
-import ContactSection from '@/components/ContactSection'; // Reusing the existing ContactSection
+import BusTicketsFooter from '@/components/BusTicketsFooter';
+import BusContactSection from '@/components/bus-tickets/BusContactSection'; // Corrected import path
 import BusTicketsThemeProvider from '@/components/BusTicketsThemeProvider';
 
-const ContactPage = () => {
+const BusContactPage = () => {
   return (
     <BusTicketsThemeProvider>
       <div className="min-h-screen flex flex-col bg-bus-background text-bus-foreground">
         <BusTicketsNavbar />
         <main className="flex-grow">
-          <ContactSection /> {/* Displaying the existing contact form */}
+          <BusContactSection /> {/* Displaying the existing contact form */}
         </main>
-        <BusTicketsFooter /> {/* NEW: Use BusTicketsFooter */}
+        <BusTicketsFooter />
       </div>
     </BusTicketsThemeProvider>
   );
 };
 
-export default ContactPage;
+export default BusContactPage;
