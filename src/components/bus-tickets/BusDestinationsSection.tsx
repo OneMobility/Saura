@@ -1,19 +1,84 @@
 "use client";
 
-import React from 'react';
-import { MapPin, Bus } from 'lucide-react';
+import React, { useCallback, useEffect, useState } from 'react';
+import useEmblaCarousel from 'embla-carousel-react';
+import { ChevronLeft, ChevronRight, Bus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
+import BusDestinationCard from './BusDestinationCard'; // Import the new component
 
 const BusDestinationsSection = () => {
-  const destinations = [
-    { name: 'Cancún', description: 'Playas paradisíacas y vida nocturna vibrante.' },
-    { name: 'Ciudad de México', description: 'Capital cultural con historia y modernidad.' },
-    { name: 'San Miguel de Allende', description: 'Encanto colonial y arte en cada esquina.' },
-    { name: 'Oaxaca', description: 'Tradición, gastronomía y artesanías únicas.' },
-    { name: 'Guadalajara', description: 'Cuna del mariachi y el tequila.' },
-    { name: 'Monterrey', description: 'Ciudad industrial rodeada de montañas.' },
+  const [emblaRef, emblaApi] = useEmblaCarousel({ loop: true, align: 'start' });
+  const [loading, setLoading] = useState(true); // Simulate loading for initial data
+  const [destinations, setDestinations] = useState<any[]>([]); // State to hold destinations
+
+  // Placeholder data for destinations
+  const placeholderDestinations = [
+    {
+      name: 'Cancún',
+      description: 'Playas paradisíacas y vida nocturna vibrante en el Caribe Mexicano.',
+      imageUrl: 'https://images.unsplash.com/photo-1589394815691-e56519717ebf?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+      link: '/bus-tickets/destinations#cancun',
+    },
+    {
+      name: 'Ciudad de México',
+      description: 'Capital cultural con historia milenaria, museos y gastronomía de clase mundial.',
+      imageUrl: 'https://images.unsplash.com/photo-1521050211434-f8599796594e?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+      link: '/bus-tickets/destinations#ciudad-de-mexico',
+    },
+    {
+      name: 'San Miguel de Allende',
+      description: 'Encanto colonial, calles empedradas y arte en cada esquina, Patrimonio de la Humanidad.',
+      imageUrl: 'https://images.unsplash.com/photo-1589394815691-e56519717ebf?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+      link: '/bus-tickets/destinations#san-miguel-de-allende',
+    },
+    {
+      name: 'Oaxaca',
+      description: 'Tradición, gastronomía exquisita y artesanías únicas en el corazón de México.',
+      imageUrl: 'https://images.unsplash.com/photo-1521050211434-f8599796594e?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+      link: '/bus-tickets/destinations#oaxaca',
+    },
+    {
+      name: 'Guadalajara',
+      description: 'Cuna del mariachi y el tequila, con una rica cultura y arquitectura colonial.',
+      imageUrl: 'https://images.unsplash.com/photo-1589394815691-e56519717ebf?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+      link: '/bus-tickets/destinations#guadalajara',
+    },
+    {
+      name: 'Monterrey',
+      description: 'Ciudad industrial rodeada de imponentes montañas, ideal para la aventura y los negocios.',
+      imageUrl: 'https://images.unsplash.com/photo-1521050211434-f8599796594e?q=80&w=2070&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D',
+      link: '/bus-tickets/destinations#monterrey',
+    },
   ];
+
+  useEffect(() => {
+    // Simulate fetching data
+    setLoading(true);
+    setTimeout(() => {
+      setDestinations(placeholderDestinations);
+      setLoading(false);
+    }, 1000);
+  }, []);
+
+  const scrollPrev = useCallback(() => {
+    if (emblaApi) emblaApi.scrollPrev();
+  }, [emblaApi]);
+
+  const scrollNext = useCallback(() => {
+    if (emblaApi) emblaApi.scrollNext();
+  }, [emblaApi]);
+
+  if (loading) {
+    return (
+      <section className="py-12 px-4 md:px-8 lg:px-16 bg-bus-background text-bus-foreground">
+        <div className="mx-auto bg-muted p-8 rounded-lg shadow-xl flex items-center justify-center min-h-[300px]">
+          <Loader2 className="h-12 w-12 animate-spin text-bus-primary" />
+          <p className="ml-4 text-bus-foreground text-xl">Cargando destinos...</p>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="py-12 px-4 md:px-8 lg:px-16 bg-bus-background text-bus-foreground">
@@ -26,16 +91,40 @@ const BusDestinationsSection = () => {
           Desde playas soleadas hasta ciudades históricas, tu próxima aventura te espera.
         </p>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {destinations.map((dest, index) => (
-            <div key={index} className="bg-card p-6 rounded-lg shadow-md hover:shadow-lg transition-shadow duration-300 flex items-start space-x-4">
-              <MapPin className="h-8 w-8 text-bus-primary shrink-0 mt-1" />
-              <div>
-                <h3 className="text-xl font-semibold text-bus-foreground mb-2">{dest.name}</h3>
-                <p className="text-muted-foreground text-base">{dest.description}</p>
-              </div>
+        <div className="relative">
+          <div className="embla" ref={emblaRef}>
+            <div className="embla__container flex -ml-4">
+              {destinations.map((dest, index) => (
+                <div key={index} className="embla__slide flex-none w-full sm:w-1/2 lg:w-1/3 pl-4">
+                  <BusDestinationCard
+                    imageUrl={dest.imageUrl}
+                    title={dest.name}
+                    subtitle={dest.description}
+                    link={dest.link}
+                    gradientFromClass={index % 2 === 0 ? 'from-bus-primary/50' : 'from-bus-secondary/50'}
+                    gradientToClass={index % 2 === 0 ? 'to-bus-primary' : 'to-bus-secondary'}
+                  />
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+
+          <Button
+            onClick={scrollPrev}
+            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/70 hover:bg-white text-bus-primary hover:text-bus-primary rounded-full p-2"
+            size="icon"
+          >
+            <ChevronLeft className="h-6 w-6" />
+            <span className="sr-only">Anterior</span>
+          </Button>
+          <Button
+            onClick={scrollNext}
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/70 hover:bg-white text-bus-primary hover:text-bus-primary rounded-full p-2"
+            size="icon"
+          >
+            <ChevronRight className="h-6 w-6" />
+            <span className="sr-only">Siguiente</span>
+          </Button>
         </div>
 
         <div className="text-center mt-12">
