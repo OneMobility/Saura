@@ -210,7 +210,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
     const baseClasses = "w-10 h-10 flex items-center justify-center rounded-md text-sm font-semibold transition-colors duration-200";
 
     if (itemType === 'aisle' || itemType === 'empty') {
-      return "w-10 h-10 flex items-center justify-center text-gray-500"; // Transparent or subtle for non-seats
+      return "w-10 h-10 flex items-center justify-center text-muted-foreground"; // Transparent or subtle for non-seats
     }
     if (itemType === 'bathroom') {
       return cn(baseClasses, "bg-gray-300 text-gray-700 cursor-default");
@@ -226,35 +226,35 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
 
     if (seat.status === 'booked') {
       if (currentClientId && seat.client_id === currentClientId) {
-        return cn(baseClasses, "bg-green-500 text-white hover:bg-green-600 cursor-pointer"); // Booked by this client, allow unselect
+        return cn(baseClasses, "bg-bus-primary text-bus-primary-foreground hover:bg-bus-primary/90 cursor-pointer"); // Booked by this client, allow unselect
       }
-      return cn(baseClasses, "bg-red-500 text-white cursor-not-allowed"); // Booked by another
+      return cn(baseClasses, "bg-destructive text-destructive-foreground cursor-not-allowed"); // Booked by another
     }
     if (seat.status === 'blocked') {
-      return cn(baseClasses, "bg-gray-400 text-gray-700 cursor-not-allowed", adminMode && "hover:bg-gray-500 cursor-pointer");
+      return cn(baseClasses, "bg-muted text-muted-foreground cursor-not-allowed", adminMode && "hover:bg-muted/80 cursor-pointer");
     }
     if (seat.status === 'courtesy') {
       return cn(baseClasses, "bg-purple-500 text-white cursor-not-allowed", adminMode && "hover:bg-purple-600 cursor-pointer");
     }
     if (isCurrentlySelected) {
-      return cn(baseClasses, "bg-green-500 text-white hover:bg-green-600 cursor-pointer");
+      return cn(baseClasses, "bg-bus-primary text-bus-primary-foreground hover:bg-bus-primary/90 cursor-pointer");
     }
     // Default for 'available' seats
-    return cn(baseClasses, "bg-gray-200 text-gray-800 hover:bg-gray-300 cursor-pointer");
+    return cn(baseClasses, "bg-secondary text-secondary-foreground hover:bg-secondary/80 cursor-pointer");
   };
 
   if (loading || sessionLoading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-rosa-mexicano" />
-        <p className="ml-4 text-gray-700">Cargando mapa de asientos...</p>
+        <Loader2 className="h-8 w-8 animate-spin text-bus-primary" />
+        <p className="ml-4 text-muted-foreground">Cargando mapa de asientos...</p>
       </div>
     );
   }
 
   if (!seatLayoutJson || seatLayoutJson.length === 0) {
     return (
-      <div className="p-4 border rounded-lg bg-gray-50 text-center text-gray-600">
+      <div className="p-4 border rounded-lg bg-muted text-center text-muted-foreground">
         <p>No hay una disposición de asientos definida para este autobús.</p>
         {adminMode && isAdmin && (
           <p className="text-sm mt-2">Por favor, define el layout en la sección de gestión de autobuses.</p>
@@ -267,17 +267,17 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
   const maxCols = seatLayoutJson.reduce((max, row) => Math.max(max, row.length), 0);
 
   return (
-    <div className="p-4 border rounded-lg bg-gray-50">
-      <h3 className="text-xl font-semibold mb-4 text-gray-800">
+    <div className="p-4 border rounded-lg bg-muted">
+      <h3 className="text-xl font-semibold mb-4 text-bus-foreground">
         Mapa de Asientos ({busCapacity} asientos)
       </h3>
       {adminMode && isAdmin && (
-        <p className="text-sm text-gray-600 mb-4">
+        <p className="text-sm text-muted-foreground mb-4">
           Modo Administrador: Haz clic en un asiento bloqueado o de coordinador para liberarlo, o en uno disponible para bloquearlo.
         </p>
       )}
       {currentClientId && (
-        <p className="text-sm text-gray-600 mb-4">
+        <p className="text-sm text-muted-foreground mb-4">
           Modo Contrato: Selecciona los asientos para este cliente.
         </p>
       )}
@@ -315,20 +315,20 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
           </React.Fragment>
         ))}
       </div>
-      <div className="mt-6 p-4 bg-white rounded-md shadow-sm">
+      <div className="mt-6 p-4 bg-background rounded-md shadow-sm">
         <h4 className="text-lg font-semibold mb-3">Leyenda:</h4>
-        <div className="grid grid-cols-2 gap-3 text-sm text-gray-700">
+        <div className="grid grid-cols-2 gap-3 text-sm text-muted-foreground">
           <div className="flex items-center">
-            <span className="w-5 h-5 bg-gray-200 rounded-sm mr-2"></span> Disponible
+            <span className="w-5 h-5 bg-secondary rounded-sm mr-2"></span> Disponible
           </div>
           <div className="flex items-center">
-            <span className="w-5 h-5 bg-green-500 rounded-sm mr-2"></span> Seleccionado (o tuyo)
+            <span className="w-5 h-5 bg-bus-primary rounded-sm mr-2"></span> Seleccionado (o tuyo)
           </div>
           <div className="flex items-center">
-            <span className="w-5 h-5 bg-red-500 rounded-sm mr-2"></span> Ocupado (otro cliente)
+            <span className="w-5 h-5 bg-destructive rounded-sm mr-2"></span> Ocupado (otro cliente)
           </div>
           <div className="flex items-center">
-            <span className="w-5 h-5 bg-gray-400 rounded-sm mr-2"></span> Bloqueado (Admin)
+            <span className="w-5 h-5 bg-muted rounded-sm mr-2"></span> Bloqueado (Admin)
           </div>
           <div className="flex items-center">
             <span className="w-5 h-5 bg-purple-500 rounded-sm mr-2"></span> Coordinador

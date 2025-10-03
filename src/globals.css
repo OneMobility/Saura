@@ -49,6 +49,14 @@
     --sidebar-border: 220 13% 91%;
 
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* NEW: Bus Tickets Theme Colors */
+    --bus-primary: 210 90% 40%; /* A shade of blue */
+    --bus-primary-foreground: 0 0% 100%; /* White text on blue */
+    --bus-secondary: 48 95% 50%; /* A shade of yellow */
+    --bus-secondary-foreground: 222.2 47.4% 11.2%; /* Dark text on yellow */
+    --bus-background: 0 0% 100%; /* White background */
+    --bus-foreground: 222.2 84% 4.9%; /* Dark text */
   }
 
   .dark {
@@ -87,6 +95,14 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+
+    /* NEW: Bus Tickets Theme Colors for Dark Mode (can be adjusted) */
+    --bus-primary: 210 90% 60%; /* Lighter blue for dark mode */
+    --bus-primary-foreground: 0 0% 100%;
+    --bus-secondary: 48 95% 60%; /* Lighter yellow for dark mode */
+    --bus-secondary-foreground: 222.2 47.4% 11.2%;
+    --bus-background: 222.2 84% 4.9%; /* Dark background */
+    --bus-foreground: 210 40% 98%; /* Light text */
   }
 }
 
@@ -97,5 +113,30 @@
 
   body {
     @apply bg-background text-foreground;
+  }
+
+  /* NEW: Bus Tickets Theme Class */
+  .bus-tickets-theme {
+    --background: var(--bus-background);
+    --foreground: var(--bus-foreground);
+    --primary: var(--bus-primary);
+    --primary-foreground: var(--bus-primary-foreground);
+    --secondary: var(--bus-secondary);
+    --secondary-foreground: var(--bus-secondary-foreground);
+    --input: 214.3 31.8% 91.4%; /* Keep default input border for contrast */
+    --ring: var(--bus-primary); /* Use bus-primary for ring focus */
+    --border: 214.3 31.8% 91.4%; /* Keep default border for contrast */
+  }
+
+  .dark .bus-tickets-theme {
+    --background: var(--bus-background);
+    --foreground: var(--bus-foreground);
+    --primary: var(--bus-primary);
+    --primary-foreground: var(--bus-primary-foreground);
+    --secondary: var(--bus-secondary);
+    --secondary-foreground: var(--bus-secondary-foreground);
+    --input: 217.2 32.6% 17.5%;
+    --ring: var(--bus-primary);
+    --border: 217.2 32.6% 17.5%;
   }
 }

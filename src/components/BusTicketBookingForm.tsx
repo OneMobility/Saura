@@ -272,9 +272,9 @@ const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto bg-bus-background text-bus-foreground">
         <DialogHeader>
-          <DialogTitle>Reservar Boletos para: {tourTitle}</DialogTitle>
+          <DialogTitle className="text-bus-primary">Reservar Boletos para: {tourTitle}</DialogTitle>
           <DialogDescription>
             Rellena tus datos y selecciona tus asientos para completar la reserva de boletos de autobús.
           </DialogDescription>
@@ -285,7 +285,7 @@ const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
             <img src={tourImage} alt={tourTitle} className="w-24 h-16 object-cover rounded-md" />
             <div>
               <h4 className="font-semibold text-lg">{tourTitle}</h4>
-              <p className="text-sm text-gray-600 line-clamp-2">{tourDescription}</p>
+              <p className="text-muted-foreground text-sm line-clamp-2">{tourDescription}</p>
             </div>
           </div>
 
@@ -294,31 +294,31 @@ const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="first_name">Nombre</Label>
-              <Input id="first_name" value={formData.first_name} onChange={handleChange} required />
+              <Input id="first_name" value={formData.first_name} onChange={handleChange} required className="focus-visible:ring-bus-primary" />
             </div>
             <div>
               <Label htmlFor="last_name">Apellido</Label>
-              <Input id="last_name" value={formData.last_name} onChange={handleChange} required />
+              <Input id="last_name" value={formData.last_name} onChange={handleChange} required className="focus-visible:ring-bus-primary" />
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={formData.email} onChange={handleChange} required />
+              <Input id="email" type="email" value={formData.email} onChange={handleChange} required className="focus-visible:ring-bus-primary" />
             </div>
             <div>
               <Label htmlFor="phone">Teléfono</Label>
-              <Input id="phone" value={formData.phone} onChange={handleChange} />
+              <Input id="phone" value={formData.phone} onChange={handleChange} className="focus-visible:ring-bus-primary" />
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="contractor_age">Edad del Contratante</Label>
-              <Input id="contractor_age" type="number" value={formData.contractor_age || ''} onChange={(e) => handleNumberChange('contractor_age', e.target.value)} min={0} max={120} />
+              <Input id="contractor_age" type="number" value={formData.contractor_age || ''} onChange={(e) => handleNumberChange('contractor_age', e.target.value)} min={0} max={120} className="focus-visible:ring-bus-primary" />
             </div>
             <div>
               <Label htmlFor="identification_number">Número de Identificación</Label>
-              <Input id="identification_number" value={formData.identification_number || ''} onChange={handleChange} placeholder="Ej: INE, Pasaporte, etc." />
+              <Input id="identification_number" value={formData.identification_number || ''} onChange={handleChange} placeholder="Ej: INE, Pasaporte, etc." className="focus-visible:ring-bus-primary" />
             </div>
           </div>
 
@@ -340,14 +340,14 @@ const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
                   value={companion.name}
                   onChange={(e) => handleCompanionChange(companion.id, 'name', e.target.value)}
                   placeholder="Nombre del acompañante"
-                  className="w-full md:w-2/3"
+                  className="w-full md:w-2/3 focus-visible:ring-bus-primary"
                 />
                 <Input
                   type="number"
                   value={companion.age || ''}
                   onChange={(e) => handleCompanionChange(companion.id, 'age', e.target.value)}
                   placeholder="Edad"
-                  className="w-full md:w-1/3"
+                  className="w-full md:w-1/3 focus-visible:ring-bus-primary"
                   min={0} max={120}
                 />
                 <Button type="button" variant="destructive" size="icon" onClick={() => removeCompanion(companion.id)}>
@@ -355,7 +355,7 @@ const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
                 </Button>
               </div>
             ))}
-            <Button type="button" variant="outline" onClick={addCompanion}>
+            <Button type="button" variant="outline" onClick={addCompanion} className="text-bus-primary border-bus-primary hover:bg-bus-primary/10">
               <PlusCircle className="mr-2 h-4 w-4" /> Añadir Acompañante
             </Button>
           </div>
@@ -366,8 +366,8 @@ const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
               <h3 className="text-lg font-semibold mb-4">Selección de Asientos</h3>
               {loadingBusLayout ? (
                 <div className="flex items-center justify-center p-8">
-                  <Loader2 className="h-8 w-8 animate-spin text-rosa-mexicano" />
-                  <p className="ml-4 text-gray-700">Cargando mapa de asientos...</p>
+                  <Loader2 className="h-8 w-8 animate-spin text-bus-primary" />
+                  <p className="ml-4 text-muted-foreground">Cargando mapa de asientos...</p>
                 </div>
               ) : (
                 <TourSeatMap
@@ -381,7 +381,7 @@ const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
                 />
               )}
               {selectedSeats.length > 0 && (
-                <p className="text-sm text-gray-600 mt-2">
+                <p className="text-sm text-muted-foreground mt-2">
                   Asientos seleccionados: {selectedSeats.join(', ')}
                 </p>
               )}
@@ -391,19 +391,19 @@ const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
           {/* Price Breakdown */}
           <div className="col-span-full mt-6 p-4 bg-gray-100 rounded-md">
             <h4 className="font-semibold text-lg mb-2">Desglose del Cálculo:</h4>
-            <p className="text-sm text-gray-700">Adultos: <span className="font-medium">{numAdults}</span> x ${tourSellingPrices.adult.toFixed(2)} = <span className="font-medium">${(numAdults * tourSellingPrices.adult).toFixed(2)}</span></p>
-            <p className="text-sm text-gray-700">Niños (-12 años): <span className="font-medium">{numChildren}</span> x ${tourSellingPrices.child.toFixed(2)} = <span className="font-medium">${(numChildren * tourSellingPrices.child).toFixed(2)}</span></p>
-            <p className="font-bold mt-2 text-gray-800">Total Calculado: <span className="text-xl">${totalAmount.toFixed(2)}</span></p>
+            <p className="text-sm text-muted-foreground">Adultos: <span className="font-medium">{numAdults}</span> x ${tourSellingPrices.adult.toFixed(2)} = <span className="font-medium">${(numAdults * tourSellingPrices.adult).toFixed(2)}</span></p>
+            <p className="text-sm text-muted-foreground">Niños (-12 años): <span className="font-medium">{numChildren}</span> x ${tourSellingPrices.child.toFixed(2)} = <span className="font-medium">${(numChildren * tourSellingPrices.child).toFixed(2)}</span></p>
+            <p className="font-bold mt-2 text-bus-foreground">Total Calculado: <span className="text-xl">${totalAmount.toFixed(2)}</span></p>
           </div>
 
           {/* Total Amount */}
-          <div className="col-span-full mt-6 p-4 bg-rosa-mexicano text-white rounded-md flex justify-between items-center">
+          <div className="col-span-full mt-6 p-4 bg-bus-primary text-bus-primary-foreground rounded-md flex justify-between items-center">
             <h3 className="text-xl font-bold">Monto Total a Pagar:</h3>
             <span className="text-2xl font-bold">${totalAmount.toFixed(2)}</span>
           </div>
 
           <DialogFooter>
-            <Button type="submit" disabled={isSubmitting || loadingBusLayout}>
+            <Button type="submit" disabled={isSubmitting || loadingBusLayout} className="bg-bus-primary hover:bg-bus-primary/90 text-bus-primary-foreground">
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
               Confirmar Reserva
             </Button>
