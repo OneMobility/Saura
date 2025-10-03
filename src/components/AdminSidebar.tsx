@@ -18,6 +18,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/admin/bus-tickets', icon: Ticket, label: 'Boletos de Autobús' }, // MOVED: Bus Tickets entry to top level
   {
     icon: Package,
     label: 'Gestión de Viajes',
@@ -27,7 +28,6 @@ const navItems: NavItem[] = [
       { href: '/admin/buses', icon: Bus, label: 'Autobuses' },
       { href: '/admin/providers', icon: Handshake, label: 'Proveedores' },
       { href: '/admin/clients', icon: UserRound, label: 'Clientes' },
-      { href: '/admin/bus-tickets', icon: Ticket, label: 'Boletos de Autobús' }, // NEW: Bus Tickets entry
     ],
   },
   { href: '/admin/blog', icon: Newspaper, label: 'Blog' },
