@@ -10,7 +10,7 @@ const BusAboutUsSection = () => {
     <section className="py-12 px-4 md:px-8 lg:px-16 bg-white text-bus-foreground">
       <div className="max-w-6xl mx-auto lg:grid lg:grid-cols-2 lg:gap-12 items-center">
         {/* Columna del Contenido de Texto (ahora a la izquierda) */}
-        <div className="text-center lg:text-left mb-8 lg:mb-0">
+        <div className="text-center lg:text-left mb-8 lg:mb-0 p-6 bg-bus-secondary rounded-lg shadow-md">
           <h2 className="text-3xl md:text-4xl font-bold text-bus-primary mb-6">
             Sobre Saura Bus
           </h2>

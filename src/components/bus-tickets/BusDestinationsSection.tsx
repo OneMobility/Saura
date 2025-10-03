@@ -111,7 +111,7 @@ const BusDestinationsSection = () => {
 
           <Button
             onClick={scrollPrev}
-            className="absolute left-0 top-1/2 -translate-y-1/2 z-10 bg-white/70 hover:bg-white text-bus-primary hover:text-bus-primary rounded-full p-2"
+            className="absolute left-4 top-1/2 -translate-y-1/2 z-10 bg-white/70 hover:bg-white text-bus-primary hover:text-bus-primary rounded-full p-2"
             size="icon"
           >
             <ChevronLeft className="h-6 w-6" />
@@ -119,7 +119,7 @@ const BusDestinationsSection = () => {
           </Button>
           <Button
             onClick={scrollNext}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-10 bg-white/70 hover:bg-white text-bus-primary hover:text-bus-primary rounded-full p-2"
+            className="absolute right-4 top-1/2 -translate-y-1/2 z-10 bg-white/70 hover:bg-white text-bus-primary hover:text-bus-primary rounded-full p-2"
             size="icon"
           >
             <ChevronRight className="h-6 w-6" />
