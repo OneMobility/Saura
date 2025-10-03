@@ -7,8 +7,9 @@ import SlideshowSettings from '@/components/admin/settings/SlideshowSettings';
 import SeoSettings from '@/components/admin/settings/SeoSettings';
 import SocialMediaSettings from '@/components/admin/settings/SocialMediaSettings';
 import AgencySettings from '@/components/admin/settings/AgencySettings';
-import AboutUsSettings from '@/components/admin/settings/AboutUsSettings'; // NEW: Import AboutUsSettings
-import PolicyTermsSettings from '@/components/admin/settings/PolicyTermsSettings'; // NEW: Import PolicyTermsSettings
+import AboutUsSettings from '@/components/admin/settings/AboutUsSettings';
+import PolicyTermsSettings from '@/components/admin/settings/PolicyTermsSettings';
+import FaqSettings from '@/components/admin/settings/FaqSettings'; // NEW: Import FaqSettings
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate } from 'react-router-dom';
 import AdminHeader from '@/components/admin/AdminHeader';
@@ -37,13 +38,14 @@ const AdminSettingsPage = () => {
         <AdminHeader pageTitle="Configuración del Sitio" />
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <Tabs defaultValue="slideshow" className="w-full">
-            <TabsList className="grid w-full grid-cols-6"> {/* Adjusted grid-cols to 6 */}
+            <TabsList className="grid w-full grid-cols-7"> {/* Adjusted grid-cols to 7 */}
               <TabsTrigger value="slideshow">Slideshow</TabsTrigger>
               <TabsTrigger value="seo">SEO</TabsTrigger>
               <TabsTrigger value="social-media">Redes Sociales</TabsTrigger>
               <TabsTrigger value="agency-info">Agencia</TabsTrigger>
-              <TabsTrigger value="about-us">Sobre Nosotros</TabsTrigger> {/* NEW: Tab trigger */}
-              <TabsTrigger value="policies-terms">Políticas y Términos</TabsTrigger> {/* NEW: Tab trigger */}
+              <TabsTrigger value="about-us">Sobre Nosotros</TabsTrigger>
+              <TabsTrigger value="policies-terms">Políticas y Términos</TabsTrigger>
+              <TabsTrigger value="faq">FAQ</TabsTrigger> {/* NEW: Tab trigger for FAQ */}
             </TabsList>
             <TabsContent value="slideshow">
               <SlideshowSettings />
@@ -57,11 +59,14 @@ const AdminSettingsPage = () => {
             <TabsContent value="agency-info">
               <AgencySettings />
             </TabsContent>
-            <TabsContent value="about-us"> {/* NEW: Tab content */}
+            <TabsContent value="about-us">
               <AboutUsSettings />
             </TabsContent>
-            <TabsContent value="policies-terms"> {/* NEW: Tab content */}
+            <TabsContent value="policies-terms">
               <PolicyTermsSettings />
+            </TabsContent>
+            <TabsContent value="faq"> {/* NEW: Tab content for FAQ */}
+              <FaqSettings />
             </TabsContent>
           </Tabs>
         </main>
