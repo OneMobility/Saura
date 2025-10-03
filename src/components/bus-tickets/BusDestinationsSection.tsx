@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { MapPin, Bus } from 'lucide-react';
-import { Button } from '@/components/ui/button'; // Corrected: Added missing import
+import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 
 const BusDestinationsSection = () => {
@@ -17,9 +17,9 @@ const BusDestinationsSection = () => {
 
   return (
     <section className="py-12 px-4 md:px-8 lg:px-16 bg-bus-background text-bus-foreground">
-      <div className="max-w-6xl mx-auto">
+      <div className="mx-auto bg-muted p-8 rounded-lg shadow-xl">
         <h2 className="text-3xl md:text-4xl font-bold text-center text-bus-primary mb-10">
-          Nuestros Destinos Populares
+          Nuestros <span className="text-bus-secondary">Destinos</span> Populares
         </h2>
         <p className="text-lg text-center mb-12 max-w-2xl mx-auto">
           Descubre los lugares más increíbles a los que puedes viajar con Saura Bus.
