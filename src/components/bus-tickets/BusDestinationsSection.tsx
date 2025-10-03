@@ -72,7 +72,7 @@ const BusDestinationsSection = () => {
   if (loading) {
     return (
       <section className="py-12 px-4 md:px-8 lg:px-16 bg-bus-background text-bus-foreground">
-        <div className="mx-auto bg-muted p-8 rounded-lg shadow-xl flex items-center justify-center min-h-[300px]">
+        <div className="max-w-6xl mx-auto bg-muted p-8 rounded-lg shadow-xl flex items-center justify-center min-h-[300px]"> {/* Added max-w-6xl */}
           <Loader2 className="h-12 w-12 animate-spin text-bus-primary" />
           <p className="ml-4 text-bus-foreground text-xl">Cargando destinos...</p>
         </div>
@@ -82,7 +82,7 @@ const BusDestinationsSection = () => {
 
   return (
     <section className="py-12 px-4 md:px-8 lg:px-16 bg-bus-background text-bus-foreground">
-      <div className="mx-auto bg-muted p-8 rounded-lg shadow-xl">
+      <div className="max-w-6xl mx-auto bg-muted p-8 rounded-lg shadow-xl"> {/* Added max-w-6xl */}
         <h2 className="text-3xl md:text-4xl font-bold text-center text-bus-primary mb-10">
           Nuestros <span className="text-bus-secondary">Destinos</span> Populares
         </h2>
