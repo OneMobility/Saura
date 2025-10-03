@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText, ChevronDown, Hotel, Truck, UserRound, Bus, Handshake } from 'lucide-react'; // Added Handshake icon for Providers
+import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText, ChevronDown, Hotel, Truck, UserRound, Bus, Handshake, Ticket } from 'lucide-react'; // Added Handshake and Ticket icon for Bus Tickets
 import { useSession } from '@/components/SessionContextProvider';
 
 interface NavItem {
@@ -25,8 +25,9 @@ const navItems: NavItem[] = [
       { href: '/admin/tours', icon: Package, label: 'Tours' },
       { href: '/admin/hotels', icon: Hotel, label: 'Hoteles' },
       { href: '/admin/buses', icon: Bus, label: 'Autobuses' },
-      { href: '/admin/providers', icon: Handshake, label: 'Proveedores' }, // Changed icon and label for Providers
+      { href: '/admin/providers', icon: Handshake, label: 'Proveedores' },
       { href: '/admin/clients', icon: UserRound, label: 'Clientes' },
+      { href: '/admin/bus-tickets', icon: Ticket, label: 'Boletos de Autobús' }, // NEW: Bus Tickets entry
     ],
   },
   { href: '/admin/blog', icon: Newspaper, label: 'Blog' },

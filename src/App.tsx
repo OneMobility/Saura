@@ -31,6 +31,7 @@ import AdminToursPage from "./pages/AdminToursPage";
 import AdminTourFormPage from "./pages/AdminTourFormPage";
 import AdminHotelFormPage from "./pages/AdminHotelFormPage";
 import AdminClientFormPage from "./pages/AdminClientFormPage";
+import AdminBusTicketsPage from "./pages/AdminBusTicketsPage"; // NEW: Import AdminBusTicketsPage
 
 // Bus Tickets Subdomain Pages
 import DestinationsPage from "./pages/bus-tickets/DestinationsPage";
@@ -39,7 +40,7 @@ import PrivacyPolicyPage from "./pages/bus-tickets/PrivacyPolicyPage";
 import TermsAndConditionsPage from "./pages/bus-tickets/TermsAndConditionsPage";
 import FaqPage from "./pages/bus-tickets/FaqPage";
 import BillingCenterPage from "./pages/bus-tickets/BillingCenterPage";
-import BusContactPage from "./pages/bus-tickets/BusContactPage"; // Corrected import to the new page component
+import BusContactPage from "./pages/bus-tickets/BusContactPage";
 import AdditionalServicesPage from "./pages/bus-tickets/AdditionalServicesPage";
 import HelpCenterPage from "./pages/bus-tickets/HelpCenterPage";
 
@@ -77,7 +78,7 @@ const App = () => {
               <Route path="/bus-tickets/faq" element={<FaqPage />} />
               <Route path="/bus-tickets/billing-center" element={<BillingCenterPage />} />
               <Route path="/bus-tickets/help-center" element={<HelpCenterPage />} />
-              <Route path="/bus-tickets/contact" element={<BusContactPage />} /> {/* Updated route to use the full page component */}
+              <Route path="/bus-tickets/contact" element={<BusContactPage />} />
 
               <Route path="/login" element={<Login />} />
               <Route
@@ -237,6 +238,14 @@ const App = () => {
                 element={
                   <ProtectedRoute adminOnly>
                     <AdminTourFormPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route // NEW: Route for AdminBusTicketsPage
+                path="/admin/bus-tickets"
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminBusTicketsPage />
                   </ProtectedRoute>
                 }
               />
