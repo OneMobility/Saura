@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { toast } from 'sonner'; // Using sonner for toasts
 import { Mail, Phone, MapPin } from 'lucide-react'; // Icons for contact info
 
-const BusContactSection = () => {
+const BusContactSection: React.FC = () => {
   const [formData, setFormData] = useState({
     name: '',
     email: '',
