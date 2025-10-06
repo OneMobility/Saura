@@ -5,7 +5,7 @@ import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, QrCode, CheckCircle2, XCircle, Scan, User, Bus, Clock, CalendarDays, MapPin, Camera } from 'lucide-react'; // Added Camera icon
+import { Loader2, QrCode, CheckCircle2, XCircle, Scan, User, Bus, Clock, CalendarDays, MapPin, Camera, Eraser } from 'lucide-react'; // Added Eraser icon
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -152,6 +152,13 @@ const AdminBusTicketValidationPage = () => {
     }
   };
 
+  const handleClearSearch = () => {
+    setQrInput('');
+    setPassengerDetails(null);
+    setValidationError(null);
+    setIsScanning(false);
+  };
+
   if (sessionLoading || (user && isAdmin && loading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -192,7 +199,7 @@ const AdminBusTicketValidationPage = () => {
               <div className="flex items-center space-x-2">
                 <Input
                   type="text"
-                  placeholder="Introduce el ID del QR (ej: passengerId_scheduleId_seatNumber)"
+                  placeholder="Introduce el ID de validación del boleto"
                   value={qrInput}
                   onChange={(e) => setQrInput(e.target.value)}
                   className="flex-grow"
@@ -205,6 +212,10 @@ const AdminBusTicketValidationPage = () => {
                 <Button onClick={() => setIsScanning(prev => !prev)} variant="outline" className="text-blue-600 hover:bg-blue-50">
                   {isScanning ? <XCircle className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
                   <span className="ml-2">{isScanning ? 'Detener Escáner' : 'Escanear QR'}</span>
+                </Button>
+                <Button onClick={handleClearSearch} variant="outline" className="text-gray-600 hover:bg-gray-100">
+                  <Eraser className="h-4 w-4" />
+                  <span className="sr-only">Limpiar</span>
                 </Button>
               </div>
 

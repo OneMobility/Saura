@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
-import QRCode from 'qrcode.react'; // Revertido a importación por defecto
+// import QRCode from 'qrcode.react'; // Eliminado: Ya no se usa qrcode.react
 
 interface BusPassenger {
   id: string;
@@ -201,34 +201,8 @@ const BusTicketConfirmationPage: React.FC = () => {
     toast.info('Generando boleto...');
 
     try {
-      const qrCodeDataUrls: { [key: string]: string } = {};
-      for (const p of bookingDetails.passengers) {
-        const qrData = `${p.id}_${bookingDetails.schedule_id}_${p.seat_number}`;
-        const canvas = document.createElement('canvas');
-        await new Promise<void>((resolve, reject) => {
-          QRCode.toCanvas(canvas, qrData, {
-            width: 180, // Set QR code size
-            height: 180,
-            color: {
-              dark: '#000000',
-              light: '#ffffff',
-            },
-            errorCorrectionLevel: 'H',
-          }, (error) => {
-            if (error) {
-              console.error('Error generating QR code to canvas:', error);
-              reject(error);
-            } else {
-              qrCodeDataUrls[p.id] = canvas.toDataURL('image/png');
-              resolve();
-            }
-          });
-        });
-      }
-
       const passengerTicketsHtml = bookingDetails.passengers.map(p => {
-        const qrData = `${p.id}_${bookingDetails.schedule_id}_${p.seat_number}`;
-        const qrImageSrc = qrCodeDataUrls[p.id] || '';
+        const validationId = `${p.id}_${bookingDetails.schedule_id}_${p.seat_number}`; // ID para validación
 
         return `
           <div class="ticket-page">
@@ -267,13 +241,10 @@ const BusTicketConfirmationPage: React.FC = () => {
                     <p><strong>Edad:</strong> ${bookingDetails.contractor_age !== null ? bookingDetails.contractor_age : 'N/A'}</p>
                 </div>
 
-                <div class="qr-code-section">
-                    <h2>Código de Validación</h2>
-                    <div class="qr-code-image-container">
-                        <img src="${qrImageSrc}" alt="QR Code" style="width: 180px; height: 180px; display: block; margin: 0;" />
-                    </div>
-                    <p class="qr-data-text">ID: ${qrData}</p>
-                    <p class="instructions">Presenta este código al abordar.</p>
+                <div class="validation-section">
+                    <h2>ID de Validación</h2>
+                    <p class="validation-id-text">${validationId}</p>
+                    <p class="instructions">Presenta este ID al abordar para la validación manual o con escáner de texto.</p>
                 </div>
 
                 <div class="footer">
@@ -305,8 +276,8 @@ const BusTicketConfirmationPage: React.FC = () => {
                     border-radius: 10px; 
                     box-shadow: 0 0 20px rgba(0,0,0,0.1); 
                     border: 2px dashed #1e293b; 
-                    position: relative; /* Needed for absolute positioning of QR */
-                    min-height: 900px; /* Ensure enough space for content + QR */
+                    position: relative;
+                    min-height: 900px;
                 }
                 .header { text-align: center; margin-bottom: 30px; }
                 .header h1 { color: #1e293b; font-size: 2.5em; margin-bottom: 5px; }
@@ -317,26 +288,23 @@ const BusTicketConfirmationPage: React.FC = () => {
                 .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
                 .passengers-list { list-style-type: disc; padding-left: 20px; }
                 .passengers-list li { margin-bottom: 5px; }
-                .qr-code-section { 
-                    position: absolute; /* Absolute positioning */
-                    bottom: 30px; /* 30px from bottom */
-                    left: 30px; /* 30px from left */
-                    text-align: left; /* Align content to left */
-                    z-index: 10; /* Ensure it's on top */
-                    background-color: white; /* Ensure white background */
-                    padding: 10px; /* Padding around QR */
-                    border: 1px solid #ccc; /* Border around QR */
-                    box-shadow: 0 2px 8px rgba(0,0,0,0.1); /* Subtle shadow */
-                    width: 200px; /* Fixed width for the section */
-                    height: 280px; /* Fixed height for the section */
-                    display: flex;
-                    flex-direction: column;
-                    justify-content: space-between;
-                    align-items: flex-start;
+                .validation-section { 
+                    margin-top: 30px;
+                    text-align: center;
+                    padding: 15px;
+                    border: 1px solid #ccc;
+                    border-radius: 5px;
+                    background-color: #f9f9f9;
                 }
-                .qr-code-section h2 { color: #1e293b; margin-bottom: 5px; font-size: 1.2em; }
-                .qr-code-image-container { margin-bottom: 5px; }
-                .qr-data-text { font-size: 0.8em; color: #555; margin-top: 0; }
+                .validation-section h2 { color: #1e293b; margin-bottom: 10px; font-size: 1.5em; }
+                .validation-id-text { 
+                    font-family: 'monospace'; 
+                    font-size: 1.2em; 
+                    font-weight: bold; 
+                    color: #333; 
+                    word-break: break-all;
+                    margin-bottom: 10px;
+                }
                 .instructions { font-size: 0.9em; color: #1e293b; font-weight: 600; margin-top: 5px; }
                 .footer { text-align: center; margin-top: 40px; color: #777; font-size: 0.9em; }
                 .total-amount { font-size: 1.8em; font-weight: 700; color: #1e293b; text-align: right; margin-top: 20px; }
@@ -344,11 +312,9 @@ const BusTicketConfirmationPage: React.FC = () => {
                     body { background-color: white; padding: 0; }
                     .ticket-container { box-shadow: none; border: 1px solid #ccc; margin: 0; width: 100%; min-height: 100vh; border-radius: 0; }
                     .page-break { page-break-after: always; }
-                    .qr-code-section {
-                        border: 1px solid #000; /* Black border for print */
-                        background-color: white; /* Ensure white background for print */
-                        bottom: 20px; /* Slightly less margin for print */
-                        left: 20px;
+                    .validation-section {
+                        border: 1px solid #000;
+                        background-color: white;
                     }
                 }
             </style>
