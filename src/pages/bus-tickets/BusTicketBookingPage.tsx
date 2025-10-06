@@ -38,6 +38,9 @@ interface BookingPageProps {
   busId: string | null;
   busCapacity: number;
   courtesies: number;
+  originId: string; // NEW: Added originId
+  destinationId: string; // NEW: Added destinationId
+  searchDate: string; // NEW: Added searchDate
 }
 
 const BusTicketBookingPage: React.FC = () => {
@@ -59,6 +62,9 @@ const BusTicketBookingPage: React.FC = () => {
     busId,
     busCapacity,
     courtesies,
+    originId, // NEW: Destructure originId
+    destinationId, // NEW: Destructure destinationId
+    searchDate, // NEW: Destructure searchDate
   } = bookingData || {};
 
   const [formData, setFormData] = useState({
@@ -82,11 +88,11 @@ const BusTicketBookingPage: React.FC = () => {
 
   // Validate bookingData on mount
   useEffect(() => {
-    if (!routeId || !routeName || !originName || !destinationName || !departureTime || adultPrice === undefined || childPrice === undefined || busCapacity === undefined || courtesies === undefined) {
+    if (!routeId || !routeName || !originName || !destinationName || !departureTime || adultPrice === undefined || childPrice === undefined || busCapacity === undefined || courtesies === undefined || !originId || !destinationId || !searchDate) { // NEW: Added originId, destinationId, searchDate to validation
       console.error('BusTicketBookingPage: Datos de reserva incompletos detectados.');
       setPageError('Datos de reserva incompletos. Por favor, regresa y selecciona un horario.');
     }
-  }, [routeId, routeName, originName, destinationName, departureTime, adultPrice, childPrice, busCapacity, courtesies]);
+  }, [routeId, routeName, originName, destinationName, departureTime, adultPrice, childPrice, busCapacity, courtesies, originId, destinationId, searchDate]); // NEW: Added originId, destinationId, searchDate to dependencies
 
   // Fetch bus layout when component mounts or busId changes
   useEffect(() => {
@@ -330,7 +336,7 @@ const BusTicketBookingPage: React.FC = () => {
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <div className="mb-8">
             <Button asChild variant="outline" className="bg-white text-bus-primary hover:bg-gray-100 border-bus-primary hover:border-bus-primary/90">
-              <Link to="/bus-tickets/search-results" state={{ originId, destinationId, searchDate: location.state.searchDate }}>
+              <Link to="/bus-tickets/search-results" state={{ originId, destinationId, searchDate }}> {/* NEW: Pass originId, destinationId, searchDate */}
                 <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Resultados
               </Link>
             </Button>
