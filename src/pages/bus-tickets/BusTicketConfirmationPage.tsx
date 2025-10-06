@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import BusTicketsNavbar from '@/components/BusTicketsNavbar';
 import BusTicketsFooter from '@/components/BusTicketsFooter';
 import BusTicketsThemeProvider from '@/components/BusTicketsThemeProvider';
@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
-import { QRCodeCanvas } from 'react-qrcode-logo'; // Import QRCodeCanvas from react-qrcode-logo
+import QRCode from 'qrcode.react'; // Import qrcode.react
 
 interface BusPassenger {
   id: string;
@@ -56,7 +56,6 @@ const BusTicketConfirmationPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isGeneratingTicket, setIsGeneratingTicket] = useState(false);
-  const qrRefs = useRef<Record<string, HTMLCanvasElement | null>>({}); // Ref for each QR canvas
 
   useEffect(() => {
     const fetchBookingDetails = async () => {
@@ -203,9 +202,15 @@ const BusTicketConfirmationPage: React.FC = () => {
 
     try {
       const passengerTicketsHtml = bookingDetails.passengers.map(p => {
-        const validationId = `${p.id}_${bookingDetails.schedule_id}_${p.seat_number}`;
-        const qrCanvas = qrRefs.current[p.id];
-        const qrCodeImageSrc = qrCanvas ? qrCanvas.toDataURL('image/png') : '';
+        const validationId = `${p.id}_${bookingDetails.schedule_id}_${p.seat_number}`; // ID para validación
+
+        // We will render the QR code directly in the HTML string using a data URL
+        // This requires a server-side or pre-rendered approach for complex QR generation in print.
+        // For simplicity, we'll just display the validation ID as text for now,
+        // as direct client-side QR rendering in a new window's document.write is complex.
+        // The admin validation page can still use the text ID.
+        // If a visual QR code is strictly needed for printing, a dedicated server-side PDF generation
+        // or a more advanced client-side library setup would be required.
 
         return `
           <div class="ticket-page">
@@ -247,7 +252,7 @@ const BusTicketConfirmationPage: React.FC = () => {
                 <div class="validation-section">
                     <h2>ID de Validación</h2>
                     <p class="validation-id-text">${validationId}</p>
-                    ${qrCodeImageSrc ? `<img src="${qrCodeImageSrc}" alt="QR Code" class="qrcode-image" />` : '<p>QR Code no disponible</p>'}
+                    <div id="qrcode-${p.id}" class="qrcode-container"></div>
                     <p class="instructions">Presenta este ID o el código QR al abordar para la validación.</p>
                 </div>
 
@@ -309,7 +314,7 @@ const BusTicketConfirmationPage: React.FC = () => {
                     word-break: break-all;
                     margin-bottom: 10px;
                 }
-                .qrcode-image { margin: 15px auto; display: block; } /* Style for the QR code image */
+                .qrcode-container { margin: 15px auto; width: 150px; height: 150px; }
                 .instructions { font-size: 0.9em; color: #1e293b; font-weight: 600; margin-top: 5px; }
                 .footer { text-align: center; margin-top: 40px; color: #777; font-size: 0.9em; }
                 .total-amount { font-size: 1.8em; font-weight: 700; color: #1e293b; text-align: right; margin-top: 20px; }
@@ -326,6 +331,27 @@ const BusTicketConfirmationPage: React.FC = () => {
         </head>
         <body>
             ${passengerTicketsHtml}
+            <script src="https://unpkg.com/qrcode.react@1.0.1/dist/qrcode.react.min.js"></script>
+            <script>
+                document.addEventListener('DOMContentLoaded', () => {
+                    ${bookingDetails.passengers.map(p => {
+                        const validationId = `${p.id}_${bookingDetails.schedule_id}_${p.seat_number}`;
+                        return `
+                            const qrCodeElement_${p.id} = document.getElementById('qrcode-${p.id}');
+                            if (qrCodeElement_${p.id}) {
+                                new QRCode(qrCodeElement_${p.id}, {
+                                    text: "${validationId}",
+                                    width: 150,
+                                    height: 150,
+                                    colorDark : "#000000",
+                                    colorLight : "#ffffff",
+                                    correctLevel : QRCode.CorrectLevel.H
+                                });
+                            }
+                        `;
+                    }).join('')}
+                });
+            </script>
         </body>
         </html>
       `;
@@ -432,27 +458,6 @@ const BusTicketConfirmationPage: React.FC = () => {
                   </ul>
                 </div>
               )}
-              <div className="md:col-span-2 mt-6">
-                <h3 className="text-xl font-semibold mb-3 text-bus-primary">Códigos QR de Boletos</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {bookingDetails.passengers.map(p => {
-                    const validationId = `${p.id}_${bookingDetails.schedule_id}_${p.seat_number}`;
-                    return (
-                      <div key={p.id} className="flex flex-col items-center justify-center p-4 border rounded-md bg-gray-50">
-                        <p className="font-medium text-sm mb-2">{p.first_name} {p.last_name} (Asiento: {p.seat_number})</p>
-                        <QRCodeCanvas
-                          value={validationId}
-                          size={128}
-                          level="H"
-                          className="mx-auto"
-                          canvasRef={(el) => (qrRefs.current[p.id] = el)} // Assign ref to canvas
-                        />
-                        <p className="text-xs text-muted-foreground mt-2 break-all">{validationId}</p>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
             </CardContent>
           </Card>
 
