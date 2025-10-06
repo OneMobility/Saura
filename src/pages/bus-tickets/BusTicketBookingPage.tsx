@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Save, PlusCircle, MinusCircle, ArrowLeft } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import TourSeatMap from '@/components/TourSeatMap';
+import BusSeatMap from '@/components/bus-tickets/BusSeatMap'; // Changed from TourSeatMap
 import BusTicketsNavbar from '@/components/BusTicketsNavbar';
 import BusTicketsFooter from '@/components/BusTicketsFooter';
 import BusTicketsThemeProvider from '@/components/BusTicketsThemeProvider';
@@ -37,10 +37,11 @@ interface BookingPageProps {
   childPrice: number;
   busId: string | null;
   busCapacity: number;
-  courtesies: number;
+  courtesies: number; // Still passed from search results, but ignored by BusSeatMap
   originId: string;
   destinationId: string;
   searchDate: string;
+  scheduleId: string; // NEW: scheduleId from search results
 }
 
 const BusTicketBookingPage: React.FC = () => {
@@ -65,6 +66,7 @@ const BusTicketBookingPage: React.FC = () => {
     originId,
     destinationId,
     searchDate,
+    scheduleId, // NEW: Destructure scheduleId
   } = bookingData || {};
 
   const [formData, setFormData] = useState({
@@ -89,11 +91,11 @@ const BusTicketBookingPage: React.FC = () => {
 
   // Validate bookingData on mount
   useEffect(() => {
-    if (!routeId || !routeName || !originName || !destinationName || !departureTime || adultPrice === undefined || childPrice === undefined || busCapacity === undefined || courtesies === undefined || !originId || !destinationId || !searchDate) {
+    if (!routeId || !routeName || !originName || !destinationName || !departureTime || adultPrice === undefined || childPrice === undefined || busCapacity === undefined || courtesies === undefined || !originId || !destinationId || !searchDate || !scheduleId) { // Added scheduleId to validation
       console.error('BusTicketBookingPage: Datos de reserva incompletos detectados.');
       setPageError('Datos de reserva incompletos. Por favor, regresa y selecciona un horario.');
     }
-  }, [routeId, routeName, originName, destinationName, departureTime, adultPrice, childPrice, busCapacity, courtesies, originId, destinationId, searchDate]);
+  }, [routeId, routeName, originName, destinationName, departureTime, adultPrice, childPrice, busCapacity, courtesies, originId, destinationId, searchDate, scheduleId]);
 
   // Fetch bus layout when component mounts or busId changes
   useEffect(() => {
@@ -267,21 +269,22 @@ const BusTicketBookingPage: React.FC = () => {
         return;
       }
 
-      const newSeatAssignments = selectedSeats.map(seatNumber => ({
-        tour_id: routeId, // Use routeId as tour_id for bus tickets
+      // NEW: Insert into bus_seat_assignments table
+      const newBusSeatAssignments = selectedSeats.map(seatNumber => ({
+        schedule_id: scheduleId, // Use scheduleId for bus seat assignments
         seat_number: seatNumber,
         status: 'booked',
         client_id: newClientData.id,
       }));
 
-      if (newSeatAssignments.length > 0) {
-        const { error: seatsError } = await supabase
-          .from('tour_seat_assignments')
-          .insert(newSeatAssignments);
+      if (newBusSeatAssignments.length > 0) {
+        const { error: busSeatsError } = await supabase
+          .from('bus_seat_assignments')
+          .insert(newBusSeatAssignments);
 
-        if (seatsError) {
-          console.error('Error inserting new seat assignments:', seatsError);
-          toast.error('Error al asignar los asientos. Contacta a soporte.');
+        if (busSeatsError) {
+          console.error('Error inserting new bus seat assignments:', busSeatsError);
+          toast.error('Error al asignar los asientos del autobús. Contacta a soporte.');
           setIsSubmitting(false);
           return;
         }
@@ -345,6 +348,8 @@ const BusTicketBookingPage: React.FC = () => {
   console.log('BusTicketBookingPage: courtesies:', courtesies);
   console.log('BusTicketBookingPage: busLayout:', busLayout);
   console.log('BusTicketBookingPage: loadingBusLayout:', loadingBusLayout);
+  console.log('BusTicketBookingPage: scheduleId:', scheduleId);
+
 
   return (
     <BusTicketsThemeProvider>
@@ -380,7 +385,7 @@ const BusTicketBookingPage: React.FC = () => {
             {step === 1 && (
               <>
                 {/* Seat Selection */}
-                {busId && busCapacity > 0 ? (
+                {busId && busCapacity > 0 && scheduleId ? ( // Added scheduleId check
                   <div className="col-span-full mt-6">
                     <h3 className="text-lg font-semibold mb-4">Paso 1: Selección de Asientos</h3>
                     {loadingBusLayout ? (
@@ -389,14 +394,13 @@ const BusTicketBookingPage: React.FC = () => {
                         <p className="ml-4 text-muted-foreground">Cargando mapa de asientos...</p>
                       </div>
                     ) : (
-                      <TourSeatMap
-                        tourId={routeId} // Use routeId as tourId for seat assignments
+                      <BusSeatMap // Changed to BusSeatMap
+                        busId={busId}
                         busCapacity={busCapacity}
-                        courtesies={courtesies}
+                        scheduleId={scheduleId} // Pass scheduleId
                         seatLayoutJson={busLayout}
                         onSeatsSelected={handleSeatsSelected}
                         readOnly={false}
-                        adminMode={false}
                       />
                     )}
                     {selectedSeats.length > 0 && (
@@ -407,7 +411,7 @@ const BusTicketBookingPage: React.FC = () => {
                   </div>
                 ) : (
                   <div className="col-span-full mt-6 p-4 border rounded-lg bg-muted text-center text-muted-foreground">
-                    <p>No hay un autobús asignado o no tiene capacidad para esta ruta.</p>
+                    <p>No hay un autobús asignado o no tiene capacidad para esta ruta/horario.</p>
                     <p className="text-sm mt-2">Por favor, verifica la configuración de la ruta y el autobús en el panel de administración.</p>
                   </div>
                 )}

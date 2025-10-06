@@ -18,12 +18,6 @@ interface Companion {
   age: number | null;
 }
 
-interface RoomDetails {
-  double_rooms: number;
-  triple_rooms: number;
-  quad_rooms: number;
-}
-
 interface ClientBookingDetails {
   id: string;
   first_name: string;
@@ -38,12 +32,14 @@ interface ClientBookingDetails {
   total_paid: number;
   status: string;
   contractor_age: number | null;
-  tour_id: string; // This is the routeId for bus tickets
+  route_id: string; // Changed from tour_id to route_id
+  schedule_id: string; // NEW: schedule_id for the specific trip
   route_name: string;
   origin_name: string;
   destination_name: string;
   departure_time: string;
   assigned_seat_numbers: number[];
+  search_date: string; // NEW: search_date to display
 }
 
 const BusTicketConfirmationPage: React.FC = () => {
@@ -82,13 +78,10 @@ const BusTicketConfirmationPage: React.FC = () => {
             total_paid,
             status,
             contractor_age,
-            tour_id,
-            tour_seat_assignments (
+            tour_id, -- This is the route_id for bus tickets
+            bus_seat_assignments (
+              schedule_id,
               seat_number
-            ),
-            tours (
-              title,
-              bus_id
             )
           `)
           .eq('contract_number', contractNumber)
@@ -101,6 +94,15 @@ const BusTicketConfirmationPage: React.FC = () => {
           return;
         }
 
+        const assignedSeats = (clientData.bus_seat_assignments || []).map((s: { seat_number: number }) => s.seat_number).sort((a: number, b: number) => a - b);
+        const scheduleId = clientData.bus_seat_assignments?.[0]?.schedule_id || null;
+
+        if (!scheduleId) {
+          setError('No se encontró el horario asociado a esta reserva de asiento.');
+          setLoading(false);
+          return;
+        }
+
         // Fetch route details (using tour_id as route_id)
         const { data: routeData, error: routeError } = await supabase
           .from('bus_routes')
@@ -108,7 +110,7 @@ const BusTicketConfirmationPage: React.FC = () => {
             name,
             all_stops
           `)
-          .eq('id', clientData.tour_id)
+          .eq('id', clientData.tour_id) // clientData.tour_id is the route_id
           .single();
 
         if (routeError || !routeData) {
@@ -129,15 +131,11 @@ const BusTicketConfirmationPage: React.FC = () => {
         const originName = destinationMap.get(routeData.all_stops[0]) || 'N/A';
         const destinationName = destinationMap.get(routeData.all_stops[routeData.all_stops.length - 1]) || 'N/A';
 
-        // Fetch schedule details (assuming one schedule per route for simplicity, or need to pass scheduleId)
-        // For now, we'll just get the first active schedule for the route.
+        // Fetch schedule details using the scheduleId from bus_seat_assignments
         const { data: scheduleData, error: scheduleError } = await supabase
           .from('bus_schedules')
-          .select('departure_time')
-          .eq('route_id', clientData.tour_id)
-          .eq('is_active', true)
-          .order('departure_time', { ascending: true })
-          .limit(1)
+          .select('departure_time, effective_date_start') // Also fetch effective_date_start for the ticket
+          .eq('id', scheduleId)
           .single();
 
         if (scheduleError || !scheduleData) {
@@ -161,12 +159,14 @@ const BusTicketConfirmationPage: React.FC = () => {
           total_paid: clientData.total_paid,
           status: clientData.status,
           contractor_age: clientData.contractor_age,
-          tour_id: clientData.tour_id,
+          route_id: clientData.tour_id, // clientData.tour_id is the route_id
+          schedule_id: scheduleId,
           route_name: routeData.name,
           origin_name: originName,
           destination_name: destinationName,
           departure_time: scheduleData.departure_time,
-          assigned_seat_numbers: clientData.tour_seat_assignments?.map((s: { seat_number: number }) => s.seat_number).sort((a: number, b: number) => a - b) || [],
+          assigned_seat_numbers: assignedSeats,
+          search_date: scheduleData.effective_date_start || format(new Date(), 'yyyy-MM-dd'), // Use schedule start date or current date
         });
 
       } catch (err: any) {
@@ -190,8 +190,6 @@ const BusTicketConfirmationPage: React.FC = () => {
     toast.info('Generando boleto...');
 
     try {
-      // Here you would typically call an Edge Function to generate a more formal ticket HTML/PDF
-      // For simplicity, we'll generate a basic HTML representation directly.
       const ticketHtml = `
         <!DOCTYPE html>
         <html lang="es">
@@ -234,7 +232,7 @@ const BusTicketConfirmationPage: React.FC = () => {
                             <p><strong>Ruta:</strong> ${bookingDetails.route_name}</p>
                             <p><strong>Origen:</strong> ${bookingDetails.origin_name}</p>
                             <p><strong>Destino:</strong> ${bookingDetails.destination_name}</p>
-                            <p><strong>Fecha de Viaje:</strong> ${format(parseISO(searchDate), 'dd/MM/yyyy', { locale: es })}</p>
+                            <p><strong>Fecha de Viaje:</strong> ${format(parseISO(bookingDetails.search_date), 'dd/MM/yyyy', { locale: es })}</p>
                             <p><strong>Hora de Salida:</strong> ${bookingDetails.departure_time}</p>
                         </div>
                         <div>
@@ -363,6 +361,7 @@ const BusTicketConfirmationPage: React.FC = () => {
               <div>
                 <h3 className="text-xl font-semibold mb-3 text-bus-primary">Detalles del Viaje</h3>
                 <p><span className="font-medium">Salida:</span> {bookingDetails.departure_time}</p>
+                <p><span className="font-medium">Fecha de Viaje:</span> {format(parseISO(bookingDetails.search_date), 'dd/MM/yyyy', { locale: es })}</p>
                 <p><span className="font-medium">Asientos:</span> {bookingDetails.assigned_seat_numbers.join(', ') || 'N/A'}</p>
                 <p><span className="font-medium">Total Personas:</span> {bookingDetails.number_of_people}</p>
                 <p><span className="font-medium">Monto Total:</span> ${bookingDetails.total_amount.toFixed(2)}</p>
