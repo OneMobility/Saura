@@ -18,7 +18,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
-  { href: '/admin/buses', icon: Bus, label: 'Autobuses' }, // MOVED: Buses to top level
+  { href: '/admin/buses', icon: Bus, label: 'Autobuses' },
   {
     icon: Ticket,
     label: 'Boletos de Autobús',
