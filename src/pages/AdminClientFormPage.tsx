@@ -977,11 +977,12 @@ const AdminClientFormPage = () => {
                 </div>
                 <div>
                   <Label htmlFor="tour_id">Tour Asociado</Label>
-                  <Select value={formData.tour_id || ''} onValueChange={(value) => handleSelectChange('tour_id', value)}>
+                  <Select value={formData.tour_id || 'none'} onValueChange={(value) => handleSelectChange('tour_id', value === 'none' ? null : value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar Tour" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="none">Ninguno</SelectItem> {/* Changed value to 'none' */}
                       {availableTours.map((tour) => (
                         <SelectItem key={tour.id} value={tour.id}>
                           {tour.title}
@@ -992,11 +993,12 @@ const AdminClientFormPage = () => {
                 </div>
                 <div>
                   <Label htmlFor="bus_route_id">Ruta de Autobús Asociada</Label>
-                  <Select value={formData.bus_route_id || ''} onValueChange={(value) => handleSelectChange('bus_route_id', value)}>
+                  <Select value={formData.bus_route_id || 'none'} onValueChange={(value) => handleSelectChange('bus_route_id', value === 'none' ? null : value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar Ruta de Autobús" />
                     </SelectTrigger>
                     <SelectContent>
+                      <SelectItem value="none">Ninguna</SelectItem> {/* Changed value to 'none' */}
                       {availableBusRoutes.map((route) => (
                         <SelectItem key={route.id} value={route.id}>
                           {route.name}
@@ -1007,7 +1009,7 @@ const AdminClientFormPage = () => {
                 </div>
               </div>
 
-              {/* Occupancy and Companions / Bus Passengers */}
+              {/* Occupancy and Passengers */}
               <h3 className="text-lg font-semibold mt-4">Ocupación y Pasajeros</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>

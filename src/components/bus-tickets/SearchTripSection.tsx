@@ -51,7 +51,7 @@ const SearchTripSection = () => {
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!origin || !destination || !date || passengers <= 0) {
+    if (!origin || origin === 'none' || !destination || destination === 'none' || !date || passengers <= 0) { // Adjusted condition
       toast.error('Por favor, rellena todos los campos de búsqueda.');
       return;
     }
@@ -84,6 +84,7 @@ const SearchTripSection = () => {
                 <SelectValue placeholder="Selecciona Origen" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="none">Selecciona Origen</SelectItem> {/* Changed value to 'none' */}
                 {availableDestinations.map((dest) => (
                   <SelectItem key={dest.id} value={dest.id}>
                     {dest.name}
@@ -99,6 +100,7 @@ const SearchTripSection = () => {
                 <SelectValue placeholder="Selecciona Destino" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="none">Selecciona Destino</SelectItem> {/* Changed value to 'none' */}
                 {availableDestinations.map((dest) => (
                   <SelectItem key={dest.id} value={dest.id}>
                     {dest.name}
@@ -139,7 +141,8 @@ const SearchTripSection = () => {
           <div className="space-y-1.5">
             <Label htmlFor="passengers" className="text-lg text-bus-primary-foreground">Pasajeros</Label>
             <Input
-              type="number"
+              type="text" // Changed to text
+              pattern="[0-9]*" // Pattern for integers
               id="passengers"
               placeholder="Número de Pasajeros"
               className="p-3 focus-visible:ring-bus-secondary"

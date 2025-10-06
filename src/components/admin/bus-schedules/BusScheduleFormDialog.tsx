@@ -27,7 +27,7 @@ interface BusScheduleFormDialogProps {
 
 const BusScheduleFormDialog: React.FC<BusScheduleFormDialogProps> = ({ isOpen, onClose, onSave, initialData }) => {
   const [formData, setFormData] = useState<BusSchedule>({
-    route_id: '',
+    route_id: 'none', // Changed initial state to 'none'
     departure_time: '08:00',
     day_of_week: [],
     effective_date_start: null,
@@ -71,7 +71,7 @@ const BusScheduleFormDialog: React.FC<BusScheduleFormDialogProps> = ({ isOpen, o
       setEndDate(initialData.effective_date_end ? parseISO(initialData.effective_date_end) : undefined);
     } else {
       setFormData({
-        route_id: '',
+        route_id: 'none', // Changed initial state to 'none'
         departure_time: '08:00',
         day_of_week: [],
         effective_date_start: null,
@@ -91,7 +91,7 @@ const BusScheduleFormDialog: React.FC<BusScheduleFormDialogProps> = ({ isOpen, o
   };
 
   const handleSelectChange = (id: keyof BusSchedule, value: string | boolean) => {
-    setFormData((prev) => ({ ...prev, [id]: value }));
+    setFormData((prev) => ({ ...prev, [id]: value === 'none' ? null : value })); // Adjusted to handle 'none'
   };
 
   const handleSwitchChange = (checked: boolean) => {
@@ -149,7 +149,7 @@ const BusScheduleFormDialog: React.FC<BusScheduleFormDialogProps> = ({ isOpen, o
     e.preventDefault();
     setIsSubmitting(true);
 
-    if (!formData.route_id || !formData.departure_time || formData.day_of_week.length === 0) {
+    if (!formData.route_id || formData.route_id === 'none' || !formData.departure_time || formData.day_of_week.length === 0) { // Adjusted condition
       toast.error('Por favor, rellena la ruta, la hora de salida y al menos un día de la semana.');
       setIsSubmitting(false);
       return;
@@ -231,11 +231,12 @@ const BusScheduleFormDialog: React.FC<BusScheduleFormDialogProps> = ({ isOpen, o
             <Label htmlFor="route_id" className="text-right">
               Ruta
             </Label>
-            <Select value={formData.route_id} onValueChange={(value) => handleSelectChange('route_id', value)} required>
+            <Select value={formData.route_id || 'none'} onValueChange={(value) => handleSelectChange('route_id', value)} required>
               <SelectTrigger className="col-span-3">
                 <SelectValue placeholder="Seleccionar una ruta" />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="none">Ninguna</SelectItem> {/* Changed value to 'none' */}
                 {availableRoutes.map((route) => (
                   <SelectItem key={route.id} value={route.id as string}>
                     {route.name}

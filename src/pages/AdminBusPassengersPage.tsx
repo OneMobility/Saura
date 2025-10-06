@@ -56,8 +56,8 @@ const AdminBusPassengersPage = () => {
   const [availableSchedules, setAvailableSchedules] = useState<BusSchedule[]>([]);
 
   // Filter states
-  const [filterRoute, setFilterRoute] = useState<string>('');
-  const [filterSchedule, setFilterSchedule] = useState<string>('');
+  const [filterRoute, setFilterRoute] = useState<string>('all'); // Changed initial state to 'all'
+  const [filterSchedule, setFilterSchedule] = useState<string>('all'); // Changed initial state to 'all'
   const [filterDate, setFilterDate] = useState<string>('');
   const [filterName, setFilterName] = useState<string>('');
 
@@ -103,10 +103,10 @@ const AdminBusPassengersPage = () => {
       `)
       .order('created_at', { ascending: false });
 
-    if (filterRoute) {
+    if (filterRoute !== 'all') { // Adjusted condition
       query = query.eq('bus_schedules.route_id', filterRoute);
     }
-    if (filterSchedule) {
+    if (filterSchedule !== 'all') { // Adjusted condition
       query = query.eq('schedule_id', filterSchedule);
     }
     if (filterDate) {
@@ -135,8 +135,8 @@ const AdminBusPassengersPage = () => {
   };
 
   const handleClearFilters = () => {
-    setFilterRoute('');
-    setFilterSchedule('');
+    setFilterRoute('all'); // Changed to 'all'
+    setFilterSchedule('all'); // Changed to 'all'
     setFilterDate('');
     setFilterName('');
     fetchBusPassengers(); // Re-fetch all passengers
@@ -184,7 +184,7 @@ const AdminBusPassengersPage = () => {
     return null;
   }
 
-  const filteredSchedules = availableSchedules.filter(s => filterRoute ? s.route_id === filterRoute : true);
+  const filteredSchedules = availableSchedules.filter(s => filterRoute !== 'all' ? s.route_id === filterRoute : true); // Adjusted condition
 
   return (
     <div className="flex min-h-screen bg-gray-100">
@@ -200,18 +200,18 @@ const AdminBusPassengersPage = () => {
                   <SelectValue placeholder="Filtrar por Ruta" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todas las Rutas</SelectItem>
+                  <SelectItem value="all">Todas las Rutas</SelectItem> {/* Changed value to 'all' */}
                   {availableRoutes.map(route => (
                     <SelectItem key={route.id} value={route.id}>{route.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={filterSchedule} onValueChange={setFilterSchedule} disabled={!filterRoute}>
+              <Select value={filterSchedule} onValueChange={setFilterSchedule} disabled={filterRoute === 'all'}> {/* Adjusted disabled condition */}
                 <SelectTrigger>
                   <SelectValue placeholder="Filtrar por Horario" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos los Horarios</SelectItem>
+                  <SelectItem value="all">Todos los Horarios</SelectItem> {/* Changed value to 'all' */}
                   {filteredSchedules.map(schedule => (
                     <SelectItem key={schedule.id} value={schedule.id}>
                       {schedule.departure_time} ({format(parseISO(schedule.effective_date_start), 'dd/MM/yy', { locale: es })})

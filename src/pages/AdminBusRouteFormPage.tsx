@@ -205,7 +205,7 @@ const AdminBusRouteFormPage = () => {
   };
 
   const handleSelectChange = (id: keyof BusRoute, value: string | boolean) => {
-    setFormData((prev) => ({ ...prev, [id]: value }));
+    setFormData((prev) => ({ ...prev, [id]: value === 'none' ? null : value })); // Adjusted to handle 'none'
   };
 
   const handleSwitchChange = (checked: boolean) => {
@@ -223,7 +223,7 @@ const AdminBusRouteFormPage = () => {
   const addStop = () => {
     setFormData((prev) => ({
       ...prev,
-      all_stops: [...prev.all_stops, ''],
+      all_stops: [...prev.all_stops, 'none'], // Changed initial value to 'none'
     }));
   };
 
@@ -255,13 +255,13 @@ const AdminBusRouteFormPage = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    if (!formData.name || !formData.bus_id || formData.all_stops.length < 2) {
+    if (!formData.name || !formData.bus_id || formData.bus_id === 'none' || formData.all_stops.length < 2) { // Adjusted condition
       toast.error('Por favor, rellena el nombre de la ruta, asigna un autobús y define al menos dos paradas.');
       setIsSubmitting(false);
       return;
     }
 
-    if (formData.all_stops.some(stopId => !stopId)) {
+    if (formData.all_stops.some(stopId => !stopId || stopId === 'none')) { // Adjusted condition
       toast.error('Por favor, selecciona un destino válido para cada parada.');
       setIsSubmitting(false);
       return;
@@ -410,11 +410,12 @@ const AdminBusRouteFormPage = () => {
                 <Label htmlFor="bus_id" className="text-right">
                   Autobús Asignado
                 </Label>
-                <Select value={formData.bus_id || ''} onValueChange={(value) => handleSelectChange('bus_id', value)} required>
+                <Select value={formData.bus_id || 'none'} onValueChange={(value) => handleSelectChange('bus_id', value)}>
                   <SelectTrigger className="col-span-3">
                     <SelectValue placeholder="Seleccionar un autobús" />
                   </SelectTrigger>
                   <SelectContent>
+                    <SelectItem value="none">Ninguno</SelectItem> {/* Changed value to 'none' */}
                     {availableBuses.map((bus) => (
                       <SelectItem key={bus.id} value={bus.id}>
                         {bus.name} (Capacidad: {bus.total_capacity})
@@ -429,13 +430,14 @@ const AdminBusRouteFormPage = () => {
                 {formData.all_stops.map((stopId, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <Select
-                      value={stopId}
-                      onValueChange={(value) => handleAllStopsChange(index, value)}
+                      value={stopId || 'none'} // Ensure value is 'none' if empty
+                      onValueChange={(value) => handleAllStopsChange(index, value === 'none' ? '' : value)} // Handle 'none' back to empty string
                     >
                       <SelectTrigger className="flex-grow">
                         <SelectValue placeholder={`Parada ${index + 1}`} />
                       </SelectTrigger>
                       <SelectContent>
+                        <SelectItem value="none">Seleccionar Destino</SelectItem> {/* Changed value to 'none' */}
                         {availableDestinations.map((dest) => (
                           <SelectItem key={dest.id} value={dest.id}>
                             {dest.name}
