@@ -34,6 +34,7 @@ import AdminClientFormPage from "./pages/AdminClientFormPage";
 import AdminBusTicketsPage from "./pages/AdminBusTicketsPage";
 import AdminBusDestinationsPage from "./pages/AdminBusDestinationsPage";
 import AdminBusRoutesPage from "./pages/AdminBusRoutesPage";
+import AdminBusRouteFormPage from "./pages/AdminBusRouteFormPage"; // NEW: Import AdminBusRouteFormPage
 import AdminBusSchedulesPage from "./pages/AdminBusSchedulesPage";
 
 // Bus Tickets Subdomain Pages
@@ -46,7 +47,7 @@ import BillingCenterPage from "./pages/bus-tickets/BillingCenterPage";
 import BusContactPage from "./pages/bus-tickets/BusContactPage";
 import AdditionalServicesPage from "./pages/bus-tickets/AdditionalServicesPage";
 import HelpCenterPage from "./pages/bus-tickets/HelpCenterPage";
-import BusSearchResultsPage from "./pages/bus-tickets/BusSearchResultsPage"; // NEW: Import BusSearchResultsPage
+import BusSearchResultsPage from "./pages/bus-tickets/BusSearchResultsPage";
 
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -83,7 +84,7 @@ const App = () => {
               <Route path="/bus-tickets/billing-center" element={<BillingCenterPage />} />
               <Route path="/bus-tickets/help-center" element={<HelpCenterPage />} />
               <Route path="/bus-tickets/contact" element={<BusContactPage />} />
-              <Route path="/bus-tickets/search-results" element={<BusSearchResultsPage />} /> {/* NEW: Route for search results */}
+              <Route path="/bus-tickets/search-results" element={<BusSearchResultsPage />} />
 
               <Route path="/login" element={<Login />} />
               <Route
@@ -267,6 +268,22 @@ const App = () => {
                 element={
                   <ProtectedRoute adminOnly>
                     <AdminBusRoutesPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/bus-tickets/routes/new"
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminBusRouteFormPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/bus-tickets/routes/edit/:id"
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminBusRouteFormPage />
                   </ProtectedRoute>
                 }
               />

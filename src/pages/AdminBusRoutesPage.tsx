@@ -8,14 +8,11 @@ import { useNavigate } from 'react-router-dom';
 import { Loader2, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import BusRoutesTable from '@/components/admin/bus-routes/BusRoutesTable';
-import BusRouteFormDialog from '@/components/admin/bus-routes/BusRouteFormDialog';
 import { BusRoute } from '@/types/shared';
 
 const AdminBusRoutesPage = () => {
   const { user, isAdmin, isLoading: sessionLoading } = useSession();
   const navigate = useNavigate();
-  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
-  const [selectedRoute, setSelectedRoute] = useState<BusRoute | null>(null);
   const [refreshKey, setRefreshKey] = useState(0); // Key to force re-fetch of routes
 
   useEffect(() => {
@@ -25,13 +22,11 @@ const AdminBusRoutesPage = () => {
   }, [user, isAdmin, sessionLoading, navigate]);
 
   const handleAddRoute = () => {
-    setSelectedRoute(null);
-    setIsFormDialogOpen(true);
+    navigate('/admin/bus-tickets/routes/new'); // Navigate to the new form page for creation
   };
 
   const handleEditRoute = (route: BusRoute) => {
-    setSelectedRoute(route);
-    setIsFormDialogOpen(true);
+    navigate(`/admin/bus-tickets/routes/edit/${route.id}`); // Navigate to the new form page for editing
   };
 
   const handleRouteSave = () => {
@@ -67,12 +62,6 @@ const AdminBusRoutesPage = () => {
           <p>&copy; {new Date().getFullYear()} Saura Tours Admin. Todos los derechos reservados.</p>
         </footer>
       </div>
-      <BusRouteFormDialog
-        isOpen={isFormDialogOpen}
-        onClose={() => setIsFormDialogOpen(false)}
-        onSave={handleRouteSave}
-        initialData={selectedRoute}
-      />
     </div>
   );
 };
