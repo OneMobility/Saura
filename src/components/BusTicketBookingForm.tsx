@@ -39,23 +39,31 @@ interface BusDetails {
 interface BusTicketBookingFormProps {
   isOpen: boolean;
   onClose: () => void;
-  tourId: string;
-  tourTitle: string;
-  tourImage: string;
-  tourDescription: string;
-  tourSellingPrices: TourSellingPrices;
-  busDetails: BusDetails;
+  routeId: string; // Changed from tourId to routeId
+  routeName: string; // Changed from tourTitle to routeName
+  originName: string;
+  destinationName: string;
+  departureTime: string;
+  adultPrice: number;
+  childPrice: number;
+  busId: string | null; // Passed directly
+  busCapacity: number; // Passed directly
+  courtesies: number; // Passed directly
 }
 
 const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
   isOpen,
   onClose,
-  tourId,
-  tourTitle,
-  tourImage,
-  tourDescription,
-  tourSellingPrices,
-  busDetails: initialBusDetails,
+  routeId,
+  routeName,
+  originName,
+  destinationName,
+  departureTime,
+  adultPrice,
+  childPrice,
+  busId,
+  busCapacity,
+  courtesies,
 }) => {
   const [formData, setFormData] = useState({
     first_name: '',
@@ -75,15 +83,15 @@ const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
   const [numAdults, setNumAdults] = useState(0);
   const [numChildren, setNumChildren] = useState(0);
 
-  // Fetch bus layout when component mounts or tourId/bus_id changes
+  // Fetch bus layout when component mounts or busId changes
   useEffect(() => {
     const fetchBusLayout = async () => {
-      if (initialBusDetails.bus_id) {
+      if (busId) {
         setLoadingBusLayout(true);
         const { data, error } = await supabase
           .from('buses')
           .select('seat_layout_json')
-          .eq('id', initialBusDetails.bus_id)
+          .eq('id', busId)
           .single();
 
         if (error) {
@@ -100,40 +108,33 @@ const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
       }
     };
     fetchBusLayout();
-  }, [initialBusDetails.bus_id]);
+  }, [busId]);
 
   useEffect(() => {
     let currentNumAdults = 0;
     let currentNumChildren = 0;
 
-    if (formData.contractor_age !== null) {
-      if (formData.contractor_age >= 12) {
-        currentNumAdults++;
-      } else {
-        currentNumChildren++;
-      }
+    // Contractor is an adult by default if age is not provided or >= 12
+    if (formData.contractor_age === null || formData.contractor_age >= 12) {
+      currentNumAdults++;
     } else {
-      currentNumAdults++; // Default to adult if age is not provided
+      currentNumChildren++;
     }
 
     formData.companions.forEach(c => {
-      if (c.age !== null) {
-        if (c.age >= 12) {
-          currentNumAdults++;
-        } else {
-          currentNumChildren++;
-        }
+      if (c.age === null || c.age >= 12) {
+        currentNumAdults++;
       } else {
-        currentNumAdults++; // Default to adult if age is not provided
+        currentNumChildren++;
       }
     });
 
     setNumAdults(currentNumAdults);
     setNumChildren(currentNumChildren);
 
-    const calculatedTotalAmount = (currentNumAdults * tourSellingPrices.adult) + (currentNumChildren * tourSellingPrices.child);
+    const calculatedTotalAmount = (currentNumAdults * adultPrice) + (currentNumChildren * childPrice);
     setTotalAmount(calculatedTotalAmount);
-  }, [formData.contractor_age, formData.companions, tourSellingPrices]);
+  }, [formData.contractor_age, formData.companions, adultPrice, childPrice]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
@@ -215,7 +216,7 @@ const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
         address: null, // Not collected in this form
         identification_number: formData.identification_number || null,
         contract_number: contract_number,
-        tour_id: tourId,
+        tour_id: routeId, // Use routeId as tour_id for bus tickets
         number_of_people: totalPeople,
         companions: formData.companions,
         extra_services: [], // Not collected in this form
@@ -241,7 +242,7 @@ const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
       }
 
       const newSeatAssignments = selectedSeats.map(seatNumber => ({
-        tour_id: tourId,
+        tour_id: routeId, // Use routeId as tour_id for bus tickets
         seat_number: seatNumber,
         status: 'booked',
         client_id: newClientData.id,
@@ -274,18 +275,19 @@ const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto bg-bus-background text-bus-foreground">
         <DialogHeader>
-          <DialogTitle className="text-bus-primary">Reservar Boletos para: {tourTitle}</DialogTitle>
+          <DialogTitle className="text-bus-primary">Reservar Boletos para: {routeName}</DialogTitle>
           <DialogDescription>
             Rellena tus datos y selecciona tus asientos para completar la reserva de boletos de autobús.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-6 py-4">
-          {/* Tour Summary */}
+          {/* Trip Summary */}
           <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-md">
-            <img src={tourImage} alt={tourTitle} className="w-24 h-16 object-cover rounded-md" />
             <div>
-              <h4 className="font-semibold text-lg">{tourTitle}</h4>
-              <p className="text-muted-foreground text-sm line-clamp-2">{tourDescription}</p>
+              <h4 className="font-semibold text-lg">{routeName}</h4>
+              <p className="text-muted-foreground text-sm">
+                {originName} a {destinationName} - Salida: {departureTime}
+              </p>
             </div>
           </div>
 
@@ -368,7 +370,7 @@ const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
           </div>
 
           {/* Seat Selection */}
-          {initialBusDetails.bus_id && initialBusDetails.bus_capacity > 0 && (
+          {busId && busCapacity > 0 && (
             <div className="col-span-full mt-6">
               <h3 className="text-lg font-semibold mb-4">Selección de Asientos</h3>
               {loadingBusLayout ? (
@@ -378,9 +380,9 @@ const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
                 </div>
               ) : (
                 <TourSeatMap
-                  tourId={tourId}
-                  busCapacity={initialBusDetails.bus_capacity}
-                  courtesies={initialBusDetails.courtesies}
+                  tourId={routeId} // Use routeId as tourId for seat assignments
+                  busCapacity={busCapacity}
+                  courtesies={courtesies}
                   seatLayoutJson={busLayout}
                   onSeatsSelected={handleSeatsSelected}
                   readOnly={false}
@@ -398,8 +400,8 @@ const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
           {/* Price Breakdown */}
           <div className="col-span-full mt-6 p-4 bg-gray-100 rounded-md">
             <h4 className="font-semibold text-lg mb-2">Desglose del Cálculo:</h4>
-            <p className="text-sm text-muted-foreground">Adultos: <span className="font-medium">{numAdults}</span> x ${tourSellingPrices.adult.toFixed(2)} = <span className="font-medium">${(numAdults * tourSellingPrices.adult).toFixed(2)}</span></p>
-            <p className="text-sm text-muted-foreground">Niños (-12 años): <span className="font-medium">{numChildren}</span> x ${tourSellingPrices.child.toFixed(2)} = <span className="font-medium">${(numChildren * tourSellingPrices.child).toFixed(2)}</span></p>
+            <p className="text-sm text-muted-foreground">Adultos: <span className="font-medium">{numAdults}</span> x ${adultPrice.toFixed(2)} = <span className="font-medium">${(numAdults * adultPrice).toFixed(2)}</span></p>
+            <p className="text-sm text-muted-foreground">Niños (-12 años): <span className="font-medium">{numChildren}</span> x ${childPrice.toFixed(2)} = <span className="font-medium">${(numChildren * childPrice).toFixed(2)}</span></p>
             <p className="font-bold mt-2 text-bus-foreground">Total Calculado: <span className="text-xl">${totalAmount.toFixed(2)}</span></p>
           </div>
 
@@ -421,4 +423,4 @@ const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
   );
 };
 
-export default ClientBookingForm;
+export default BusTicketBookingForm;

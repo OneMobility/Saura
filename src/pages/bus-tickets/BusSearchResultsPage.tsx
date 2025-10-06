@@ -11,6 +11,8 @@ import { format, parseISO, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Dialog, DialogTrigger } from '@/components/ui/dialog'; // Import Dialog and DialogTrigger
+import BusTicketBookingForm from '@/components/BusTicketBookingForm'; // Import the new booking form
 
 interface SearchResult {
   routeId: string;
@@ -24,6 +26,8 @@ interface SearchResult {
   busId: string | null;
   originName: string;
   destinationName: string;
+  busCapacity: number; // NEW: Add busCapacity
+  courtesies: number; // NEW: Add courtesies
 }
 
 const BusSearchResultsPage = () => {
@@ -35,6 +39,9 @@ const BusSearchResultsPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [originName, setOriginName] = useState<string>('');
   const [destinationName, setDestinationName] = useState<string>('');
+
+  const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false); // NEW: State for booking dialog
+  const [selectedScheduleForBooking, setSelectedScheduleForBooking] = useState<SearchResult | null>(null); // NEW: State for selected schedule
 
   const fetchResults = useCallback(async () => {
     setLoading(true);
@@ -89,6 +96,13 @@ const BusSearchResultsPage = () => {
         .eq('is_active', true);
       if (schedulesError) throw schedulesError;
 
+      // 4. Fetch all buses to get capacity and courtesies
+      const { data: busesData, error: busesError } = await supabase
+        .from('buses')
+        .select('id, total_capacity, seat_layout_json'); // Fetch seat_layout_json too
+      if (busesError) throw busesError;
+      const busMap = new Map(busesData.map(b => [b.id, b]));
+
       const foundResults: SearchResult[] = [];
 
       routesData.forEach(route => {
@@ -118,6 +132,7 @@ const BusSearchResultsPage = () => {
                 isScheduleValidForDateRange &&
                 isDepartureTimeInFuture
               ) {
+                const busDetails = busMap.get(route.bus_id);
                 foundResults.push({
                   routeId: route.id,
                   routeName: route.name,
@@ -130,6 +145,8 @@ const BusSearchResultsPage = () => {
                   busId: route.bus_id,
                   originName: destinationMap.get(originId) || 'N/A',
                   destinationName: destinationMap.get(destinationId) || 'N/A',
+                  busCapacity: busDetails?.total_capacity || 0, // Default to 0 if bus not found
+                  courtesies: 0, // Bus tickets don't typically have 'courtesies' like tours, default to 0
                 });
               }
             });
@@ -152,6 +169,11 @@ const BusSearchResultsPage = () => {
   useEffect(() => {
     fetchResults();
   }, [fetchResults]);
+
+  const handleSelectSchedule = (schedule: SearchResult) => {
+    setSelectedScheduleForBooking(schedule);
+    setIsBookingDialogOpen(true);
+  };
 
   const displayDate = searchDate ? format(new Date(searchDate), 'EEEE, dd MMMM yyyy', { locale: es }) : 'Fecha no especificada';
 
@@ -220,7 +242,10 @@ const BusSearchResultsPage = () => {
                       {result.durationMinutes && <p><Clock className="inline-block h-4 w-4 mr-1" /> {result.durationMinutes} min</p>}
                       {result.distanceKm && <p><MapPin className="inline-block h-4 w-4 mr-1" /> {result.distanceKm} km</p>}
                     </div>
-                    <Button className="w-full bg-bus-secondary hover:bg-bus-secondary/90 text-bus-secondary-foreground font-semibold py-3 text-lg">
+                    <Button 
+                      className="w-full bg-bus-secondary hover:bg-bus-secondary/90 text-bus-secondary-foreground font-semibold py-3 text-lg"
+                      onClick={() => handleSelectSchedule(result)} // NEW: Open booking form
+                    >
                       Seleccionar Horario
                     </Button>
                   </CardContent>
@@ -230,6 +255,24 @@ const BusSearchResultsPage = () => {
           )}
         </main>
         <BusTicketsFooter />
+
+        {/* NEW: BusTicketBookingForm Dialog */}
+        {selectedScheduleForBooking && (
+          <BusTicketBookingForm
+            isOpen={isBookingDialogOpen}
+            onClose={() => setIsBookingDialogOpen(false)}
+            routeId={selectedScheduleForBooking.routeId}
+            routeName={selectedScheduleForBooking.routeName}
+            originName={selectedScheduleForBooking.originName}
+            destinationName={selectedScheduleForBooking.destinationName}
+            departureTime={selectedScheduleForBooking.departureTime}
+            adultPrice={selectedScheduleForBooking.adultPrice}
+            childPrice={selectedScheduleForBooking.childPrice}
+            busId={selectedScheduleForBooking.busId}
+            busCapacity={selectedScheduleForBooking.busCapacity}
+            courtesies={selectedScheduleForBooking.courtesies}
+          />
+        )}
       </div>
     </BusTicketsThemeProvider>
   );
