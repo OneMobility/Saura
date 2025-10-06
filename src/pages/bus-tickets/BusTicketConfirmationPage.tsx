@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import BusTicketsNavbar from '@/components/BusTicketsNavbar';
 import BusTicketsFooter from '@/components/BusTicketsFooter';
 import BusTicketsThemeProvider from '@/components/BusTicketsThemeProvider';
@@ -12,8 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
-import QRCodeReact from 'qrcode.react'; // Renamed to avoid conflict with qrcode library
-import QRCode from 'qrcode'; // Import the underlying qrcode library
+import { QRCodeCanvas } from 'react-qrcode-logo'; // Import QRCodeCanvas from react-qrcode-logo
 
 interface BusPassenger {
   id: string;
@@ -57,7 +56,7 @@ const BusTicketConfirmationPage: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isGeneratingTicket, setIsGeneratingTicket] = useState(false);
-  const [qrCodeDataUrls, setQrCodeDataUrls] = useState<Record<string, string>>({}); // Store Data URLs for each passenger
+  const qrRefs = useRef<Record<string, HTMLCanvasElement | null>>({}); // Ref for each QR canvas
 
   useEffect(() => {
     const fetchBookingDetails = async () => {
@@ -182,20 +181,6 @@ const BusTicketConfirmationPage: React.FC = () => {
           passengers: passengersData,
         });
 
-        // Generate QR codes for each passenger
-        const newQrCodeDataUrls: Record<string, string> = {};
-        for (const p of passengersData) {
-          const validationId = `${p.id}_${scheduleId}_${p.seat_number}`;
-          try {
-            const url = await QRCode.toDataURL(validationId, { errorCorrectionLevel: 'H', width: 150 });
-            newQrCodeDataUrls[p.id] = url;
-          } catch (qrError) {
-            console.error('Error generating QR code for passenger:', p.id, qrError);
-            newQrCodeDataUrls[p.id] = ''; // Fallback to empty string
-          }
-        }
-        setQrCodeDataUrls(newQrCodeDataUrls);
-
       } catch (err: any) {
         console.error('Unexpected error fetching booking details:', err);
         setError(`Ocurrió un error inesperado: ${err.message}`);
@@ -219,7 +204,8 @@ const BusTicketConfirmationPage: React.FC = () => {
     try {
       const passengerTicketsHtml = bookingDetails.passengers.map(p => {
         const validationId = `${p.id}_${bookingDetails.schedule_id}_${p.seat_number}`;
-        const qrCodeImageSrc = qrCodeDataUrls[p.id] || ''; // Use the pre-generated Data URL
+        const qrCanvas = qrRefs.current[p.id];
+        const qrCodeImageSrc = qrCanvas ? qrCanvas.toDataURL('image/png') : '';
 
         return `
           <div class="ticket-page">
@@ -454,11 +440,13 @@ const BusTicketConfirmationPage: React.FC = () => {
                     return (
                       <div key={p.id} className="flex flex-col items-center justify-center p-4 border rounded-md bg-gray-50">
                         <p className="font-medium text-sm mb-2">{p.first_name} {p.last_name} (Asiento: {p.seat_number})</p>
-                        {qrCodeDataUrls[p.id] ? (
-                          <QRCodeReact value={validationId} size={128} level="H" className="mx-auto" />
-                        ) : (
-                          <Loader2 className="h-12 w-12 animate-spin text-bus-primary" />
-                        )}
+                        <QRCodeCanvas
+                          value={validationId}
+                          size={128}
+                          level="H"
+                          className="mx-auto"
+                          canvasRef={(el) => (qrRefs.current[p.id] = el)} // Assign ref to canvas
+                        />
                         <p className="text-xs text-muted-foreground mt-2 break-all">{validationId}</p>
                       </div>
                     );
