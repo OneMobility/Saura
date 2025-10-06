@@ -221,7 +221,8 @@ const BusTicketBookingPage: React.FC = () => {
         address: null, // Not collected in this form
         identification_number: contractor.identification_number || null,
         contract_number: contract_number,
-        tour_id: routeId, // Use routeId as tour_id for bus tickets
+        tour_id: null, // Set tour_id to null for bus tickets
+        bus_route_id: routeId, // NEW: Use bus_route_id for bus tickets
         number_of_people: passengersData.length,
         companions: companions,
         extra_services: [], // Not collected in this form

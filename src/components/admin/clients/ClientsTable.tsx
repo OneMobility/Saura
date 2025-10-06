@@ -29,8 +29,9 @@ interface Client {
   phone: string | null;
   address: string | null;
   contract_number: string;
-  identification_number: string | null; // NEW: Added identification_number
+  identification_number: string | null;
   tour_id: string | null;
+  bus_route_id: string | null; // NEW: Add bus_route_id
   number_of_people: number;
   companions: Companion[];
   extra_services: any[];
@@ -43,6 +44,7 @@ interface Client {
   room_details: RoomDetails;
   remaining_payment?: number;
   tour_title?: string;
+  bus_route_name?: string; // NEW: Add bus_route_name
 }
 
 interface ClientsTableProps {
@@ -71,6 +73,9 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
         *,
         tours (
           title
+        ),
+        bus_routes ( -- NEW: Select bus_routes
+          name
         )
       `)
       .order('created_at', { ascending: false });
@@ -79,14 +84,15 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
       console.error('Error fetching clients:', error);
       toast.error('Error al cargar la lista de clientes.');
     } else {
-      const clientsWithTourTitles = (data || []).map(client => ({
+      const clientsWithTitles = (data || []).map(client => ({
         ...client,
         tour_title: client.tours?.title || 'N/A',
+        bus_route_name: client.bus_routes?.name || 'N/A', // NEW: Set bus_route_name
         companions: client.companions || [],
         room_details: client.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
         remaining_payment: client.total_amount - client.total_paid,
       }));
-      setClients(clientsWithTourTitles);
+      setClients(clientsWithTitles);
     }
     setLoading(false);
   };
@@ -241,8 +247,8 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                 <TableHead>Contrato</TableHead>
                 <TableHead>Cliente</TableHead>
                 <TableHead>Email</TableHead>
-                <TableHead>Identificación</TableHead> {/* NEW: Column for identification_number */}
-                <TableHead>Tour</TableHead>
+                <TableHead>Identificación</TableHead>
+                <TableHead>Tour/Ruta</TableHead> {/* NEW: Combined column */}
                 <TableHead>Personas</TableHead>
                 <TableHead>Habitaciones</TableHead>
                 <TableHead>Total</TableHead>
@@ -258,8 +264,8 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                   <TableCell className="font-medium">{client.contract_number}</TableCell>
                   <TableCell>{client.first_name} {client.last_name}</TableCell>
                   <TableCell>{client.email}</TableCell>
-                  <TableCell>{client.identification_number || 'N/A'}</TableCell> {/* NEW: Display identification_number */}
-                  <TableCell>{client.tour_title}</TableCell>
+                  <TableCell>{client.identification_number || 'N/A'}</TableCell>
+                  <TableCell>{client.tour_id ? client.tour_title : client.bus_route_name}</TableCell> {/* NEW: Conditional display */}
                   <TableCell>{client.number_of_people}</TableCell>
                   <TableCell>{formatRoomDetails(client.room_details)}</TableCell>
                   <TableCell>${client.total_amount.toFixed(2)}</TableCell>

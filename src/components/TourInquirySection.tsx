@@ -37,7 +37,7 @@ interface ClientContract {
   phone: string | null;
   address: string | null;
   contract_number: string;
-  identification_number: string | null; // NEW: Added identification_number
+  identification_number: string | null;
   number_of_people: number;
   companions: Companion[];
   total_amount: number;
@@ -72,6 +72,7 @@ const TourInquirySection = () => {
       const { data: clientData, error: clientError } = await supabase
         .from('clients')
         .select(`
+          id,
           first_name,
           last_name,
           email,
@@ -87,12 +88,22 @@ const TourInquirySection = () => {
           status,
           contractor_age,
           room_details,
+          tour_id,
+          bus_route_id, -- NEW: Select bus_route_id
           tours (
             title,
             description,
             image_url
           ),
+          bus_routes ( -- NEW: Select bus_routes
+            name,
+            all_stops
+          ),
           tour_seat_assignments (
+            seat_number
+          ),
+          bus_seat_assignments ( -- NEW: Select bus_seat_assignments
+            schedule_id,
             seat_number
           )
         `)
@@ -112,8 +123,32 @@ const TourInquirySection = () => {
       }
 
       if (clientData) {
-        const assignedSeats = (clientData.tour_seat_assignments || []).map((s: { seat_number: number }) => s.seat_number).sort((a: number, b: number) => a - b);
-        
+        let tourTitle = 'N/A';
+        let tourDescription = 'N/A';
+        let tourImageUrl = 'https://via.placeholder.com/400x200?text=Imagen+No+Disponible';
+        let assignedSeats: number[] = [];
+
+        if (clientData.tour_id && clientData.tours) {
+          tourTitle = clientData.tours.title || 'N/A';
+          tourDescription = clientData.tours.description || 'N/A';
+          tourImageUrl = clientData.tours.image_url || tourImageUrl;
+          assignedSeats = (clientData.tour_seat_assignments || []).map((s: { seat_number: number }) => s.seat_number).sort((a: number, b: number) => a - b);
+        } else if (clientData.bus_route_id && clientData.bus_routes) { // NEW: Handle bus route details
+          tourTitle = `Ruta de Autobús: ${clientData.bus_routes.name || 'N/A'}`;
+          tourDescription = `Viaje de ${destinationMap.get(clientData.bus_routes.all_stops[0]) || 'N/A'} a ${destinationMap.get(clientData.bus_routes.all_stops[clientData.bus_routes.all_stops.length - 1]) || 'N/A'}`;
+          // For bus tickets, we might not have a specific image per route, use a generic one or route-specific if available
+          tourImageUrl = 'https://images.unsplash.com/photo-1544620347-c4fd4a8d462c?q=80&w=2069&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; // Generic bus image
+          assignedSeats = (clientData.bus_seat_assignments || []).map((s: { seat_number: number }) => s.seat_number).sort((a: number, b: number) => a - b);
+        }
+
+        // Fetch all destinations to map IDs to names for bus routes
+        const { data: destinationsData, error: destinationsError } = await supabase
+          .from('bus_destinations')
+          .select('id, name');
+        if (destinationsError) throw destinationsError;
+        const destinationMap = new Map(destinationsData.map(d => [d.id, d.name]));
+
+
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         const functionName = 'get-public-client-payments';
         const edgeFunctionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
@@ -138,11 +173,11 @@ const TourInquirySection = () => {
 
         setContractDetails({
           ...clientData,
-          tour_title: clientData.tours?.title || 'N/A',
-          tour_description: clientData.tours?.description || 'N/A',
-          tour_image_url: clientData.tours?.image_url || 'https://via.placeholder.com/400x200?text=Tour+Image',
+          tour_title: tourTitle,
+          tour_description: tourDescription,
+          tour_image_url: tourImageUrl,
           companions: clientData.companions || [],
-          identification_number: clientData.identification_number || null, // NEW: Set identification_number
+          identification_number: clientData.identification_number || null,
           contractor_age: clientData.contractor_age || null,
           room_details: clientData.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
           assigned_seat_numbers: assignedSeats,
@@ -213,7 +248,7 @@ const TourInquirySection = () => {
                 <p><span className="font-semibold">Contrato:</span> {contractDetails.contract_number}</p>
                 <p><span className="font-semibold">Cliente:</span> {contractDetails.first_name} {contractDetails.last_name}</p>
                 {contractDetails.contractor_age !== null && <p><span className="font-semibold">Edad Contratante:</span> {contractDetails.contractor_age}</p>}
-                {contractDetails.identification_number && <p><span className="font-semibold">Identificación:</span> {contractDetails.identification_number}</p>} {/* NEW: Display identification_number */}
+                {contractDetails.identification_number && <p><span className="font-semibold">Identificación:</span> {contractDetails.identification_number}</p>}
                 <p><span className="font-semibold">Email:</span> {contractDetails.email}</p>
                 {contractDetails.phone && <p><span className="font-semibold">Teléfono:</span> {contractDetails.phone}</p>}
                 {contractDetails.address && <p><span className="font-semibold">Dirección:</span> {contractDetails.address}</p>}

@@ -78,7 +78,7 @@ const BusTicketConfirmationPage: React.FC = () => {
             total_paid,
             status,
             contractor_age,
-            tour_id, -- This is the route_id for bus tickets
+            bus_route_id, -- NEW: Use bus_route_id
             bus_seat_assignments (
               schedule_id,
               seat_number
@@ -103,14 +103,14 @@ const BusTicketConfirmationPage: React.FC = () => {
           return;
         }
 
-        // Fetch route details (using tour_id as route_id)
+        // Fetch route details (using bus_route_id)
         const { data: routeData, error: routeError } = await supabase
           .from('bus_routes')
           .select(`
             name,
             all_stops
           `)
-          .eq('id', clientData.tour_id) // clientData.tour_id is the route_id
+          .eq('id', clientData.bus_route_id) // NEW: Use bus_route_id
           .single();
 
         if (routeError || !routeData) {
@@ -159,7 +159,7 @@ const BusTicketConfirmationPage: React.FC = () => {
           total_paid: clientData.total_paid,
           status: clientData.status,
           contractor_age: clientData.contractor_age,
-          route_id: clientData.tour_id, // clientData.tour_id is the route_id
+          route_id: clientData.bus_route_id, // NEW: Use bus_route_id here
           schedule_id: scheduleId,
           route_name: routeData.name,
           origin_name: originName,

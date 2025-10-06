@@ -24,18 +24,39 @@ const formatRoomDetails = (details: any) => {
 // Helper function to generate HTML for the service contract
 const generateServiceContractHtml = (data: any) => {
   const client = data.client;
-  const tour = data.tour || {};
+  const tour = data.tour || {}; // Can be a tour or a bus route
   const seats = data.seats;
   const agency = data.agency;
+  const busRoute = data.busRoute || {}; // NEW: Bus route data
 
   const clientFullName = `${client.first_name || ''} ${client.last_name || ''}`.trim();
-  const tourTitle = tour?.title || 'N/A';
   const contractDate = format(new Date(client.created_at), 'dd/MM/yyyy', { locale: es });
 
   const safeCompanions = Array.isArray(client.companions) ? client.companions : [];
   const safeExtraServices = Array.isArray(client.extra_services) ? client.extra_services : [];
-  const safeIncludes = Array.isArray(tour.includes) ? tour.includes : [];
-  const safeItinerary = Array.isArray(tour.itinerary) ? tour.itinerary : [];
+
+  let tourOrRouteTitle = 'N/A';
+  let tourOrRouteDuration = 'N/A';
+  let includesList = '<li>N/A</li>';
+  let itineraryList = '<li>N/A</li>';
+
+  if (client.tour_id && tour.title) {
+    tourOrRouteTitle = tour.title;
+    tourOrRouteDuration = tour.duration || 'N/A';
+    const safeIncludes = Array.isArray(tour.includes) ? tour.includes : [];
+    includesList = safeIncludes.length > 0
+      ? safeIncludes.map((item: string) => `<li>${item}</li>`).join('')
+      : '<li>N/A</li>';
+    const safeItinerary = Array.isArray(tour.itinerary) ? tour.itinerary : [];
+    itineraryList = safeItinerary.length > 0
+      ? safeItinerary.map((item: any) => `<li>Día ${item.day}: ${item.activity}</li>`).join('')
+      : '<li>N/A</li>';
+  } else if (client.bus_route_id && busRoute.name) { // NEW: Handle bus route details
+    tourOrRouteTitle = `Ruta de Autobús: ${busRoute.name}`;
+    tourOrRouteDuration = data.busSchedule?.departure_time ? `Salida: ${data.busSchedule.departure_time}` : 'N/A';
+    includesList = '<li>Transporte en autobús</li><li>Asiento asignado</li>'; // Generic includes for bus tickets
+    itineraryList = `<li>Viaje de ${data.destinationMap.get(busRoute.all_stops[0]) || 'N/A'} a ${data.destinationMap.get(busRoute.all_stops[busRoute.all_stops.length - 1]) || 'N/A'}</li>`;
+  }
 
   const companionsList = safeCompanions.length > 0
     ? safeCompanions.map((c: any) => `<li>${c.name || 'Acompañante sin nombre'} ${c.age !== null && typeof c.age === 'number' ? `(${c.age} años)` : ''}</li>`).join('')
@@ -57,14 +78,6 @@ const generateServiceContractHtml = (data: any) => {
         const quantity = typeof s.quantity === 'number' ? s.quantity : 0;
         return `<li>${s.name_snapshot || 'Servicio sin nombre'} (${s.service_type_snapshot || 'N/A'}) - Cantidad: ${quantity} - Precio: $${price.toFixed(2)}</li>`;
       }).join('')
-    : '<li>N/A</li>';
-
-  const includesList = safeIncludes.length > 0
-    ? safeIncludes.map((item: string) => `<li>${item}</li>`).join('')
-    : '<li>N/A</li>';
-
-  const itineraryList = safeItinerary.length > 0
-    ? safeItinerary.map((item: any) => `<li>Día ${item.day}: ${item.activity}</li>`).join('')
     : '<li>N/A</li>';
 
   const clientTotalAmount = typeof client.total_amount === 'number' ? client.total_amount : 0;
@@ -254,7 +267,11 @@ const generateServiceContractHtml = (data: any) => {
                 .agency-header img { max-width: 85px; margin-bottom: 10px; }
                 .agency-header h2 { font-size: 1.6em; }
                 .agency-header p { font-size: 0.8em; }
-                .section { padding: 10px; margin-bottom: 15px; }
+                .main-content-grid {
+                    gap: 18px;
+                    margin-bottom: 20px;
+                }
+                .section { padding: 10px; margin-bottom: 8px; }
                 .section p, .section ul, .section ol { margin-bottom: 5px; }
                 ul, ol { padding-left: 18px; margin-top: 4px; }
                 ul li, ol li { font-size: 0.9em; margin-bottom: 2px; }
@@ -277,23 +294,23 @@ const generateServiceContractHtml = (data: any) => {
                 <p>Dirección: ${agency?.agency_address || 'N/A'}</p>
             </div>
 
-            <h1>CONTRATO DE VENTA DE TOUR</h1>
+            <h1>CONTRATO DE VENTA DE ${client.tour_id ? 'TOUR' : 'BOLETO DE AUTOBÚS'}</h1>
 
             <div class="section">
                 <p>Número de Contrato: <strong>${client.contract_number || 'N/A'}</strong></p>
                 <p>En la ciudad de Saltillo, Coahuila, México, a <strong>${contractDate}</strong>, se celebra el presente contrato de prestación de servicios turísticos entre:</p>
                 <p><strong>${agency?.agency_name || 'LA AGENCIA'},</strong> con domicilio en <strong>${agency?.agency_address || 'N/A'}</strong>, representada por el C. Juan De Dios Saucedo Cortés, en adelante “LA AGENCIA”; y</p>
-                <p><strong>${clientFullName},</strong> con domicilio en <strong>${client.address || 'N/A'}</strong>, identificado con <strong>[CAMPO NO DISPONIBLE EN DB]</strong>, en adelante “EL CLIENTE”.</p>
+                <p><strong>${clientFullName},</strong> con domicilio en <strong>${client.address || 'N/A'}</strong>, identificado con <strong>${client.identification_number || '[CAMPO NO DISPONIBLE EN DB]'}</strong>, en adelante “EL CLIENTE”.</p>
             </div>
 
             <div class="section">
                 <h2>1. OBJETO DEL CONTRATO</h2>
-                <p>LA AGENCIA se compromete a coordinar y poner a disposición de EL CLIENTE el tour denominado <strong>${tourTitle}</strong>, que se llevará a cabo el día <strong>[FECHA DEL TOUR NO DISPONIBLE EN DB]</strong>, con las siguientes características:</p>
+                <p>LA AGENCIA se compromete a coordinar y poner a disposición de EL CLIENTE el ${client.tour_id ? 'tour' : 'viaje en autobús'} denominado <strong>${tourOrRouteTitle}</strong>, que se llevará a cabo el día <strong>[FECHA DEL VIAJE NO DISPONIBLE EN DB]</strong>, con las siguientes características:</p>
                 <p><span class="label">Destino / Itinerario:</span></p>
                 <ol>
                     ${itineraryList}
                 </ol>
-                <p><span class="label">Duración:</span> ${tour?.duration || 'N/A'}</p>
+                <p><span class="label">Duración/Salida:</span> ${tourOrRouteDuration}</p>
                 <p><span class="label">Incluye:</span></p>
                 <ul>
                     ${includesList}
@@ -351,14 +368,14 @@ const generateServiceContractHtml = (data: any) => {
                 <ul>
                     <li>Presentarse en el lugar y hora indicados.</li>
                     <li>Contar con la documentación requerida (identificaciones, permisos, visas, certificados médicos, etc.).</li>
-                    <li>Respetar las normas de seguridad y convivencia durante el tour.</li>
+                    <li>Respetar las normas de seguridad y convivencia durante el viaje.</li>
                     <li>Asumir los gastos personales no incluidos en el contrato.</li>
                 </ul>
             </div>
 
             <div class="section">
                 <h2>7. CESIÓN DE DERECHOS Y USO DE IMAGEN</h2>
-                <p>EL CLIENTE autoriza a LA AGENCIA a utilizar fotografías o videos tomados durante el tour con fines publicitarios o promocionales.</p>
+                <p>EL CLIENTE autoriza a LA AGENCIA a utilizar fotografías o videos tomados durante el viaje con fines publicitarios o promocionales.</p>
                 <p>En caso de cesión de lugar a otra persona, LA AGENCIA no asume responsabilidades adicionales.</p>
             </div>
 
@@ -388,7 +405,7 @@ const generateServiceContractHtml = (data: any) => {
 
             <div class="section">
                 <h2>12. PROPIEDAD INTELECTUAL</h2>
-                <p>Todo material informativo, publicitario, imágenes, marcas y logotipos relacionados con el tour son propiedad de LA AGENCIA y no podrán ser reproducidos sin su autorización.</p>
+                <p>Todo material informativo, publicitario, imágenes, marcas y logotipos relacionados con el viaje son propiedad de LA AGENCIA y no podrán ser reproducidos sin su autorización.</p>
             </div>
 
             <div class="section">
@@ -507,7 +524,15 @@ serve(async (req) => {
           includes,
           itinerary
         ),
+        bus_routes ( -- NEW: Select bus_routes
+          name,
+          all_stops
+        ),
         tour_seat_assignments (
+          seat_number
+        ),
+        bus_seat_assignments ( -- NEW: Select bus_seat_assignments
+          schedule_id,
           seat_number
         )
       `)
@@ -529,9 +554,20 @@ serve(async (req) => {
         .eq('tour_id', client.tour_id);
 
       if (seatsError) {
-        console.error('Edge Function: Error fetching seats for contract:', seatsError.message);
+        console.error('Edge Function: Error fetching tour seats for contract:', seatsError.message);
       } else {
         seats = fetchedSeats || [];
+      }
+    } else if (client.bus_route_id) { // NEW: Fetch bus seat assignments
+      const { data: fetchedBusSeats, error: busSeatsError } = await supabaseAdmin
+        .from('bus_seat_assignments')
+        .select('schedule_id, seat_number')
+        .eq('client_id', clientId);
+
+      if (busSeatsError) {
+        console.error('Edge Function: Error fetching bus seats for contract:', busSeatsError.message);
+      } else {
+        seats = fetchedBusSeats || [];
       }
     }
 
@@ -545,12 +581,21 @@ serve(async (req) => {
       console.error('Edge Function: Error fetching agency settings for contract:', agencyError.message);
     }
 
+    // NEW: Fetch destinations for bus routes
+    const { data: destinationsData, error: destinationsError } = await supabaseAdmin
+      .from('bus_destinations')
+      .select('id, name');
+    if (destinationsError) throw destinationsError;
+    const destinationMap = new Map(destinationsData.map(d => [d.id, d.name]));
+
     console.log('Edge Function: Generating HTML content for contract...');
     const htmlContent = generateServiceContractHtml({
       client,
       tour: client.tours,
+      busRoute: client.bus_routes, // NEW: Pass bus route data
       seats: seats,
       agency: agency,
+      destinationMap: destinationMap, // Pass destination map for bus route formatting
     });
     console.log('Edge Function: HTML content generated successfully for contract.');
 
