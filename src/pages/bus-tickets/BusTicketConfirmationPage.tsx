@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
-import QRCode from 'qrcode.react'; // CAMBIO: Importación por defecto para QRCode
+import QRCode from 'qrcode.react'; // Revertido a importación por defecto
 
 interface BusPassenger {
   id: string;
