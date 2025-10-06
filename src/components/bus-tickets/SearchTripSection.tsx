@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -12,6 +12,12 @@ import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { supabase } from '@/integrations/supabase/client'; // Import supabase
+
+interface BusDestination {
+  id: string;
+  name: string;
+}
 
 const SearchTripSection = () => {
   const [origin, setOrigin] = useState('');
@@ -19,6 +25,27 @@ const SearchTripSection = () => {
   const [date, setDate] = useState<Date | undefined>(undefined);
   const [passengers, setPassengers] = useState(1);
   const [loading, setLoading] = useState(false);
+  const [availableDestinations, setAvailableDestinations] = useState<BusDestination[]>([]);
+  const [loadingDestinations, setLoadingDestinations] = useState(true);
+
+  useEffect(() => {
+    const fetchDestinations = async () => {
+      setLoadingDestinations(true);
+      const { data, error } = await supabase
+        .from('bus_destinations')
+        .select('id, name')
+        .order('name', { ascending: true });
+
+      if (error) {
+        console.error('Error fetching bus destinations:', error);
+        toast.error('Error al cargar los destinos disponibles.');
+      } else {
+        setAvailableDestinations(data || []);
+      }
+      setLoadingDestinations(false);
+    };
+    fetchDestinations();
+  }, []);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,29 +70,33 @@ const SearchTripSection = () => {
         <form onSubmit={handleSearch} className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           <div className="space-y-1.5">
             <Label htmlFor="origin" className="text-lg text-bus-primary-foreground">Origen</Label>
-            <Input
-              type="text"
-              id="origin"
-              placeholder="Ciudad de Origen"
-              className="p-3 focus-visible:ring-bus-secondary"
-              value={origin}
-              onChange={(e) => setOrigin(e.target.value)}
-              required
-              disabled={loading}
-            />
+            <Select value={origin} onValueChange={setOrigin} required disabled={loading || loadingDestinations}>
+              <SelectTrigger className="p-3 focus-visible:ring-bus-secondary">
+                <SelectValue placeholder="Selecciona Origen" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableDestinations.map((dest) => (
+                  <SelectItem key={dest.id} value={dest.id}>
+                    {dest.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="destination" className="text-lg text-bus-primary-foreground">Destino</Label>
-            <Input
-              type="text"
-              id="destination"
-              placeholder="Ciudad de Destino"
-              className="p-3 focus-visible:ring-bus-secondary"
-              value={destination}
-              onChange={(e) => setDestination(e.target.value)}
-              required
-              disabled={loading}
-            />
+            <Select value={destination} onValueChange={setDestination} required disabled={loading || loadingDestinations}>
+              <SelectTrigger className="p-3 focus-visible:ring-bus-secondary">
+                <SelectValue placeholder="Selecciona Destino" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableDestinations.map((dest) => (
+                  <SelectItem key={dest.id} value={dest.id}>
+                    {dest.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="date" className="text-lg text-bus-primary-foreground">Fecha</Label>

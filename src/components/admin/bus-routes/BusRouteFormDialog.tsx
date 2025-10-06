@@ -9,9 +9,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, ArrowRight } from 'lucide-react';
+import { Loader2, Save, PlusCircle, MinusCircle, ArrowRight, ChevronDown } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { BusRoute, BusRouteDestination, AvailableBus, RouteSegment } from '@/types/shared';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface BusDestinationOption {
   id: string;
@@ -38,6 +39,7 @@ const BusRouteFormDialog: React.FC<BusRouteFormDialogProps> = ({ isOpen, onClose
   const [availableDestinations, setAvailableDestinations] = useState<BusDestinationOption[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingDependencies, setLoadingDependencies] = useState(true);
+  const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({}); // State for collapsible sections
 
   // Helper to get destination name from ID
   const getDestinationName = useCallback((id: string) => {
@@ -113,29 +115,43 @@ const BusRouteFormDialog: React.FC<BusRouteFormDialogProps> = ({ isOpen, onClose
       return;
     }
 
-    const newSegments: RouteSegment[] = [];
-    for (let i = 0; i < formData.all_stops.length - 1; i++) {
-      const start_destination_id = formData.all_stops[i];
-      const end_destination_id = formData.all_stops[i + 1];
+    const newSegmentsMap = new Map<string, RouteSegment>(); // Key: `${start_id}-${end_id}`
+    const existingSegmentsMap = new Map<string, RouteSegment>();
+    routeSegments.forEach(s => existingSegmentsMap.set(`${s.start_destination_id}-${s.end_destination_id}`, s));
 
-      // Try to find an existing segment for this pair
-      const existingSegment = routeSegments.find(
-        s => s.start_destination_id === start_destination_id && s.end_destination_id === end_destination_id
-      );
+    for (let i = 0; i < formData.all_stops.length; i++) {
+      for (let j = i + 1; j < formData.all_stops.length; j++) {
+        const start_destination_id = formData.all_stops[i];
+        const end_destination_id = formData.all_stops[j];
+        const key = `${start_destination_id}-${end_destination_id}`;
 
-      newSegments.push(existingSegment || {
-        id: uuidv4(), // Assign a new UUID if it's a new segment
-        route_id: formData.id || '', // Will be updated on save if new route
-        start_destination_id,
-        end_destination_id,
-        adult_price: 0,
-        child_price: 0,
-        duration_minutes: null,
-        distance_km: null,
-      });
+        const existingSegment = existingSegmentsMap.get(key);
+
+        newSegmentsMap.set(key, existingSegment || {
+          id: uuidv4(), // Assign a new UUID if it's a new segment
+          route_id: formData.id || '', // Will be updated on save if new route
+          start_destination_id,
+          end_destination_id,
+          adult_price: 0,
+          child_price: 0,
+          duration_minutes: null,
+          distance_km: null,
+        });
+      }
     }
-    setRouteSegments(newSegments);
-  }, [formData.all_stops, formData.id, routeSegments]); // Depend on routeSegments to preserve existing data
+    // Sort segments for consistent display: first by start_destination_id order, then by end_destination_id order
+    const sortedNewSegments = Array.from(newSegmentsMap.values()).sort((a, b) => {
+      const startA = availableDestinations.findIndex(d => d.id === a.start_destination_id);
+      const startB = availableDestinations.findIndex(d => d.id === b.start_destination_id);
+      if (startA !== startB) return startA - startB;
+
+      const endA = availableDestinations.findIndex(d => d.id === a.end_destination_id);
+      const endB = availableDestinations.findIndex(d => d.id === b.end_destination_id);
+      return endA - endB;
+    });
+
+    setRouteSegments(sortedNewSegments);
+  }, [formData.all_stops, formData.id, availableDestinations]); // Depend on availableDestinations for sorting
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value, type } = e.target;
@@ -239,31 +255,38 @@ const BusRouteFormDialog: React.FC<BusRouteFormDialogProps> = ({ isOpen, onClose
 
       // 2. Save/Update Route Segments
       if (currentRouteId) {
-        // Delete old segments not present in newSegments
-        const existingSegmentsForRoute = (await supabase.from('route_segments').select('id').eq('route_id', currentRouteId)).data || [];
-        const existingSegmentIds = existingSegmentsForRoute.map(s => s.id);
-        const segmentsToKeepIds = routeSegments.map(s => s.id);
-        const segmentsToDelete = existingSegmentIds.filter(id => !segmentsToKeepIds.includes(id));
+        // Get current segments in DB for this route
+        const { data: existingSegmentsInDb, error: fetchExistingError } = await supabase
+          .from('route_segments')
+          .select('id, start_destination_id, end_destination_id')
+          .eq('route_id', currentRouteId);
+
+        if (fetchExistingError) throw fetchExistingError;
+
+        const existingSegmentIdsInDb = new Set(existingSegmentsInDb.map(s => s.id));
+        const segmentsToUpsert = routeSegments.map(segment => ({
+          ...segment,
+          route_id: currentRouteId, // Ensure route_id is set for all segments
+        }));
+        const segmentsToKeepIds = new Set(segmentsToUpsert.map(s => s.id));
+
+        // Identify segments to delete (those in DB but not in current form data)
+        const segmentsToDelete = existingSegmentsInDb.filter(s => !segmentsToKeepIds.has(s.id));
         
         if (segmentsToDelete.length > 0) {
           const { error: deleteError } = await supabase
             .from('route_segments')
             .delete()
-            .in('id', segmentsToDelete);
+            .in('id', segmentsToDelete.map(s => s.id));
           if (deleteError) console.error('Error deleting old segments:', deleteError);
         }
 
         // Upsert new and updated segments
-        const segmentsToUpsert = routeSegments.map(segment => ({
-          ...segment,
-          route_id: currentRouteId, // Ensure route_id is set for all segments
-        }));
-
-        const { error: segmentsError } = await supabase
+        const { error: upsertError } = await supabase
           .from('route_segments')
           .upsert(segmentsToUpsert, { onConflict: 'id' });
 
-        if (segmentsError) throw segmentsError;
+        if (upsertError) throw upsertError;
         toast.success('Segmentos de ruta actualizados con éxito.');
       }
 
@@ -292,6 +315,16 @@ const BusRouteFormDialog: React.FC<BusRouteFormDialogProps> = ({ isOpen, onClose
       </Dialog>
     );
   }
+
+  // Group segments by start destination for easier editing
+  const groupedSegments = routeSegments.reduce((acc, segment) => {
+    const startName = getDestinationName(segment.start_destination_id);
+    if (!acc[startName]) {
+      acc[startName] = [];
+    }
+    acc[startName].push(segment);
+    return acc;
+  }, {} as Record<string, RouteSegment[]>);
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -364,63 +397,79 @@ const BusRouteFormDialog: React.FC<BusRouteFormDialogProps> = ({ isOpen, onClose
 
           {formData.all_stops.length >= 2 && (
             <div className="space-y-4 col-span-full mt-6 p-4 border rounded-md bg-gray-50">
-              <h3 className="text-lg font-semibold">Configuración de Segmentos de Ruta</h3>
-              {routeSegments.map((segment, index) => (
-                <div key={segment.id} className="grid grid-cols-1 md:grid-cols-6 gap-2 items-center p-3 border-b last:border-b-0">
-                  <div className="md:col-span-2 flex items-center space-x-2">
-                    <span className="font-medium">{getDestinationName(segment.start_destination_id)}</span>
-                    <ArrowRight className="h-4 w-4 text-gray-600" />
-                    <span className="font-medium">{getDestinationName(segment.end_destination_id)}</span>
-                  </div>
-                  <div className="md:col-span-1">
-                    <Label htmlFor={`adult_price_${segment.id}`} className="sr-only">Precio Adulto</Label>
-                    <Input
-                      id={`adult_price_${segment.id}`}
-                      type="number"
-                      value={segment.adult_price}
-                      onChange={(e) => handleSegmentPriceChange(segment.id as string, 'adult_price', e.target.value)}
-                      placeholder="Precio Adulto"
-                      min={0}
-                      step="0.01"
-                      required
-                    />
-                  </div>
-                  <div className="md:col-span-1">
-                    <Label htmlFor={`child_price_${segment.id}`} className="sr-only">Precio Niño</Label>
-                    <Input
-                      id={`child_price_${segment.id}`}
-                      type="number"
-                      value={segment.child_price}
-                      onChange={(e) => handleSegmentPriceChange(segment.id as string, 'child_price', e.target.value)}
-                      placeholder="Precio Niño"
-                      min={0}
-                      step="0.01"
-                    />
-                  </div>
-                  <div className="md:col-span-1">
-                    <Label htmlFor={`duration_${segment.id}`} className="sr-only">Duración (min)</Label>
-                    <Input
-                      id={`duration_${segment.id}`}
-                      type="number"
-                      value={segment.duration_minutes || ''}
-                      onChange={(e) => handleSegmentPriceChange(segment.id as string, 'duration_minutes', e.target.value)}
-                      placeholder="Duración (min)"
-                      min={0}
-                    />
-                  </div>
-                  <div className="md:col-span-1">
-                    <Label htmlFor={`distance_${segment.id}`} className="sr-only">Distancia (km)</Label>
-                    <Input
-                      id={`distance_${segment.id}`}
-                      type="number"
-                      value={segment.distance_km || ''}
-                      onChange={(e) => handleSegmentPriceChange(segment.id as string, 'distance_km', e.target.value)}
-                      placeholder="Distancia (km)"
-                      min={0}
-                      step="0.1"
-                    />
-                  </div>
-                </div>
+              <h3 className="text-lg font-semibold mb-4">Configuración de Precios y Detalles por Segmento</h3>
+              {Object.keys(groupedSegments).map(startName => (
+                <Collapsible
+                  key={startName}
+                  open={openCollapsibles[startName]}
+                  onOpenChange={(isOpen) => setOpenCollapsibles(prev => ({ ...prev, [startName]: isOpen }))}
+                >
+                  <CollapsibleTrigger asChild>
+                    <Button variant="ghost" className="w-full justify-between text-lg font-medium hover:bg-gray-100">
+                      <span>Desde: {startName}</span>
+                      <ChevronDown className="h-4 w-4 transition-transform duration-200 data-[state=open]:rotate-180" />
+                    </Button>
+                  </CollapsibleTrigger>
+                  <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                    <div className="ml-4 border-l border-gray-200 pl-2 py-1 space-y-2">
+                      {groupedSegments[startName].map((segment) => (
+                        <div key={segment.id} className="grid grid-cols-1 md:grid-cols-6 gap-2 items-center p-3 border-b last:border-b-0 bg-white rounded-md shadow-sm">
+                          <div className="md:col-span-2 flex items-center space-x-2">
+                            <span className="font-medium">Hasta: {getDestinationName(segment.end_destination_id)}</span>
+                          </div>
+                          <div className="md:col-span-1">
+                            <Label htmlFor={`adult_price_${segment.id}`} className="sr-only">Precio Adulto</Label>
+                            <Input
+                              id={`adult_price_${segment.id}`}
+                              type="number"
+                              value={segment.adult_price}
+                              onChange={(e) => handleSegmentPriceChange(segment.id as string, 'adult_price', e.target.value)}
+                              placeholder="Precio Adulto"
+                              min={0}
+                              step="0.01"
+                              required
+                            />
+                          </div>
+                          <div className="md:col-span-1">
+                            <Label htmlFor={`child_price_${segment.id}`} className="sr-only">Precio Niño</Label>
+                            <Input
+                              id={`child_price_${segment.id}`}
+                              type="number"
+                              value={segment.child_price}
+                              onChange={(e) => handleSegmentPriceChange(segment.id as string, 'child_price', e.target.value)}
+                              placeholder="Precio Niño"
+                              min={0}
+                              step="0.01"
+                            />
+                          </div>
+                          <div className="md:col-span-1">
+                            <Label htmlFor={`duration_${segment.id}`} className="sr-only">Duración (min)</Label>
+                            <Input
+                              id={`duration_${segment.id}`}
+                              type="number"
+                              value={segment.duration_minutes || ''}
+                              onChange={(e) => handleSegmentPriceChange(segment.id as string, 'duration_minutes', e.target.value)}
+                              placeholder="Duración (min)"
+                              min={0}
+                            />
+                          </div>
+                          <div className="md:col-span-1">
+                            <Label htmlFor={`distance_${segment.id}`} className="sr-only">Distancia (km)</Label>
+                            <Input
+                              id={`distance_${segment.id}`}
+                              type="number"
+                              value={segment.distance_km || ''}
+                              onChange={(e) => handleSegmentPriceChange(segment.id as string, 'distance_km', e.target.value)}
+                              placeholder="Distancia (km)"
+                              min={0}
+                              step="0.1"
+                            />
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </CollapsibleContent>
+                </Collapsible>
               ))}
             </div>
           )}
