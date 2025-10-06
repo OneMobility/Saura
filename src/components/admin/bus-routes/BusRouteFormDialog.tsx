@@ -73,7 +73,10 @@ const BusRouteFormDialog: React.FC<BusRouteFormDialogProps> = ({ isOpen, onClose
 
   useEffect(() => {
     if (initialData) {
-      setFormData(initialData);
+      setFormData({
+        ...initialData,
+        all_stops: initialData.all_stops || [], // Ensure all_stops is an array
+      });
       // Fetch existing segments for this route
       const fetchSegments = async () => {
         if (initialData.id) {
