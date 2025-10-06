@@ -45,6 +45,9 @@ const BusTicketBookingPage: React.FC = () => {
   const navigate = useNavigate();
   const bookingData = location.state as BookingPageProps;
 
+  console.log('BusTicketBookingPage: location.state', location.state);
+  console.log('BusTicketBookingPage: bookingData', bookingData);
+
   const {
     routeId,
     routeName,
@@ -80,6 +83,7 @@ const BusTicketBookingPage: React.FC = () => {
   // Validate bookingData on mount
   useEffect(() => {
     if (!routeId || !routeName || !originName || !destinationName || !departureTime || adultPrice === undefined || childPrice === undefined || busCapacity === undefined || courtesies === undefined) {
+      console.error('BusTicketBookingPage: Datos de reserva incompletos detectados.');
       setPageError('Datos de reserva incompletos. Por favor, regresa y selecciona un horario.');
     }
   }, [routeId, routeName, originName, destinationName, departureTime, adultPrice, childPrice, busCapacity, courtesies]);
@@ -277,6 +281,7 @@ const BusTicketBookingPage: React.FC = () => {
   };
 
   if (pageError) {
+    console.log('BusTicketBookingPage: Rendering pageError block.');
     return (
       <BusTicketsThemeProvider>
         <div className="min-h-screen flex flex-col bg-bus-background text-bus-foreground">
@@ -297,6 +302,7 @@ const BusTicketBookingPage: React.FC = () => {
   }
 
   if (!bookingData) {
+    console.log('BusTicketBookingPage: Rendering !bookingData block.');
     return (
       <BusTicketsThemeProvider>
         <div className="min-h-screen flex flex-col bg-bus-background text-bus-foreground">
@@ -316,6 +322,7 @@ const BusTicketBookingPage: React.FC = () => {
     );
   }
 
+  console.log('BusTicketBookingPage: Rendering main form.');
   return (
     <BusTicketsThemeProvider>
       <div className="min-h-screen flex flex-col bg-bus-background text-bus-foreground">
