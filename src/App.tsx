@@ -48,7 +48,8 @@ import BusContactPage from "./pages/bus-tickets/BusContactPage";
 import AdditionalServicesPage from "./pages/bus-tickets/AdditionalServicesPage";
 import HelpCenterPage from "./pages/bus-tickets/HelpCenterPage";
 import BusSearchResultsPage from "./pages/bus-tickets/BusSearchResultsPage";
-import BusTicketBookingPage from "./pages/bus-tickets/BusTicketBookingPage"; // NEW: Import BusTicketBookingPage
+import BusTicketBookingPage from "./pages/bus-tickets/BusTicketBookingPage";
+import BusTicketConfirmationPage from "./pages/bus-tickets/BusTicketConfirmationPage"; // NEW: Import BusTicketConfirmationPage
 
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -86,7 +87,8 @@ const App = () => {
               <Route path="/bus-tickets/help-center" element={<HelpCenterPage />} />
               <Route path="/bus-tickets/contact" element={<BusContactPage />} />
               <Route path="/bus-tickets/search-results" element={<BusSearchResultsPage />} />
-              <Route path="/bus-tickets/book" element={<BusTicketBookingPage />} /> {/* NEW: Route for booking page */}
+              <Route path="/bus-tickets/book" element={<BusTicketBookingPage />} />
+              <Route path="/bus-tickets/confirmation/:contractNumber" element={<BusTicketConfirmationPage />} /> {/* NEW: Route for confirmation page */}
 
               <Route path="/login" element={<Login />} />
               <Route

@@ -38,9 +38,9 @@ interface BookingPageProps {
   busId: string | null;
   busCapacity: number;
   courtesies: number;
-  originId: string; // NEW: Added originId
-  destinationId: string; // NEW: Added destinationId
-  searchDate: string; // NEW: Added searchDate
+  originId: string;
+  destinationId: string;
+  searchDate: string;
 }
 
 const BusTicketBookingPage: React.FC = () => {
@@ -62,9 +62,9 @@ const BusTicketBookingPage: React.FC = () => {
     busId,
     busCapacity,
     courtesies,
-    originId, // NEW: Destructure originId
-    destinationId, // NEW: Destructure destinationId
-    searchDate, // NEW: Destructure searchDate
+    originId,
+    destinationId,
+    searchDate,
   } = bookingData || {};
 
   const [formData, setFormData] = useState({
@@ -82,17 +82,18 @@ const BusTicketBookingPage: React.FC = () => {
   const [busLayout, setBusLayout] = useState<SeatLayout | null>(null);
   const [loadingBusLayout, setLoadingBusLayout] = useState(true);
   const [pageError, setPageError] = useState<string | null>(null);
+  const [step, setStep] = useState(1); // 1: Seat Selection, 2: Passenger Details
 
   const [numAdults, setNumAdults] = useState(0);
   const [numChildren, setNumChildren] = useState(0);
 
   // Validate bookingData on mount
   useEffect(() => {
-    if (!routeId || !routeName || !originName || !destinationName || !departureTime || adultPrice === undefined || childPrice === undefined || busCapacity === undefined || courtesies === undefined || !originId || !destinationId || !searchDate) { // NEW: Added originId, destinationId, searchDate to validation
+    if (!routeId || !routeName || !originName || !destinationName || !departureTime || adultPrice === undefined || childPrice === undefined || busCapacity === undefined || courtesies === undefined || !originId || !destinationId || !searchDate) {
       console.error('BusTicketBookingPage: Datos de reserva incompletos detectados.');
       setPageError('Datos de reserva incompletos. Por favor, regresa y selecciona un horario.');
     }
-  }, [routeId, routeName, originName, destinationName, departureTime, adultPrice, childPrice, busCapacity, courtesies, originId, destinationId, searchDate]); // NEW: Added originId, destinationId, searchDate to dependencies
+  }, [routeId, routeName, originName, destinationName, departureTime, adultPrice, childPrice, busCapacity, courtesies, originId, destinationId, searchDate]);
 
   // Fetch bus layout when component mounts or busId changes
   useEffect(() => {
@@ -188,6 +189,15 @@ const BusTicketBookingPage: React.FC = () => {
     setSelectedSeats(seats);
   }, []);
 
+  const handleContinueToDetails = () => {
+    const totalPeople = 1 + formData.companions.length;
+    if (selectedSeats.length !== totalPeople) {
+      toast.error(`Debes seleccionar ${totalPeople} asientos para este contrato.`);
+      return;
+    }
+    setStep(2);
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
@@ -214,6 +224,7 @@ const BusTicketBookingPage: React.FC = () => {
       }
     }
 
+    // Seat validation already done in step 1, but a final check doesn't hurt
     if (selectedSeats.length !== totalPeople) {
       toast.error(`Debes seleccionar ${totalPeople} asientos para este contrato.`);
       setIsSubmitting(false);
@@ -277,7 +288,7 @@ const BusTicketBookingPage: React.FC = () => {
       }
 
       toast.success(`¡Reserva de boleto exitosa! Tu número de contrato es: ${contract_number}.`);
-      navigate('/bus-tickets'); // Redirect to bus tickets home after successful booking
+      navigate(`/bus-tickets/confirmation/${contract_number}`); // Redirect to confirmation page
     } catch (error) {
       console.error('Unexpected error during booking:', error);
       toast.error('Ocurrió un error inesperado al procesar tu reserva.');
@@ -296,7 +307,7 @@ const BusTicketBookingPage: React.FC = () => {
             <h1 className="text-4xl md:text-5xl font-bold mb-4 text-red-600">Error de Reserva</h1>
             <p className="text-xl mb-6">{pageError}</p>
             <Button asChild className="bg-bus-primary hover:bg-bus-primary/90 text-bus-primary-foreground">
-              <Link to="/bus-tickets/search-results">
+              <Link to="/bus-tickets/search-results" state={{ originId: bookingData?.originId, destinationId: bookingData?.destinationId, searchDate: bookingData?.searchDate }}>
                 <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Resultados
               </Link>
             </Button>
@@ -336,7 +347,7 @@ const BusTicketBookingPage: React.FC = () => {
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <div className="mb-8">
             <Button asChild variant="outline" className="bg-white text-bus-primary hover:bg-gray-100 border-bus-primary hover:border-bus-primary/90">
-              <Link to="/bus-tickets/search-results" state={{ originId, destinationId, searchDate }}> {/* NEW: Pass originId, destinationId, searchDate */}
+              <Link to="/bus-tickets/search-results" state={{ originId: bookingData?.originId, destinationId: bookingData?.destinationId, searchDate: bookingData?.searchDate }}>
                 <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Resultados
               </Link>
             </Button>
@@ -350,143 +361,156 @@ const BusTicketBookingPage: React.FC = () => {
           </p>
 
           <div className="bg-card p-8 rounded-lg shadow-lg max-w-4xl mx-auto">
-            <form onSubmit={handleSubmit} className="grid gap-6 py-4">
-              {/* Trip Summary */}
-              <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-md">
-                <div>
-                  <h4 className="font-semibold text-lg">{routeName}</h4>
-                  <p className="text-muted-foreground text-sm">
-                    {originName} a {destinationName} - Salida: {departureTime}
-                  </p>
-                </div>
+            {/* Trip Summary - Always visible */}
+            <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-md mb-6">
+              <div>
+                <h4 className="font-semibold text-lg">{routeName}</h4>
+                <p className="text-muted-foreground text-sm">
+                  {originName} a {destinationName} - Salida: {departureTime}
+                </p>
               </div>
+            </div>
 
-              {/* Client Basic Info */}
-              <h3 className="text-lg font-semibold mt-4">Tus Datos</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="first_name">Nombre</Label>
-                  <Input id="first_name" value={formData.first_name} onChange={handleChange} required className="focus-visible:ring-bus-primary" />
+            {step === 1 && (
+              <>
+                {/* Seat Selection */}
+                {busId && busCapacity > 0 && (
+                  <div className="col-span-full mt-6">
+                    <h3 className="text-lg font-semibold mb-4">Paso 1: Selección de Asientos</h3>
+                    {loadingBusLayout ? (
+                      <div className="flex items-center justify-center p-8">
+                        <Loader2 className="h-8 w-8 animate-spin text-bus-primary" />
+                        <p className="ml-4 text-muted-foreground">Cargando mapa de asientos...</p>
+                      </div>
+                    ) : (
+                      <TourSeatMap
+                        tourId={routeId} // Use routeId as tourId for seat assignments
+                        busCapacity={busCapacity}
+                        courtesies={courtesies}
+                        seatLayoutJson={busLayout}
+                        onSeatsSelected={handleSeatsSelected}
+                        readOnly={false}
+                        adminMode={false}
+                      />
+                    )}
+                    {selectedSeats.length > 0 && (
+                      <p className="text-sm text-muted-foreground mt-2">
+                        Asientos seleccionados: {selectedSeats.join(', ')}
+                      </p>
+                    )}
+                  </div>
+                )}
+                <div className="flex justify-end mt-6">
+                  <Button onClick={handleContinueToDetails} disabled={loadingBusLayout || selectedSeats.length === 0} className="bg-bus-primary hover:bg-bus-primary/90 text-bus-primary-foreground">
+                    Continuar a Datos del Pasajero
+                  </Button>
                 </div>
-                <div>
-                  <Label htmlFor="last_name">Apellido</Label>
-                  <Input id="last_name" value={formData.last_name} onChange={handleChange} required className="focus-visible:ring-bus-primary" />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" value={formData.email} onChange={handleChange} required className="focus-visible:ring-bus-primary" />
-                </div>
-                <div>
-                  <Label htmlFor="phone">Teléfono</Label>
-                  <Input id="phone" value={formData.phone} onChange={handleChange} className="focus-visible:ring-bus-primary" />
-                </div>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="contractor_age">Edad del Contratante</Label>
-                  <Input 
-                    id="contractor_age" 
-                    type="text" // Changed to text
-                    pattern="[0-9]*" // Pattern for integers
-                    value={formData.contractor_age || ''} 
-                    onChange={(e) => handleNumberChange('contractor_age', e.target.value)} 
-                    className="focus-visible:ring-bus-primary" 
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="identification_number">Número de Identificación</Label>
-                  <Input id="identification_number" value={formData.identification_number || ''} onChange={handleChange} placeholder="Ej: INE, Pasaporte, etc." className="focus-visible:ring-bus-primary" />
-                </div>
-              </div>
+              </>
+            )}
 
-              {/* Companions */}
-              <h3 className="text-lg font-semibold mt-4">Acompañantes</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Número Total de Personas</Label>
-                  <Input value={1 + formData.companions.length} readOnly className="bg-gray-100 cursor-not-allowed" />
+            {step === 2 && (
+              <form onSubmit={handleSubmit} className="grid gap-6 py-4">
+                <h3 className="text-lg font-semibold mt-4">Paso 2: Tus Datos</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="first_name">Nombre</Label>
+                    <Input id="first_name" value={formData.first_name} onChange={handleChange} required className="focus-visible:ring-bus-primary" />
+                  </div>
+                  <div>
+                    <Label htmlFor="last_name">Apellido</Label>
+                    <Input id="last_name" value={formData.last_name} onChange={handleChange} required className="focus-visible:ring-bus-primary" />
+                  </div>
                 </div>
-              </div>
-
-              <div className="space-y-2 mt-4">
-                <Label className="font-semibold">Acompañantes</Label>
-                {formData.companions.map((companion) => (
-                  <div key={companion.id} className="flex flex-col md:flex-row items-center gap-2">
-                    <Input
-                      value={companion.name}
-                      onChange={(e) => handleCompanionChange(companion.id, 'name', e.target.value)}
-                      placeholder="Nombre del acompañante"
-                      className="w-full md:w-2/3 focus-visible:ring-bus-primary"
-                    />
-                    <Input
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="email">Email</Label>
+                    <Input id="email" type="email" value={formData.email} onChange={handleChange} required className="focus-visible:ring-bus-primary" />
+                  </div>
+                  <div>
+                    <Label htmlFor="phone">Teléfono (Opcional)</Label>
+                    <Input id="phone" value={formData.phone} onChange={handleChange} className="focus-visible:ring-bus-primary" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="contractor_age">Edad del Contratante (Opcional)</Label>
+                    <Input 
+                      id="contractor_age" 
                       type="text" // Changed to text
                       pattern="[0-9]*" // Pattern for integers
-                      value={companion.age || ''}
-                      onChange={(e) => handleCompanionChange(companion.id, 'age', e.target.value)}
-                      placeholder="Edad"
-                      className="w-full md:w-1/3 focus-visible:ring-bus-primary"
+                      value={formData.contractor_age || ''} 
+                      onChange={(e) => handleNumberChange('contractor_age', e.target.value)} 
+                      className="focus-visible:ring-bus-primary" 
                     />
-                    <Button type="button" variant="destructive" size="icon" onClick={() => removeCompanion(companion.id)}>
-                      <MinusCircle className="h-4 w-4" />
-                    </Button>
                   </div>
-                ))}
-                <Button type="button" variant="outline" onClick={addCompanion} className="text-bus-primary border-bus-primary hover:bg-bus-primary/10">
-                  <PlusCircle className="mr-2 h-4 w-4" /> Añadir Acompañante
-                </Button>
-              </div>
-
-              {/* Seat Selection */}
-              {busId && busCapacity > 0 && (
-                <div className="col-span-full mt-6">
-                  <h3 className="text-lg font-semibold mb-4">Selección de Asientos</h3>
-                  {loadingBusLayout ? (
-                    <div className="flex items-center justify-center p-8">
-                      <Loader2 className="h-8 w-8 animate-spin text-bus-primary" />
-                      <p className="ml-4 text-muted-foreground">Cargando mapa de asientos...</p>
-                    </div>
-                  ) : (
-                    <TourSeatMap
-                      tourId={routeId} // Use routeId as tourId for seat assignments
-                      busCapacity={busCapacity}
-                      courtesies={courtesies}
-                      seatLayoutJson={busLayout}
-                      onSeatsSelected={handleSeatsSelected}
-                      readOnly={false}
-                      adminMode={false}
-                    />
-                  )}
-                  {selectedSeats.length > 0 && (
-                    <p className="text-sm text-muted-foreground mt-2">
-                      Asientos seleccionados: {selectedSeats.join(', ')}
-                    </p>
-                  )}
+                  <div>
+                    <Label htmlFor="identification_number">Número de Identificación (Opcional)</Label>
+                    <Input id="identification_number" value={formData.identification_number || ''} onChange={handleChange} placeholder="Ej: INE, Pasaporte, etc." className="focus-visible:ring-bus-primary" />
+                  </div>
                 </div>
-              )}
 
-              {/* Price Breakdown */}
-              <div className="col-span-full mt-6 p-4 bg-gray-100 rounded-md">
-                <h4 className="font-semibold text-lg mb-2">Desglose del Cálculo:</h4>
-                <p className="text-sm text-muted-foreground">Adultos: <span className="font-medium">{numAdults}</span> x ${adultPrice.toFixed(2)} = <span className="font-medium">${(numAdults * adultPrice).toFixed(2)}</span></p>
-                <p className="text-sm text-muted-foreground">Niños (-12 años): <span className="font-medium">{numChildren}</span> x ${childPrice.toFixed(2)} = <span className="font-medium">${(numChildren * childPrice).toFixed(2)}</span></p>
-                <p className="font-bold mt-2 text-bus-foreground">Total Calculado: <span className="text-xl">${totalAmount.toFixed(2)}</span></p>
-              </div>
+                {/* Companions */}
+                <h3 className="text-lg font-semibold mt-4">Acompañantes</h3>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Número Total de Personas</Label>
+                    <Input value={1 + formData.companions.length} readOnly className="bg-gray-100 cursor-not-allowed" />
+                  </div>
+                </div>
 
-              {/* Total Amount */}
-              <div className="col-span-full mt-6 p-4 bg-bus-primary text-bus-primary-foreground rounded-md flex justify-between items-center">
-                <h3 className="text-xl font-bold">Monto Total a Pagar:</h3>
-                <span className="text-2xl font-bold">${totalAmount.toFixed(2)}</span>
-              </div>
+                <div className="space-y-2 mt-4">
+                  <Label className="font-semibold">Acompañantes</Label>
+                  {formData.companions.map((companion) => (
+                    <div key={companion.id} className="flex flex-col md:flex-row items-center gap-2">
+                      <Input
+                        value={companion.name}
+                        onChange={(e) => handleCompanionChange(companion.id, 'name', e.target.value)}
+                        placeholder="Nombre del acompañante"
+                        className="w-full md:w-2/3 focus-visible:ring-bus-primary"
+                      />
+                      <Input
+                        type="text" // Changed to text
+                        pattern="[0-9]*" // Pattern for integers
+                        value={companion.age || ''}
+                        onChange={(e) => handleCompanionChange(companion.id, 'age', e.target.value)}
+                        placeholder="Edad"
+                        className="w-full md:w-1/3 focus-visible:ring-bus-primary"
+                      />
+                      <Button type="button" variant="destructive" size="icon" onClick={() => removeCompanion(companion.id)}>
+                        <MinusCircle className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" onClick={addCompanion} className="text-bus-primary border-bus-primary hover:bg-bus-primary/10">
+                    <PlusCircle className="mr-2 h-4 w-4" /> Añadir Acompañante
+                  </Button>
+                </div>
 
-              <div className="flex justify-end mt-6">
-                <Button type="submit" disabled={isSubmitting || loadingBusLayout} className="bg-bus-primary hover:bg-bus-primary/90 text-bus-primary-foreground">
-                  {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                  Confirmar Reserva
-                </Button>
-              </div>
-            </form>
+                {/* Price Breakdown */}
+                <div className="col-span-full mt-6 p-4 bg-gray-100 rounded-md">
+                  <h4 className="font-semibold text-lg mb-2">Desglose del Cálculo:</h4>
+                  <p className="text-sm text-muted-foreground">Adultos: <span className="font-medium">{numAdults}</span> x ${adultPrice.toFixed(2)} = <span className="font-medium">${(numAdults * adultPrice).toFixed(2)}</span></p>
+                  <p className="text-sm text-muted-foreground">Niños (-12 años): <span className="font-medium">{numChildren}</span> x ${childPrice.toFixed(2)} = <span className="font-medium">${(numChildren * childPrice).toFixed(2)}</span></p>
+                  <p className="font-bold mt-2 text-bus-foreground">Total Calculado: <span className="text-xl">${totalAmount.toFixed(2)}</span></p>
+                </div>
+
+                {/* Total Amount */}
+                <div className="col-span-full mt-6 p-4 bg-bus-primary text-bus-primary-foreground rounded-md flex justify-between items-center">
+                  <h3 className="text-xl font-bold">Monto Total a Pagar:</h3>
+                  <span className="text-2xl font-bold">${totalAmount.toFixed(2)}</span>
+                </div>
+
+                <div className="flex justify-between mt-6">
+                  <Button type="button" variant="outline" onClick={() => setStep(1)} className="bg-white text-bus-primary hover:bg-gray-100 border-bus-primary hover:border-bus-primary/90">
+                    <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Asientos
+                  </Button>
+                  <Button type="submit" disabled={isSubmitting} className="bg-bus-primary hover:bg-bus-primary/90 text-bus-primary-foreground">
+                    {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    Confirmar Reserva
+                  </Button>
+                </div>
+              </form>
+            )}
           </div>
         </main>
         <BusTicketsFooter />
