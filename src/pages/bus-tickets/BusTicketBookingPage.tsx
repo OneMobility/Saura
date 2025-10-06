@@ -8,7 +8,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Save, PlusCircle, MinusCircle, ArrowLeft } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import BusSeatMap from '@/components/bus-tickets/BusSeatMap'; // Changed from TourSeatMap
+import BusSeatMap from '@/components/bus-tickets/BusSeatMap';
 import BusTicketsNavbar from '@/components/BusTicketsNavbar';
 import BusTicketsFooter from '@/components/BusTicketsFooter';
 import BusTicketsThemeProvider from '@/components/BusTicketsThemeProvider';
@@ -21,9 +21,14 @@ type SeatLayoutItem = {
 type SeatLayoutRow = SeatLayoutItem[];
 type SeatLayout = SeatLayoutRow[];
 
-interface Companion {
-  id: string;
-  name: string;
+interface Passenger {
+  id: string; // Unique ID for React keys
+  isContractor: boolean;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string;
+  identification_number: string | null;
   age: number | null;
 }
 
@@ -37,20 +42,17 @@ interface BookingPageProps {
   childPrice: number;
   busId: string | null;
   busCapacity: number;
-  courtesies: number; // Still passed from search results, but ignored by BusSeatMap
+  courtesies: number;
   originId: string;
   destinationId: string;
   searchDate: string;
-  scheduleId: string; // NEW: scheduleId from search results
+  scheduleId: string;
 }
 
 const BusTicketBookingPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
   const bookingData = location.state as BookingPageProps;
-
-  console.log('BusTicketBookingPage: location.state', location.state);
-  console.log('BusTicketBookingPage: bookingData', bookingData);
 
   const {
     routeId,
@@ -66,18 +68,10 @@ const BusTicketBookingPage: React.FC = () => {
     originId,
     destinationId,
     searchDate,
-    scheduleId, // NEW: Destructure scheduleId
+    scheduleId,
   } = bookingData || {};
 
-  const [formData, setFormData] = useState({
-    first_name: '',
-    last_name: '',
-    email: '',
-    phone: '',
-    identification_number: null as string | null,
-    contractor_age: null as number | null,
-    companions: [] as Companion[],
-  });
+  const [passengersData, setPassengersData] = useState<Passenger[]>([]);
   const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
   const [totalAmount, setTotalAmount] = useState(0);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -91,7 +85,7 @@ const BusTicketBookingPage: React.FC = () => {
 
   // Validate bookingData on mount
   useEffect(() => {
-    if (!routeId || !routeName || !originName || !destinationName || !departureTime || adultPrice === undefined || childPrice === undefined || busCapacity === undefined || courtesies === undefined || !originId || !destinationId || !searchDate || !scheduleId) { // Added scheduleId to validation
+    if (!routeId || !routeName || !originName || !destinationName || !departureTime || adultPrice === undefined || childPrice === undefined || busCapacity === undefined || courtesies === undefined || !originId || !destinationId || !searchDate || !scheduleId) {
       console.error('BusTicketBookingPage: Datos de reserva incompletos detectados.');
       setPageError('Datos de reserva incompletos. Por favor, regresa y selecciona un horario.');
     }
@@ -128,19 +122,13 @@ const BusTicketBookingPage: React.FC = () => {
     }
   }, [busId]);
 
+  // Calculate total amount and adult/child counts based on passengersData
   useEffect(() => {
     let currentNumAdults = 0;
     let currentNumChildren = 0;
 
-    // Contractor is an adult by default if age is not provided or >= 12
-    if (formData.contractor_age === null || formData.contractor_age >= 12) {
-      currentNumAdults++;
-    } else {
-      currentNumChildren++;
-    }
-
-    formData.companions.forEach(c => {
-      if (c.age === null || c.age >= 12) {
+    passengersData.forEach(p => {
+      if (p.age === null || p.age >= 12) {
         currentNumAdults++;
       } else {
         currentNumChildren++;
@@ -152,39 +140,12 @@ const BusTicketBookingPage: React.FC = () => {
 
     const calculatedTotalAmount = (currentNumAdults * adultPrice) + (currentNumChildren * childPrice);
     setTotalAmount(calculatedTotalAmount);
-  }, [formData.contractor_age, formData.companions, adultPrice, childPrice]);
+  }, [passengersData, adultPrice, childPrice]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { id, value } = e.target;
-    setFormData((prev) => ({ ...prev, [id]: value }));
-  };
-
-  const handleNumberChange = (id: 'contractor_age', value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [id]: parseFloat(value) || null,
-    }));
-  };
-
-  const handleCompanionChange = (id: string, field: 'name' | 'age', value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      companions: prev.companions.map(c => c.id === id ? { ...c, [field]: field === 'age' ? (parseFloat(value) || null) : value } : c),
-    }));
-  };
-
-  const addCompanion = () => {
-    setFormData((prev) => ({
-      ...prev,
-      companions: [...prev.companions, { id: uuidv4(), name: '', age: null }],
-    }));
-  };
-
-  const removeCompanion = (id: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      companions: prev.companions.filter(c => c.id !== id),
-    }));
+  const handlePassengerChange = (passengerId: string, field: keyof Passenger, value: string | number | null) => {
+    setPassengersData(prev =>
+      prev.map(p => (p.id === passengerId ? { ...p, [field]: value } : p))
+    );
   };
 
   const handleSeatsSelected = useCallback((seats: number[]) => {
@@ -192,11 +153,23 @@ const BusTicketBookingPage: React.FC = () => {
   }, []);
 
   const handleContinueToDetails = () => {
-    const totalPeople = 1 + formData.companions.length;
-    if (selectedSeats.length !== totalPeople) {
-      toast.error(`Debes seleccionar ${totalPeople} asientos para este contrato.`);
+    if (selectedSeats.length === 0) {
+      toast.error('Por favor, selecciona al menos un asiento.');
       return;
     }
+
+    // Initialize passengersData based on selectedSeats.length
+    const newPassengersData: Passenger[] = selectedSeats.map((_, index) => ({
+      id: uuidv4(),
+      isContractor: index === 0,
+      first_name: '',
+      last_name: '',
+      email: '',
+      phone: '',
+      identification_number: null,
+      age: null,
+    }));
+    setPassengersData(newPassengersData);
     setStep(2);
   };
 
@@ -204,55 +177,59 @@ const BusTicketBookingPage: React.FC = () => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const totalPeople = 1 + formData.companions.length;
-
-    if (!formData.first_name || !formData.last_name || !formData.email) {
-      toast.error('Por favor, rellena los campos obligatorios (Nombre, Apellido, Email).');
+    if (passengersData.length === 0) {
+      toast.error('No hay pasajeros registrados.');
       setIsSubmitting(false);
       return;
     }
 
-    if (formData.contractor_age !== null && (formData.contractor_age < 0 || formData.contractor_age > 120)) {
-      toast.error('La edad del contratante debe ser un valor razonable.');
-      setIsSubmitting(false);
-      return;
-    }
-
-    for (const companion of formData.companions) {
-      if (companion.age !== null && (companion.age < 0 || companion.age > 120)) {
-        toast.error(`La edad del acompañante ${companion.name || 'sin nombre'} debe ser un valor razonable.`);
+    // Validate all passenger data
+    for (const p of passengersData) {
+      if (!p.first_name || !p.last_name) {
+        toast.error(`Por favor, rellena el nombre y apellido para todos los pasajeros.`);
+        setIsSubmitting(false);
+        return;
+      }
+      if (p.isContractor && (!p.email || !p.phone)) {
+        toast.error('Por favor, rellena el email y teléfono del contratante.');
+        setIsSubmitting(false);
+        return;
+      }
+      if (p.age !== null && (p.age < 0 || p.age > 120)) {
+        toast.error(`La edad del pasajero ${p.first_name} ${p.last_name} debe ser un valor razonable.`);
         setIsSubmitting(false);
         return;
       }
     }
 
-    // Seat validation already done in step 1, but a final check doesn't hurt
-    if (selectedSeats.length !== totalPeople) {
-      toast.error(`Debes seleccionar ${totalPeople} asientos para este contrato.`);
-      setIsSubmitting(false);
-      return;
-    }
-
     try {
       const contract_number = uuidv4().substring(0, 8).toUpperCase();
 
+      const contractor = passengersData[0];
+      const companions = passengersData.slice(1).map(p => ({
+        id: p.id,
+        name: `${p.first_name} ${p.last_name}`,
+        age: p.age,
+        identification_number: p.identification_number,
+      }));
+
       const clientDataToSave = {
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        email: formData.email,
-        phone: formData.phone || null,
+        first_name: contractor.first_name,
+        last_name: contractor.last_name,
+        email: contractor.email,
+        phone: contractor.phone || null,
         address: null, // Not collected in this form
-        identification_number: formData.identification_number || null,
+        identification_number: contractor.identification_number || null,
         contract_number: contract_number,
         tour_id: routeId, // Use routeId as tour_id for bus tickets
-        number_of_people: totalPeople,
-        companions: formData.companions,
+        number_of_people: passengersData.length,
+        companions: companions,
         extra_services: [], // Not collected in this form
         total_amount: totalAmount,
         advance_payment: 0,
         total_paid: 0,
         status: 'pending',
-        contractor_age: formData.contractor_age,
+        contractor_age: contractor.age,
         room_details: { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }, // Not applicable for bus tickets
       };
 
@@ -269,9 +246,8 @@ const BusTicketBookingPage: React.FC = () => {
         return;
       }
 
-      // NEW: Insert into bus_seat_assignments table
       const newBusSeatAssignments = selectedSeats.map(seatNumber => ({
-        schedule_id: scheduleId, // Use scheduleId for bus seat assignments
+        schedule_id: scheduleId,
         seat_number: seatNumber,
         status: 'booked',
         client_id: newClientData.id,
@@ -291,7 +267,7 @@ const BusTicketBookingPage: React.FC = () => {
       }
 
       toast.success(`¡Reserva de boleto exitosa! Tu número de contrato es: ${contract_number}.`);
-      navigate(`/bus-tickets/confirmation/${contract_number}`); // Redirect to confirmation page
+      navigate(`/bus-tickets/confirmation/${contract_number}`);
     } catch (error) {
       console.error('Unexpected error during booking:', error);
       toast.error('Ocurrió un error inesperado al procesar tu reserva.');
@@ -301,7 +277,6 @@ const BusTicketBookingPage: React.FC = () => {
   };
 
   if (pageError) {
-    console.log('BusTicketBookingPage: Rendering pageError block.');
     return (
       <BusTicketsThemeProvider>
         <div className="min-h-screen flex flex-col bg-bus-background text-bus-foreground">
@@ -322,7 +297,6 @@ const BusTicketBookingPage: React.FC = () => {
   }
 
   if (!bookingData) {
-    console.log('BusTicketBookingPage: Rendering !bookingData block.');
     return (
       <BusTicketsThemeProvider>
         <div className="min-h-screen flex flex-col bg-bus-background text-bus-foreground">
@@ -341,15 +315,6 @@ const BusTicketBookingPage: React.FC = () => {
       </BusTicketsThemeProvider>
     );
   }
-
-  console.log('BusTicketBookingPage: Rendering main form.');
-  console.log('BusTicketBookingPage: busId:', busId);
-  console.log('BusTicketBookingPage: busCapacity:', busCapacity);
-  console.log('BusTicketBookingPage: courtesies:', courtesies);
-  console.log('BusTicketBookingPage: busLayout:', busLayout);
-  console.log('BusTicketBookingPage: loadingBusLayout:', loadingBusLayout);
-  console.log('BusTicketBookingPage: scheduleId:', scheduleId);
-
 
   return (
     <BusTicketsThemeProvider>
@@ -385,7 +350,7 @@ const BusTicketBookingPage: React.FC = () => {
             {step === 1 && (
               <>
                 {/* Seat Selection */}
-                {busId && busCapacity > 0 && scheduleId ? ( // Added scheduleId check
+                {busId && busCapacity > 0 && scheduleId ? (
                   <div className="col-span-full mt-6">
                     <h3 className="text-lg font-semibold mb-4">Paso 1: Selección de Asientos</h3>
                     {loadingBusLayout ? (
@@ -394,10 +359,10 @@ const BusTicketBookingPage: React.FC = () => {
                         <p className="ml-4 text-muted-foreground">Cargando mapa de asientos...</p>
                       </div>
                     ) : (
-                      <BusSeatMap // Changed to BusSeatMap
+                      <BusSeatMap
                         busId={busId}
                         busCapacity={busCapacity}
-                        scheduleId={scheduleId} // Pass scheduleId
+                        scheduleId={scheduleId}
                         seatLayoutJson={busLayout}
                         onSeatsSelected={handleSeatsSelected}
                         readOnly={false}
@@ -425,81 +390,88 @@ const BusTicketBookingPage: React.FC = () => {
 
             {step === 2 && (
               <form onSubmit={handleSubmit} className="grid gap-6 py-4">
-                <h3 className="text-lg font-semibold mt-4">Paso 2: Tus Datos</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="first_name">Nombre</Label>
-                    <Input id="first_name" value={formData.first_name} onChange={handleChange} required className="focus-visible:ring-bus-primary" />
-                  </div>
-                  <div>
-                    <Label htmlFor="last_name">Apellido</Label>
-                    <Input id="last_name" value={formData.last_name} onChange={handleChange} required className="focus-visible:ring-bus-primary" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="email">Email</Label>
-                    <Input id="email" type="email" value={formData.email} onChange={handleChange} required className="focus-visible:ring-bus-primary" />
-                  </div>
-                  <div>
-                    <Label htmlFor="phone">Teléfono (Opcional)</Label>
-                    <Input id="phone" value={formData.phone} onChange={handleChange} className="focus-visible:ring-bus-primary" />
-                  </div>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label htmlFor="contractor_age">Edad del Contratante (Opcional)</Label>
-                    <Input 
-                      id="contractor_age" 
-                      type="text" // Changed to text
-                      pattern="[0-9]*" // Pattern for integers
-                      value={formData.contractor_age || ''} 
-                      onChange={(e) => handleNumberChange('contractor_age', e.target.value)} 
-                      className="focus-visible:ring-bus-primary" 
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="identification_number">Número de Identificación (Opcional)</Label>
-                    <Input id="identification_number" value={formData.identification_number || ''} onChange={handleChange} placeholder="Ej: INE, Pasaporte, etc." className="focus-visible:ring-bus-primary" />
-                  </div>
-                </div>
+                <h3 className="text-lg font-semibold mt-4">Paso 2: Datos de los Pasajeros</h3>
+                <p className="text-sm text-muted-foreground mb-4">
+                  Por favor, rellena los datos para cada uno de los {selectedSeats.length} asientos seleccionados.
+                </p>
 
-                {/* Companions */}
-                <h3 className="text-lg font-semibold mt-4">Acompañantes</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div>
-                    <Label>Número Total de Personas</Label>
-                    <Input value={1 + formData.companions.length} readOnly className="bg-gray-100 cursor-not-allowed" />
-                  </div>
-                </div>
-
-                <div className="space-y-2 mt-4">
-                  <Label className="font-semibold">Acompañantes</Label>
-                  {formData.companions.map((companion) => (
-                    <div key={companion.id} className="flex flex-col md:flex-row items-center gap-2">
-                      <Input
-                        value={companion.name}
-                        onChange={(e) => handleCompanionChange(companion.id, 'name', e.target.value)}
-                        placeholder="Nombre del acompañante"
-                        className="w-full md:w-2/3 focus-visible:ring-bus-primary"
-                      />
-                      <Input
-                        type="text" // Changed to text
-                        pattern="[0-9]*" // Pattern for integers
-                        value={companion.age || ''}
-                        onChange={(e) => handleCompanionChange(companion.id, 'age', e.target.value)}
-                        placeholder="Edad"
-                        className="w-full md:w-1/3 focus-visible:ring-bus-primary"
-                      />
-                      <Button type="button" variant="destructive" size="icon" onClick={() => removeCompanion(companion.id)}>
-                        <MinusCircle className="h-4 w-4" />
-                      </Button>
+                {passengersData.map((passenger, index) => (
+                  <div key={passenger.id} className="border p-4 rounded-md bg-gray-50 space-y-4">
+                    <h4 className="font-semibold text-lg text-bus-primary">
+                      {passenger.isContractor ? 'Datos del Contratante' : `Datos del Pasajero ${index + 1}`}
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor={`first_name-${passenger.id}`}>Nombre</Label>
+                        <Input
+                          id={`first_name-${passenger.id}`}
+                          value={passenger.first_name}
+                          onChange={(e) => handlePassengerChange(passenger.id, 'first_name', e.target.value)}
+                          required
+                          className="focus-visible:ring-bus-primary"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`last_name-${passenger.id}`}>Apellido</Label>
+                        <Input
+                          id={`last_name-${passenger.id}`}
+                          value={passenger.last_name}
+                          onChange={(e) => handlePassengerChange(passenger.id, 'last_name', e.target.value)}
+                          required
+                          className="focus-visible:ring-bus-primary"
+                        />
+                      </div>
                     </div>
-                  ))}
-                  <Button type="button" variant="outline" onClick={addCompanion} className="text-bus-primary border-bus-primary hover:bg-bus-primary/10">
-                    <PlusCircle className="mr-2 h-4 w-4" /> Añadir Acompañante
-                  </Button>
-                </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <Label htmlFor={`age-${passenger.id}`}>Edad (Opcional)</Label>
+                        <Input
+                          id={`age-${passenger.id}`}
+                          type="text"
+                          pattern="[0-9]*"
+                          value={passenger.age || ''}
+                          onChange={(e) => handlePassengerChange(passenger.id, 'age', parseFloat(e.target.value) || null)}
+                          className="focus-visible:ring-bus-primary"
+                        />
+                      </div>
+                      <div>
+                        <Label htmlFor={`identification_number-${passenger.id}`}>Número de Identificación (Opcional)</Label>
+                        <Input
+                          id={`identification_number-${passenger.id}`}
+                          value={passenger.identification_number || ''}
+                          onChange={(e) => handlePassengerChange(passenger.id, 'identification_number', e.target.value)}
+                          placeholder="Ej: INE, Pasaporte, etc."
+                          className="focus-visible:ring-bus-primary"
+                        />
+                      </div>
+                    </div>
+                    {passenger.isContractor && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor={`email-${passenger.id}`}>Email</Label>
+                          <Input
+                            id={`email-${passenger.id}`}
+                            type="email"
+                            value={passenger.email}
+                            onChange={(e) => handlePassengerChange(passenger.id, 'email', e.target.value)}
+                            required
+                            className="focus-visible:ring-bus-primary"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`phone-${passenger.id}`}>Teléfono</Label>
+                          <Input
+                            id={`phone-${passenger.id}`}
+                            value={passenger.phone}
+                            onChange={(e) => handlePassengerChange(passenger.id, 'phone', e.target.value)}
+                            required
+                            className="focus-visible:ring-bus-primary"
+                          />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ))}
 
                 {/* Price Breakdown */}
                 <div className="col-span-full mt-6 p-4 bg-gray-100 rounded-md">
