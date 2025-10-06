@@ -26,3 +26,33 @@ export type SeatLayoutItem = {
 };
 export type SeatLayoutRow = SeatLayoutItem[];
 export type SeatLayout = SeatLayoutRow[];
+
+// NEW: Interface for BusRouteDestination (snapshot of bus_destinations)
+export interface BusRouteDestination {
+  id: string;
+  name: string;
+  order_index: number;
+}
+
+// NEW: Interface for BusRoute
+export interface BusRoute {
+  id?: string;
+  name: string;
+  description: string | null;
+  bus_id: string | null;
+  destinations: BusRouteDestination[]; // Array of selected destinations
+  price_per_seat: number;
+  departure_time: string; // Stored as TIME WITH TIME ZONE
+  arrival_time: string; // Stored as TIME WITH TIME ZONE
+  is_active: boolean;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// NEW: Interface for AvailableBus (simplified for route linking)
+export interface AvailableBus {
+  id: string;
+  name: string;
+  total_capacity: number;
+  rental_cost: number;
+}

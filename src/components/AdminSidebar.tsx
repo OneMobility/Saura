@@ -18,6 +18,7 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { href: '/admin/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
+  { href: '/admin/buses', icon: Bus, label: 'Autobuses' }, // MOVED: Buses to top level
   {
     icon: Ticket,
     label: 'Boletos de Autobús',
@@ -33,7 +34,6 @@ const navItems: NavItem[] = [
     children: [
       { href: '/admin/tours', icon: Package, label: 'Tours' },
       { href: '/admin/hotels', icon: Hotel, label: 'Hoteles' },
-      { href: '/admin/buses', icon: Bus, label: 'Autobuses' },
       { href: '/admin/providers', icon: Handshake, label: 'Proveedores' },
       { href: '/admin/clients', icon: UserRound, label: 'Clientes' },
     ],
@@ -172,27 +172,26 @@ const AdminSidebar = () => {
                         <item.icon className="h-5 w-5" />
                         <span className="sr-only">{item.label}</span>
                       </Link>
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent side="right">{item.label}</TooltipContent>
-                </Tooltip>
-              ) : (
-                <Button
-                  variant="ghost"
-                  className={cn(
-                    "w-full h-10 justify-start px-4 space-x-3",
-                    location.pathname === item.href
-                      ? "bg-rosa-mexicano text-white hover:bg-rosa-mexicano/90"
-                      : "hover:bg-gray-700"
-                  )}
-                  asChild
-                >
-                  <Link to={item.href || '#'}>
-                    <item.icon className="h-5 w-5" />
-                    <span>{item.label}</span>
-                  </Link>
-                </Button>
-              )}
+                    </TooltipTrigger>
+                    <TooltipContent side="right">{item.label}</TooltipContent>
+                  </Tooltip>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    className={cn(
+                      "w-full h-10 justify-start px-4 space-x-3",
+                      location.pathname === item.href
+                        ? "bg-rosa-mexicano text-white hover:bg-rosa-mexicano/90"
+                        : "hover:bg-gray-700"
+                    )}
+                    asChild
+                  >
+                    <Link to={item.href || '#'}>
+                      <item.icon className="h-5 w-5" />
+                      <span>{item.label}</span>
+                    </Link>
+                  </Button>
+                )}
             </div>
           )
         ))}

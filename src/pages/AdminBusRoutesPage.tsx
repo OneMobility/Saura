@@ -1,17 +1,44 @@
 "use client";
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate } from 'react-router-dom';
-import { Loader2 } from 'lucide-react';
+import { Loader2, PlusCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import BusRoutesTable from '@/components/admin/bus-routes/BusRoutesTable'; // Import the new BusRoutesTable
+import BusRouteFormDialog from '@/components/admin/bus-routes/BusRouteFormDialog'; // Import the new BusRouteFormDialog
+import { BusRoute } from '@/types/shared';
 
 const AdminBusRoutesPage = () => {
-  const { user, isAdmin, isLoading } = useSession();
+  const { user, isAdmin, isLoading: sessionLoading } = useSession();
   const navigate = useNavigate();
+  const [isFormDialogOpen, setIsFormDialogOpen] = useState(false);
+  const [selectedRoute, setSelectedRoute] = useState<BusRoute | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0); // Key to force re-fetch of routes
 
-  if (isLoading) {
+  useEffect(() => {
+    if (!sessionLoading && (!user || !isAdmin)) {
+      navigate('/login');
+    }
+  }, [user, isAdmin, sessionLoading, navigate]);
+
+  const handleAddRoute = () => {
+    setSelectedRoute(null);
+    setIsFormDialogOpen(true);
+  };
+
+  const handleEditRoute = (route: BusRoute) => {
+    setSelectedRoute(route);
+    setIsFormDialogOpen(true);
+  };
+
+  const handleRouteSave = () => {
+    setRefreshKey(prev => prev + 1); // Increment key to trigger re-fetch in BusRoutesTable
+  };
+
+  if (sessionLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <Loader2 className="h-12 w-12 animate-spin text-rosa-mexicano" />
@@ -21,7 +48,6 @@ const AdminBusRoutesPage = () => {
   }
 
   if (!user || !isAdmin) {
-    navigate('/login');
     return null;
   }
 
@@ -29,22 +55,24 @@ const AdminBusRoutesPage = () => {
     <div className="flex min-h-screen bg-gray-100">
       <AdminSidebar />
       <div className="flex flex-col flex-grow">
-        <AdminHeader pageTitle="Gestión de Rutas de Autobús" />
+        <AdminHeader pageTitle="Gestión de Rutas de Autobús">
+          <Button onClick={handleAddRoute} className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white">
+            <PlusCircle className="mr-2 h-4 w-4" /> Añadir Nueva Ruta
+          </Button>
+        </AdminHeader>
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Próximamente: Gestión de Rutas de Autobús</h2>
-            <p className="text-gray-600">
-              Esta sección está en desarrollo. Aquí podrás definir y gestionar las rutas de tus autobuses, incluyendo paradas, tiempos y precios.
-            </p>
-            <p className="text-gray-600 mt-2">
-              ¡Mantente atento a las actualizaciones!
-            </p>
-          </div>
+          <BusRoutesTable onEditRoute={handleEditRoute} onRouteDeleted={handleRouteSave} refreshKey={refreshKey} />
         </main>
         <footer className="bg-gray-800 text-white py-4 text-center text-sm">
           <p>&copy; {new Date().getFullYear()} Saura Tours Admin. Todos los derechos reservados.</p>
         </footer>
       </div>
+      <BusRouteFormDialog
+        isOpen={isFormDialogOpen}
+        onClose={() => setIsFormDialogOpen(false)}
+        onSave={handleRouteSave}
+        initialData={selectedRoute}
+      />
     </div>
   );
 };
