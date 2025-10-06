@@ -31,13 +31,13 @@ interface SearchResult {
 const BusSearchResultsPage = () => {
   const location = useLocation();
   const navigate = useNavigate(); // Initialize useNavigate
-  const { originId, destinationId, searchDate } = location.state || {};
+  const { originId, destinationId, searchDate } = location.state || {}; // Destructure originId and destinationId from location.state
 
   const [results, setResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [originName, setOriginName] = useState<string>('');
-  const [destinationName, setDestinationName] = useState<string>('');
+  const [originDisplayName, setOriginDisplayName] = useState<string>(''); // Renamed to avoid conflict with originId
+  const [destinationDisplayName, setDestinationDisplayName] = useState<string>(''); // Renamed to avoid conflict with destinationId
 
   const fetchResults = useCallback(async () => {
     setLoading(true);
@@ -69,8 +69,8 @@ const BusSearchResultsPage = () => {
       if (destinationsError) throw destinationsError;
       const destinationMap = new Map(destinationsData.map(d => [d.id, d.name]));
 
-      setOriginName(destinationMap.get(originId) || 'Origen Desconocido');
-      setDestinationName(destinationMap.get(destinationId) || 'Destino Desconocido');
+      setOriginDisplayName(destinationMap.get(originId) || 'Origen Desconocido');
+      setDestinationDisplayName(destinationMap.get(destinationId) || 'Destino Desconocido');
 
       // 1. Fetch all routes
       const { data: routesData, error: routesError } = await supabase
@@ -103,10 +103,10 @@ const BusSearchResultsPage = () => {
 
       routesData.forEach(route => {
         // Check if origin and destination are in the route's stops and in correct order
-        const originIndex = route.all_stops.indexOf(originId);
-        const destinationIndex = route.all_stops.indexOf(destinationId);
+        const currentOriginIndex = route.all_stops.indexOf(originId);
+        const currentDestinationIndex = route.all_stops.indexOf(destinationId);
 
-        if (originIndex !== -1 && destinationIndex !== -1 && originIndex < destinationIndex) {
+        if (currentOriginIndex !== -1 && currentDestinationIndex !== -1 && currentOriginIndex < currentDestinationIndex) {
           // Find the direct segment for this origin-destination pair within this route
           const segment = segmentsData.find(
             s => s.route_id === route.id && s.start_destination_id === originId && s.end_destination_id === destinationId
@@ -167,7 +167,14 @@ const BusSearchResultsPage = () => {
   }, [fetchResults]);
 
   const handleSelectSchedule = (schedule: SearchResult) => {
-    navigate('/bus-tickets/book', { state: { ...schedule, searchDate } }); // Navigate to booking page with state
+    navigate('/bus-tickets/book', {
+      state: {
+        ...schedule,
+        searchDate,
+        originId, // Pass originId
+        destinationId, // Pass destinationId
+      },
+    });
   };
 
   const displayDate = searchDate ? format(new Date(searchDate), 'EEEE, dd MMMM yyyy', { locale: es }) : 'Fecha no especificada';
@@ -189,7 +196,7 @@ const BusSearchResultsPage = () => {
             Resultados de Búsqueda
           </h1>
           <p className="text-lg text-center mb-10">
-            <span className="font-semibold">{originName}</span> a <span className="font-semibold">{destinationName}</span> el <span className="font-semibold">{displayDate}</span>
+            <span className="font-semibold">{originDisplayName}</span> a <span className="font-semibold">{destinationDisplayName}</span> el <span className="font-semibold">{displayDate}</span>
           </p>
 
           {loading ? (
