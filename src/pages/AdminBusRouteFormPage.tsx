@@ -38,7 +38,7 @@ const AdminBusRouteFormPage = () => {
   const [availableBuses, setAvailableBuses] = useState<AvailableBus[]>([]);
   const [availableDestinations, setAvailableDestinations] = useState<BusDestinationOption[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loadingInitialData, setLoadingInitialData] = useState(true);
+  const [loadingInitialData, setLoadingInitialData] = useState(true); // This is the main loading state
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({}); // State for collapsible sections
 
   // Helper to get destination name from ID
@@ -53,8 +53,10 @@ const AdminBusRouteFormPage = () => {
   }, [user, isAdmin, sessionLoading, navigate]);
 
   useEffect(() => {
-    const fetchDependencies = async () => {
-      setLoadingInitialData(true);
+    const fetchData = async () => {
+      setLoadingInitialData(true); // Start loading
+
+      // 1. Fetch dependencies (buses, destinations)
       const [busesRes, destinationsRes] = await Promise.all([
         supabase.from('buses').select('id, name, total_capacity, rental_cost').order('name', { ascending: true }),
         supabase.from('bus_destinations').select('id, name, order_index').order('order_index', { ascending: true }),
@@ -73,16 +75,9 @@ const AdminBusRouteFormPage = () => {
       } else {
         setAvailableDestinations(destinationsRes.data || []);
       }
-      setLoadingInitialData(false);
-    };
 
-    fetchDependencies();
-  }, []);
-
-  useEffect(() => {
-    const loadRouteData = async () => {
+      // 2. If editing, fetch route data and its segments
       if (routeIdFromParams) {
-        setLoadingInitialData(true);
         const { data, error } = await supabase
           .from('bus_routes')
           .select('*')
@@ -92,21 +87,16 @@ const AdminBusRouteFormPage = () => {
         if (error) {
           console.error('Error fetching route for editing:', error);
           toast.error('Error al cargar los datos de la ruta para editar.');
-          setLoadingInitialData(false);
-          return;
-        }
-
-        if (data) {
+        } else if (data) {
           setFormData({
             ...data,
-            all_stops: data.all_stops || [], // Ensure all_stops is an array
+            all_stops: data.all_stops || [],
           });
-          // Fetch existing segments for this route
           const { data: segmentsData, error: segmentsError } = await supabase
             .from('route_segments')
             .select('*')
             .eq('route_id', data.id)
-            .order('created_at', { ascending: true }); // Order by creation to maintain sequence
+            .order('created_at', { ascending: true });
 
           if (segmentsError) {
             console.error('Error fetching route segments for initial data:', segmentsError);
@@ -116,6 +106,7 @@ const AdminBusRouteFormPage = () => {
           }
         }
       } else {
+        // Reset form for new route
         setFormData({
           name: '',
           all_stops: [],
@@ -124,13 +115,11 @@ const AdminBusRouteFormPage = () => {
         });
         setRouteSegments([]);
       }
-      setLoadingInitialData(false);
+      setLoadingInitialData(false); // End loading
     };
 
-    if (!loadingDependencies) { // Only load route data once dependencies are loaded
-      loadRouteData();
-    }
-  }, [routeIdFromParams, loadingDependencies]);
+    fetchData();
+  }, [routeIdFromParams, user, isAdmin, navigate]); // Dependencies for this consolidated effect
 
   // Effect to update route segments when all_stops changes
   useEffect(() => {
@@ -175,7 +164,7 @@ const AdminBusRouteFormPage = () => {
     });
 
     setRouteSegments(sortedNewSegments);
-  }, [formData.all_stops, formData.id, availableDestinations]); // Depend on availableDestinations for sorting
+  }, [formData.all_stops, formData.id, availableDestinations, routeSegments]); // Added routeSegments to dependencies to ensure it reacts to changes in existing segments
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value, type } = e.target;
