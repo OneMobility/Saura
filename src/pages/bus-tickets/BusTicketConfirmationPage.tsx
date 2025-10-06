@@ -11,6 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { toast } from 'sonner'; // Import toast from sonner
 
 interface BusPassenger {
   id: string;
@@ -45,6 +46,7 @@ interface ClientBookingDetails {
   departure_time: string;
   search_date: string;
   passengers: BusPassenger[]; // NEW: Array of all passengers
+  assigned_seat_numbers: number[]; // Added missing property
 }
 
 const BusTicketConfirmationPage: React.FC = () => {
