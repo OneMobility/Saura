@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText, ChevronDown, Hotel, Truck, UserRound, Bus, Handshake, Ticket, MapPin, Map, CalendarClock, UsersRound } from 'lucide-react'; // Added UsersRound
+import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText, ChevronDown, Hotel, Truck, UserRound, Bus, Handshake, Ticket, MapPin, Map, CalendarClock, UsersRound, QrCode } from 'lucide-react'; // Added QrCode
 import { useSession } from '@/components/SessionContextProvider'; // Import useSession
 
 interface NavItem {
@@ -26,7 +26,8 @@ const navItems: NavItem[] = [
       { href: '/admin/bus-tickets/routes', icon: Map, label: 'Rutas' },
       { href: '/admin/bus-tickets/schedules', icon: CalendarClock, label: 'Horarios' },
       { href: '/admin/bus-tickets/destinations', icon: MapPin, label: 'Destinos' },
-      { href: '/admin/bus-tickets/passengers', icon: UsersRound, label: 'Pasajeros' }, // NEW: Passengers link
+      { href: '/admin/bus-tickets/passengers', icon: UsersRound, label: 'Pasajeros' },
+      { href: '/admin/bus-tickets/validate', icon: QrCode, label: 'Validación QR' }, // NEW: QR Validation link
     ],
   },
   {

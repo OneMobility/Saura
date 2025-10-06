@@ -11,7 +11,8 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { toast } from 'sonner'; // Import toast from sonner
+import { toast } from 'sonner';
+import QRCode from 'qrcode.react'; // Import QRCode
 
 interface BusPassenger {
   id: string;
@@ -200,35 +201,11 @@ const BusTicketConfirmationPage: React.FC = () => {
     toast.info('Generando boleto...');
 
     try {
-      const ticketHtml = `
-        <!DOCTYPE html>
-        <html lang="es">
-        <head>
-            <meta charset="UTF-8">
-            <meta name="viewport" content="width=device-width, initial-scale=1.0">
-            <title>Boleto de Autobús - ${bookingDetails.contract_number}</title>
-            <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
-            <style>
-                body { font-family: 'Poppins', sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; background-color: #f4f4f4; }
-                .ticket-container { max-width: 800px; margin: 20px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.1); border: 2px dashed #1e293b; }
-                .header { text-align: center; margin-bottom: 30px; }
-                .header h1 { color: #1e293b; font-size: 2.5em; margin-bottom: 5px; }
-                .header p { color: #ffd700; font-size: 1.2em; font-weight: 600; }
-                .section { margin-bottom: 20px; padding: 15px; border-left: 5px solid #ffd700; background-color: #fdfdfd; border-radius: 5px; }
-                .section h2 { color: #1e293b; font-size: 1.5em; margin-bottom: 10px; }
-                .section p { margin: 5px 0; }
-                .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
-                .passengers-list { list-style-type: disc; padding-left: 20px; }
-                .passengers-list li { margin-bottom: 5px; }
-                .footer { text-align: center; margin-top: 40px; color: #777; font-size: 0.9em; }
-                .total-amount { font-size: 1.8em; font-weight: 700; color: #1e293b; text-align: right; margin-top: 20px; }
-                @media print {
-                    body { background-color: white; padding: 0; }
-                    .ticket-container { box-shadow: none; border: 1px solid #ccc; margin: 0; width: 100%; min-height: 100vh; border-radius: 0; }
-                }
-            </style>
-        </head>
-        <body>
+      const passengerTicketsHtml = bookingDetails.passengers.map(p => {
+        // Data for QR code: passengerId_scheduleId_seatNumber
+        const qrData = `${p.id}_${bookingDetails.schedule_id}_${p.seat_number}`;
+        return `
+          <div class="ticket-page">
             <div class="ticket-container">
                 <div class="header">
                     <h1>Saura Bus</h1>
@@ -236,7 +213,7 @@ const BusTicketConfirmationPage: React.FC = () => {
                 </div>
 
                 <div class="section">
-                    <h2>Detalles de la Reserva</h2>
+                    <h2>Detalles del Boleto</h2>
                     <div class="details-grid">
                         <div>
                             <p><strong>Ruta:</strong> ${bookingDetails.route_name}</p>
@@ -247,8 +224,9 @@ const BusTicketConfirmationPage: React.FC = () => {
                         </div>
                         <div>
                             <p><strong>Número de Contrato:</strong> ${bookingDetails.contract_number}</p>
-                            <p><strong>Asientos Asignados:</strong> ${bookingDetails.assigned_seat_numbers.join(', ') || 'N/A'}</p>
-                            <p><strong>Total de Personas:</strong> ${bookingDetails.number_of_people}</p>
+                            <p><strong>Asiento:</strong> ${p.seat_number}</p>
+                            <p><strong>Pasajero:</strong> ${p.first_name} ${p.last_name}</p>
+                            <p><strong>Tipo:</strong> ${p.age !== null && p.age < 12 ? 'Niño' : 'Adulto'}</p>
                             <p><strong>Estado:</strong> ${bookingDetails.status}</p>
                         </div>
                     </div>
@@ -263,17 +241,11 @@ const BusTicketConfirmationPage: React.FC = () => {
                     <p><strong>Edad:</strong> ${bookingDetails.contractor_age !== null ? bookingDetails.contractor_age : 'N/A'}</p>
                 </div>
 
-                ${bookingDetails.passengers.filter(p => !p.is_contractor).length > 0 ? `
-                <div class="section">
-                    <h2>Acompañantes</h2>
-                    <ul class="passengers-list">
-                        ${bookingDetails.passengers.filter(p => !p.is_contractor).map(p => `<li>${p.first_name} ${p.last_name} (Asiento: ${p.seat_number}) ${p.age !== null ? `(${p.age} años)` : ''}</li>`).join('')}
-                    </ul>
-                </div>
-                ` : ''}
-
-                <div class="total-amount">
-                    Total Pagado: $${bookingDetails.total_amount.toFixed(2)}
+                <div class="qr-code-section">
+                    <h2>Código de Validación</h2>
+                    <div id="qrcode-${p.id}"></div>
+                    <p class="qr-data-text">ID: ${qrData}</p>
+                    <p class="instructions">Presenta este código al abordar.</p>
                 </div>
 
                 <div class="footer">
@@ -281,16 +253,74 @@ const BusTicketConfirmationPage: React.FC = () => {
                     <p>Este es un comprobante de tu reserva. Por favor, preséntalo al abordar.</p>
                 </div>
             </div>
+          </div>
+        `;
+      }).join('<div class="page-break"></div>'); // Add page break between tickets
+
+      const fullHtml = `
+        <!DOCTYPE html>
+        <html lang="es">
+        <head>
+            <meta charset="UTF-8">
+            <meta name="viewport" content="width=device-width, initial-scale=1.0">
+            <title>Boletos de Autobús - ${bookingDetails.contract_number}</title>
+            <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+            <style>
+                body { font-family: 'Poppins', sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; background-color: #f4f4f4; }
+                .ticket-page { page-break-after: always; }
+                .ticket-page:last-child { page-break-after: avoid; }
+                .ticket-container { max-width: 800px; margin: 20px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.1); border: 2px dashed #1e293b; }
+                .header { text-align: center; margin-bottom: 30px; }
+                .header h1 { color: #1e293b; font-size: 2.5em; margin-bottom: 5px; }
+                .header p { color: #ffd700; font-size: 1.2em; font-weight: 600; }
+                .section { margin-bottom: 20px; padding: 15px; border-left: 5px solid #ffd700; background-color: #fdfdfd; border-radius: 5px; }
+                .section h2 { color: #1e293b; font-size: 1.5em; margin-bottom: 10px; }
+                .section p { margin: 5px 0; }
+                .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+                .passengers-list { list-style-type: disc; padding-left: 20px; }
+                .passengers-list li { margin-bottom: 5px; }
+                .qr-code-section { text-align: center; margin-top: 30px; }
+                .qr-code-section h2 { color: #1e293b; margin-bottom: 15px; }
+                .qr-code-section canvas { margin: 0 auto; display: block; }
+                .qr-data-text { font-size: 0.9em; color: #555; margin-top: 10px; }
+                .instructions { font-size: 1em; color: #1e293b; font-weight: 600; margin-top: 15px; }
+                .footer { text-align: center; margin-top: 40px; color: #777; font-size: 0.9em; }
+                .total-amount { font-size: 1.8em; font-weight: 700; color: #1e293b; text-align: right; margin-top: 20px; }
+                @media print {
+                    body { background-color: white; padding: 0; }
+                    .ticket-container { box-shadow: none; border: 1px solid #ccc; margin: 0; width: 100%; min-height: 100vh; border-radius: 0; }
+                    .page-break { page-break-after: always; }
+                }
+            </style>
+        </head>
+        <body>
+            ${passengerTicketsHtml}
+            <script src="https://cdn.jsdelivr.net/npm/qrcode.react@1.0.1/dist/qrcode.min.js"></script>
+            <script>
+                // Render QR codes after the document is loaded
+                window.onload = function() {
+                    ${bookingDetails.passengers.map(p => `
+                        new QRCode(document.getElementById('qrcode-${p.id}'), {
+                            text: '${p.id}_${bookingDetails.schedule_id}_${p.seat_number}',
+                            width: 128,
+                            height: 128,
+                            colorDark : "#000000",
+                            colorLight : "#ffffff",
+                            correctLevel : QRCode.CorrectLevel.H
+                        });
+                    `).join('')}
+                };
+            </script>
         </body>
         </html>
       `;
 
       const newWindow = window.open('', '_blank');
       if (newWindow) {
-        newWindow.document.write(ticketHtml);
+        newWindow.document.write(fullHtml);
         newWindow.document.close();
         newWindow.focus();
-        toast.success('Boleto generado. Puedes imprimirlo desde la nueva pestaña.');
+        toast.success('Boletos generados. Puedes imprimirlos desde la nueva pestaña.');
       } else {
         toast.error('No se pudo abrir una nueva ventana. Por favor, permite pop-ups.');
       }
