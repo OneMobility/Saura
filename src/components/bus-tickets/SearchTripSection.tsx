@@ -13,6 +13,7 @@ import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client'; // Import supabase
+import { useNavigate } from 'react-router-dom'; // Import useNavigate
 
 interface BusDestination {
   id: string;
@@ -20,6 +21,7 @@ interface BusDestination {
 }
 
 const SearchTripSection = () => {
+  const navigate = useNavigate(); // Initialize useNavigate
   const [origin, setOrigin] = useState('');
   const [destination, setDestination] = useState('');
   const [date, setDate] = useState<Date | undefined>(undefined);
@@ -54,11 +56,18 @@ const SearchTripSection = () => {
       return;
     }
     setLoading(true);
-    // Aquí iría la lógica para buscar viajes
-    console.log('Buscando viajes:', { origin, destination, date: date.toISOString(), passengers });
-    toast.success('Búsqueda realizada. Mostrando resultados (simulado).');
+    
+    // Navigate to the search results page with state
+    navigate('/bus-tickets/search-results', {
+      state: {
+        originId: origin,
+        destinationId: destination,
+        searchDate: date.toISOString(), // Pass date as ISO string
+        passengers: passengers,
+      },
+    });
+
     setLoading(false);
-    // En una aplicación real, esto redirigiría a una página de resultados
   };
 
   return (
