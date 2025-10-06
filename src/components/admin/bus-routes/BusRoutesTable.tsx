@@ -17,17 +17,19 @@ interface BusRoutesTableProps {
 const BusRoutesTable: React.FC<BusRoutesTableProps> = ({ onEditRoute, onRouteDeleted, refreshKey }) => {
   const [routes, setRoutes] = useState<BusRoute[]>([]);
   const [availableBuses, setAvailableBuses] = useState<AvailableBus[]>([]);
+  const [availableDestinations, setAvailableDestinations] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetchRoutesAndBuses();
+    fetchRoutesAndDependencies();
   }, [refreshKey]);
 
-  const fetchRoutesAndBuses = async () => {
+  const fetchRoutesAndDependencies = async () => {
     setLoading(true);
-    const [routesRes, busesRes] = await Promise.all([
+    const [routesRes, busesRes, destinationsRes] = await Promise.all([
       supabase.from('bus_routes').select('*').order('name', { ascending: true }),
       supabase.from('buses').select('id, name'),
+      supabase.from('bus_destinations').select('id, name'),
     ]);
 
     if (busesRes.error) {
@@ -35,6 +37,13 @@ const BusRoutesTable: React.FC<BusRoutesTableProps> = ({ onEditRoute, onRouteDel
       toast.error('Error al cargar los autobuses.');
     } else {
       setAvailableBuses(busesRes.data || []);
+    }
+
+    if (destinationsRes.error) {
+      console.error('Error fetching destinations:', destinationsRes.error);
+      toast.error('Error al cargar los destinos.');
+    } else {
+      setAvailableDestinations(destinationsRes.data || []);
     }
 
     if (routesRes.error) {
@@ -48,6 +57,10 @@ const BusRoutesTable: React.FC<BusRoutesTableProps> = ({ onEditRoute, onRouteDel
 
   const getBusName = (busId: string | null) => {
     return availableBuses.find(bus => bus.id === busId)?.name || 'N/A';
+  };
+
+  const getDestinationName = (destinationId: string | null) => {
+    return availableDestinations.find(dest => dest.id === destinationId)?.name || 'N/A';
   };
 
   const handleDeleteRoute = async (id: string) => {
@@ -91,11 +104,10 @@ const BusRoutesTable: React.FC<BusRoutesTableProps> = ({ onEditRoute, onRouteDel
               <TableRow>
                 <TableHead>Nombre</TableHead>
                 <TableHead>Autobús</TableHead>
+                <TableHead>Origen</TableHead> {/* NEW */}
                 <TableHead>Destinos</TableHead>
-                <TableHead>Precio/Asiento</TableHead>
-                <TableHead>Salida</TableHead>
-                <TableHead>Llegada</TableHead>
-                <TableHead>Activa</TableHead>
+                <TableHead>Precio Adulto</TableHead> {/* NEW */}
+                <TableHead>Precio Niño</TableHead> {/* NEW */}
                 <TableHead>Acciones</TableHead>
               </TableRow>
             </TableHeader>
@@ -104,13 +116,12 @@ const BusRoutesTable: React.FC<BusRoutesTableProps> = ({ onEditRoute, onRouteDel
                 <TableRow key={route.id}>
                   <TableCell className="font-medium">{route.name}</TableCell>
                   <TableCell>{getBusName(route.bus_id)}</TableCell>
+                  <TableCell>{getDestinationName(route.origin_destination_id)}</TableCell> {/* NEW */}
                   <TableCell className="line-clamp-2 max-w-[200px]">
                     {route.destinations.map(d => d.name).join(', ')}
                   </TableCell>
-                  <TableCell>${route.price_per_seat.toFixed(2)}</TableCell>
-                  <TableCell>{route.departure_time}</TableCell>
-                  <TableCell>{route.arrival_time}</TableCell>
-                  <TableCell>{route.is_active ? 'Sí' : 'No'}</TableCell>
+                  <TableCell>${route.adult_price_per_seat.toFixed(2)}</TableCell> {/* NEW */}
+                  <TableCell>${route.child_price_per_seat.toFixed(2)}</TableCell> {/* NEW */}
                   <TableCell className="flex space-x-2">
                     <Button
                       variant="outline"

@@ -30,13 +30,12 @@ interface BusRouteFormDialogProps {
 const BusRouteFormDialog: React.FC<BusRouteFormDialogProps> = ({ isOpen, onClose, onSave, initialData }) => {
   const [formData, setFormData] = useState<BusRoute>({
     name: '',
-    description: null,
+    origin_destination_id: null, // NEW: Initialize origin_destination_id
     bus_id: null,
     destinations: [],
-    price_per_seat: 0,
-    departure_time: '00:00',
-    arrival_time: '00:00',
-    is_active: true,
+    adult_price_per_seat: 0, // NEW: Initialize adult price
+    child_price_per_seat: 0, // NEW: Initialize child price
+    is_active: true, // Keep for internal logic, but not exposed in form
   });
   const [availableBuses, setAvailableBuses] = useState<AvailableBus[]>([]);
   const [availableDestinations, setAvailableDestinations] = useState<BusDestinationOption[]>([]);
@@ -76,12 +75,11 @@ const BusRouteFormDialog: React.FC<BusRouteFormDialogProps> = ({ isOpen, onClose
     } else {
       setFormData({
         name: '',
-        description: null,
+        origin_destination_id: null,
         bus_id: null,
         destinations: [],
-        price_per_seat: 0,
-        departure_time: '00:00',
-        arrival_time: '00:00',
+        adult_price_per_seat: 0,
+        child_price_per_seat: 0,
         is_active: true,
       });
     }
@@ -133,27 +131,26 @@ const BusRouteFormDialog: React.FC<BusRouteFormDialogProps> = ({ isOpen, onClose
     e.preventDefault();
     setIsSubmitting(true);
 
-    if (!formData.name || !formData.bus_id || formData.destinations.length === 0 || formData.price_per_seat <= 0 || !formData.departure_time || !formData.arrival_time) {
-      toast.error('Por favor, rellena todos los campos obligatorios.');
+    if (!formData.name || !formData.bus_id || !formData.origin_destination_id || formData.destinations.length === 0 || formData.adult_price_per_seat <= 0) {
+      toast.error('Por favor, rellena todos los campos obligatorios (Nombre, Autobús, Origen, Destinos, Precio Adulto).');
       setIsSubmitting(false);
       return;
     }
 
     if (formData.destinations.some(d => !d.id)) {
-      toast.error('Por favor, selecciona un destino válido para cada entrada.');
+      toast.error('Por favor, selecciona un destino válido para cada entrada de destino.');
       setIsSubmitting(false);
       return;
     }
 
     const dataToSave = {
       name: formData.name,
-      description: formData.description,
+      origin_destination_id: formData.origin_destination_id,
       bus_id: formData.bus_id,
       destinations: formData.destinations,
-      price_per_seat: formData.price_per_seat,
-      departure_time: formData.departure_time,
-      arrival_time: formData.arrival_time,
-      is_active: formData.is_active,
+      adult_price_per_seat: formData.adult_price_per_seat,
+      child_price_per_seat: formData.child_price_per_seat,
+      is_active: formData.is_active, // Keep is_active for DB, even if not in form
     };
 
     if (initialData?.id) {
@@ -225,17 +222,6 @@ const BusRouteFormDialog: React.FC<BusRouteFormDialogProps> = ({ isOpen, onClose
               required
             />
           </div>
-          <div className="grid grid-cols-4 items-start gap-4">
-            <Label htmlFor="description" className="text-right pt-2">
-              Descripción
-            </Label>
-            <Textarea
-              id="description"
-              value={formData.description || ''}
-              onChange={handleChange}
-              className="col-span-3 min-h-[80px]"
-            />
-          </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="bus_id" className="text-right">
               Autobús Asignado
@@ -254,8 +240,26 @@ const BusRouteFormDialog: React.FC<BusRouteFormDialogProps> = ({ isOpen, onClose
             </Select>
           </div>
 
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="origin_destination_id" className="text-right">
+              Origen
+            </Label>
+            <Select value={formData.origin_destination_id || ''} onValueChange={(value) => handleSelectChange('origin_destination_id', value)} required>
+              <SelectTrigger className="col-span-3">
+                <SelectValue placeholder="Seleccionar destino de origen" />
+              </SelectTrigger>
+              <SelectContent>
+                {availableDestinations.map((dest) => (
+                  <SelectItem key={dest.id} value={dest.id}>
+                    {dest.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
           <div className="space-y-2 col-span-full">
-            <Label className="text-lg font-semibold">Destinos de la Ruta</Label>
+            <Label className="text-lg font-semibold">Destinos (Paradas)</Label>
             {formData.destinations.map((dest, index) => (
               <div key={index} className="flex items-center gap-2">
                 <Select
@@ -284,13 +288,13 @@ const BusRouteFormDialog: React.FC<BusRouteFormDialogProps> = ({ isOpen, onClose
           </div>
 
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="price_per_seat" className="text-right">
-              Precio por Asiento
+            <Label htmlFor="adult_price_per_seat" className="text-right">
+              Precio por Asiento (Adulto)
             </Label>
             <Input
-              id="price_per_seat"
+              id="adult_price_per_seat"
               type="number"
-              value={formData.price_per_seat}
+              value={formData.adult_price_per_seat}
               onChange={handleChange}
               className="col-span-3"
               min={0}
@@ -299,46 +303,20 @@ const BusRouteFormDialog: React.FC<BusRouteFormDialogProps> = ({ isOpen, onClose
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="departure_time" className="text-right">
-              Hora de Salida
+            <Label htmlFor="child_price_per_seat" className="text-right">
+              Precio por Asiento (Niño)
             </Label>
             <Input
-              id="departure_time"
-              type="time"
-              value={formData.departure_time}
+              id="child_price_per_seat"
+              type="number"
+              value={formData.child_price_per_seat}
               onChange={handleChange}
               className="col-span-3"
-              required
+              min={0}
+              step="0.01"
             />
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="arrival_time" className="text-right">
-              Hora de Llegada
-            </Label>
-            <Input
-              id="arrival_time"
-              type="time"
-              value={formData.arrival_time}
-              onChange={handleChange}
-              className="col-span-3"
-              required
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="is_active" className="text-right">
-              Ruta Activa
-            </Label>
-            <div className="col-span-3 flex items-center">
-              <Switch
-                id="is_active"
-                checked={formData.is_active}
-                onCheckedChange={(checked) => handleSelectChange('is_active', checked)}
-              />
-              <span className="ml-2 text-sm text-gray-600">
-                {formData.is_active ? 'Sí' : 'No'}
-              </span>
-            </div>
-          </div>
+          {/* Removed description, departure_time, arrival_time, is_active from form */}
           <DialogFooter>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}

@@ -38,13 +38,12 @@ export interface BusRouteDestination {
 export interface BusRoute {
   id?: string;
   name: string;
-  description: string | null;
+  origin_destination_id: string | null; // NEW: Origin destination ID
+  destinations: BusRouteDestination[]; // Array of selected destinations (stops)
+  adult_price_per_seat: number; // NEW: Adult price
+  child_price_per_seat: number; // NEW: Child price
   bus_id: string | null;
-  destinations: BusRouteDestination[]; // Array of selected destinations
-  price_per_seat: number;
-  departure_time: string; // Stored as TIME WITH TIME ZONE
-  arrival_time: string; // Stored as TIME WITH TIME ZONE
-  is_active: boolean;
+  is_active?: boolean; // Keep in DB, but not in form as per user request
   created_at?: string;
   updated_at?: string;
 }
