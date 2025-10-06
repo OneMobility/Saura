@@ -201,9 +201,35 @@ const BusTicketConfirmationPage: React.FC = () => {
     toast.info('Generando boleto...');
 
     try {
-      const passengerTicketsHtml = bookingDetails.passengers.map(p => {
-        // Data for QR code: passengerId_scheduleId_seatNumber
+      const qrCodeDataUrls: { [key: string]: string } = {};
+      for (const p of bookingDetails.passengers) {
         const qrData = `${p.id}_${bookingDetails.schedule_id}_${p.seat_number}`;
+        const canvas = document.createElement('canvas');
+        await new Promise<void>((resolve, reject) => {
+          QRCode.toCanvas(canvas, qrData, {
+            width: 180, // Set QR code size
+            height: 180,
+            color: {
+              dark: '#000000',
+              light: '#ffffff',
+            },
+            errorCorrectionLevel: 'H',
+          }, (error) => {
+            if (error) {
+              console.error('Error generating QR code to canvas:', error);
+              reject(error);
+            } else {
+              qrCodeDataUrls[p.id] = canvas.toDataURL('image/png');
+              resolve();
+            }
+          });
+        });
+      }
+
+      const passengerTicketsHtml = bookingDetails.passengers.map(p => {
+        const qrData = `${p.id}_${bookingDetails.schedule_id}_${p.seat_number}`;
+        const qrImageSrc = qrCodeDataUrls[p.id] || '';
+
         return `
           <div class="ticket-page">
             <div class="ticket-container">
@@ -243,7 +269,9 @@ const BusTicketConfirmationPage: React.FC = () => {
 
                 <div class="qr-code-section">
                     <h2>Código de Validación</h2>
-                    <div id="qrcode-${p.id}" class="qr-code-canvas-container"></div>
+                    <div class="qr-code-image-container">
+                        <img src="${qrImageSrc}" alt="QR Code" style="width: 180px; height: 180px; display: block; margin: 0;" />
+                    </div>
                     <p class="qr-data-text">ID: ${qrData}</p>
                     <p class="instructions">Presenta este código al abordar.</p>
                 </div>
@@ -278,7 +306,7 @@ const BusTicketConfirmationPage: React.FC = () => {
                     box-shadow: 0 0 20px rgba(0,0,0,0.1); 
                     border: 2px dashed #1e293b; 
                     position: relative; /* Needed for absolute positioning of QR */
-                    min-height: 900px; /* Ensure enough space for large QR */
+                    min-height: 900px; /* Ensure enough space for content + QR */
                 }
                 .header { text-align: center; margin-bottom: 30px; }
                 .header h1 { color: #1e293b; font-size: 2.5em; margin-bottom: 5px; }
@@ -299,12 +327,18 @@ const BusTicketConfirmationPage: React.FC = () => {
                     padding: 10px; /* Padding around QR */
                     border: 1px solid #ccc; /* Border around QR */
                     box-shadow: 0 2px 8px rgba(0,0,0,0.1); /* Subtle shadow */
+                    width: 200px; /* Fixed width for the section */
+                    height: 280px; /* Fixed height for the section */
+                    display: flex;
+                    flex-direction: column;
+                    justify-content: space-between;
+                    align-items: flex-start;
                 }
-                .qr-code-section h2 { color: #1e293b; margin-bottom: 15px; }
-                .qr-code-section canvas { margin: 0; display: block; } /* Remove auto margin for left alignment */
-                .qr-data-text { font-size: 0.9em; color: #555; margin-top: 10px; }
-                .instructions { font-size: 1em; color: #1e293b; font-weight: 600; margin-top: 15px; }
-                .footer { text-align: center; margin-top: 850px; /* Push footer down to avoid overlap with large QR */ color: #777; font-size: 0.9em; }
+                .qr-code-section h2 { color: #1e293b; margin-bottom: 5px; font-size: 1.2em; }
+                .qr-code-image-container { margin-bottom: 5px; }
+                .qr-data-text { font-size: 0.8em; color: #555; margin-top: 0; }
+                .instructions { font-size: 0.9em; color: #1e293b; font-weight: 600; margin-top: 5px; }
+                .footer { text-align: center; margin-top: 40px; color: #777; font-size: 0.9em; }
                 .total-amount { font-size: 1.8em; font-weight: 700; color: #1e293b; text-align: right; margin-top: 20px; }
                 @media print {
                     body { background-color: white; padding: 0; }
@@ -316,28 +350,11 @@ const BusTicketConfirmationPage: React.FC = () => {
                         bottom: 20px; /* Slightly less margin for print */
                         left: 20px;
                     }
-                    .footer { margin-top: 850px; /* Maintain spacing for print */ }
                 }
             </style>
         </head>
         <body>
             ${passengerTicketsHtml}
-            <script src="https://cdn.jsdelivr.net/npm/qrcode.react@1.0.1/dist/qrcode.min.js"></script>
-            <script>
-                // Render QR codes after the document is loaded
-                window.onload = function() {
-                    ${bookingDetails.passengers.map(p => `
-                        new QRCode(document.getElementById('qrcode-${p.id}'), {
-                            text: '${p.id}_${bookingDetails.schedule_id}_${p.seat_number}',
-                            width: 800, /* Increased size to 800 */
-                            height: 800, /* Increased size to 800 */
-                            colorDark : "#000000",
-                            colorLight : "#ffffff",
-                            correctLevel : QRCode.CorrectLevel.H
-                        });
-                    `).join('')}
-                };
-            </script>
         </body>
         </html>
       `;
