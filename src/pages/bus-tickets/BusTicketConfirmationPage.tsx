@@ -243,7 +243,7 @@ const BusTicketConfirmationPage: React.FC = () => {
 
                 <div class="qr-code-section">
                     <h2>Código de Validación</h2>
-                    <div id="qrcode-${p.id}"></div>
+                    <div id="qrcode-${p.id}" class="qr-code-canvas-container"></div>
                     <p class="qr-data-text">ID: ${qrData}</p>
                     <p class="instructions">Presenta este código al abordar.</p>
                 </div>
@@ -281,7 +281,18 @@ const BusTicketConfirmationPage: React.FC = () => {
                 .passengers-list li { margin-bottom: 5px; }
                 .qr-code-section { text-align: center; margin-top: 30px; }
                 .qr-code-section h2 { color: #1e293b; margin-bottom: 15px; }
-                .qr-code-section canvas { margin: 0 auto; display: block; }
+                .qr-code-canvas-container { 
+                    margin: 0 auto; 
+                    display: flex; 
+                    justify-content: center; 
+                    align-items: center; 
+                    padding: 10px; /* Added padding */
+                    border: 1px solid #ccc; /* Added border */
+                    background-color: #fff; /* Ensure white background */
+                    width: fit-content; /* Adjust width to content */
+                    height: fit-content; /* Adjust height to content */
+                }
+                .qr-code-canvas-container canvas { margin: 0 auto; display: block; }
                 .qr-data-text { font-size: 0.9em; color: #555; margin-top: 10px; }
                 .instructions { font-size: 1em; color: #1e293b; font-weight: 600; margin-top: 15px; }
                 .footer { text-align: center; margin-top: 40px; color: #777; font-size: 0.9em; }
@@ -290,6 +301,10 @@ const BusTicketConfirmationPage: React.FC = () => {
                     body { background-color: white; padding: 0; }
                     .ticket-container { box-shadow: none; border: 1px solid #ccc; margin: 0; width: 100%; min-height: 100vh; border-radius: 0; }
                     .page-break { page-break-after: always; }
+                    .qr-code-canvas-container {
+                        border: 1px solid #000; /* Black border for print */
+                        background-color: white; /* Ensure white background for print */
+                    }
                 }
             </style>
         </head>
@@ -302,8 +317,8 @@ const BusTicketConfirmationPage: React.FC = () => {
                     ${bookingDetails.passengers.map(p => `
                         new QRCode(document.getElementById('qrcode-${p.id}'), {
                             text: '${p.id}_${bookingDetails.schedule_id}_${p.seat_number}',
-                            width: 128,
-                            height: 128,
+                            width: 180, /* Increased size */
+                            height: 180, /* Increased size */
                             colorDark : "#000000",
                             colorLight : "#ffffff",
                             correctLevel : QRCode.CorrectLevel.H
