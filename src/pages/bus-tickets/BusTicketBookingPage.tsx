@@ -340,6 +340,12 @@ const BusTicketBookingPage: React.FC = () => {
   }
 
   console.log('BusTicketBookingPage: Rendering main form.');
+  console.log('BusTicketBookingPage: busId:', busId);
+  console.log('BusTicketBookingPage: busCapacity:', busCapacity);
+  console.log('BusTicketBookingPage: courtesies:', courtesies);
+  console.log('BusTicketBookingPage: busLayout:', busLayout);
+  console.log('BusTicketBookingPage: loadingBusLayout:', loadingBusLayout);
+
   return (
     <BusTicketsThemeProvider>
       <div className="min-h-screen flex flex-col bg-bus-background text-bus-foreground">
@@ -374,7 +380,7 @@ const BusTicketBookingPage: React.FC = () => {
             {step === 1 && (
               <>
                 {/* Seat Selection */}
-                {busId && busCapacity > 0 && (
+                {busId && busCapacity > 0 ? (
                   <div className="col-span-full mt-6">
                     <h3 className="text-lg font-semibold mb-4">Paso 1: Selección de Asientos</h3>
                     {loadingBusLayout ? (
@@ -398,6 +404,11 @@ const BusTicketBookingPage: React.FC = () => {
                         Asientos seleccionados: {selectedSeats.join(', ')}
                       </p>
                     )}
+                  </div>
+                ) : (
+                  <div className="col-span-full mt-6 p-4 border rounded-lg bg-muted text-center text-muted-foreground">
+                    <p>No hay un autobús asignado o no tiene capacidad para esta ruta.</p>
+                    <p className="text-sm mt-2">Por favor, verifica la configuración de la ruta y el autobús en el panel de administración.</p>
                   </div>
                 )}
                 <div className="flex justify-end mt-6">
