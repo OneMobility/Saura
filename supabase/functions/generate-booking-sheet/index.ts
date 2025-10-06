@@ -215,7 +215,7 @@ const generateBookingSheetHtml = (data: any) => {
                 color: #E4007C;
                 border-top: 1px solid #E4007C;
                 padding-top: 8px; /* Reduced padding */
-                margin-top: 12px; /* Reduced margin */
+                margin-top: 12px;
             }
             .footer-info {
                 text-align: center;

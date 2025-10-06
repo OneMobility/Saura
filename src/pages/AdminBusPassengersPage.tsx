@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { useSession } from '@/components/SessionContextProvider';
@@ -14,52 +14,42 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { BusPassenger, BusRoute, BusSchedule, AvailableBus } from '@/types/shared'; // Import shared types
+import BusPassengerEditDialog from '@/components/admin/bus-passengers/BusPassengerEditDialog'; // NEW: Import BusPassengerEditDialog
 
-interface BusPassenger {
-  id: string;
-  client_id: string;
-  schedule_id: string;
-  seat_number: number;
-  first_name: string;
-  last_name: string;
-  age: number | null;
-  identification_number: string | null;
-  is_contractor: boolean;
-  email: string | null;
-  phone: string | null;
-  created_at: string;
-  // Joined data
+interface BusPassengerWithDetails extends BusPassenger {
   client_contract_number?: string;
   route_name?: string;
   departure_time?: string;
   schedule_date?: string;
+  origin_name?: string; // Added for display
+  destination_name?: string; // Added for display
 }
 
-interface BusRoute {
+interface BusDestinationOption {
   id: string;
   name: string;
-}
-
-interface BusSchedule {
-  id: string;
-  route_id: string;
-  departure_time: string;
-  effective_date_start: string;
 }
 
 const AdminBusPassengersPage = () => {
   const { user, isAdmin, isLoading: sessionLoading } = useSession();
   const navigate = useNavigate();
-  const [passengers, setPassengers] = useState<BusPassenger[]>([]);
+  const [passengers, setPassengers] = useState<BusPassengerWithDetails[]>([]);
   const [loading, setLoading] = useState(true);
   const [availableRoutes, setAvailableRoutes] = useState<BusRoute[]>([]);
   const [availableSchedules, setAvailableSchedules] = useState<BusSchedule[]>([]);
+  const [availableBuses, setAvailableBuses] = useState<AvailableBus[]>([]); // NEW: For passing to edit dialog
+  const [availableDestinations, setAvailableDestinations] = useState<BusDestinationOption[]>([]); // NEW: For passing to edit dialog
 
   // Filter states
   const [filterRoute, setFilterRoute] = useState<string>('all');
   const [filterSchedule, setFilterSchedule] = useState<string>('all');
   const [filterDate, setFilterDate] = useState<string>('');
   const [filterName, setFilterName] = useState<string>('');
+
+  // Edit dialog states
+  const [isEditPassengerDialogOpen, setIsEditPassengerDialogOpen] = useState(false);
+  const [selectedPassenger, setSelectedPassenger] = useState<BusPassenger | null>(null);
 
   useEffect(() => {
     if (!sessionLoading && (!user || !isAdmin)) {
@@ -71,9 +61,11 @@ const AdminBusPassengersPage = () => {
   }, [user, isAdmin, sessionLoading, navigate]);
 
   const fetchDependencies = async () => {
-    const [routesRes, schedulesRes] = await Promise.all([
-      supabase.from('bus_routes').select('id, name').order('name', { ascending: true }),
-      supabase.from('bus_schedules').select('id, route_id, departure_time, effective_date_start').order('effective_date_start', { ascending: false }, 'departure_time', { ascending: true }),
+    const [routesRes, schedulesRes, busesRes, destinationsRes] = await Promise.all([
+      supabase.from('bus_routes').select('id, name, all_stops, bus_id').order('name', { ascending: true }),
+      supabase.from('bus_schedules').select('id, route_id, departure_time, day_of_week, effective_date_start, effective_date_end').order('effective_date_start', { ascending: false }, 'departure_time', { ascending: true }),
+      supabase.from('buses').select('id, name, total_capacity, rental_cost, seat_layout_json').order('name', { ascending: true }),
+      supabase.from('bus_destinations').select('id, name').order('name', { ascending: true }),
     ]);
 
     if (routesRes.error) {
@@ -89,6 +81,20 @@ const AdminBusPassengersPage = () => {
     } else {
       setAvailableSchedules(schedulesRes.data || []);
     }
+
+    if (busesRes.error) {
+      console.error('Error fetching buses:', busesRes.error);
+      toast.error('Error al cargar los autobuses.');
+    } else {
+      setAvailableBuses(busesRes.data || []);
+    }
+
+    if (destinationsRes.error) {
+      console.error('Error fetching destinations:', destinationsRes.error);
+      toast.error('Error al cargar los destinos.');
+    } else {
+      setAvailableDestinations(destinationsRes.data || []);
+    }
   };
 
   const fetchBusPassengers = async () => {
@@ -97,8 +103,8 @@ const AdminBusPassengersPage = () => {
       .from('bus_passengers')
       .select(`
         *,
-        clients ( contract_number ),
-        bus_schedules ( route_id, departure_time, effective_date_start, bus_routes ( name ) )
+        clients ( contract_number, first_name, last_name, email, phone ),
+        bus_schedules ( route_id, departure_time, effective_date_start, bus_routes ( name, all_stops ) )
       `)
       .order('created_at', { ascending: false });
 
@@ -121,13 +127,21 @@ const AdminBusPassengersPage = () => {
       console.error('Error fetching bus passengers:', error.message); // Improved error logging
       toast.error('Error al cargar la lista de pasajeros de autobús.');
     } else {
-      const passengersWithDetails = (data || []).map(p => ({
-        ...p,
-        client_contract_number: p.clients?.contract_number || 'N/A',
-        route_name: p.bus_schedules?.bus_routes?.name || 'N/A',
-        departure_time: p.bus_schedules?.departure_time || 'N/A',
-        schedule_date: p.bus_schedules?.effective_date_start || 'N/A',
-      }));
+      const passengersWithDetails = (data || []).map(p => {
+        const routeStops = p.bus_schedules?.bus_routes?.all_stops || [];
+        const originName = availableDestinations.find(d => d.id === routeStops[0])?.name || 'N/A';
+        const destinationName = availableDestinations.find(d => d.id === routeStops[routeStops.length - 1])?.name || 'N/A';
+
+        return {
+          ...p,
+          client_contract_number: p.clients?.contract_number || 'N/A',
+          route_name: p.bus_schedules?.bus_routes?.name || 'N/A',
+          departure_time: p.bus_schedules?.departure_time || 'N/A',
+          schedule_date: p.bus_schedules?.effective_date_start || 'N/A',
+          origin_name: originName,
+          destination_name: destinationName,
+        };
+      });
       setPassengers(passengersWithDetails);
     }
     setLoading(false);
@@ -142,29 +156,41 @@ const AdminBusPassengersPage = () => {
   };
 
   const handleEditPassenger = (passenger: BusPassenger) => {
-    // Implement edit logic, perhaps open a dialog or navigate to a form
-    toast.info(`Editar pasajero: ${passenger.first_name} ${passenger.last_name}`);
-    // For now, we'll just log, but a dialog would be ideal here.
+    setSelectedPassenger(passenger);
+    setIsEditPassengerDialogOpen(true);
   };
 
-  const handleDeletePassenger = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar este pasajero? Esto liberará su asiento.')) {
+  const handleDeletePassenger = async (id: string, scheduleId: string, seatNumber: number) => {
+    if (!window.confirm('¿Estás seguro de que quieres eliminar este pasajero? Esto liberará su asiento y podría afectar el contrato del cliente.')) {
       return;
     }
     setLoading(true);
-    const { error } = await supabase
-      .from('bus_passengers')
-      .delete()
-      .eq('id', id);
+    try {
+      // 1. Delete the passenger record
+      const { error: deletePassengerError } = await supabase
+        .from('bus_passengers')
+        .delete()
+        .eq('id', id);
 
-    if (error) {
-      console.error('Error deleting passenger:', error);
-      toast.error('Error al eliminar el pasajero.');
-    } else {
-      toast.success('Pasajero eliminado con éxito. Asiento liberado.');
+      if (deletePassengerError) throw deletePassengerError;
+
+      // 2. Release the seat assignment
+      const { error: releaseSeatError } = await supabase
+        .from('bus_seat_assignments')
+        .update({ status: 'available', client_id: null, updated_at: new Date().toISOString() })
+        .eq('schedule_id', scheduleId)
+        .eq('seat_number', seatNumber);
+
+      if (releaseSeatError) throw releaseSeatError;
+
+      toast.success('Pasajero eliminado y asiento liberado con éxito.');
       fetchBusPassengers(); // Refresh the list
+    } catch (error: any) {
+      console.error('Error deleting passenger or releasing seat:', error);
+      toast.error(`Error al eliminar el pasajero: ${error.message}`);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
   };
 
   if (sessionLoading || (user && isAdmin && loading)) {
@@ -254,9 +280,12 @@ const AdminBusPassengersPage = () => {
                       <TableHead>Nombre</TableHead>
                       <TableHead>Asiento</TableHead>
                       <TableHead>Ruta</TableHead>
+                      <TableHead>Origen</TableHead>
+                      <TableHead>Destino</TableHead>
                       <TableHead>Horario</TableHead>
                       <TableHead>Fecha Viaje</TableHead>
                       <TableHead>Contratante</TableHead>
+                      <TableHead>Estado Abordaje</TableHead>
                       <TableHead>Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -267,9 +296,12 @@ const AdminBusPassengersPage = () => {
                         <TableCell>{passenger.first_name} {passenger.last_name}</TableCell>
                         <TableCell>{passenger.seat_number}</TableCell>
                         <TableCell>{passenger.route_name}</TableCell>
+                        <TableCell>{passenger.origin_name}</TableCell>
+                        <TableCell>{passenger.destination_name}</TableCell>
                         <TableCell>{passenger.departure_time}</TableCell>
                         <TableCell>{passenger.schedule_date ? format(parseISO(passenger.schedule_date), 'dd/MM/yy', { locale: es }) : 'N/A'}</TableCell>
                         <TableCell>{passenger.is_contractor ? 'Sí' : 'No'}</TableCell>
+                        <TableCell>{passenger.boarding_status}</TableCell>
                         <TableCell className="flex space-x-2">
                           <Button
                             variant="outline"
@@ -283,7 +315,7 @@ const AdminBusPassengersPage = () => {
                           <Button
                             variant="destructive"
                             size="icon"
-                            onClick={() => handleDeletePassenger(passenger.id)}
+                            onClick={() => handleDeletePassenger(passenger.id, passenger.schedule_id, passenger.seat_number)}
                           >
                             <Trash2 className="h-4 w-4" />
                             <span className="sr-only">Eliminar</span>
@@ -301,6 +333,18 @@ const AdminBusPassengersPage = () => {
           <p>&copy; {new Date().getFullYear()} Saura Tours Admin. Todos los derechos reservados.</p>
         </footer>
       </div>
+      {selectedPassenger && (
+        <BusPassengerEditDialog
+          isOpen={isEditPassengerDialogOpen}
+          onClose={() => setIsEditPassengerDialogOpen(false)}
+          onSave={fetchBusPassengers}
+          passenger={selectedPassenger}
+          availableRoutes={availableRoutes}
+          availableSchedules={availableSchedules}
+          availableBuses={availableBuses}
+          availableDestinations={availableDestinations}
+        />
+      )}
     </div>
   );
 };

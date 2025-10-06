@@ -78,4 +78,31 @@ export interface AvailableBus {
   name: string;
   total_capacity: number;
   rental_cost: number;
+  seat_layout_json: SeatLayout | null; // Added seat_layout_json
+}
+
+// NEW: Interface for BusPassenger (from bus_passengers table)
+export interface BusPassenger {
+  id: string;
+  client_id: string;
+  schedule_id: string;
+  seat_number: number;
+  first_name: string;
+  last_name: string;
+  age: number | null;
+  identification_number: string | null;
+  is_contractor: boolean;
+  email: string | null;
+  phone: string | null;
+  boarding_status: 'pending' | 'boarded' | 'not_boarded';
+  created_at: string;
+  updated_at: string;
+}
+
+// NEW: Interface for BusDetails (for seat map)
+export interface BusDetails {
+  bus_id: string | null;
+  bus_capacity: number;
+  courtesies: number;
+  seat_layout_json: SeatLayout | null;
 }
