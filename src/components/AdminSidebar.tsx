@@ -6,7 +6,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText, ChevronDown, Hotel, Truck, UserRound, Bus, Handshake, Ticket, MapPin, Map } from 'lucide-react'; // Added Map icon for Routes
+import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText, ChevronDown, Hotel, Truck, UserRound, Bus, Handshake, Ticket, MapPin, Map } from 'lucide-react';
 import { useSession } from '@/components/SessionContextProvider';
 
 interface NavItem {
@@ -24,7 +24,7 @@ const navItems: NavItem[] = [
     children: [
       { href: '/admin/bus-tickets', icon: Ticket, label: 'Horarios' },
       { href: '/admin/bus-tickets/destinations', icon: MapPin, label: 'Destinos' },
-      { href: '/admin/bus-tickets/routes', icon: Map, label: 'Rutas' }, // NEW: Added Routes submenu item
+      { href: '/admin/bus-tickets/routes', icon: Map, label: 'Rutas' },
     ],
   },
   {
@@ -172,26 +172,27 @@ const AdminSidebar = () => {
                         <item.icon className="h-5 w-5" />
                         <span className="sr-only">{item.label}</span>
                       </Link>
-                    </TooltipTrigger>
-                    <TooltipContent side="right">{item.label}</TooltipContent>
-                  </Tooltip>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    className={cn(
-                      "w-full h-10 justify-start px-4 space-x-3",
-                      location.pathname === item.href
-                        ? "bg-rosa-mexicano text-white hover:bg-rosa-mexicano/90"
-                        : "hover:bg-gray-700"
-                    )}
-                    asChild
-                  >
-                    <Link to={item.href || '#'}>
-                      <item.icon className="h-5 w-5" />
-                      <span>{item.label}</span>
-                    </Link>
-                  </Button>
-                )}
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent side="right">{item.label}</TooltipContent>
+                </Tooltip>
+              ) : (
+                <Button
+                  variant="ghost"
+                  className={cn(
+                    "w-full h-10 justify-start px-4 space-x-3",
+                    location.pathname === item.href
+                      ? "bg-rosa-mexicano text-white hover:bg-rosa-mexicano/90"
+                      : "hover:bg-gray-700"
+                  )}
+                  asChild
+                >
+                  <Link to={item.href || '#'}>
+                    <item.icon className="h-5 w-5" />
+                    <span>{item.label}</span>
+                  </Link>
+                </Button>
+              )}
             </div>
           )
         ))}
