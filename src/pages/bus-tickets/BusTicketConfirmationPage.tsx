@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { toast } from 'sonner';
-// Eliminado: import QRCode from 'qrcode.react';
+import QRCode from 'qrcode.react'; // Import qrcode.react
 
 interface BusPassenger {
   id: string;
@@ -204,6 +204,14 @@ const BusTicketConfirmationPage: React.FC = () => {
       const passengerTicketsHtml = bookingDetails.passengers.map(p => {
         const validationId = `${p.id}_${bookingDetails.schedule_id}_${p.seat_number}`; // ID para validación
 
+        // We will render the QR code directly in the HTML string using a data URL
+        // This requires a server-side or pre-rendered approach for complex QR generation in print.
+        // For simplicity, we'll just display the validation ID as text for now,
+        // as direct client-side QR rendering in a new window's document.write is complex.
+        // The admin validation page can still use the text ID.
+        // If a visual QR code is strictly needed for printing, a dedicated server-side PDF generation
+        // or a more advanced client-side library setup would be required.
+
         return `
           <div class="ticket-page">
             <div class="ticket-container">
@@ -244,7 +252,8 @@ const BusTicketConfirmationPage: React.FC = () => {
                 <div class="validation-section">
                     <h2>ID de Validación</h2>
                     <p class="validation-id-text">${validationId}</p>
-                    <p class="instructions">Presenta este ID al abordar para la validación manual o con escáner de texto.</p>
+                    <div id="qrcode-${p.id}" class="qrcode-container"></div>
+                    <p class="instructions">Presenta este ID o el código QR al abordar para la validación.</p>
                 </div>
 
                 <div class="footer">
@@ -305,6 +314,7 @@ const BusTicketConfirmationPage: React.FC = () => {
                     word-break: break-all;
                     margin-bottom: 10px;
                 }
+                .qrcode-container { margin: 15px auto; width: 150px; height: 150px; }
                 .instructions { font-size: 0.9em; color: #1e293b; font-weight: 600; margin-top: 5px; }
                 .footer { text-align: center; margin-top: 40px; color: #777; font-size: 0.9em; }
                 .total-amount { font-size: 1.8em; font-weight: 700; color: #1e293b; text-align: right; margin-top: 20px; }
@@ -321,6 +331,27 @@ const BusTicketConfirmationPage: React.FC = () => {
         </head>
         <body>
             ${passengerTicketsHtml}
+            <script src="https://unpkg.com/qrcode.react@1.0.1/dist/qrcode.react.min.js"></script>
+            <script>
+                document.addEventListener('DOMContentLoaded', () => {
+                    ${bookingDetails.passengers.map(p => {
+                        const validationId = `${p.id}_${bookingDetails.schedule_id}_${p.seat_number}`;
+                        return `
+                            const qrCodeElement_${p.id} = document.getElementById('qrcode-${p.id}');
+                            if (qrCodeElement_${p.id}) {
+                                new QRCode(qrCodeElement_${p.id}, {
+                                    text: "${validationId}",
+                                    width: 150,
+                                    height: 150,
+                                    colorDark : "#000000",
+                                    colorLight : "#ffffff",
+                                    correctLevel : QRCode.CorrectLevel.H
+                                });
+                            }
+                        `;
+                    }).join('')}
+                });
+            </script>
         </body>
         </html>
       `;
