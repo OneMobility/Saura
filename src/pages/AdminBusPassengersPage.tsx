@@ -56,8 +56,8 @@ const AdminBusPassengersPage = () => {
   const [availableSchedules, setAvailableSchedules] = useState<BusSchedule[]>([]);
 
   // Filter states
-  const [filterRoute, setFilterRoute] = useState<string>('all'); // Changed initial state to 'all'
-  const [filterSchedule, setFilterSchedule] = useState<string>('all'); // Changed initial state to 'all'
+  const [filterRoute, setFilterRoute] = useState<string>('all');
+  const [filterSchedule, setFilterSchedule] = useState<string>('all');
   const [filterDate, setFilterDate] = useState<string>('');
   const [filterName, setFilterName] = useState<string>('');
 
@@ -98,15 +98,14 @@ const AdminBusPassengersPage = () => {
       .select(`
         *,
         clients ( contract_number ),
-        bus_schedules ( route_id, departure_time, effective_date_start ),
-        bus_routes ( name )
+        bus_schedules ( route_id, departure_time, effective_date_start, bus_routes ( name ) )
       `)
       .order('created_at', { ascending: false });
 
-    if (filterRoute !== 'all') { // Adjusted condition
+    if (filterRoute !== 'all') {
       query = query.eq('bus_schedules.route_id', filterRoute);
     }
-    if (filterSchedule !== 'all') { // Adjusted condition
+    if (filterSchedule !== 'all') {
       query = query.eq('schedule_id', filterSchedule);
     }
     if (filterDate) {
@@ -119,7 +118,7 @@ const AdminBusPassengersPage = () => {
     const { data, error } = await query;
 
     if (error) {
-      console.error('Error fetching bus passengers:', error);
+      console.error('Error fetching bus passengers:', error.message); // Improved error logging
       toast.error('Error al cargar la lista de pasajeros de autobús.');
     } else {
       const passengersWithDetails = (data || []).map(p => ({
@@ -135,8 +134,8 @@ const AdminBusPassengersPage = () => {
   };
 
   const handleClearFilters = () => {
-    setFilterRoute('all'); // Changed to 'all'
-    setFilterSchedule('all'); // Changed to 'all'
+    setFilterRoute('all');
+    setFilterSchedule('all');
     setFilterDate('');
     setFilterName('');
     fetchBusPassengers(); // Re-fetch all passengers
@@ -170,7 +169,7 @@ const AdminBusPassengersPage = () => {
 
   if (sessionLoading || (user && isAdmin && loading)) {
     return (
-      <div className="flex min-h-screen bg-gray-100">
+      <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <AdminSidebar />
         <div className="flex flex-col flex-grow items-center justify-center">
           <Loader2 className="h-12 w-12 animate-spin text-rosa-mexicano" />
@@ -184,7 +183,7 @@ const AdminBusPassengersPage = () => {
     return null;
   }
 
-  const filteredSchedules = availableSchedules.filter(s => filterRoute !== 'all' ? s.route_id === filterRoute : true); // Adjusted condition
+  const filteredSchedules = availableSchedules.filter(s => filterRoute !== 'all' ? s.route_id === filterRoute : true);
 
   return (
     <div className="flex min-h-screen bg-gray-100">
@@ -200,18 +199,18 @@ const AdminBusPassengersPage = () => {
                   <SelectValue placeholder="Filtrar por Ruta" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todas las Rutas</SelectItem> {/* Changed value to 'all' */}
+                  <SelectItem value="all">Todas las Rutas</SelectItem>
                   {availableRoutes.map(route => (
                     <SelectItem key={route.id} value={route.id}>{route.name}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={filterSchedule} onValueChange={setFilterSchedule} disabled={filterRoute === 'all'}> {/* Adjusted disabled condition */}
+              <Select value={filterSchedule} onValueChange={setFilterSchedule} disabled={filterRoute === 'all'}>
                 <SelectTrigger>
                   <SelectValue placeholder="Filtrar por Horario" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Todos los Horarios</SelectItem> {/* Changed value to 'all' */}
+                  <SelectItem value="all">Todos los Horarios</SelectItem>
                   {filteredSchedules.map(schedule => (
                     <SelectItem key={schedule.id} value={schedule.id}>
                       {schedule.departure_time} ({format(parseISO(schedule.effective_date_start), 'dd/MM/yy', { locale: es })})
