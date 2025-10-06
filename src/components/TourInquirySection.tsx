@@ -9,6 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { SeatLayout } from '@/types/shared'; // Import SeatLayout
 
 interface Companion {
   id: string;
@@ -184,7 +185,7 @@ const TourInquirySection = () => {
             <Input
               type="text"
               id="contract-number"
-              placeholder="Número de Contrato"
+              placeholder="Introduce tu número de contrato"
               className="bg-white text-gray-800 placeholder:text-gray-500 border-none focus-visible:ring-offset-0 focus-visible:ring-2 focus-visible:ring-white"
               value={contractNumber}
               onChange={(e) => setContractNumber(e.target.value)}

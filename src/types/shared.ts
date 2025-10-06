@@ -18,3 +18,11 @@ export interface AvailableProvider {
   selling_price_per_unit: number;
   is_active: boolean;
 }
+
+// Definición de tipos para el layout de asientos (consolidado)
+export type SeatLayoutItem = {
+  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty' | 'entry';
+  number?: number; // Solo para asientos
+};
+export type SeatLayoutRow = SeatLayoutItem[];
+export type SeatLayout = SeatLayoutRow[];

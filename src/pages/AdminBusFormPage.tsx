@@ -12,7 +12,7 @@ import BusPaymentDialog from '@/components/admin/buses/BusPaymentDialog'; // NEW
 import BusPaymentHistoryTable from '@/components/admin/buses/BusPaymentHistoryTable'; // NEW: Import BusPaymentHistoryTable
 
 interface Bus {
-  id: string;
+  id: string; // Made required
   name: string;
   rental_cost: number;
   total_paid: number;

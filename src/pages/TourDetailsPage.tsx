@@ -11,15 +11,7 @@ import { format } from 'date-fns';
 import TourSeatMap from '@/components/TourSeatMap';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog'; // Import Dialog and DialogTrigger
 import ClientBookingForm from '@/components/ClientBookingForm'; // Import the new ClientBookingForm
-import { TourProviderService } from '@/types/shared'; // NEW: Import shared type
-
-// Definición de tipos para el layout de asientos
-type SeatLayoutItem = {
-  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty' | 'entry';
-  number?: number; // Solo para asientos
-};
-type SeatLayoutRow = SeatLayoutItem[];
-type SeatLayout = SeatLayoutRow[];
+import { TourProviderService, SeatLayout } from '@/types/shared'; // NEW: Import shared type and SeatLayout
 
 interface Bus {
   id: string;

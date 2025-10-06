@@ -7,10 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, CalendarIcon } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
-import { format } from 'date-fns';
+import { Loader2, Save } from 'lucide-react'; // Removed CalendarIcon
+import { format, parse, isValid } from 'date-fns'; // Added parse and isValid
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
@@ -23,7 +21,7 @@ interface Provider {
   // For simplicity here, we'll assume a 'total_contracted_cost' or similar if available,
   // but for now, we'll just show current total_paid vs. amount being paid.
   // A more complex solution would involve summing costs from linked tour_provider_services.
-  // For this dialog, we'll just show the payment being made.
+  // For this dialog, we'll keep it simple and focus on the payment transaction.
 }
 
 interface ProviderPaymentDialogProps {
@@ -35,15 +33,30 @@ interface ProviderPaymentDialogProps {
 
 const ProviderPaymentDialog: React.FC<ProviderPaymentDialogProps> = ({ isOpen, onClose, provider, onPaymentRegistered }) => {
   const [amount, setAmount] = useState<number>(0);
-  const [paymentDate, setPaymentDate] = useState<Date | undefined>(new Date());
+  const [paymentDateInput, setPaymentDateInput] = useState<string>(format(new Date(), 'dd/MM/yy', { locale: es })); // State for input string
+  const [paymentDate, setPaymentDate] = useState<Date | undefined>(new Date()); // Internal Date object
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen && provider) {
       setAmount(0); // Reset amount when dialog opens
-      setPaymentDate(new Date()); // Default to today
+      const today = new Date();
+      setPaymentDate(today); // Default to today
+      setPaymentDateInput(format(today, 'dd/MM/yy', { locale: es })); // Set input string
     }
   }, [isOpen, provider]);
+
+  const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    setPaymentDateInput(value);
+
+    const parsedDate = parse(value, 'dd/MM/yy', new Date(), { locale: es });
+    if (isValid(parsedDate)) {
+      setPaymentDate(parsedDate);
+    } else {
+      setPaymentDate(undefined);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -61,8 +74,8 @@ const ProviderPaymentDialog: React.FC<ProviderPaymentDialogProps> = ({ isOpen, o
       return;
     }
 
-    if (!paymentDate) {
-      toast.error('Por favor, selecciona la fecha del abono.');
+    if (!paymentDate || !isValid(paymentDate)) {
+      toast.error('Por favor, introduce una fecha de abono válida (DD/MM/AA).');
       setIsSubmitting(false);
       return;
     }
@@ -139,32 +152,18 @@ const ProviderPaymentDialog: React.FC<ProviderPaymentDialogProps> = ({ isOpen, o
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="paymentDate" className="text-right">
+            <Label htmlFor="paymentDateInput" className="text-right">
               Fecha del Abono
             </Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button
-                  variant={"outline"}
-                  className={cn(
-                    "col-span-3 justify-start text-left font-normal",
-                    !paymentDate && "text-muted-foreground"
-                  )}
-                >
-                  <CalendarIcon className="mr-2 h-4 w-4" />
-                  {paymentDate ? format(paymentDate, "PPP", { locale: es }) : <span>Selecciona una fecha</span>}
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={paymentDate}
-                  onSelect={setPaymentDate}
-                  initialFocus
-                  locale={es}
-                />
-              </PopoverContent>
-            </Popover>
+            <Input
+              id="paymentDateInput"
+              type="text"
+              value={paymentDateInput}
+              onChange={handleDateInputChange}
+              placeholder="DD/MM/AA"
+              className="col-span-3"
+              required
+            />
           </div>
 
           {provider && (

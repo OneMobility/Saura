@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { PlusCircle, Trash2, Loader2, Edit, ChevronUp, ChevronDown } from 'lucide-react';
+import { PlusCircle, Trash2, Loader2, Edit, ChevronUp, ChevronDown, Save } from 'lucide-react'; // Added Save
 import RichTextEditor from '@/components/RichTextEditor'; // Import the new RichTextEditor
 
 interface FaqItem {

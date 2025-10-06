@@ -7,9 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, CalendarIcon, DollarSign } from 'lucide-react';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Calendar } from '@/components/ui/calendar';
+import { Loader2, Save, DollarSign } from 'lucide-react'; // Removed CalendarIcon
 import { format, parse, isValid, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
 
@@ -138,7 +136,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
             remaining_payment: totalQuoteCost - (data.total_paid || 0),
           };
           setFormData(loadedData);
-          setDateInput(data.quoted_date ? format(new Date(data.quoted_date), 'dd/MM/yy') : '');
+          setDateInput(data.quoted_date ? format(parseISO(data.quoted_date), 'dd/MM/yy') : '');
           
           // NEW: Only call onHotelDataLoaded if it hasn't been called for this specific hotelId yet
           if (loadedHotelIdRef.current !== hotelId) {
@@ -352,38 +350,20 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
             <Label htmlFor="quoted_date" className="text-right">
               Fecha Cotizada
             </Label>
-            <Popover>
-              <PopoverTrigger asChild>
-                <div className="relative col-span-3">
-                  <Input
-                    id="quoted_date_input"
-                    value={dateInput}
-                    onChange={handleDateInputChange}
-                    placeholder="DD/MM/AA"
-                    className={cn(
-                      "w-full justify-start text-left font-normal pr-10",
-                      !formData.quoted_date && "text-muted-foreground"
-                    )}
-                  />
-                  <Button
-                    variant={"ghost"}
-                    className="absolute right-0 top-0 h-full px-3 py-2"
-                    onClick={(e) => e.preventDefault()}
-                  >
-                    <CalendarIcon className="h-4 w-4" />
-                    <span className="sr-only">Seleccionar fecha</span>
-                  </Button>
-                </div>
-              </PopoverTrigger>
-              <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={formData.quoted_date ? parseISO(formData.quoted_date) : undefined}
-                  onSelect={handleDateSelect}
-                  initialFocus
-                />
-              </PopoverContent>
-            </Popover>
+            <div className="relative col-span-3">
+              <Input
+                id="quoted_date_input"
+                type="text"
+                value={dateInput}
+                onChange={handleDateInputChange}
+                placeholder="DD/MM/AA"
+                className={cn(
+                  "w-full justify-start text-left font-normal pr-10",
+                  !formData.quoted_date && "text-muted-foreground"
+                )}
+                required
+              />
+            </div>
           </div>
 
           <div className="grid grid-cols-4 items-center gap-4">

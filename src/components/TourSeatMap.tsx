@@ -7,14 +7,7 @@ import { Loader2, Check, X, Ban, CarFront, Toilet } from 'lucide-react'; // Adde
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useSession } from '@/components/SessionContextProvider';
-
-// Definición de tipos para el layout de asientos
-type SeatLayoutItem = {
-  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty';
-  number?: number; // Solo para asientos
-};
-type SeatLayoutRow = SeatLayoutItem[];
-type SeatLayout = SeatLayoutRow[];
+import { SeatLayout, SeatLayoutItem } from '@/types/shared'; // Import shared SeatLayout types
 
 interface Seat {
   seat_number: number;
@@ -87,7 +80,12 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
       // Populate allSeats, merging with existing assignments
       layoutSeatNumbers.forEach(seatNumber => {
         const existingAssignment = fetchedAssignments.find(s => s.seat_number === seatNumber);
-        allSeats.push(existingAssignment || { seat_number: seatNumber, status: 'available', client_id: null });
+        allSeats.push({
+          seat_number: seatNumber,
+          status: (existingAssignment?.status || 'available') as Seat['status'], // Cast status
+          client_id: existingAssignment?.client_id || null,
+          id: existingAssignment?.id,
+        });
       });
 
       // Sort seats by number to ensure "first available" is consistent
@@ -209,7 +207,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
   const getSeatClasses = (seat: Seat | null, itemType: SeatLayoutItem['type']) => {
     const baseClasses = "w-10 h-10 flex items-center justify-center rounded-md text-sm font-semibold transition-colors duration-200";
 
-    if (itemType === 'aisle' || itemType === 'empty') {
+    if (itemType === 'aisle' || itemType === 'empty' || itemType === 'entry') { // Added 'entry'
       return "w-10 h-10 flex items-center justify-center text-muted-foreground"; // Transparent or subtle for non-seats
     }
     if (itemType === 'bathroom') {
@@ -306,6 +304,10 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
                     <div className={getSeatClasses(null, item.type)} title="Conductor">
                       <CarFront className="h-5 w-5" />
                     </div>
+                  ) : item.type === 'entry' ? ( // Render 'entry' type
+                    <div className={getSeatClasses(null, item.type)} title="Ascenso">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-log-in"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>
+                    </div>
                   ) : ( // empty type
                     <div className={getSeatClasses(null, item.type)}></div>
                   )}
@@ -338,6 +340,9 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
           </div>
           <div className="flex items-center">
             <span className="w-5 h-5 bg-gray-700 rounded-sm mr-2"></span> Conductor
+          </div>
+          <div className="flex items-center">
+            <span className="w-5 h-5 bg-green-600 rounded-sm mr-2"></span> Ascenso
           </div>
         </div>
       </div>

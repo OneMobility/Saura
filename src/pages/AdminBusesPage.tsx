@@ -15,7 +15,7 @@ interface Bus {
   license_plate: string;
   rental_cost: number;
   total_capacity: number;
-  seat_map_image_url: string | null;
+  seat_map_image_url: string | null; // Added missing property
   created_at: string;
 }
 

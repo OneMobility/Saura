@@ -12,14 +12,7 @@ import { Loader2, Save, PlusCircle, MinusCircle } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import TourSeatMap from '@/components/TourSeatMap';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TourProviderService, AvailableProvider } from '@/types/shared';
-
-type SeatLayoutItem = {
-  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty';
-  number?: number;
-};
-type SeatLayoutRow = SeatLayoutItem[];
-type SeatLayout = SeatLayoutRow[];
+import { TourProviderService, AvailableProvider, SeatLayout } from '@/types/shared'; // Import shared SeatLayout
 
 interface Companion {
   id: string;
@@ -218,6 +211,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
               name_snapshot: selectedProviderService.name_snapshot,
               service_type_snapshot: selectedProviderService.service_type_snapshot,
               unit_type_snapshot: selectedProviderService.unit_type_snapshot,
+              cost_per_unit_snapshot: selectedProviderService.cost_per_unit_snapshot,
             };
           }
         } else if (field === 'quantity') {
@@ -239,6 +233,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
         name_snapshot: '',
         service_type_snapshot: '',
         unit_type_snapshot: 'person',
+        cost_per_unit_snapshot: 0,
       }],
     }));
   };
@@ -295,7 +290,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
         email: formData.email,
         phone: formData.phone || null,
         address: formData.address || null,
-        identification_number: formData.identification_number || null, // NEW: Save identification_number
+        identification_number: formData.identification_number || null,
         contract_number: contract_number,
         tour_id: tourId,
         number_of_people: totalPeople,

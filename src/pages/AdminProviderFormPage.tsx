@@ -12,7 +12,7 @@ import ProviderPaymentDialog from '@/components/admin/providers/ProviderPaymentD
 import ProviderPaymentHistoryTable from '@/components/admin/providers/ProviderPaymentHistoryTable'; // NEW: Import ProviderPaymentHistoryTable
 
 interface Provider {
-  id: string;
+  id: string; // Make id required for consistency
   name: string;
   cost_per_unit: number;
   total_paid: number;
@@ -84,7 +84,7 @@ const AdminProviderFormPage = () => {
           isOpen={isPaymentDialogOpen}
           onClose={() => setIsPaymentDialogOpen(false)}
           provider={selectedProviderForPayment}
-          onPaymentRegistered={() => handleProviderDataRefresh(selectedProviderForPayment)} // Refresh provider data after payment
+          onPaymentRegistered={() => handleProviderDataRefresh(selectedSelectedProviderForPayment)} // Refresh provider data after payment
         />
       )}
     </div>

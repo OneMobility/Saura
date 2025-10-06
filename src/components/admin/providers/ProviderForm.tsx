@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,38 +11,39 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Save, DollarSign } from 'lucide-react';
 
 interface Provider {
-  id?: string;
+  id: string; // Make id required for consistency in callbacks
   name: string;
   service_type: string;
   cost_per_unit: number;
   unit_type: string;
   selling_price_per_unit: number;
   is_active: boolean;
-  advance_payment: number; // Ensure this is part of the interface
-  total_paid: number; // Ensure this is part of the interface
+  advance_payment: number;
+  total_paid: number;
 }
 
 interface ProviderFormProps {
   providerId?: string;
   onSave: () => void;
-  onProviderDataLoaded?: (providerData: Provider) => void; // NEW: Callback for when provider data is loaded
-  onRegisterPayment?: (providerData: Provider) => void; // NEW: Callback for opening payment dialog
+  onProviderDataLoaded?: (providerData: Provider) => void;
+  onRegisterPayment?: (providerData: Provider) => void;
 }
 
 const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave, onProviderDataLoaded, onRegisterPayment }) => {
   const [formData, setFormData] = useState<Provider>({
+    id: providerId || '', // Initialize id, will be updated on fetch or insert
     name: '',
     service_type: '',
     cost_per_unit: 0,
     unit_type: 'person',
     selling_price_per_unit: 0,
     is_active: true,
-    advance_payment: 0, // Initialize
-    total_paid: 0, // Initialize
+    advance_payment: 0,
+    total_paid: 0,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
-  const loadedProviderIdRef = useRef<string | undefined>(undefined); // NEW: Ref to track if onProviderDataLoaded was called for this ID
+  const loadedProviderIdRef = useRef<string | undefined>(undefined);
 
   useEffect(() => {
     const fetchProviderData = async () => {
@@ -58,18 +59,17 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave, onProvi
           console.error('Error fetching provider for editing:', error);
           toast.error('Error al cargar los datos del proveedor para editar.');
           setLoadingInitialData(false);
-          loadedProviderIdRef.current = undefined; // Reset ref on error
+          loadedProviderIdRef.current = undefined;
           return;
         }
 
         if (data) {
-          const loadedData = {
+          const loadedData: Provider = {
             ...data,
             advance_payment: data.advance_payment || 0,
             total_paid: data.total_paid || 0,
           };
           setFormData(loadedData);
-          // NEW: Only call onProviderDataLoaded if it hasn't been called for this specific providerId yet
           if (loadedProviderIdRef.current !== providerId) {
             onProviderDataLoaded?.(loadedData);
             loadedProviderIdRef.current = providerId;
@@ -77,6 +77,7 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave, onProvi
         }
       } else {
         setFormData({
+          id: '',
           name: '',
           service_type: '',
           cost_per_unit: 0,
@@ -86,13 +87,13 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave, onProvi
           advance_payment: 0,
           total_paid: 0,
         });
-        loadedProviderIdRef.current = undefined; // Reset for new form
+        loadedProviderIdRef.current = undefined;
       }
       setLoadingInitialData(false);
     };
 
     fetchProviderData();
-  }, [providerId, onProviderDataLoaded]); // onProviderDataLoaded is still a dependency, but its invocation is guarded.
+  }, [providerId, onProviderDataLoaded]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value, type } = e.target;

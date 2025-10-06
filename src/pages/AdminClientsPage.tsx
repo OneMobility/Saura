@@ -16,7 +16,7 @@ interface Client {
   last_name: string;
   total_amount: number;
   total_paid: number;
-  remaining_payment: number;
+  remaining_payment: number; // Made required
   // Add other necessary client properties here if needed by ClientPaymentDialog
 }
 
