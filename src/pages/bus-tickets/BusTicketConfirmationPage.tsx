@@ -269,7 +269,17 @@ const BusTicketConfirmationPage: React.FC = () => {
                 body { font-family: 'Poppins', sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 20px; background-color: #f4f4f4; }
                 .ticket-page { page-break-after: always; }
                 .ticket-page:last-child { page-break-after: avoid; }
-                .ticket-container { max-width: 800px; margin: 20px auto; background: white; padding: 30px; border-radius: 10px; box-shadow: 0 0 20px rgba(0,0,0,0.1); border: 2px dashed #1e293b; }
+                .ticket-container { 
+                    max-width: 800px; 
+                    margin: 20px auto; 
+                    background: white; 
+                    padding: 30px; 
+                    border-radius: 10px; 
+                    box-shadow: 0 0 20px rgba(0,0,0,0.1); 
+                    border: 2px dashed #1e293b; 
+                    position: relative; /* Needed for absolute positioning of QR */
+                    min-height: 900px; /* Ensure enough space for large QR */
+                }
                 .header { text-align: center; margin-bottom: 30px; }
                 .header h1 { color: #1e293b; font-size: 2.5em; margin-bottom: 5px; }
                 .header p { color: #ffd700; font-size: 1.2em; font-weight: 600; }
@@ -279,32 +289,34 @@ const BusTicketConfirmationPage: React.FC = () => {
                 .details-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
                 .passengers-list { list-style-type: disc; padding-left: 20px; }
                 .passengers-list li { margin-bottom: 5px; }
-                .qr-code-section { text-align: center; margin-top: 30px; }
-                .qr-code-section h2 { color: #1e293b; margin-bottom: 15px; }
-                .qr-code-canvas-container { 
-                    margin: 0 auto; 
-                    display: flex; 
-                    justify-content: center; 
-                    align-items: center; 
-                    padding: 10px; /* Added padding */
-                    border: 1px solid #ccc; /* Added border */
-                    background-color: #fff; /* Ensure white background */
-                    width: fit-content; /* Adjust width to content */
-                    height: fit-content; /* Adjust height to content */
+                .qr-code-section { 
+                    position: absolute; /* Absolute positioning */
+                    bottom: 30px; /* 30px from bottom */
+                    left: 30px; /* 30px from left */
+                    text-align: left; /* Align content to left */
+                    z-index: 10; /* Ensure it's on top */
+                    background-color: white; /* Ensure white background */
+                    padding: 10px; /* Padding around QR */
+                    border: 1px solid #ccc; /* Border around QR */
+                    box-shadow: 0 2px 8px rgba(0,0,0,0.1); /* Subtle shadow */
                 }
-                .qr-code-canvas-container canvas { margin: 0 auto; display: block; }
+                .qr-code-section h2 { color: #1e293b; margin-bottom: 15px; }
+                .qr-code-section canvas { margin: 0; display: block; } /* Remove auto margin for left alignment */
                 .qr-data-text { font-size: 0.9em; color: #555; margin-top: 10px; }
                 .instructions { font-size: 1em; color: #1e293b; font-weight: 600; margin-top: 15px; }
-                .footer { text-align: center; margin-top: 40px; color: #777; font-size: 0.9em; }
+                .footer { text-align: center; margin-top: 850px; /* Push footer down to avoid overlap with large QR */ color: #777; font-size: 0.9em; }
                 .total-amount { font-size: 1.8em; font-weight: 700; color: #1e293b; text-align: right; margin-top: 20px; }
                 @media print {
                     body { background-color: white; padding: 0; }
                     .ticket-container { box-shadow: none; border: 1px solid #ccc; margin: 0; width: 100%; min-height: 100vh; border-radius: 0; }
                     .page-break { page-break-after: always; }
-                    .qr-code-canvas-container {
+                    .qr-code-section {
                         border: 1px solid #000; /* Black border for print */
                         background-color: white; /* Ensure white background for print */
+                        bottom: 20px; /* Slightly less margin for print */
+                        left: 20px;
                     }
+                    .footer { margin-top: 850px; /* Maintain spacing for print */ }
                 }
             </style>
         </head>
@@ -317,8 +329,8 @@ const BusTicketConfirmationPage: React.FC = () => {
                     ${bookingDetails.passengers.map(p => `
                         new QRCode(document.getElementById('qrcode-${p.id}'), {
                             text: '${p.id}_${bookingDetails.schedule_id}_${p.seat_number}',
-                            width: 180, /* Increased size */
-                            height: 180, /* Increased size */
+                            width: 800, /* Increased size to 800 */
+                            height: 800, /* Increased size to 800 */
                             colorDark : "#000000",
                             colorLight : "#ffffff",
                             correctLevel : QRCode.CorrectLevel.H
@@ -372,7 +384,7 @@ const BusTicketConfirmationPage: React.FC = () => {
             <p className="text-xl mb-6">{error || 'No se pudieron cargar los detalles de tu reserva.'}</p>
             <Button asChild className="bg-bus-primary hover:bg-bus-primary/90 text-bus-primary-foreground">
               <Link to="/bus-tickets">
-                <ArrowLeft className="mr-2 h-4 w-4" /> Ir a la Página Principal de Boletos
+                <ArrowLeft className="mr-2 h-4 w-4" /> Volver a la Página Principal de Boletos
               </Link>
             </Button>
           </main>
