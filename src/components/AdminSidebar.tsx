@@ -22,8 +22,8 @@ const navItems: NavItem[] = [
     icon: Ticket,
     label: 'Boletos de Autobús',
     children: [
-      { href: '/admin/bus-tickets', icon: Ticket, label: 'General' },
-      { href: '/admin/bus-tickets/destinations', icon: MapPin, label: 'Destinos' }, // NEW: Link to Bus Destinations
+      { href: '/admin/bus-tickets', icon: Ticket, label: 'Horarios' }, // Changed 'General' to 'Horarios'
+      { href: '/admin/bus-tickets/destinations', icon: MapPin, label: 'Destinos' },
     ],
   },
   {
