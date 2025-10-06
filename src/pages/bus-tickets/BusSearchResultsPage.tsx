@@ -4,15 +4,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import BusTicketsNavbar from '@/components/BusTicketsNavbar';
 import BusTicketsFooter from '@/components/BusTicketsFooter';
 import BusTicketsThemeProvider from '@/components/BusTicketsThemeProvider';
-import { useLocation, Link } from 'react-router-dom';
+import { useLocation, Link, useNavigate } from 'react-router-dom'; // Import useNavigate
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, ArrowLeft, Clock, MapPin, DollarSign, CalendarDays } from 'lucide-react';
 import { format, parseISO, getDay } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
-import { Dialog, DialogTrigger } from '@/components/ui/dialog'; // Import Dialog and DialogTrigger
-import BusTicketBookingForm from '@/components/BusTicketBookingForm'; // Import the new booking form
 
 interface SearchResult {
   routeId: string;
@@ -32,6 +30,7 @@ interface SearchResult {
 
 const BusSearchResultsPage = () => {
   const location = useLocation();
+  const navigate = useNavigate(); // Initialize useNavigate
   const { originId, destinationId, searchDate } = location.state || {};
 
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -39,9 +38,6 @@ const BusSearchResultsPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [originName, setOriginName] = useState<string>('');
   const [destinationName, setDestinationName] = useState<string>('');
-
-  const [isBookingDialogOpen, setIsBookingDialogOpen] = useState(false); // NEW: State for booking dialog
-  const [selectedScheduleForBooking, setSelectedScheduleForBooking] = useState<SearchResult | null>(null); // NEW: State for selected schedule
 
   const fetchResults = useCallback(async () => {
     setLoading(true);
@@ -171,8 +167,7 @@ const BusSearchResultsPage = () => {
   }, [fetchResults]);
 
   const handleSelectSchedule = (schedule: SearchResult) => {
-    setSelectedScheduleForBooking(schedule);
-    setIsBookingDialogOpen(true);
+    navigate('/bus-tickets/book', { state: { ...schedule, searchDate } }); // Navigate to booking page with state
   };
 
   const displayDate = searchDate ? format(new Date(searchDate), 'EEEE, dd MMMM yyyy', { locale: es }) : 'Fecha no especificada';
@@ -244,7 +239,7 @@ const BusSearchResultsPage = () => {
                     </div>
                     <Button 
                       className="w-full bg-bus-secondary hover:bg-bus-secondary/90 text-bus-secondary-foreground font-semibold py-3 text-lg"
-                      onClick={() => handleSelectSchedule(result)} // NEW: Open booking form
+                      onClick={() => handleSelectSchedule(result)} // NEW: Navigate to booking page
                     >
                       Seleccionar Horario
                     </Button>
@@ -255,24 +250,6 @@ const BusSearchResultsPage = () => {
           )}
         </main>
         <BusTicketsFooter />
-
-        {/* NEW: BusTicketBookingForm Dialog */}
-        {selectedScheduleForBooking && (
-          <BusTicketBookingForm
-            isOpen={isBookingDialogOpen}
-            onClose={() => setIsBookingDialogOpen(false)}
-            routeId={selectedScheduleForBooking.routeId}
-            routeName={selectedScheduleForBooking.routeName}
-            originName={selectedScheduleForBooking.originName}
-            destinationName={selectedScheduleForBooking.destinationName}
-            departureTime={selectedScheduleForBooking.departureTime}
-            adultPrice={selectedScheduleForBooking.adultPrice}
-            childPrice={selectedScheduleForBooking.childPrice}
-            busId={selectedScheduleForBooking.busId}
-            busCapacity={selectedScheduleForBooking.busCapacity}
-            courtesies={selectedScheduleForBooking.courtesies}
-          />
-        )}
       </div>
     </BusTicketsThemeProvider>
   );

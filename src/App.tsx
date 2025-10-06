@@ -34,7 +34,7 @@ import AdminClientFormPage from "./pages/AdminClientFormPage";
 import AdminBusTicketsPage from "./pages/AdminBusTicketsPage";
 import AdminBusDestinationsPage from "./pages/AdminBusDestinationsPage";
 import AdminBusRoutesPage from "./pages/AdminBusRoutesPage";
-import AdminBusRouteFormPage from "./pages/AdminBusRouteFormPage"; // NEW: Import AdminBusRouteFormPage
+import AdminBusRouteFormPage from "./pages/AdminBusRouteFormPage";
 import AdminBusSchedulesPage from "./pages/AdminBusSchedulesPage";
 
 // Bus Tickets Subdomain Pages
@@ -48,6 +48,7 @@ import BusContactPage from "./pages/bus-tickets/BusContactPage";
 import AdditionalServicesPage from "./pages/bus-tickets/AdditionalServicesPage";
 import HelpCenterPage from "./pages/bus-tickets/HelpCenterPage";
 import BusSearchResultsPage from "./pages/bus-tickets/BusSearchResultsPage";
+import BusTicketBookingPage from "./pages/bus-tickets/BusTicketBookingPage"; // NEW: Import BusTicketBookingPage
 
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
@@ -85,6 +86,7 @@ const App = () => {
               <Route path="/bus-tickets/help-center" element={<HelpCenterPage />} />
               <Route path="/bus-tickets/contact" element={<BusContactPage />} />
               <Route path="/bus-tickets/search-results" element={<BusSearchResultsPage />} />
+              <Route path="/bus-tickets/book" element={<BusTicketBookingPage />} /> {/* NEW: Route for booking page */}
 
               <Route path="/login" element={<Login />} />
               <Route
