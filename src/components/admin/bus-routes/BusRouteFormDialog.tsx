@@ -35,7 +35,7 @@ const BusRouteFormDialog: React.FC<BusRouteFormDialogProps> = ({ isOpen, onClose
     destinations: [],
     adult_price_per_seat: 0, // NEW: Initialize adult price
     child_price_per_seat: 0, // NEW: Initialize child price
-    is_active: true, // Keep for internal logic, but not exposed in form
+    // is_active: true, // Removed from form data as it's dropped from DB
   });
   const [availableBuses, setAvailableBuses] = useState<AvailableBus[]>([]);
   const [availableDestinations, setAvailableDestinations] = useState<BusDestinationOption[]>([]);
@@ -80,7 +80,7 @@ const BusRouteFormDialog: React.FC<BusRouteFormDialogProps> = ({ isOpen, onClose
         destinations: [],
         adult_price_per_seat: 0,
         child_price_per_seat: 0,
-        is_active: true,
+        // is_active: true, // Removed from form data as it's dropped from DB
       });
     }
   }, [initialData, isOpen]);
@@ -150,7 +150,7 @@ const BusRouteFormDialog: React.FC<BusRouteFormDialogProps> = ({ isOpen, onClose
       destinations: formData.destinations,
       adult_price_per_seat: formData.adult_price_per_seat,
       child_price_per_seat: formData.child_price_per_seat,
-      is_active: formData.is_active, // Keep is_active for DB, even if not in form
+      // is_active: formData.is_active, // Removed from dataToSave as it's dropped from DB
     };
 
     if (initialData?.id) {
@@ -316,7 +316,6 @@ const BusRouteFormDialog: React.FC<BusRouteFormDialogProps> = ({ isOpen, onClose
               step="0.01"
             />
           </div>
-          {/* Removed description, departure_time, arrival_time, is_active from form */}
           <DialogFooter>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
