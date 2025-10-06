@@ -14,7 +14,5 @@ export default defineConfig(() => ({
       "@": path.resolve(__dirname, "./src"),
     },
   },
-  optimizeDeps: {
-    exclude: ["qrcode"], // Excluido qrcode de la optimización
-  },
+  // Se eliminó la exclusión de 'qrcode' de optimizeDeps
 }));
