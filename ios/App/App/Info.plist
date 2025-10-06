@@ -45,5 +45,7 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<true/>
+	<key>NSCameraUsageDescription</key>
+	<string>Necesitamos acceso a tu cámara para escanear códigos QR de boletos.</string> <!-- NEW: Camera usage description -->
 </dict>
 </plist>

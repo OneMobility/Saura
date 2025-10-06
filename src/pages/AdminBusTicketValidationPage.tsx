@@ -5,7 +5,7 @@ import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, QrCode, CheckCircle2, XCircle, Scan, User, Bus, Clock, CalendarDays, MapPin } from 'lucide-react';
+import { Loader2, QrCode, CheckCircle2, XCircle, Scan, User, Bus, Clock, CalendarDays, MapPin, Camera } from 'lucide-react'; // Added Camera icon
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -14,6 +14,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { QrReader } from 'react-qr-reader'; // Import QrReader
 
 interface PassengerDetails {
   id: string;
@@ -39,6 +40,7 @@ const AdminBusTicketValidationPage = () => {
   const [loading, setLoading] = useState(false);
   const [isUpdatingStatus, setIsUpdatingStatus] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const [isScanning, setIsScanning] = useState(false); // NEW: State to control camera scanner
 
   useEffect(() => {
     if (!sessionLoading && (!user || !isAdmin)) {
@@ -50,6 +52,7 @@ const AdminBusTicketValidationPage = () => {
     setLoading(true);
     setPassengerDetails(null);
     setValidationError(null);
+    setIsScanning(false); // Stop scanning when fetching details
 
     if (!qrInput.trim()) {
       setValidationError('Por favor, introduce el ID del QR o escanea un código.');
@@ -138,6 +141,17 @@ const AdminBusTicketValidationPage = () => {
     }
   };
 
+  const handleScanResult = (result: any, error: any) => {
+    if (result) {
+      setQrInput(result.text);
+      setIsScanning(false); // Stop scanning after a successful scan
+      fetchPassengerDetails(); // Automatically fetch details
+    }
+    if (error) {
+      // console.error(error); // Log errors but don't show toast for every minor camera glitch
+    }
+  };
+
   if (sessionLoading || (user && isAdmin && loading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -182,13 +196,32 @@ const AdminBusTicketValidationPage = () => {
                   value={qrInput}
                   onChange={(e) => setQrInput(e.target.value)}
                   className="flex-grow"
-                  disabled={loading}
+                  disabled={loading || isScanning}
                 />
-                <Button onClick={fetchPassengerDetails} disabled={loading}>
+                <Button onClick={fetchPassengerDetails} disabled={loading || isScanning}>
                   {loading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Scan className="h-4 w-4" />}
                   <span className="ml-2">Buscar</span>
                 </Button>
+                <Button onClick={() => setIsScanning(prev => !prev)} variant="outline" className="text-blue-600 hover:bg-blue-50">
+                  {isScanning ? <XCircle className="h-4 w-4" /> : <Camera className="h-4 w-4" />}
+                  <span className="ml-2">{isScanning ? 'Detener Escáner' : 'Escanear QR'}</span>
+                </Button>
               </div>
+
+              {isScanning && (
+                <div className="relative w-full h-64 bg-gray-200 rounded-md overflow-hidden flex items-center justify-center">
+                  <QrReader
+                    onResult={handleScanResult}
+                    constraints={{ facingMode: 'environment' }} // Use rear camera
+                    scanDelay={300}
+                    videoStyle={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                    containerStyle={{ width: '100%', height: '100%', padding: 0 }}
+                  />
+                  <p className="absolute bottom-2 text-sm text-gray-700 bg-white/70 px-2 py-1 rounded-md">
+                    Apuntando la cámara al código QR...
+                  </p>
+                </div>
+              )}
 
               {validationError && (
                 <div className="text-red-600 text-center p-3 bg-red-50 rounded-md">
