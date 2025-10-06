@@ -12,34 +12,39 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 
-interface Companion {
+interface BusPassenger {
   id: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   age: number | null;
+  identification_number: string | null;
+  is_contractor: boolean;
+  seat_number: number;
+  email: string | null;
+  phone: string | null;
 }
 
 interface ClientBookingDetails {
   id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone: string | null;
-  identification_number: string | null;
+  first_name: string; // Contractor's first name
+  last_name: string;  // Contractor's last name
+  email: string;      // Contractor's email
+  phone: string | null; // Contractor's phone
+  identification_number: string | null; // Contractor's identification
   contract_number: string;
   number_of_people: number;
-  companions: Companion[];
   total_amount: number;
   total_paid: number;
   status: string;
   contractor_age: number | null;
-  route_id: string; // Changed from tour_id to route_id
-  schedule_id: string; // NEW: schedule_id for the specific trip
+  route_id: string;
+  schedule_id: string;
   route_name: string;
   origin_name: string;
   destination_name: string;
   departure_time: string;
-  assigned_seat_numbers: number[];
-  search_date: string; // NEW: search_date to display
+  search_date: string;
+  passengers: BusPassenger[]; // NEW: Array of all passengers
 }
 
 const BusTicketConfirmationPage: React.FC = () => {
@@ -73,16 +78,11 @@ const BusTicketConfirmationPage: React.FC = () => {
             identification_number,
             contract_number,
             number_of_people,
-            companions,
             total_amount,
             total_paid,
             status,
             contractor_age,
-            bus_route_id, -- NEW: Use bus_route_id
-            bus_seat_assignments (
-              schedule_id,
-              seat_number
-            )
+            bus_route_id
           `)
           .eq('contract_number', contractNumber)
           .single();
@@ -94,14 +94,22 @@ const BusTicketConfirmationPage: React.FC = () => {
           return;
         }
 
-        const assignedSeats = (clientData.bus_seat_assignments || []).map((s: { seat_number: number }) => s.seat_number).sort((a: number, b: number) => a - b);
-        const scheduleId = clientData.bus_seat_assignments?.[0]?.schedule_id || null;
+        // Fetch passengers for this client
+        const { data: passengersData, error: passengersError } = await supabase
+          .from('bus_passengers')
+          .select('*')
+          .eq('client_id', clientData.id)
+          .order('seat_number', { ascending: true });
 
-        if (!scheduleId) {
-          setError('No se encontró el horario asociado a esta reserva de asiento.');
+        if (passengersError || !passengersData || passengersData.length === 0) {
+          console.error('Error fetching passengers data:', passengersError);
+          setError('No se encontraron los pasajeros asociados a esta reserva.');
           setLoading(false);
           return;
         }
+
+        const assignedSeats = passengersData.map(p => p.seat_number).sort((a, b) => a - b);
+        const scheduleId = passengersData[0].schedule_id; // Assuming all passengers are on the same schedule
 
         // Fetch route details (using bus_route_id)
         const { data: routeData, error: routeError } = await supabase
@@ -110,7 +118,7 @@ const BusTicketConfirmationPage: React.FC = () => {
             name,
             all_stops
           `)
-          .eq('id', clientData.bus_route_id) // NEW: Use bus_route_id
+          .eq('id', clientData.bus_route_id)
           .single();
 
         if (routeError || !routeData) {
@@ -131,10 +139,10 @@ const BusTicketConfirmationPage: React.FC = () => {
         const originName = destinationMap.get(routeData.all_stops[0]) || 'N/A';
         const destinationName = destinationMap.get(routeData.all_stops[routeData.all_stops.length - 1]) || 'N/A';
 
-        // Fetch schedule details using the scheduleId from bus_seat_assignments
+        // Fetch schedule details using the scheduleId from bus_passengers
         const { data: scheduleData, error: scheduleError } = await supabase
           .from('bus_schedules')
-          .select('departure_time, effective_date_start') // Also fetch effective_date_start for the ticket
+          .select('departure_time, effective_date_start')
           .eq('id', scheduleId)
           .single();
 
@@ -154,19 +162,19 @@ const BusTicketConfirmationPage: React.FC = () => {
           identification_number: clientData.identification_number,
           contract_number: clientData.contract_number,
           number_of_people: clientData.number_of_people,
-          companions: clientData.companions || [],
           total_amount: clientData.total_amount,
           total_paid: clientData.total_paid,
           status: clientData.status,
           contractor_age: clientData.contractor_age,
-          route_id: clientData.bus_route_id, // NEW: Use bus_route_id here
+          route_id: clientData.bus_route_id,
           schedule_id: scheduleId,
           route_name: routeData.name,
           origin_name: originName,
           destination_name: destinationName,
           departure_time: scheduleData.departure_time,
           assigned_seat_numbers: assignedSeats,
-          search_date: scheduleData.effective_date_start || format(new Date(), 'yyyy-MM-dd'), // Use schedule start date or current date
+          search_date: scheduleData.effective_date_start || format(new Date(), 'yyyy-MM-dd'),
+          passengers: passengersData,
         });
 
       } catch (err: any) {
@@ -253,11 +261,11 @@ const BusTicketConfirmationPage: React.FC = () => {
                     <p><strong>Edad:</strong> ${bookingDetails.contractor_age !== null ? bookingDetails.contractor_age : 'N/A'}</p>
                 </div>
 
-                ${bookingDetails.companions.length > 0 ? `
+                ${bookingDetails.passengers.filter(p => !p.is_contractor).length > 0 ? `
                 <div class="section">
                     <h2>Acompañantes</h2>
                     <ul class="passengers-list">
-                        ${bookingDetails.companions.map(c => `<li>${c.name} ${c.age !== null ? `(${c.age} años)` : ''}</li>`).join('')}
+                        ${bookingDetails.passengers.filter(p => !p.is_contractor).map(p => `<li>${p.first_name} ${p.last_name} (Asiento: ${p.seat_number}) ${p.age !== null ? `(${p.age} años)` : ''}</li>`).join('')}
                     </ul>
                 </div>
                 ` : ''}
@@ -367,12 +375,12 @@ const BusTicketConfirmationPage: React.FC = () => {
                 <p><span className="font-medium">Monto Total:</span> ${bookingDetails.total_amount.toFixed(2)}</p>
                 <p><span className="font-medium">Estado:</span> {bookingDetails.status}</p>
               </div>
-              {bookingDetails.companions.length > 0 && (
+              {bookingDetails.passengers.filter(p => !p.is_contractor).length > 0 && (
                 <div className="md:col-span-2">
                   <h3 className="text-xl font-semibold mb-3 text-bus-primary">Acompañantes</h3>
                   <ul className="list-disc list-inside">
-                    {bookingDetails.companions.map((c, index) => (
-                      <li key={index}>{c.name} {c.age !== null && `(${c.age} años)`}</li>
+                    {bookingDetails.passengers.filter(p => !p.is_contractor).map((p, index) => (
+                      <li key={index}>{p.first_name} {p.last_name} (Asiento: {p.seat_number}) {p.age !== null && `(${p.age} años)`}</li>
                     ))}
                   </ul>
                 </div>

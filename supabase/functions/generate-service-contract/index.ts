@@ -25,9 +25,9 @@ const formatRoomDetails = (details: any) => {
 const generateServiceContractHtml = (data: any) => {
   const client = data.client;
   const tour = data.tour || {}; // Can be a tour or a bus route
-  const seats = data.seats;
   const agency = data.agency;
   const busRoute = data.busRoute || {}; // NEW: Bus route data
+  const busPassengers = data.busPassengers || []; // NEW: Bus passengers data
 
   const clientFullName = `${client.first_name || ''} ${client.last_name || ''}`.trim();
   const contractDate = format(new Date(client.created_at), 'dd/MM/yyyy', { locale: es });
@@ -39,6 +39,7 @@ const generateServiceContractHtml = (data: any) => {
   let tourOrRouteDuration = 'N/A';
   let includesList = '<li>N/A</li>';
   let itineraryList = '<li>N/A</li>';
+  let seatNumbers = 'N/A';
 
   if (client.tour_id && tour.title) {
     tourOrRouteTitle = tour.title;
@@ -51,26 +52,27 @@ const generateServiceContractHtml = (data: any) => {
     itineraryList = safeItinerary.length > 0
       ? safeItinerary.map((item: any) => `<li>Día ${item.day}: ${item.activity}</li>`).join('')
       : '<li>N/A</li>';
-  } else if (client.bus_route_id && busRoute.name) { // NEW: Handle bus route details
+    const tourSeats = data.tourSeats || [];
+    if (tourSeats && tourSeats.length > 0) {
+      seatNumbers = tourSeats.map((s: any) => s.seat_number).sort((a: number, b: number) => a - b).join(', ');
+    }
+  } else if (client.bus_route_id && busRoute.name) {
     tourOrRouteTitle = `Ruta de Autobús: ${busRoute.name}`;
     tourOrRouteDuration = data.busSchedule?.departure_time ? `Salida: ${data.busSchedule.departure_time}` : 'N/A';
-    includesList = '<li>Transporte en autobús</li><li>Asiento asignado</li>'; // Generic includes for bus tickets
+    includesList = '<li>Transporte en autobús</li><li>Asiento asignado</li>';
     itineraryList = `<li>Viaje de ${data.destinationMap.get(busRoute.all_stops[0]) || 'N/A'} a ${data.destinationMap.get(busRoute.all_stops[busRoute.all_stops.length - 1]) || 'N/A'}</li>`;
+    if (busPassengers.length > 0) {
+      seatNumbers = busPassengers.map((p: any) => p.seat_number).sort((a: number, b: number) => a - b).join(', ');
+    }
   }
 
-  const companionsList = safeCompanions.length > 0
+  const companionsListHtml = safeCompanions.length > 0
     ? safeCompanions.map((c: any) => `<li>${c.name || 'Acompañante sin nombre'} ${c.age !== null && typeof c.age === 'number' ? `(${c.age} años)` : ''}</li>`).join('')
     : '<li>N/A</li>';
 
-  let seatNumbers = 'N/A';
-  if (seats && seats.length > 0) {
-    const validSeats = seats.filter((s: any) => s && typeof s.seat_number === 'number');
-    if (validSeats.length > 0) {
-      const numbers = validSeats.map((s: any) => s.seat_number);
-      const sortedNumbers = numbers.sort((a: number, b: number) => a - b);
-      seatNumbers = sortedNumbers.join(', ');
-    }
-  }
+  const busPassengersListHtml = busPassengers.length > 0
+    ? busPassengers.map((p: any) => `<li>${p.first_name || 'N/A'} ${p.last_name || 'N/A'} (Asiento: ${p.seat_number}) ${p.age !== null && typeof p.age === 'number' ? `(${p.age} años)` : ''} ${p.is_contractor ? '(Contratante)' : ''}</li>`).join('')
+    : '<li>N/A</li>';
 
   const extraServicesList = safeExtraServices.length > 0
     ? safeExtraServices.map((s: any) => {
@@ -524,16 +526,9 @@ serve(async (req) => {
           includes,
           itinerary
         ),
-        bus_routes ( -- NEW: Select bus_routes
+        bus_routes (
           name,
           all_stops
-        ),
-        tour_seat_assignments (
-          seat_number
-        ),
-        bus_seat_assignments ( -- NEW: Select bus_seat_assignments
-          schedule_id,
-          seat_number
         )
       `)
       .eq('id', clientId)
@@ -545,7 +540,10 @@ serve(async (req) => {
     }
     console.log('Edge Function: Client data fetched successfully for contract.');
 
-    let seats: any[] = [];
+    let tourSeats: any[] = [];
+    let busPassengers: any[] = [];
+    let busSchedule: any = null;
+
     if (client.tour_id) {
       const { data: fetchedSeats, error: seatsError } = await supabaseAdmin
         .from('tour_seat_assignments')
@@ -556,18 +554,27 @@ serve(async (req) => {
       if (seatsError) {
         console.error('Edge Function: Error fetching tour seats for contract:', seatsError.message);
       } else {
-        seats = fetchedSeats || [];
+        tourSeats = fetchedSeats || [];
       }
-    } else if (client.bus_route_id) { // NEW: Fetch bus seat assignments
-      const { data: fetchedBusSeats, error: busSeatsError } = await supabaseAdmin
-        .from('bus_seat_assignments')
-        .select('schedule_id, seat_number')
+    } else if (client.bus_route_id) {
+      const { data: fetchedBusPassengers, error: busPassengersError } = await supabaseAdmin
+        .from('bus_passengers')
+        .select('*')
         .eq('client_id', clientId);
 
-      if (busSeatsError) {
-        console.error('Edge Function: Error fetching bus seats for contract:', busSeatsError.message);
+      if (busPassengersError) {
+        console.error('Edge Function: Error fetching bus passengers for contract:', busPassengersError.message);
       } else {
-        seats = fetchedBusSeats || [];
+        busPassengers = fetchedBusPassengers || [];
+        if (busPassengers.length > 0) {
+          const { data: fetchedSchedule, error: scheduleError } = await supabaseAdmin
+            .from('bus_schedules')
+            .select('departure_time')
+            .eq('id', busPassengers[0].schedule_id)
+            .single();
+          if (scheduleError) console.error('Error fetching bus schedule:', scheduleError.message);
+          busSchedule = fetchedSchedule;
+        }
       }
     }
 
@@ -592,10 +599,12 @@ serve(async (req) => {
     const htmlContent = generateServiceContractHtml({
       client,
       tour: client.tours,
-      busRoute: client.bus_routes, // NEW: Pass bus route data
-      seats: seats,
+      busRoute: client.bus_routes,
+      tourSeats: tourSeats,
+      busPassengers: busPassengers,
+      busSchedule: busSchedule,
       agency: agency,
-      destinationMap: destinationMap, // Pass destination map for bus route formatting
+      destinationMap: destinationMap,
     });
     console.log('Edge Function: HTML content generated successfully for contract.');
 

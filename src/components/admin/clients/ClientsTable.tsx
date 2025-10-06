@@ -9,10 +9,16 @@ import { Edit, Trash2, Loader2, DollarSign, FileText, FileSignature } from 'luci
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
 
-interface Companion {
+interface BusPassenger {
   id: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   age: number | null;
+  identification_number: string | null;
+  is_contractor: boolean;
+  seat_number: number;
+  email: string | null;
+  phone: string | null;
 }
 
 interface RoomDetails {
@@ -31,9 +37,9 @@ interface Client {
   contract_number: string;
   identification_number: string | null;
   tour_id: string | null;
-  bus_route_id: string | null; // NEW: Add bus_route_id
+  bus_route_id: string | null;
   number_of_people: number;
-  companions: Companion[];
+  companions: BusPassenger[]; // Changed to BusPassenger[] for bus tickets
   extra_services: any[];
   total_amount: number;
   advance_payment: number;
@@ -44,7 +50,7 @@ interface Client {
   room_details: RoomDetails;
   remaining_payment?: number;
   tour_title?: string;
-  bus_route_name?: string; // NEW: Add bus_route_name
+  bus_route_name?: string;
 }
 
 interface ClientsTableProps {
@@ -74,7 +80,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
         tours (
           title
         ),
-        bus_routes ( -- NEW: Select bus_routes
+        bus_routes (
           name
         )
       `)
@@ -84,13 +90,30 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
       console.error('Error fetching clients:', error);
       toast.error('Error al cargar la lista de clientes.');
     } else {
-      const clientsWithTitles = (data || []).map(client => ({
-        ...client,
-        tour_title: client.tours?.title || 'N/A',
-        bus_route_name: client.bus_routes?.name || 'N/A', // NEW: Set bus_route_name
-        companions: client.companions || [],
-        room_details: client.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
-        remaining_payment: client.total_amount - client.total_paid,
+      const clientsWithTitles = await Promise.all((data || []).map(async client => {
+        let companionsList: BusPassenger[] = [];
+        if (client.bus_route_id) {
+          const { data: busPassengers, error: passengersError } = await supabase
+            .from('bus_passengers')
+            .select('*')
+            .eq('client_id', client.id);
+          if (passengersError) {
+            console.error('Error fetching bus passengers for client:', passengersError);
+          } else {
+            companionsList = busPassengers || [];
+          }
+        } else {
+          companionsList = (client.companions || []).map((c: any) => ({ ...c, is_contractor: false, seat_number: 0 }));
+        }
+
+        return {
+          ...client,
+          tour_title: client.tours?.title || 'N/A',
+          bus_route_name: client.bus_routes?.name || 'N/A',
+          companions: companionsList, // Use the fetched or mapped companions
+          room_details: client.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
+          remaining_payment: client.total_amount - client.total_paid,
+        };
       }));
       setClients(clientsWithTitles);
     }
@@ -98,7 +121,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
   };
 
   const handleDeleteClient = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar este cliente y su contrato? Esto también liberará los asientos asignados.')) {
+    if (!window.confirm('¿Estás seguro de que quieres eliminar este cliente y su contrato? Esto también liberará los asientos asignados y los pasajeros asociados.')) {
       return;
     }
     setLoading(true);
@@ -111,7 +134,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
       console.error('Error deleting client:', error);
       toast.error('Error al eliminar el cliente.');
     } else {
-      toast.success('Cliente eliminado con éxito. Los asientos asignados han sido liberados.');
+      toast.success('Cliente eliminado con éxito. Los asientos asignados y pasajeros han sido liberados.');
       fetchClients();
     }
     setLoading(false);
@@ -248,7 +271,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                 <TableHead>Cliente</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Identificación</TableHead>
-                <TableHead>Tour/Ruta</TableHead> {/* NEW: Combined column */}
+                <TableHead>Viaje</TableHead> {/* Changed from Tour/Ruta to Viaje */}
                 <TableHead>Personas</TableHead>
                 <TableHead>Habitaciones</TableHead>
                 <TableHead>Total</TableHead>
@@ -265,7 +288,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                   <TableCell>{client.first_name} {client.last_name}</TableCell>
                   <TableCell>{client.email}</TableCell>
                   <TableCell>{client.identification_number || 'N/A'}</TableCell>
-                  <TableCell>{client.tour_id ? client.tour_title : client.bus_route_name}</TableCell> {/* NEW: Conditional display */}
+                  <TableCell>{client.tour_id ? client.tour_title : client.bus_route_name}</TableCell>
                   <TableCell>{client.number_of_people}</TableCell>
                   <TableCell>{formatRoomDetails(client.room_details)}</TableCell>
                   <TableCell>${client.total_amount.toFixed(2)}</TableCell>

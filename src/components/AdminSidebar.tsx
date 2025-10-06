@@ -6,8 +6,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText, ChevronDown, Hotel, Truck, UserRound, Bus, Handshake, Ticket, MapPin, Map, CalendarClock } from 'lucide-react'; // Added CalendarClock
-import { useSession } from '@/components/SessionContextProvider'; // Import useSession
+import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText, ChevronDown, Hotel, Truck, UserRound, Bus, Handshake, Ticket, MapPin, Map, CalendarClock, UsersRound } from 'lucide-react'; // Added UsersRound
 
 interface NavItem {
   href?: string;
@@ -23,9 +22,10 @@ const navItems: NavItem[] = [
     icon: Ticket,
     label: 'Boletos de Autobús',
     children: [
-      { href: '/admin/bus-tickets/routes', icon: Map, label: 'Rutas' }, // Changed order, removed 'Horarios' here
-      { href: '/admin/bus-tickets/schedules', icon: CalendarClock, label: 'Horarios' }, // NEW: Schedules link
+      { href: '/admin/bus-tickets/routes', icon: Map, label: 'Rutas' },
+      { href: '/admin/bus-tickets/schedules', icon: CalendarClock, label: 'Horarios' },
       { href: '/admin/bus-tickets/destinations', icon: MapPin, label: 'Destinos' },
+      { href: '/admin/bus-tickets/passengers', icon: UsersRound, label: 'Pasajeros' }, // NEW: Passengers link
     ],
   },
   {

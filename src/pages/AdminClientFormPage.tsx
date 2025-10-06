@@ -27,6 +27,18 @@ type SeatLayoutItem = {
 type SeatLayoutRow = SeatLayoutItem[];
 type SeatLayout = SeatLayoutRow[];
 
+interface BusPassenger { // NEW: Interface for bus passengers
+  id: string;
+  first_name: string;
+  last_name: string;
+  age: number | null;
+  identification_number: string | null;
+  is_contractor: boolean;
+  seat_number: number;
+  email: string | null;
+  phone: string | null;
+}
+
 interface Companion {
   id: string;
   name: string;
@@ -49,9 +61,10 @@ interface Client {
   contract_number: string;
   identification_number: string | null;
   tour_id: string | null;
-  bus_route_id: string | null; // NEW: Add bus_route_id
+  bus_route_id: string | null;
   number_of_people: number;
-  companions: Companion[];
+  companions: Companion[]; // For tour clients
+  bus_passengers: BusPassenger[]; // NEW: For bus ticket clients
   extra_services: TourProviderService[];
   total_amount: number;
   advance_payment: number;
@@ -73,7 +86,7 @@ interface Tour {
   courtesies: number;
 }
 
-interface BusRoute { // NEW: Interface for BusRoute
+interface BusRoute {
   id: string;
   name: string;
   bus_id: string | null;
@@ -86,7 +99,7 @@ interface BusDetails {
   seat_layout_json: SeatLayout | null;
 }
 
-interface BusSchedule { // NEW: Interface for BusSchedule
+interface BusSchedule {
   id: string;
   route_id: string;
   departure_time: string;
@@ -137,9 +150,10 @@ const AdminClientFormPage = () => {
     contract_number: uuidv4().substring(0, 8).toUpperCase(),
     identification_number: null,
     tour_id: null,
-    bus_route_id: null, // NEW: Initialize bus_route_id
+    bus_route_id: null,
     number_of_people: 1,
-    companions: [],
+    companions: [], // For tour clients
+    bus_passengers: [], // NEW: For bus ticket clients
     extra_services: [],
     total_amount: 0,
     advance_payment: 0,
@@ -151,12 +165,12 @@ const AdminClientFormPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
   const [availableTours, setAvailableTours] = useState<Tour[]>([]);
-  const [availableBusRoutes, setAvailableBusRoutes] = useState<BusRoute[]>([]); // NEW: State for available bus routes
-  const [availableBusSchedules, setAvailableBusSchedules] = useState<BusSchedule[]>([]); // NEW: State for available bus schedules
+  const [availableBusRoutes, setAvailableBusRoutes] = useState<BusRoute[]>([]);
+  const [availableBusSchedules, setAvailableBusSchedules] = useState<BusSchedule[]>([]);
   const [availableProviders, setAvailableProviders] = useState<AvailableProvider[]>([]);
   const [selectedTourPrices, setSelectedTourPrices] = useState<Tour | null>(null);
-  const [selectedBusRoute, setSelectedBusRoute] = useState<BusRoute | null>(null); // NEW: State for selected bus route
-  const [selectedBusSchedule, setSelectedBusSchedule] = useState<BusSchedule | null>(null); // NEW: State for selected bus schedule
+  const [selectedBusRoute, setSelectedBusRoute] = useState<BusRoute | null>(null);
+  const [selectedBusSchedule, setSelectedBusSchedule] = useState<BusSchedule | null>(null);
   const [busDetails, setBusDetails] = useState<BusDetails | null>(null);
   const [clientSelectedSeats, setClientSelectedSeats] = useState<number[]>([]);
   const [initialClientStatus, setInitialClientStatus] = useState<string>('pending');
@@ -179,7 +193,7 @@ const AdminClientFormPage = () => {
 
   useEffect(() => {
     const fetchToursAndRoutes = async () => {
-      const [toursRes, routesRes, schedulesRes] = await Promise.all([ // NEW: Fetch schedules too
+      const [toursRes, routesRes, schedulesRes] = await Promise.all([
         supabase
           .from('tours')
           .select('id, title, selling_price_double_occupancy, selling_price_triple_occupancy, selling_price_quad_occupancy, selling_price_child, bus_id, courtesies')
@@ -239,64 +253,62 @@ const AdminClientFormPage = () => {
   const refreshClientData = useCallback(async () => {
     if (clientIdFromParams) {
       setLoadingInitialData(true);
-      const { data, error } = await supabase
+      const { data: clientData, error: clientError } = await supabase
         .from('clients')
         .select('*')
         .eq('id', clientIdFromParams)
         .single();
 
-      if (error) {
-        console.error('Error fetching client for editing:', error);
+      if (clientError) {
+        console.error('Error fetching client for editing:', clientError);
         toast.error('Error al cargar los datos del cliente para editar.');
         setLoadingInitialData(false);
         return;
       }
 
-      if (data) {
-        setFormData({
-          ...data,
-          companions: data.companions || [],
-          extra_services: data.extra_services || [],
-          contract_number: data.contract_number || uuidv4().substring(0, 8).toUpperCase(),
-          identification_number: data.identification_number || null,
-          contractor_age: data.contractor_age || null,
-          room_details: data.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
-        });
-        setInitialClientStatus(data.status);
-        setRoomDetails(data.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
+      if (clientData) {
+        let companionsForForm: Companion[] = [];
+        let busPassengersForForm: BusPassenger[] = [];
+        let assignedSeats: number[] = [];
+        let selectedSchedule: BusSchedule | null = null;
 
-        // Fetch seat assignments based on whether it's a tour or bus ticket
-        if (data.tour_id) {
+        if (clientData.tour_id) {
+          companionsForForm = clientData.companions || [];
           const { data: seatAssignments, error: seatsError } = await supabase
             .from('tour_seat_assignments')
             .select('seat_number')
-            .eq('client_id', data.id)
-            .eq('tour_id', data.tour_id);
-
-          if (seatsError) {
-            console.error('Error fetching client tour seat assignments:', seatsError);
-          } else {
-            setClientSelectedSeats(seatAssignments?.map(s => s.seat_number) || []);
-          }
-        } else if (data.bus_route_id) { // NEW: Fetch bus seat assignments
-          // For bus tickets, we need the schedule_id to fetch seats.
-          // Assuming a client booking a bus ticket will have an associated bus_seat_assignment
-          // from which we can derive the schedule_id.
-          const { data: busSeatAssignments, error: busSeatsError } = await supabase
-            .from('bus_seat_assignments')
-            .select('schedule_id, seat_number')
-            .eq('client_id', data.id);
-
-          if (busSeatsError) {
-            console.error('Error fetching client bus seat assignments:', busSeatsError);
-          } else {
-            setClientSelectedSeats(busSeatAssignments?.map(s => s.seat_number) || []);
-            if (busSeatAssignments && busSeatAssignments.length > 0) {
-              const schedule = availableBusSchedules.find(s => s.id === busSeatAssignments[0].schedule_id);
-              setSelectedBusSchedule(schedule || null);
-            }
+            .eq('client_id', clientData.id)
+            .eq('tour_id', clientData.tour_id);
+          if (seatsError) console.error('Error fetching client tour seat assignments:', seatsError);
+          assignedSeats = seatAssignments?.map(s => s.seat_number) || [];
+        } else if (clientData.bus_route_id) {
+          const { data: busPassengers, error: busPassengersError } = await supabase
+            .from('bus_passengers')
+            .select('*')
+            .eq('client_id', clientData.id)
+            .order('seat_number', { ascending: true });
+          if (busPassengersError) console.error('Error fetching client bus passengers:', busPassengersError);
+          busPassengersForForm = busPassengers || [];
+          assignedSeats = busPassengersForForm.map(p => p.seat_number) || [];
+          if (busPassengersForForm.length > 0) {
+            selectedSchedule = availableBusSchedules.find(s => s.id === busPassengersForForm[0].schedule_id) || null;
           }
         }
+
+        setFormData({
+          ...clientData,
+          companions: companionsForForm,
+          bus_passengers: busPassengersForForm,
+          extra_services: clientData.extra_services || [],
+          contract_number: clientData.contract_number || uuidv4().substring(0, 8).toUpperCase(),
+          identification_number: clientData.identification_number || null,
+          contractor_age: clientData.contractor_age || null,
+          room_details: clientData.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
+        });
+        setInitialClientStatus(clientData.status);
+        setRoomDetails(clientData.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
+        setClientSelectedSeats(assignedSeats);
+        setSelectedBusSchedule(selectedSchedule);
       }
     } else {
       setFormData({
@@ -308,9 +320,10 @@ const AdminClientFormPage = () => {
         contract_number: uuidv4().substring(0, 8).toUpperCase(),
         identification_number: null,
         tour_id: null,
-        bus_route_id: null, // NEW: Reset bus_route_id
+        bus_route_id: null,
         number_of_people: 1,
         companions: [],
+        bus_passengers: [],
         extra_services: [],
         total_amount: 0,
         advance_payment: 0,
@@ -323,12 +336,12 @@ const AdminClientFormPage = () => {
       setInitialClientStatus('pending');
       setRoomDetails({ double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
       setSelectedTourPrices(null);
-      setSelectedBusRoute(null); // NEW: Reset selected bus route
-      setSelectedBusSchedule(null); // NEW: Reset selected bus schedule
+      setSelectedBusRoute(null);
+      setSelectedBusSchedule(null);
       setBusDetails(null);
     }
     setLoadingInitialData(false);
-  }, [clientIdFromParams, availableBusSchedules]); // Added availableBusSchedules to dependencies
+  }, [clientIdFromParams, availableBusSchedules]);
 
   useEffect(() => {
     if (!sessionLoading) {
@@ -340,8 +353,8 @@ const AdminClientFormPage = () => {
     if (formData.tour_id) {
       const tour = availableTours.find(t => t.id === formData.tour_id);
       setSelectedTourPrices(tour || null);
-      setSelectedBusRoute(null); // Clear bus route selection
-      setSelectedBusSchedule(null); // Clear bus schedule selection
+      setSelectedBusRoute(null);
+      setSelectedBusSchedule(null);
 
       const fetchBusForTour = async () => {
         if (tour?.bus_id) {
@@ -367,12 +380,12 @@ const AdminClientFormPage = () => {
         }
       };
       fetchBusForTour();
-    } else if (formData.bus_route_id) { // NEW: Handle bus route selection
+    } else if (formData.bus_route_id) {
       const route = availableBusRoutes.find(r => r.id === formData.bus_route_id);
       setSelectedBusRoute(route || null);
-      setSelectedTourPrices(null); // Clear tour selection
+      setSelectedTourPrices(null);
 
-      const schedule = availableBusSchedules.find(s => s.route_id === formData.bus_route_id); // Assuming one schedule per route for simplicity here
+      const schedule = availableBusSchedules.find(s => s.route_id === formData.bus_route_id);
       setSelectedBusSchedule(schedule || null);
 
       const fetchBusForRoute = async () => {
@@ -390,7 +403,7 @@ const AdminClientFormPage = () => {
             setBusDetails({
               bus_id: busData.id,
               bus_capacity: busData.total_capacity,
-              courtesies: 0, // Bus tickets don't have 'courtesies' in this context
+              courtesies: 0,
               seat_layout_json: busData.seat_layout_json,
             });
           }
@@ -410,20 +423,12 @@ const AdminClientFormPage = () => {
   useEffect(() => {
     let currentNumAdults = 0;
     let currentNumChildren = 0;
+    let totalPeople = 0;
 
-    if (formData.contractor_age !== null) {
-      if (formData.contractor_age >= 12) {
-        currentNumAdults++;
-      } else {
-        currentNumChildren++;
-      }
-    } else {
-      currentNumAdults++;
-    }
-
-    formData.companions.forEach(c => {
-      if (c.age !== null) {
-        if (c.age >= 12) {
+    if (formData.tour_id) {
+      totalPeople = 1 + formData.companions.length;
+      if (formData.contractor_age !== null) {
+        if (formData.contractor_age >= 12) {
           currentNumAdults++;
         } else {
           currentNumChildren++;
@@ -431,12 +436,30 @@ const AdminClientFormPage = () => {
       } else {
         currentNumAdults++;
       }
-    });
+      formData.companions.forEach(c => {
+        if (c.age !== null) {
+          if (c.age >= 12) {
+            currentNumAdults++;
+          } else {
+            currentNumChildren++;
+          }
+        } else {
+          currentNumAdults++;
+        }
+      });
+    } else if (formData.bus_route_id) {
+      totalPeople = formData.bus_passengers.length;
+      formData.bus_passengers.forEach(p => {
+        if (p.age === null || p.age >= 12) {
+          currentNumAdults++;
+        } else {
+          currentNumChildren++;
+        }
+      });
+    }
 
     setNumAdults(currentNumAdults);
     setNumChildren(currentNumChildren);
-
-    const totalPeople = currentNumAdults + currentNumChildren;
 
     let calculatedTotalAmount = 0;
     let calculatedRoomDetails: RoomDetails = { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 };
@@ -449,27 +472,62 @@ const AdminClientFormPage = () => {
       calculatedTotalAmount += calculatedRoomDetails.quad_rooms * ((selectedTourPrices.selling_price_quad_occupancy || 0) * 4);
       
       calculatedTotalAmount += currentNumChildren * (selectedTourPrices.selling_price_child || 0);
-    } else if (formData.bus_route_id && selectedBusRoute) { // NEW: Calculate for bus tickets
-      calculatedTotalAmount += currentNumAdults * (selectedBusRoute as any).adult_price; // Assuming adult_price is available on route or segment
-      calculatedTotalAmount += currentNumChildren * (selectedBusRoute as any).child_price; // Assuming child_price is available on route or segment
-      // Room details are not applicable for bus tickets, so it remains default
+    } else if (formData.bus_route_id && selectedBusRoute) {
+      // For bus tickets, we need to fetch segment prices
+      const fetchSegmentPrices = async () => {
+        if (formData.bus_route_id) {
+          const { data: segments, error: segmentsError } = await supabase
+            .from('route_segments')
+            .select('adult_price, child_price')
+            .eq('route_id', formData.bus_route_id);
+          
+          if (segmentsError) {
+            console.error('Error fetching segment prices:', segmentsError);
+            toast.error('Error al cargar los precios de los segmentos de la ruta.');
+            return;
+          }
+
+          const totalAdultPrice = segments.reduce((sum, segment) => sum + segment.adult_price, 0);
+          const totalChildPrice = segments.reduce((sum, segment) => sum + segment.child_price, 0);
+
+          let busCalculatedAmount = (currentNumAdults * totalAdultPrice) + (currentNumChildren * totalChildPrice);
+          
+          const currentExtraServicesTotal = formData.extra_services.reduce((sum, service) => {
+            return sum + (service.selling_price_per_unit_snapshot * service.quantity);
+          }, 0);
+          busCalculatedAmount += currentExtraServicesTotal;
+
+          setFormData(prev => ({
+            ...prev,
+            number_of_people: totalPeople,
+            room_details: { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
+            total_amount: busCalculatedAmount,
+            remaining_payment: busCalculatedAmount - prev.total_paid,
+          }));
+        }
+      };
+      fetchSegmentPrices();
     }
 
     const currentExtraServicesTotal = formData.extra_services.reduce((sum, service) => {
       return sum + (service.selling_price_per_unit_snapshot * service.quantity);
     }, 0);
     setExtraServicesTotal(currentExtraServicesTotal);
-    calculatedTotalAmount += currentExtraServicesTotal;
+    if (formData.tour_id) { // Only add extra services to tour total amount
+      calculatedTotalAmount += currentExtraServicesTotal;
+    }
 
-    setFormData(prev => ({
-      ...prev,
-      number_of_people: totalPeople,
-      room_details: calculatedRoomDetails,
-      total_amount: calculatedTotalAmount,
-      remaining_payment: calculatedTotalAmount - prev.total_paid,
-    }));
-    setRoomDetails(calculatedRoomDetails); // Update local roomDetails state
-  }, [formData.companions.length, formData.total_paid, selectedTourPrices, formData.contractor_age, formData.companions, formData.extra_services, formData.tour_id, formData.bus_route_id, selectedBusRoute]);
+    if (formData.tour_id) {
+      setFormData(prev => ({
+        ...prev,
+        number_of_people: totalPeople,
+        room_details: calculatedRoomDetails,
+        total_amount: calculatedTotalAmount,
+        remaining_payment: calculatedTotalAmount - prev.total_paid,
+      }));
+      setRoomDetails(calculatedRoomDetails);
+    }
+  }, [formData.companions.length, formData.bus_passengers.length, formData.total_paid, selectedTourPrices, formData.contractor_age, formData.companions, formData.bus_passengers, formData.extra_services, formData.tour_id, formData.bus_route_id, selectedBusRoute]);
 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -487,9 +545,11 @@ const AdminClientFormPage = () => {
   const handleSelectChange = (id: keyof Client, value: string) => {
     setFormData((prev) => ({ ...prev, [id]: value }));
     if (id === 'tour_id') {
-      setFormData(prev => ({ ...prev, bus_route_id: null })); // Clear bus route if tour is selected
+      setFormData(prev => ({ ...prev, bus_route_id: null, bus_passengers: [], companions: [] })); // Clear bus route and passengers if tour is selected
+      setClientSelectedSeats([]);
     } else if (id === 'bus_route_id') {
-      setFormData(prev => ({ ...prev, tour_id: null })); // Clear tour if bus route is selected
+      setFormData(prev => ({ ...prev, tour_id: null, companions: [], bus_passengers: [] })); // Clear tour and companions if bus route is selected
+      setClientSelectedSeats([]);
     }
   };
 
@@ -511,6 +571,37 @@ const AdminClientFormPage = () => {
     setFormData((prev) => ({
       ...prev,
       companions: prev.companions.filter(c => c.id !== id),
+    }));
+  };
+
+  const handleBusPassengerChange = (id: string, field: keyof BusPassenger, value: string | number | null) => {
+    setFormData(prev => ({
+      ...prev,
+      bus_passengers: prev.bus_passengers.map(p => (p.id === id ? { ...p, [field]: value } : p))
+    }));
+  };
+
+  const addBusPassenger = () => {
+    setFormData(prev => ({
+      ...prev,
+      bus_passengers: [...prev.bus_passengers, {
+        id: uuidv4(),
+        first_name: '',
+        last_name: '',
+        age: null,
+        identification_number: null,
+        is_contractor: prev.bus_passengers.length === 0, // First added is contractor
+        seat_number: 0, // Will be assigned from selected seats
+        email: null,
+        phone: null,
+      }],
+    }));
+  };
+
+  const removeBusPassenger = (id: string) => {
+    setFormData(prev => ({
+      ...prev,
+      bus_passengers: prev.bus_passengers.filter(p => p.id !== id),
     }));
   };
 
@@ -595,15 +686,44 @@ const AdminClientFormPage = () => {
       return;
     }
 
-    for (const companion of formData.companions) {
-      if (companion.age !== null && (companion.age < 0 || companion.age > 120)) {
-        toast.error(`La edad del acompañante ${companion.name || 'sin nombre'} debe ser un valor razonable.`);
-        setIsSubmitting(false);
-        return;
+    // Validate companions for tour clients
+    if (formData.tour_id) {
+      for (const companion of formData.companions) {
+        if (companion.age !== null && (companion.age < 0 || companion.age > 120)) {
+          toast.error(`La edad del acompañante ${companion.name || 'sin nombre'} debe ser un valor razonable.`);
+          setIsSubmitting(false);
+          return;
+        }
       }
     }
 
-    const totalPeople = 1 + formData.companions.length;
+    // Validate bus passengers for bus ticket clients
+    if (formData.bus_route_id) {
+      if (formData.bus_passengers.length === 0) {
+        toast.error('Debes añadir al menos un pasajero para la reserva de autobús.');
+        setIsSubmitting(false);
+        return;
+      }
+      for (const passenger of formData.bus_passengers) {
+        if (!passenger.first_name || !passenger.last_name) {
+          toast.error(`Por favor, rellena el nombre y apellido para todos los pasajeros de autobús.`);
+          setIsSubmitting(false);
+          return;
+        }
+        if (passenger.age !== null && (passenger.age < 0 || passenger.age > 120)) {
+          toast.error(`La edad del pasajero ${passenger.first_name} ${passenger.last_name} debe ser un valor razonable.`);
+          setIsSubmitting(false);
+          return;
+        }
+        if (passenger.is_contractor && (!passenger.email || !passenger.phone)) {
+          toast.error('El contratante de autobús debe tener email y teléfono.');
+          setIsSubmitting(false);
+          return;
+        }
+      }
+    }
+
+    const totalPeople = formData.tour_id ? (1 + formData.companions.length) : formData.bus_passengers.length;
     if (busDetails && clientSelectedSeats.length !== totalPeople) {
       toast.error(`Debes seleccionar ${totalPeople} asientos para este contrato.`);
       setIsSubmitting(false);
@@ -626,16 +746,16 @@ const AdminClientFormPage = () => {
       contract_number: formData.contract_number,
       identification_number: formData.identification_number || null,
       tour_id: formData.tour_id,
-      bus_route_id: formData.bus_route_id, // NEW: Save bus_route_id
+      bus_route_id: formData.bus_route_id,
       number_of_people: totalPeople,
-      companions: formData.companions,
+      companions: formData.tour_id ? formData.companions : [], // Only save companions for tour clients
       extra_services: formData.extra_services,
       total_amount: formData.total_amount,
       advance_payment: formData.advance_payment,
       total_paid: formData.total_paid,
       status: formData.status,
       contractor_age: formData.contractor_age,
-      room_details: roomDetails,
+      room_details: formData.tour_id ? roomDetails : { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }, // Only save room details for tour clients
       user_id: authUser.id,
     };
 
@@ -672,7 +792,7 @@ const AdminClientFormPage = () => {
     }
 
     if (currentClientIdToUse) {
-      // Handle seat assignments based on tour_id or bus_route_id
+      // Handle seat assignments and passengers based on tour_id or bus_route_id
       if (formData.tour_id) {
         const { error: deleteError } = await supabase
           .from('tour_seat_assignments')
@@ -711,21 +831,60 @@ const AdminClientFormPage = () => {
         } else {
           toast.info('Cliente cancelado. Los asientos del tour han sido liberados.');
         }
-      } else if (formData.bus_route_id && selectedBusSchedule) { // NEW: Handle bus seat assignments
-        const { error: deleteError } = await supabase
+      } else if (formData.bus_route_id && selectedBusSchedule) {
+        // Delete existing bus passengers and seat assignments for this client/schedule
+        const { error: deletePassengersError } = await supabase
+          .from('bus_passengers')
+          .delete()
+          .eq('client_id', currentClientIdToUse)
+          .eq('schedule_id', selectedBusSchedule.id);
+
+        if (deletePassengersError) {
+          console.error('Error deleting old bus passengers:', deletePassengersError);
+          toast.error('Error al actualizar los pasajeros del autobús.');
+          setIsSubmitting(false);
+          return;
+        }
+
+        const { error: deleteSeatsError } = await supabase
           .from('bus_seat_assignments')
           .delete()
           .eq('client_id', currentClientIdToUse)
-          .eq('schedule_id', selectedBusSchedule.id); // Delete by schedule_id
+          .eq('schedule_id', selectedBusSchedule.id);
 
-        if (deleteError) {
-          console.error('Error deleting old bus seat assignments:', deleteError);
+        if (deleteSeatsError) {
+          console.error('Error deleting old bus seat assignments:', deleteSeatsError);
           toast.error('Error al actualizar la asignación de asientos del autobús.');
           setIsSubmitting(false);
           return;
         }
 
         if (formData.status !== 'cancelled') {
+          // Insert new bus passengers and seat assignments
+          const passengersToInsert = formData.bus_passengers.map((p, index) => ({
+            client_id: currentClientIdToUse,
+            schedule_id: selectedBusSchedule.id,
+            seat_number: clientSelectedSeats[index], // Assign selected seat to each passenger
+            first_name: p.first_name,
+            last_name: p.last_name,
+            age: p.age,
+            identification_number: p.identification_number || null,
+            is_contractor: p.is_contractor,
+            email: p.is_contractor ? p.email : null,
+            phone: p.is_contractor ? p.phone : null,
+          }));
+
+          const { error: insertPassengersError } = await supabase
+            .from('bus_passengers')
+            .insert(passengersToInsert);
+
+          if (insertPassengersError) {
+            console.error('Error inserting new bus passengers:', insertPassengersError);
+            toast.error('Error al guardar los pasajeros del autobús.');
+            setIsSubmitting(false);
+            return;
+          }
+
           const newBusSeatAssignments = clientSelectedSeats.map(seatNumber => ({
             schedule_id: selectedBusSchedule.id,
             seat_number: seatNumber,
@@ -734,20 +893,20 @@ const AdminClientFormPage = () => {
           }));
 
           if (newBusSeatAssignments.length > 0) {
-            const { error: insertError } = await supabase
+            const { error: insertSeatsError } = await supabase
               .from('bus_seat_assignments')
               .insert(newBusSeatAssignments);
 
-            if (insertError) {
-              console.error('Error inserting new bus seat assignments:', insertError);
+            if (insertSeatsError) {
+              console.error('Error inserting new bus seat assignments:', insertSeatsError);
               toast.error('Error al guardar la asignación de asientos del autobús.');
               setIsSubmitting(false);
               return;
             }
           }
-          toast.success('Asientos de autobús asignados con éxito.');
+          toast.success('Pasajeros y asientos de autobús asignados con éxito.');
         } else {
-          toast.info('Cliente cancelado. Los asientos del autobús han sido liberados.');
+          toast.info('Cliente cancelado. Los pasajeros y asientos del autobús han sido liberados.');
         }
       }
     }
@@ -832,7 +991,7 @@ const AdminClientFormPage = () => {
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="bus_route_id">Ruta de Autobús Asociada</Label> {/* NEW: Bus Route Select */}
+                  <Label htmlFor="bus_route_id">Ruta de Autobús Asociada</Label>
                   <Select value={formData.bus_route_id || ''} onValueChange={(value) => handleSelectChange('bus_route_id', value)}>
                     <SelectTrigger>
                       <SelectValue placeholder="Seleccionar Ruta de Autobús" />
@@ -848,8 +1007,8 @@ const AdminClientFormPage = () => {
                 </div>
               </div>
 
-              {/* Occupancy and Companions */}
-              <h3 className="text-lg font-semibold mt-4">Ocupación y Acompañantes</h3>
+              {/* Occupancy and Companions / Bus Passengers */}
+              <h3 className="text-lg font-semibold mt-4">Ocupación y Pasajeros</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="number_of_people">Número Total de Personas</Label>
@@ -861,33 +1020,115 @@ const AdminClientFormPage = () => {
                 </div>
               </div>
 
-              <div className="space-y-2 mt-4">
-                <Label className="font-semibold">Acompañantes</Label>
-                {formData.companions.map((companion) => (
-                  <div key={companion.id} className="flex flex-col md:flex-row items-center gap-2">
-                    <Input
-                      value={companion.name}
-                      onChange={(e) => handleCompanionChange(companion.id, 'name', e.target.value)}
-                      placeholder="Nombre del acompañante"
-                      className="w-full md:w-2/3"
-                    />
-                    <Input
-                      type="text" // Changed to text
-                      pattern="[0-9]*" // Pattern for integers
-                      value={companion.age || ''}
-                      onChange={(e) => handleCompanionChange(companion.id, 'age', e.target.value)}
-                      placeholder="Edad"
-                      className="w-full md:w-1/3"
-                    />
-                    <Button type="button" variant="destructive" size="icon" onClick={() => removeCompanion(companion.id)}>
-                      <MinusCircle className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-                <Button type="button" variant="outline" onClick={addCompanion}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Añadir Acompañante
-                </Button>
-              </div>
+              {formData.tour_id ? (
+                <div className="space-y-2 mt-4">
+                  <Label className="font-semibold">Acompañantes (Tour)</Label>
+                  {formData.companions.map((companion) => (
+                    <div key={companion.id} className="flex flex-col md:flex-row items-center gap-2">
+                      <Input
+                        value={companion.name}
+                        onChange={(e) => handleCompanionChange(companion.id, 'name', e.target.value)}
+                        placeholder="Nombre del acompañante"
+                        className="w-full md:w-2/3"
+                      />
+                      <Input
+                        type="text"
+                        pattern="[0-9]*"
+                        value={companion.age || ''}
+                        onChange={(e) => handleCompanionChange(companion.id, 'age', e.target.value)}
+                        placeholder="Edad"
+                        className="w-full md:w-1/3"
+                      />
+                      <Button type="button" variant="destructive" size="icon" onClick={() => removeCompanion(companion.id)}>
+                        <MinusCircle className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" onClick={addCompanion}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Añadir Acompañante
+                  </Button>
+                </div>
+              ) : formData.bus_route_id ? (
+                <div className="space-y-2 mt-4">
+                  <Label className="font-semibold">Pasajeros (Autobús)</Label>
+                  {formData.bus_passengers.map((passenger, index) => (
+                    <div key={passenger.id} className="border p-4 rounded-md bg-gray-50 space-y-4">
+                      <h4 className="font-semibold text-sm text-gray-700">
+                        {passenger.is_contractor ? 'Contratante' : `Pasajero ${index + 1}`}
+                      </h4>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor={`bus_passenger_first_name-${passenger.id}`}>Nombre</Label>
+                          <Input
+                            id={`bus_passenger_first_name-${passenger.id}`}
+                            value={passenger.first_name}
+                            onChange={(e) => handleBusPassengerChange(passenger.id, 'first_name', e.target.value)}
+                            required
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`bus_passenger_last_name-${passenger.id}`}>Apellido</Label>
+                          <Input
+                            id={`bus_passenger_last_name-${passenger.id}`}
+                            value={passenger.last_name}
+                            onChange={(e) => handleBusPassengerChange(passenger.id, 'last_name', e.target.value)}
+                            required
+                          />
+                        </div>
+                      </div>
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <Label htmlFor={`bus_passenger_age-${passenger.id}`}>Edad (Opcional)</Label>
+                          <Input
+                            id={`bus_passenger_age-${passenger.id}`}
+                            type="text"
+                            pattern="[0-9]*"
+                            value={passenger.age || ''}
+                            onChange={(e) => handleBusPassengerChange(passenger.id, 'age', parseFloat(e.target.value) || null)}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`bus_passenger_identification_number-${passenger.id}`}>Identificación (Opcional)</Label>
+                          <Input
+                            id={`bus_passenger_identification_number-${passenger.id}`}
+                            value={passenger.identification_number || ''}
+                            onChange={(e) => handleBusPassengerChange(passenger.id, 'identification_number', e.target.value)}
+                          />
+                        </div>
+                      </div>
+                      {passenger.is_contractor && (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <Label htmlFor={`bus_passenger_email-${passenger.id}`}>Email</Label>
+                            <Input
+                              id={`bus_passenger_email-${passenger.id}`}
+                              type="email"
+                              value={passenger.email || ''}
+                              onChange={(e) => handleBusPassengerChange(passenger.id, 'email', e.target.value)}
+                              required
+                            />
+                          </div>
+                          <div>
+                            <Label htmlFor={`bus_passenger_phone-${passenger.id}`}>Teléfono</Label>
+                            <Input
+                              id={`bus_passenger_phone-${passenger.id}`}
+                              value={passenger.phone || ''}
+                              onChange={(e) => handleBusPassengerChange(passenger.id, 'phone', e.target.value)}
+                              required
+                            />
+                          </div>
+                        </div>
+                      )}
+                      <Button type="button" variant="destructive" size="icon" onClick={() => removeBusPassenger(passenger.id)}>
+                        <MinusCircle className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" onClick={addBusPassenger}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Añadir Pasajero
+                  </Button>
+                </div>
+              ) : null}
 
               {/* Extra Services for Client */}
               <div className="space-y-2 col-span-full mt-6">
@@ -921,8 +1162,8 @@ const AdminClientFormPage = () => {
                             </SelectContent>
                           </Select>
                           <Input
-                            type="text" // Changed to text
-                            pattern="[0-9]*" // Pattern for integers
+                            type="text"
+                            pattern="[0-9]*"
                             value={clientService.quantity}
                             onChange={(e) => handleClientExtraServiceChange(clientService.id, 'quantity', e.target.value)}
                             placeholder="Cantidad"
@@ -962,7 +1203,7 @@ const AdminClientFormPage = () => {
                       initialSelectedSeats={clientSelectedSeats}
                     />
                   )}
-                  {formData.bus_route_id && selectedBusSchedule && ( // NEW: Render BusSeatMap for bus tickets
+                  {formData.bus_route_id && selectedBusSchedule && (
                     <BusSeatMap
                       busId={busDetails.bus_id || ''}
                       busCapacity={busDetails.bus_capacity}
@@ -1009,7 +1250,7 @@ const AdminClientFormPage = () => {
                     )}
                   </>
                 )}
-                {formData.bus_route_id && selectedBusRoute && ( // NEW: Price breakdown for bus tickets
+                {formData.bus_route_id && selectedBusRoute && (
                   <>
                     <p className="text-sm text-gray-700">
                       Boletos Adulto: <span className="font-medium">{numAdults}</span> x ${(selectedBusRoute as any).adult_price.toFixed(2)} = <span className="font-medium">${(numAdults * (selectedBusRoute as any).adult_price).toFixed(2)}</span>
@@ -1038,8 +1279,8 @@ const AdminClientFormPage = () => {
                   <Label htmlFor="advance_payment">Anticipo</Label>
                   <Input 
                     id="advance_payment" 
-                    type="text" // Changed to text
-                    pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
+                    type="text"
+                    pattern="[0-9]*\.?[0-9]*"
                     value={formData.advance_payment} 
                     onChange={(e) => handleNumberChange('advance_payment', e.target.value)} 
                   />
@@ -1050,8 +1291,8 @@ const AdminClientFormPage = () => {
                   <Label htmlFor="total_paid">Total Pagado</Label>
                   <Input 
                     id="total_paid" 
-                    type="text" // Changed to text
-                    pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
+                    type="text"
+                    pattern="[0-9]*\.?[0-9]*"
                     value={formData.total_paid} 
                     onChange={(e) => handleNumberChange('total_paid', e.target.value)} 
                   />

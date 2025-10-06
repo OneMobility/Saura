@@ -11,10 +11,16 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { SeatLayout } from '@/types/shared'; // Import SeatLayout
 
-interface Companion {
+interface BusPassenger {
   id: string;
-  name: string;
+  first_name: string;
+  last_name: string;
   age: number | null;
+  identification_number: string | null;
+  is_contractor: boolean;
+  seat_number: number;
+  email: string | null;
+  phone: string | null;
 }
 
 interface RoomDetails {
@@ -39,7 +45,7 @@ interface ClientContract {
   contract_number: string;
   identification_number: string | null;
   number_of_people: number;
-  companions: Companion[];
+  companions: BusPassenger[]; // Changed to BusPassenger for bus tickets
   total_amount: number;
   advance_payment: number;
   total_paid: number;
@@ -69,6 +75,13 @@ const TourInquirySection = () => {
     setContractDetails(null);
 
     try {
+      // Fetch all destinations to map IDs to names for bus routes
+      const { data: destinationsData, error: destinationsError } = await supabase
+        .from('bus_destinations')
+        .select('id, name');
+      if (destinationsError) throw destinationsError;
+      const destinationMap = new Map(destinationsData.map(d => [d.id, d.name]));
+
       const { data: clientData, error: clientError } = await supabase
         .from('clients')
         .select(`
@@ -81,7 +94,7 @@ const TourInquirySection = () => {
           contract_number,
           identification_number,
           number_of_people,
-          companions,
+          companions, -- Keep for tour clients
           total_amount,
           advance_payment,
           total_paid,
@@ -89,22 +102,15 @@ const TourInquirySection = () => {
           contractor_age,
           room_details,
           tour_id,
-          bus_route_id, -- NEW: Select bus_route_id
+          bus_route_id,
           tours (
             title,
             description,
             image_url
           ),
-          bus_routes ( -- NEW: Select bus_routes
+          bus_routes (
             name,
             all_stops
-          ),
-          tour_seat_assignments (
-            seat_number
-          ),
-          bus_seat_assignments ( -- NEW: Select bus_seat_assignments
-            schedule_id,
-            seat_number
           )
         `)
         .eq('contract_number', contractNumber.trim())
@@ -127,27 +133,38 @@ const TourInquirySection = () => {
         let tourDescription = 'N/A';
         let tourImageUrl = 'https://via.placeholder.com/400x200?text=Imagen+No+Disponible';
         let assignedSeats: number[] = [];
+        let companionsList: BusPassenger[] = [];
+        let roomDetailsForClient: RoomDetails = { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 };
 
         if (clientData.tour_id && clientData.tours) {
           tourTitle = clientData.tours.title || 'N/A';
           tourDescription = clientData.tours.description || 'N/A';
           tourImageUrl = clientData.tours.image_url || tourImageUrl;
-          assignedSeats = (clientData.tour_seat_assignments || []).map((s: { seat_number: number }) => s.seat_number).sort((a: number, b: number) => a - b);
-        } else if (clientData.bus_route_id && clientData.bus_routes) { // NEW: Handle bus route details
+          assignedSeats = (await supabase.from('tour_seat_assignments').select('seat_number').eq('client_id', clientData.id)).data?.map(s => s.seat_number).sort((a: number, b: number) => a - b) || [];
+          companionsList = (clientData.companions || []).map((c: any) => ({ ...c, is_contractor: false, seat_number: 0 })); // Map old companions to new interface
+          roomDetailsForClient = clientData.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 };
+        } else if (clientData.bus_route_id && clientData.bus_routes) {
           tourTitle = `Ruta de Autobús: ${clientData.bus_routes.name || 'N/A'}`;
           tourDescription = `Viaje de ${destinationMap.get(clientData.bus_routes.all_stops[0]) || 'N/A'} a ${destinationMap.get(clientData.bus_routes.all_stops[clientData.bus_routes.all_stops.length - 1]) || 'N/A'}`;
-          // For bus tickets, we might not have a specific image per route, use a generic one or route-specific if available
           tourImageUrl = 'https://images.unsplash.com/photo-1544620347-c4fd4a8d462c?q=80&w=2069&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; // Generic bus image
-          assignedSeats = (clientData.bus_seat_assignments || []).map((s: { seat_number: number }) => s.seat_number).sort((a: number, b: number) => a - b);
+          
+          // Fetch passengers from the new bus_passengers table
+          const { data: busPassengersData, error: busPassengersError } = await supabase
+            .from('bus_passengers')
+            .select('*')
+            .eq('client_id', clientData.id)
+            .order('seat_number', { ascending: true });
+
+          if (busPassengersError) {
+            console.error('Error fetching bus passengers:', busPassengersError);
+            toast.error('Error al cargar los pasajeros del autobús.');
+            setLoading(false);
+            return;
+          }
+          companionsList = busPassengersData || [];
+          assignedSeats = companionsList.map(p => p.seat_number).sort((a: number, b: number) => a - b);
+          roomDetailsForClient = { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }; // Not applicable for bus tickets
         }
-
-        // Fetch all destinations to map IDs to names for bus routes
-        const { data: destinationsData, error: destinationsError } = await supabase
-          .from('bus_destinations')
-          .select('id, name');
-        if (destinationsError) throw destinationsError;
-        const destinationMap = new Map(destinationsData.map(d => [d.id, d.name]));
-
 
         const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
         const functionName = 'get-public-client-payments';
@@ -176,10 +193,10 @@ const TourInquirySection = () => {
           tour_title: tourTitle,
           tour_description: tourDescription,
           tour_image_url: tourImageUrl,
-          companions: clientData.companions || [],
+          companions: companionsList, // Use the new companionsList
           identification_number: clientData.identification_number || null,
           contractor_age: clientData.contractor_age || null,
-          room_details: clientData.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
+          room_details: roomDetailsForClient,
           assigned_seat_numbers: assignedSeats,
           payments_history: paymentsHistory,
         });
@@ -254,7 +271,7 @@ const TourInquirySection = () => {
                 {contractDetails.address && <p><span className="font-semibold">Dirección:</span> {contractDetails.address}</p>}
               </div>
               <div>
-                <p><span className="font-semibold">Tour:</span> {contractDetails.tour_title}</p>
+                <p><span className="font-semibold">Viaje:</span> {contractDetails.tour_title}</p>
                 <p><span className="font-semibold">Personas:</span> {contractDetails.number_of_people}</p>
                 <p><span className="font-semibold">Habitaciones:</span> {formatRoomDetails(contractDetails.room_details)}</p>
                 <p><span className="font-semibold">Asientos Asignados:</span> {contractDetails.assigned_seat_numbers.length > 0 ? contractDetails.assigned_seat_numbers.join(', ') : 'N/A'}</p>
@@ -263,15 +280,15 @@ const TourInquirySection = () => {
             </div>
 
             <div className="mb-6">
-              <h4 className="text-xl font-semibold mb-2">Acompañantes:</h4>
+              <h4 className="text-xl font-semibold mb-2">Pasajeros:</h4>
               {contractDetails.companions.length > 0 ? (
                 <ul className="list-disc list-inside">
-                  {contractDetails.companions.map((c, index) => (
-                    <li key={c.id || index}>{c.name} {c.age !== null && `(${c.age} años)`}</li>
+                  {contractDetails.companions.map((p, index) => (
+                    <li key={p.id || index}>{p.first_name} {p.last_name} (Asiento: {p.seat_number}) {p.age !== null && `(${p.age} años)`} {p.is_contractor && '(Contratante)'}</li>
                   ))}
                 </ul>
               ) : (
-                <p>No se registraron acompañantes.</p>
+                <p>No se registraron pasajeros.</p>
               )}
             </div>
 
@@ -312,7 +329,7 @@ const TourInquirySection = () => {
             </div>
 
             <div className="mb-6">
-              <h4 className="text-xl font-semibold mb-2">Descripción del Tour:</h4>
+              <h4 className="text-xl font-semibold mb-2">Descripción del Viaje:</h4>
               <img src={contractDetails.tour_image_url} alt={contractDetails.tour_title} className="w-full h-48 object-cover rounded-md mb-4" />
               <p>{contractDetails.tour_description}</p>
             </div>

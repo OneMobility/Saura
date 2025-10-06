@@ -205,14 +205,14 @@ const BusTicketBookingPage: React.FC = () => {
     try {
       const contract_number = uuidv4().substring(0, 8).toUpperCase();
 
-      const contractor = passengersData[0];
-      const companions = passengersData.slice(1).map(p => ({
-        id: p.id,
-        name: `${p.first_name} ${p.last_name}`,
-        age: p.age,
-        identification_number: p.identification_number,
-      }));
+      const contractor = passengersData.find(p => p.isContractor);
+      if (!contractor) {
+        toast.error('Error: No se encontró el contratante.');
+        setIsSubmitting(false);
+        return;
+      }
 
+      // 1. Insert the main client record (contractor)
       const clientDataToSave = {
         first_name: contractor.first_name,
         last_name: contractor.last_name,
@@ -221,10 +221,10 @@ const BusTicketBookingPage: React.FC = () => {
         address: null, // Not collected in this form
         identification_number: contractor.identification_number || null,
         contract_number: contract_number,
-        tour_id: null, // Set tour_id to null for bus tickets
-        bus_route_id: routeId, // NEW: Use bus_route_id for bus tickets
+        tour_id: null, // Explicitly set tour_id to null for bus tickets
+        bus_route_id: routeId, // Use bus_route_id for bus tickets
         number_of_people: passengersData.length,
-        companions: companions,
+        companions: [], // Companions will be stored in bus_passengers, not here
         extra_services: [], // Not collected in this form
         total_amount: totalAmount,
         advance_payment: 0,
@@ -247,24 +247,32 @@ const BusTicketBookingPage: React.FC = () => {
         return;
       }
 
-      const newBusSeatAssignments = selectedSeats.map(seatNumber => ({
+      const newClientId = newClientData.id;
+
+      // 2. Insert each passenger into the new bus_passengers table
+      const passengersToInsert = passengersData.map((p, index) => ({
+        client_id: newClientId,
         schedule_id: scheduleId,
-        seat_number: seatNumber,
-        status: 'booked',
-        client_id: newClientData.id,
+        seat_number: selectedSeats[index], // Assign selected seat to each passenger
+        first_name: p.first_name,
+        last_name: p.last_name,
+        age: p.age,
+        identification_number: p.identification_number || null,
+        is_contractor: p.isContractor,
+        email: p.isContractor ? p.email : null,
+        phone: p.isContractor ? p.phone : null,
       }));
 
-      if (newBusSeatAssignments.length > 0) {
-        const { error: busSeatsError } = await supabase
-          .from('bus_seat_assignments')
-          .insert(newBusSeatAssignments);
+      const { error: passengersError } = await supabase
+        .from('bus_passengers')
+        .insert(passengersToInsert);
 
-        if (busSeatsError) {
-          console.error('Error inserting new bus seat assignments:', busSeatsError);
-          toast.error('Error al asignar los asientos del autobús. Contacta a soporte.');
-          setIsSubmitting(false);
-          return;
-        }
+      if (passengersError) {
+        console.error('Error inserting bus passengers:', passengersError);
+        toast.error('Error al registrar los pasajeros. Contacta a soporte.');
+        // Consider rolling back client creation if this fails
+        setIsSubmitting(false);
+        return;
       }
 
       toast.success(`¡Reserva de boleto exitosa! Tu número de contrato es: ${contract_number}.`);
