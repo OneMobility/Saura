@@ -23,6 +23,27 @@ interface BusDestinationOption {
   order_index: number;
 }
 
+// Helper function to convert total minutes to "HH:MM" string
+const minutesToHHMM = (totalMinutes: number | null): string => {
+  if (totalMinutes === null || totalMinutes < 0) return '';
+  const hours = Math.floor(totalMinutes / 60);
+  const minutes = totalMinutes % 60;
+  return `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+};
+
+// Helper function to convert "HH:MM" string to total minutes
+const hhmmToMinutes = (hhmm: string): number | null => {
+  const parts = hhmm.split(':');
+  if (parts.length === 2) {
+    const hours = parseInt(parts[0], 10);
+    const minutes = parseInt(parts[1], 10);
+    if (!isNaN(hours) && !isNaN(minutes) && hours >= 0 && minutes >= 0 && minutes < 60) {
+      return hours * 60 + minutes;
+    }
+  }
+  return null;
+};
+
 const AdminBusRouteFormPage = () => {
   const { id: routeIdFromParams } = useParams<{ id: string }>();
   const navigate = useNavigate();
@@ -35,6 +56,7 @@ const AdminBusRouteFormPage = () => {
     is_active: true, // Re-added
   });
   const [routeSegments, setRouteSegments] = useState<RouteSegment[]>([]); // State for segments
+  const [segmentDurationInputs, setSegmentDurationInputs] = useState<Record<string, string>>({}); // State for HH:MM duration inputs
   const [availableBuses, setAvailableBuses] = useState<AvailableBus[]>([]);
   const [availableDestinations, setAvailableDestinations] = useState<BusDestinationOption[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -103,6 +125,13 @@ const AdminBusRouteFormPage = () => {
             toast.error('Error al cargar los segmentos de la ruta.');
           } else {
             setRouteSegments(segmentsData || []);
+            const initialDurations: Record<string, string> = {};
+            (segmentsData || []).forEach(segment => {
+              if (segment.id) {
+                initialDurations[segment.id] = minutesToHHMM(segment.duration_minutes);
+              }
+            });
+            setSegmentDurationInputs(initialDurations);
           }
         }
       } else {
@@ -114,6 +143,7 @@ const AdminBusRouteFormPage = () => {
           is_active: true,
         });
         setRouteSegments([]);
+        setSegmentDurationInputs({});
       }
       setLoadingInitialData(false); // End loading
     };
@@ -206,11 +236,19 @@ const AdminBusRouteFormPage = () => {
   };
 
   const handleSegmentPriceChange = (segmentId: string, field: 'adult_price' | 'child_price' | 'duration_minutes' | 'distance_km', value: string) => {
-    setRouteSegments(prev => prev.map(segment =>
-      segment.id === segmentId
-        ? { ...segment, [field]: parseFloat(value) || 0 }
-        : segment
-    ));
+    setRouteSegments(prev => prev.map(segment => {
+      if (segment.id === segmentId) {
+        if (field === 'duration_minutes') {
+          setSegmentDurationInputs(prevDurations => ({ ...prevDurations, [segmentId]: value }));
+          const totalMinutes = hhmmToMinutes(value);
+          return { ...segment, duration_minutes: totalMinutes };
+        } else {
+          // For other numeric fields, parse as float
+          return { ...segment, [field]: parseFloat(value) || 0 };
+        }
+      }
+      return segment;
+    }));
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -233,6 +271,18 @@ const AdminBusRouteFormPage = () => {
       toast.error('El precio para adultos debe ser mayor que cero para todos los segmentos.');
       setIsSubmitting(false);
       return;
+    }
+
+    // Validate HH:MM format for duration_minutes
+    for (const segment of routeSegments) {
+      if (segment.id && segmentDurationInputs[segment.id]) {
+        const durationString = segmentDurationInputs[segment.id];
+        if (durationString && hhmmToMinutes(durationString) === null) {
+          toast.error(`Formato de duración inválido para el segmento desde ${getDestinationName(segment.start_destination_id)} hasta ${getDestinationName(segment.end_destination_id)}. Usa HH:MM.`);
+          setIsSubmitting(false);
+          return;
+        }
+      }
     }
 
     let currentRouteId = formData.id;
@@ -429,12 +479,11 @@ const AdminBusRouteFormPage = () => {
                                 <Label htmlFor={`adult_price_${segment.id}`} className="sr-only">Precio Adulto</Label>
                                 <Input
                                   id={`adult_price_${segment.id}`}
-                                  type="number"
+                                  type="text" // Changed to text
+                                  pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
                                   value={segment.adult_price}
                                   onChange={(e) => handleSegmentPriceChange(segment.id as string, 'adult_price', e.target.value)}
                                   placeholder="Precio Adulto"
-                                  min={0}
-                                  step="0.01"
                                   required
                                 />
                               </div>
@@ -442,35 +491,33 @@ const AdminBusRouteFormPage = () => {
                                 <Label htmlFor={`child_price_${segment.id}`} className="sr-only">Precio Niño</Label>
                                 <Input
                                   id={`child_price_${segment.id}`}
-                                  type="number"
+                                  type="text" // Changed to text
+                                  pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
                                   value={segment.child_price}
                                   onChange={(e) => handleSegmentPriceChange(segment.id as string, 'child_price', e.target.value)}
                                   placeholder="Precio Niño"
-                                  min={0}
-                                  step="0.01"
                                 />
                               </div>
                               <div className="md:col-span-1">
-                                <Label htmlFor={`duration_${segment.id}`} className="sr-only">Duración (min)</Label>
+                                <Label htmlFor={`duration_${segment.id}`} className="sr-only">Duración (HH:MM)</Label>
                                 <Input
                                   id={`duration_${segment.id}`}
-                                  type="number"
-                                  value={segment.duration_minutes || ''}
+                                  type="text" // Changed to text
+                                  pattern="[0-9]{1,2}:[0-9]{2}" // Pattern for HH:MM
+                                  value={segmentDurationInputs[segment.id as string] || ''}
                                   onChange={(e) => handleSegmentPriceChange(segment.id as string, 'duration_minutes', e.target.value)}
-                                  placeholder="Duración (min)"
-                                  min={0}
+                                  placeholder="HH:MM"
                                 />
                               </div>
                               <div className="md:col-span-1">
                                 <Label htmlFor={`distance_${segment.id}`} className="sr-only">Distancia (km)</Label>
                                 <Input
                                   id={`distance_${segment.id}`}
-                                  type="number"
+                                  type="text" // Changed to text
+                                  pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
                                   value={segment.distance_km || ''}
                                   onChange={(e) => handleSegmentPriceChange(segment.id as string, 'distance_km', e.target.value)}
                                   placeholder="Distancia (km)"
-                                  min={0}
-                                  step="0.1"
                                 />
                               </div>
                             </div>

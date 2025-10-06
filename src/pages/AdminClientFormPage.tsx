@@ -415,7 +415,7 @@ const AdminClientFormPage = () => {
             };
           }
         } else if (field === 'quantity') {
-          newExtraServices[index] = { ...newExtraServices[index], quantity: value as number };
+          newExtraServices[index] = { ...newExtraServices[index], quantity: parseFloat(value as string) || 0 };
         }
       }
       return { ...prev, extra_services: newExtraServices };
@@ -433,6 +433,7 @@ const AdminClientFormPage = () => {
         name_snapshot: '',
         service_type_snapshot: '',
         unit_type_snapshot: 'person',
+        cost_per_unit_snapshot: 0,
       }],
     }));
   };
@@ -501,7 +502,7 @@ const AdminClientFormPage = () => {
       contract_number: formData.contract_number,
       identification_number: formData.identification_number || null, // NEW: Save identification_number
       tour_id: formData.tour_id,
-      number_of_people: formData.number_of_people,
+      number_of_people: totalPeople,
       companions: formData.companions,
       extra_services: formData.extra_services,
       total_amount: formData.total_amount,
@@ -628,7 +629,13 @@ const AdminClientFormPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="contractor_age">Edad del Contratante</Label>
-                  <Input id="contractor_age" type="number" value={formData.contractor_age || ''} onChange={(e) => handleNumberChange('contractor_age', e.target.value)} min={0} max={120} />
+                  <Input 
+                    id="contractor_age" 
+                    type="text" // Changed to text
+                    pattern="[0-9]*" // Pattern for integers
+                    value={formData.contractor_age || ''} 
+                    onChange={(e) => handleNumberChange('contractor_age', e.target.value)} 
+                  />
                 </div>
                 <div>
                   <Label htmlFor="identification_number">Número de Identificación</Label>
@@ -665,7 +672,7 @@ const AdminClientFormPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="number_of_people">Número Total de Personas</Label>
-                  <Input id="number_of_people" type="number" value={formData.number_of_people} readOnly className="bg-gray-100 cursor-not-allowed" />
+                  <Input id="number_of_people" type="text" pattern="[0-9]*" value={formData.number_of_people} readOnly className="bg-gray-100 cursor-not-allowed" />
                 </div>
                 <div>
                   <Label>Distribución de Habitaciones</Label>
@@ -684,12 +691,12 @@ const AdminClientFormPage = () => {
                       className="w-full md:w-2/3"
                     />
                     <Input
-                      type="number"
+                      type="text" // Changed to text
+                      pattern="[0-9]*" // Pattern for integers
                       value={companion.age || ''}
                       onChange={(e) => handleCompanionChange(companion.id, 'age', e.target.value)}
                       placeholder="Edad"
                       className="w-full md:w-1/3"
-                      min={0} max={120}
                     />
                     <Button type="button" variant="destructive" size="icon" onClick={() => removeCompanion(companion.id)}>
                       <MinusCircle className="h-4 w-4" />
@@ -729,12 +736,13 @@ const AdminClientFormPage = () => {
                         </SelectContent>
                       </Select>
                       <Input
-                        type="number"
+                        type="text" // Changed to text
+                        pattern="[0-9]*" // Pattern for integers
                         value={clientService.quantity}
-                        onChange={(e) => handleClientExtraServiceChange(clientService.id, 'quantity', parseFloat(e.target.value) || 0)}
+                        onChange={(e) => handleClientExtraServiceChange(clientService.id, 'quantity', e.target.value)}
                         placeholder="Cantidad"
                         className="w-full md:w-1/6"
-                        min={1}
+                        required
                       />
                       <span className="text-sm text-gray-600 md:w-1/4 text-center md:text-left">
                         Precio Venta Total: ${totalSellingPrice.toFixed(2)}
@@ -811,21 +819,33 @@ const AdminClientFormPage = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="total_amount">Monto Total del Contrato</Label>
-                  <Input id="total_amount" type="number" value={formData.total_amount.toFixed(2)} readOnly className="bg-gray-100 cursor-not-allowed font-bold" />
+                  <Input id="total_amount" type="text" pattern="[0-9]*\.?[0-9]*" value={formData.total_amount.toFixed(2)} readOnly className="bg-gray-100 cursor-not-allowed font-bold" />
                 </div>
                 <div>
                   <Label htmlFor="advance_payment">Anticipo</Label>
-                  <Input id="advance_payment" type="number" value={formData.advance_payment} onChange={(e) => handleNumberChange('advance_payment', e.target.value)} min={0} step="0.01" />
+                  <Input 
+                    id="advance_payment" 
+                    type="text" // Changed to text
+                    pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
+                    value={formData.advance_payment} 
+                    onChange={(e) => handleNumberChange('advance_payment', e.target.value)} 
+                  />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label htmlFor="total_paid">Total Pagado</Label>
-                  <Input id="total_paid" type="number" value={formData.total_paid} onChange={(e) => handleNumberChange('total_paid', e.target.value)} min={0} step="0.01" />
+                  <Input 
+                    id="total_paid" 
+                    type="text" // Changed to text
+                    pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
+                    value={formData.total_paid} 
+                    onChange={(e) => handleNumberChange('total_paid', e.target.value)} 
+                  />
                 </div>
                 <div>
                   <Label htmlFor="remaining_payment">Falta por Pagar</Label>
-                  <Input id="remaining_payment" type="number" value={(formData.total_amount - formData.total_paid).toFixed(2)} readOnly className="bg-gray-100 cursor-not-allowed font-bold text-red-600" />
+                  <Input id="remaining_payment" type="text" pattern="[0-9]*\.?[0-9]*" value={(formData.total_amount - formData.total_paid).toFixed(2)} readOnly className="bg-gray-100 cursor-not-allowed font-bold text-red-600" />
                 </div>
               </div>
               <div>

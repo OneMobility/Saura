@@ -135,12 +135,11 @@ const HotelPaymentDialog: React.FC<HotelPaymentDialogProps> = ({ isOpen, onClose
             </Label>
             <Input
               id="amount"
-              type="number"
+              type="text" // Changed to text
+              pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
               value={amount}
               onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
               className="col-span-3"
-              min={0.01}
-              step="0.01"
               required
             />
           </div>

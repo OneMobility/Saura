@@ -12,11 +12,11 @@ import { PlusCircle, Trash2, Loader2, Upload } from 'lucide-react'; // Added Upl
 import { v4 as uuidv4 } from 'uuid'; // For unique file names
 
 interface Slide {
-  id: string;
-  image_url: string;
+  id: string; // Changed to string to match Supabase UUID
+  image_url: string; // Changed to image_url to match Supabase column name
   title: string;
   description: string;
-  order_index: number;
+  order_index: number; // Added order_index for sorting
 }
 
 const SlideshowSettings = () => {
@@ -35,7 +35,7 @@ const SlideshowSettings = () => {
     const { data, error } = await supabase
       .from('slides')
       .select('*')
-      .order('order_index', { ascending: true });
+      .order('order_index', { ascending: true }); // Order by order_index
 
     if (error) {
       console.error('Error fetching slides:', error);

@@ -96,10 +96,10 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave, onProvi
   }, [providerId, onProviderDataLoaded]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { id, value, type } = e.target;
+    const { id, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [id]: type === 'number' ? parseFloat(value) : value,
+      [id]: ['cost_per_unit', 'selling_price_per_unit', 'advance_payment', 'total_paid'].includes(id) ? parseFloat(value) || 0 : value,
     }));
   };
 
@@ -211,12 +211,11 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave, onProvi
           </Label>
           <Input
             id="cost_per_unit"
-            type="number"
+            type="text" // Changed to text
+            pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
             value={formData.cost_per_unit}
             onChange={handleChange}
             className="col-span-3"
-            min={0}
-            step="0.01"
             required
           />
         </div>
@@ -243,12 +242,11 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave, onProvi
           </Label>
           <Input
             id="selling_price_per_unit"
-            type="number"
+            type="text" // Changed to text
+            pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
             value={formData.selling_price_per_unit}
             onChange={handleChange}
             className="col-span-3"
-            min={0}
-            step="0.01"
             required
           />
         </div>
@@ -275,12 +273,11 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave, onProvi
           </Label>
           <Input
             id="advance_payment"
-            type="number"
+            type="text" // Changed to text
+            pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
             value={formData.advance_payment}
             onChange={handleChange}
             className="col-span-3"
-            min={0}
-            step="0.01"
           />
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
@@ -289,12 +286,11 @@ const ProviderForm: React.FC<ProviderFormProps> = ({ providerId, onSave, onProvi
           </Label>
           <Input
             id="total_paid"
-            type="number"
+            type="text" // Changed to text
+            pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
             value={formData.total_paid}
             onChange={handleChange}
             className="col-span-3"
-            min={0}
-            step="0.01"
           />
         </div>
 

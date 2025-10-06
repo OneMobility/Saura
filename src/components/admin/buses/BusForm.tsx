@@ -124,10 +124,10 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave, onBusDataLoaded, onReg
   }, [calculatePayment]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { id, value, type } = e.target;
+    const { id, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [id]: type === 'number' ? parseFloat(value) : value,
+      [id]: ['rental_cost', 'total_capacity', 'advance_payment', 'total_paid'].includes(id) ? parseFloat(value) || 0 : value,
     }));
   };
 
@@ -268,12 +268,11 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave, onBusDataLoaded, onReg
           </Label>
           <Input
             id="rental_cost"
-            type="number"
+            type="text" // Changed to text
+            pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
             value={formData.rental_cost}
             onChange={handleChange}
             className="col-span-3"
-            min={0}
-            step="0.01"
             required
           />
         </div>
@@ -283,11 +282,11 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave, onBusDataLoaded, onReg
           </Label>
           <Input
             id="total_capacity"
-            type="number"
+            type="text" // Changed to text
+            pattern="[0-9]*" // Pattern for integers
             value={formData.total_capacity}
             onChange={handleChange}
             className="col-span-3"
-            min={1}
             required
           />
         </div>
@@ -299,12 +298,11 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave, onBusDataLoaded, onReg
           </Label>
           <Input
             id="advance_payment"
-            type="number"
+            type="text" // Changed to text
+            pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
             value={formData.advance_payment}
             onChange={handleChange}
             className="col-span-3"
-            min={0}
-            step="0.01"
           />
         </div>
         <div className="grid grid-cols-4 items-center gap-4">
@@ -313,12 +311,11 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave, onBusDataLoaded, onReg
           </Label>
           <Input
             id="total_paid"
-            type="number"
+            type="text" // Changed to text
+            pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
             value={formData.total_paid}
             onChange={handleChange}
             className="col-span-3"
-            min={0}
-            step="0.01"
           />
         </div>
 

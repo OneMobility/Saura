@@ -106,7 +106,7 @@ const ClientPaymentDialog: React.FC<ClientPaymentDialogProps> = ({ isOpen, onClo
         toast.error('Error al actualizar el total pagado del cliente.');
         // Consider rolling back payment insertion if this fails, or handle with a trigger
       } else {
-        toast.success('Abono registrado y total pagado actualizado con éxito.');
+        toast.success('Abono registrado y total pagado del cliente actualizado con éxito.');
         onPaymentRegistered(); // Notify parent to refresh client list
         onClose();
       }
@@ -136,12 +136,11 @@ const ClientPaymentDialog: React.FC<ClientPaymentDialogProps> = ({ isOpen, onClo
             </Label>
             <Input
               id="amount"
-              type="number"
+              type="text" // Changed to text
+              pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
               value={amount}
               onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
               className="col-span-3"
-              min={0.01}
-              step="0.01"
               required
             />
           </div>

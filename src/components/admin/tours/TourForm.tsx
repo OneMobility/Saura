@@ -445,13 +445,16 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   }, [calculateCosts]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { id, value, type } = e.target;
+    const { id, value } = e.target;
     setFormData((prev) => {
-      const newValue = type === 'number' ? parseFloat(value) : value;
-      const updatedData = { ...prev, [id]: newValue };
+      const updatedData = { ...prev, [id]: value };
 
       if (id === 'title') {
         updatedData.slug = generateSlug(value);
+      }
+      // For numeric fields, parse as float
+      if (['bus_capacity', 'bus_cost', 'courtesies', 'selling_price_per_person', 'selling_price_double_occupancy', 'selling_price_triple_occupancy', 'selling_price_quad_occupancy', 'selling_price_child', 'other_income'].includes(id)) {
+        updatedData[id as keyof Tour] = parseFloat(value) || 0;
       }
       return updatedData;
     });
@@ -1050,15 +1053,15 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
           <Label htmlFor="bus_capacity" className="md:text-right">Capacidad Autobús</Label>
-          <Input id="bus_capacity" type="number" value={formData.bus_capacity} readOnly className="md:col-span-3 bg-gray-100 cursor-not-allowed" title="Derivado del autobús seleccionado" />
+          <Input id="bus_capacity" type="text" pattern="[0-9]*" value={formData.bus_capacity} readOnly className="md:col-span-3 bg-gray-100 cursor-not-allowed" title="Derivado del autobús seleccionado" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
           <Label htmlFor="bus_cost" className="md:text-right">Costo Autobús</Label>
-          <Input id="bus_cost" type="number" value={formData.bus_cost} readOnly className="md:col-span-3 bg-gray-100 cursor-not-allowed" title="Derivado del autobús seleccionado" />
+          <Input id="bus_cost" type="text" pattern="[0-9]*\.?[0-9]*" value={formData.bus_cost} readOnly className="md:col-span-3 bg-gray-100 cursor-not-allowed" title="Derivado del autobús seleccionado" />
         </div>
         <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
           <Label htmlFor="courtesies" className="md:text-right">Coordinadores (Asientos Bus)</Label>
-          <Input id="courtesies" type="number" value={formData.courtesies} onChange={(e) => handleNumberChange('courtesies', e.target.value)} className="md:col-span-3" required min={0} />
+          <Input id="courtesies" type="text" pattern="[0-9]*" value={formData.courtesies} onChange={(e) => handleNumberChange('courtesies', e.target.value)} className="md:col-span-3" required />
         </div>
 
         {/* Seat Map for Admin to block courtesies */}
@@ -1161,12 +1164,13 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
                   </SelectContent>
                 </Select>
                 <Input
-                  type="number"
+                  type="text" // Changed to text
+                  pattern="[0-9]*" // Pattern for integers
                   value={tourProviderService.quantity}
                   onChange={(e) => handleProviderServiceChange(tourProviderService.id, 'quantity', parseFloat(e.target.value) || 0)}
                   placeholder="Cantidad"
                   className="w-full md:w-1/6"
-                  min={1}
+                  required
                 />
                 <span className="text-sm text-gray-600 md:w-1/4 text-center md:text-left">
                   Costo Total: ${totalCost.toFixed(2)}
@@ -1208,12 +1212,12 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             <Label htmlFor="other_income" className="font-semibold">Otros Ingresos:</Label>
             <Input
               id="other_income"
-              type="number"
+              type="text" // Changed to text
+              pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
               value={formData.other_income}
-              onChange={(e) => handleNumberChange('other_income', e.target.value)}
+              onChange={handleChange}
               className="w-full"
-              min={0}
-              step="0.01"
+              required
             />
           </div>
           <div>
@@ -1237,33 +1241,32 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             <Label htmlFor="desired_profit_percentage" className="md:text-right">Ganancia Deseada (%)</Label>
             <Input
               id="desired_profit_percentage"
-              type="number"
+              type="text" // Changed to text
+              pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
               value={desiredProfitPercentage}
               onChange={(e) => setDesiredProfitPercentage(parseFloat(e.target.value) || 0)}
               className="md:col-span-3"
-              min={0}
-              step="0.1"
             />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4 mt-4">
             <Label htmlFor="suggested_selling_price" className="md:text-right font-bold text-lg">Precio de Venta Sugerido por Persona (Promedio Adulto)</Label>
-            <Input id="suggested_selling_price" type="number" value={suggestedSellingPrice.toFixed(2)} readOnly className="md:col-span-3 text-lg font-bold bg-blue-100 cursor-not-allowed" title="Calculado en base al costo por persona pagante y la ganancia deseada" />
+            <Input id="suggested_selling_price" type="text" value={suggestedSellingPrice.toFixed(2)} readOnly className="md:col-span-3 text-lg font-bold bg-blue-100 cursor-not-allowed" title="Calculado en base al costo por persona pagante y la ganancia deseada" />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4 mt-4">
             <Label htmlFor="selling_price_double_occupancy" className="md:text-right font-bold text-lg">Precio Venta por Persona (Doble)</Label>
-            <Input id="selling_price_double_occupancy" type="number" value={formData.selling_price_double_occupancy} onChange={(e) => handleNumberChange('selling_price_double_occupancy', e.target.value)} className="md:col-span-3 text-lg font-bold" required min={0} step="0.01" />
+            <Input id="selling_price_double_occupancy" type="text" pattern="[0-9]*\.?[0-9]*" value={formData.selling_price_double_occupancy} onChange={handleChange} className="md:col-span-3 text-lg font-bold" required />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4 mt-4">
             <Label htmlFor="selling_price_triple_occupancy" className="md:text-right font-bold text-lg">Precio Venta por Persona (Triple)</Label>
-            <Input id="selling_price_triple_occupancy" type="number" value={formData.selling_price_triple_occupancy} onChange={(e) => handleNumberChange('selling_price_triple_occupancy', e.target.value)} className="md:col-span-3 text-lg font-bold" required min={0} step="0.01" />
+            <Input id="selling_price_triple_occupancy" type="text" pattern="[0-9]*\.?[0-9]*" value={formData.selling_price_triple_occupancy} onChange={handleChange} className="md:col-span-3 text-lg font-bold" required />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4 mt-4">
             <Label htmlFor="selling_price_quad_occupancy" className="md:text-right font-bold text-lg">Precio Venta por Persona (Cuádruple)</Label>
-            <Input id="selling_price_quad_occupancy" type="number" value={formData.selling_price_quad_occupancy} onChange={(e) => handleNumberChange('selling_price_quad_occupancy', e.target.value)} className="md:col-span-3 text-lg font-bold" required min={0} step="0.01" />
+            <Input id="selling_price_quad_occupancy" type="text" pattern="[0-9]*\.?[0-9]*" value={formData.selling_price_quad_occupancy} onChange={handleChange} className="md:col-span-3 text-lg font-bold" required />
           </div>
           <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4 mt-4">
             <Label htmlFor="selling_price_child" className="md:text-right font-bold text-lg">Precio Venta por Menor (-12 años)</Label>
-            <Input id="selling_price_child" type="number" value={formData.selling_price_child} onChange={(e) => handleNumberChange('selling_price_child', e.target.value)} className="md:col-span-3 text-lg font-bold" required min={0} step="0.01" />
+            <Input id="selling_price_child" type="text" pattern="[0-9]*\.?[0-9]*" value={formData.selling_price_child} onChange={handleChange} className="md:col-span-3 text-lg font-bold" required />
           </div>
         </div>
 
@@ -1277,12 +1280,11 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             <Label htmlFor="expected_clients_for_breakeven" className="md:text-right">Clientes Esperados (para análisis)</Label>
             <Input
               id="expected_clients_for_breakeven"
-              type="number"
+              type="text" // Changed to text
+              pattern="[0-9]*" // Pattern for integers
               value={expectedClientsForBreakeven}
               onChange={(e) => setExpectedClientsForBreakeven(parseFloat(e.target.value) || 0)}
               className="md:col-span-3"
-              min={0}
-              max={formData.bus_capacity - formData.courtesies} // Use 'courtesies' here
             />
           </div>
           <div className="flex justify-end mt-4">

@@ -314,7 +314,14 @@ const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="contractor_age">Edad del Contratante</Label>
-              <Input id="contractor_age" type="number" value={formData.contractor_age || ''} onChange={(e) => handleNumberChange('contractor_age', e.target.value)} min={0} max={120} className="focus-visible:ring-bus-primary" />
+              <Input 
+                id="contractor_age" 
+                type="text" // Changed to text
+                pattern="[0-9]*" // Pattern for integers
+                value={formData.contractor_age || ''} 
+                onChange={(e) => handleNumberChange('contractor_age', e.target.value)} 
+                className="focus-visible:ring-bus-primary" 
+              />
             </div>
             <div>
               <Label htmlFor="identification_number">Número de Identificación</Label>
@@ -343,12 +350,12 @@ const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
                   className="w-full md:w-2/3 focus-visible:ring-bus-primary"
                 />
                 <Input
-                  type="number"
+                  type="text" // Changed to text
+                  pattern="[0-9]*" // Pattern for integers
                   value={companion.age || ''}
                   onChange={(e) => handleCompanionChange(companion.id, 'age', e.target.value)}
                   placeholder="Edad"
                   className="w-full md:w-1/3 focus-visible:ring-bus-primary"
-                  min={0} max={120}
                 />
                 <Button type="button" variant="destructive" size="icon" onClick={() => removeCompanion(companion.id)}>
                   <MinusCircle className="h-4 w-4" />
@@ -414,4 +421,4 @@ const BusTicketBookingForm: React.FC<BusTicketBookingFormProps> = ({
   );
 };
 
-export default BusTicketBookingForm;
+export default ClientBookingForm;

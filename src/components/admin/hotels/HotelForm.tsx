@@ -190,10 +190,10 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { id, value, type } = e.target;
+    const { id, value } = e.target;
     setFormData((prev) => ({
       ...prev,
-      [id]: type === 'number' ? parseFloat(value) : value,
+      [id]: ['num_nights_quoted', 'cost_per_night_double', 'cost_per_night_triple', 'cost_per_night_quad', 'num_double_rooms', 'num_triple_rooms', 'num_quad_rooms', 'num_courtesy_rooms', 'advance_payment', 'total_paid'].includes(id) ? parseFloat(value) || 0 : value,
     }));
   };
 
@@ -372,11 +372,11 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
             </Label>
             <Input
               id="num_nights_quoted"
-              type="number"
+              type="text" // Changed to text
+              pattern="[0-9]*" // Pattern for integers
               value={formData.num_nights_quoted}
               onChange={handleChange}
               className="col-span-3"
-              min={1}
               required
             />
           </div>
@@ -388,12 +388,11 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
             </Label>
             <Input
               id="cost_per_night_double"
-              type="number"
+              type="text" // Changed to text
+              pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
               value={formData.cost_per_night_double}
               onChange={handleChange}
               className="col-span-3"
-              min={0}
-              step="0.01"
               required
             />
           </div>
@@ -403,12 +402,11 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
             </Label>
             <Input
               id="cost_per_night_triple"
-              type="number"
+              type="text" // Changed to text
+              pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
               value={formData.cost_per_night_triple}
               onChange={handleChange}
               className="col-span-3"
-              min={0}
-              step="0.01"
               required
             />
           </div>
@@ -418,12 +416,11 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
             </Label>
             <Input
               id="cost_per_night_quad"
-              type="number"
+              type="text" // Changed to text
+              pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
               value={formData.cost_per_night_quad}
               onChange={handleChange}
               className="col-span-3"
-              min={0}
-              step="0.01"
               required
             />
           </div>
@@ -435,11 +432,11 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
             </Label>
             <Input
               id="num_double_rooms"
-              type="number"
+              type="text" // Changed to text
+              pattern="[0-9]*" // Pattern for integers
               value={formData.num_double_rooms}
               onChange={handleChange}
               className="col-span-3"
-              min={0}
               required
             />
           </div>
@@ -449,11 +446,11 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
             </Label>
             <Input
               id="num_triple_rooms"
-              type="number"
+              type="text" // Changed to text
+              pattern="[0-9]*" // Pattern for integers
               value={formData.num_triple_rooms}
               onChange={handleChange}
               className="col-span-3"
-              min={0}
               required
             />
           </div>
@@ -463,11 +460,11 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
             </Label>
             <Input
               id="num_quad_rooms"
-              type="number"
+              type="text" // Changed to text
+              pattern="[0-9]*" // Pattern for integers
               value={formData.num_quad_rooms}
               onChange={handleChange}
               className="col-span-3"
-              min={0}
               required
             />
           </div>
@@ -477,11 +474,11 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
             </Label>
             <Input
               id="num_courtesy_rooms"
-              type="number"
+              type="text" // Changed to text
+              pattern="[0-9]*" // Pattern for integers
               value={formData.num_courtesy_rooms}
               onChange={handleChange}
               className="col-span-3"
-              min={0}
               required
             />
           </div>
@@ -509,12 +506,11 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
             </Label>
             <Input
               id="advance_payment"
-              type="number"
+              type="text" // Changed to text
+              pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
               value={formData.advance_payment}
               onChange={handleChange}
               className="col-span-3"
-              min={0}
-              step="0.01"
             />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
@@ -523,12 +519,11 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
             </Label>
             <Input
               id="total_paid"
-              type="number"
+              type="text" // Changed to text
+              pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
               value={formData.total_paid}
               onChange={handleChange}
               className="col-span-3"
-              min={0}
-              step="0.01"
             />
           </div>
 

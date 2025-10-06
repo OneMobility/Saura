@@ -56,7 +56,10 @@ const BusDestinationFormDialog: React.FC<BusDestinationFormDialogProps> = ({ isO
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
-    setFormData((prev) => ({ ...prev, [id]: value }));
+    setFormData((prev) => ({ 
+      ...prev, 
+      [id]: id === 'order_index' ? parseFloat(value) || 0 : value 
+    }));
   };
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -227,11 +230,12 @@ const BusDestinationFormDialog: React.FC<BusDestinationFormDialogProps> = ({ isO
             </Label>
             <Input
               id="order_index"
-              type="number"
+              type="text" // Changed to text
+              pattern="[0-9]*" // Pattern for integers
               value={formData.order_index}
               onChange={handleChange}
               className="col-span-3"
-              min={0}
+              required
             />
           </div>
           <DialogFooter>

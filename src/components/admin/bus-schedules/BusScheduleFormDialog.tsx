@@ -251,10 +251,12 @@ const BusScheduleFormDialog: React.FC<BusScheduleFormDialogProps> = ({ isOpen, o
             </Label>
             <Input
               id="departure_time"
-              type="time"
+              type="text" // Changed to text
+              pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]" // Pattern for HH:MM
               value={formData.departure_time}
               onChange={handleChange}
               className="col-span-3"
+              placeholder="HH:MM"
               required
             />
           </div>
@@ -302,13 +304,14 @@ const BusScheduleFormDialog: React.FC<BusScheduleFormDialogProps> = ({ isOpen, o
                 />
               </PopoverContent>
             </Popover>
+            {/* Hidden input for manual entry, but popover button is primary interaction */}
             <Input
               id="effective_date_start_input"
               type="text"
               value={startDateInput}
               onChange={handleStartDateInputChange}
               placeholder="DD/MM/AA"
-              className="col-span-3 hidden"
+              className="col-span-3 hidden" // Keep hidden as popover is the main interaction
             />
           </div>
 
@@ -339,13 +342,14 @@ const BusScheduleFormDialog: React.FC<BusScheduleFormDialogProps> = ({ isOpen, o
                 />
               </PopoverContent>
             </Popover>
+            {/* Hidden input for manual entry, but popover button is primary interaction */}
             <Input
               id="effective_date_end_input"
               type="text"
               value={endDateInput}
               onChange={handleEndDateInputChange}
               placeholder="DD/MM/AA"
-              className="col-span-3 hidden"
+              className="col-span-3 hidden" // Keep hidden as popover is the main interaction
             />
           </div>
 

@@ -119,14 +119,16 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
     });
   };
 
-  const handleGridSizeChange = (newRows: number, newCols: number) => {
-    if (newRows <= 0 || newCols <= 0) {
-      toast.error('Las filas y columnas deben ser mayores que 0.');
+  const handleGridSizeChange = (field: 'rows' | 'cols', value: string) => {
+    const numValue = parseInt(value, 10);
+    if (isNaN(numValue) || numValue <= 0) {
+      // Optionally show a toast or handle invalid input visually
+      if (field === 'rows') setRows(1); // Default to 1 or previous valid state
+      if (field === 'cols') setCols(1);
       return;
     }
-    setRows(newRows);
-    setCols(newCols);
-    // The useEffect that depends on rows and cols will handle grid update and parent notification
+    if (field === 'rows') setRows(numValue);
+    if (field === 'cols') setCols(numValue);
   };
 
   const renderCellContent = (item: SeatLayoutItem) => {
@@ -173,20 +175,22 @@ const SeatLayoutEditor: React.FC<SeatLayoutEditorProps> = ({ initialLayout, onLa
         <Label htmlFor="rows">Filas:</Label>
         <Input
           id="rows"
-          type="number"
+          type="text" // Changed to text
+          pattern="[0-9]*" // Pattern for integers
           value={rows}
-          onChange={(e) => handleGridSizeChange(parseInt(e.target.value) || 1, cols)}
+          onChange={(e) => handleGridSizeChange('rows', e.target.value)}
           className="w-20"
-          min={1}
+          required
         />
         <Label htmlFor="cols">Columnas:</Label>
         <Input
           id="cols"
-          type="number"
+          type="text" // Changed to text
+          pattern="[0-9]*" // Pattern for integers
           value={cols}
-          onChange={(e) => handleGridSizeChange(rows, parseInt(e.target.value) || 1)}
+          onChange={(e) => handleGridSizeChange('cols', e.target.value)}
           className="w-20"
-          min={1}
+          required
         />
       </div>
 

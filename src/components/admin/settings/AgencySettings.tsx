@@ -39,7 +39,7 @@ const AgencySettings = () => {
   }, []);
 
   useEffect(() => {
-    // Update preview when agencyInfo.logo_url changes (e.g., after fetching or saving)
+    // Update preview when agencyInfo.logo_url changes (e.e., after fetching or saving)
     if (agencyInfo.logo_url) {
       setLogoUrlPreview(agencyInfo.logo_url);
     } else if (!logoFile) { // Clear preview if no logo_url and no file selected
