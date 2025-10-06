@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText, ChevronDown, Hotel, Truck, UserRound, Bus, Handshake, Ticket, MapPin, Map, CalendarClock } from 'lucide-react'; // Added CalendarClock
+import { useSession } from '@/components/SessionContextProvider'; // Import useSession
 
 interface NavItem {
   href?: string;
