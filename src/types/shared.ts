@@ -34,16 +34,40 @@ export interface BusRouteDestination {
   order_index: number;
 }
 
-// NEW: Interface for BusRoute
+// NEW: Interface for BusRoute (updated structure)
 export interface BusRoute {
   id?: string;
   name: string;
-  origin_destination_id: string | null; // NEW: Origin destination ID
-  destinations: BusRouteDestination[]; // Array of selected destinations (stops)
-  adult_price_per_seat: number; // NEW: Adult price
-  child_price_per_seat: number; // NEW: Child price
+  all_stops: string[]; // Array of destination IDs in order
   bus_id: string | null;
-  is_active?: boolean; // Keep in DB, but not in form as per user request
+  is_active: boolean; // Re-added
+  created_at?: string;
+  updated_at?: string;
+}
+
+// NEW: Interface for RouteSegment
+export interface RouteSegment {
+  id?: string;
+  route_id: string;
+  start_destination_id: string;
+  end_destination_id: string;
+  adult_price: number;
+  child_price: number;
+  duration_minutes: number | null;
+  distance_km: number | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// NEW: Interface for BusSchedule
+export interface BusSchedule {
+  id?: string;
+  route_id: string;
+  departure_time: string; // e.g., "14:30"
+  day_of_week: number[]; // Array of numbers (0=Sun, 1=Mon, ..., 6=Sat)
+  effective_date_start: string | null; // DATE string
+  effective_date_end: string | null; // DATE string
+  is_active: boolean;
   created_at?: string;
   updated_at?: string;
 }
