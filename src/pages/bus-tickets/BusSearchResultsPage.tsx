@@ -49,6 +49,14 @@ const BusSearchResultsPage = () => {
 
     const searchDayOfWeek = getDay(new Date(searchDate)); // 0 for Sunday, 1 for Monday, etc.
     const formattedSearchDate = format(new Date(searchDate), 'yyyy-MM-dd');
+    const todayFormatted = format(new Date(), 'yyyy-MM-dd');
+    const isSearchDateToday = formattedSearchDate === todayFormatted;
+
+    // Get current time for comparison if searchDate is today
+    const now = new Date();
+    const currentHour = now.getHours();
+    const currentMinute = now.getMinutes();
+    const currentTimeString = `${String(currentHour).padStart(2, '0')}:${String(currentMinute).padStart(2, '0')}`;
 
     try {
       // Fetch all destinations to map IDs to names
@@ -97,11 +105,18 @@ const BusSearchResultsPage = () => {
           if (segment) {
             // Find schedules for this route and day
             schedulesData.forEach(schedule => {
+              const isScheduleValidForDateRange = 
+                (!schedule.effective_date_start || new Date(formattedSearchDate) >= parseISO(schedule.effective_date_start)) &&
+                (!schedule.effective_date_end || new Date(formattedSearchDate) <= parseISO(schedule.effective_date_end));
+
+              // NEW: Add time-based filtering for today's schedules
+              const isDepartureTimeInFuture = isSearchDateToday ? schedule.departure_time >= currentTimeString : true;
+
               if (
                 schedule.route_id === route.id &&
                 schedule.day_of_week.includes(searchDayOfWeek) &&
-                (!schedule.effective_date_start || new Date(formattedSearchDate) >= parseISO(schedule.effective_date_start)) &&
-                (!schedule.effective_date_end || new Date(formattedSearchDate) <= parseISO(schedule.effective_date_end))
+                isScheduleValidForDateRange &&
+                isDepartureTimeInFuture
               ) {
                 foundResults.push({
                   routeId: route.id,
