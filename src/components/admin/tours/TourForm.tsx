@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Search, Hotel as HotelIcon } from 'lucide-react'; // Added Search and HotelIcon
+import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Search, Hotel as HotelIcon, ArrowRight } from 'lucide-react'; // Added Search and HotelIcon
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { v4 as uuidv4 } from 'uuid';
 import { format, parse, isValid, parseISO, addDays, differenceInDays, isEqual } from 'date-fns'; // Import differenceInDays, isEqual
@@ -1148,8 +1148,39 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             )}
           </div>
         </div>
+        
+        {/* NEW: Automated Duration Display & Range Selection */}
+        <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4 p-4 bg-gray-50 border rounded-md">
+          <Label className="md:text-right font-semibold">Noches Calculadas</Label>
+          <div className="md:col-span-3 flex items-center space-x-2">
+            <Input
+              value={numNightsTour > 0 ? `${numNightsTour + 1} días / ${numNightsTour} noches` : 'Selecciona fechas'}
+              readOnly
+              className="bg-gray-100 cursor-not-allowed font-medium text-rosa-mexicano"
+            />
+            <Button 
+              type="button" 
+              variant="outline" 
+              size="sm"
+              onClick={() => {
+                if (numNightsTour > 0) {
+                  setFormData(prev => ({ ...prev, duration: `${numNightsTour + 1} días / ${numNightsTour} noches` }));
+                  toast.success('Duración aplicada al campo de texto.');
+                }
+              }}
+              disabled={numNightsTour <= 0}
+              className="border-rosa-mexicano text-rosa-mexicano hover:bg-rosa-mexicano/10"
+            >
+              Aplicar a Duración
+            </Button>
+          </div>
+          <p className="md:col-start-2 md:col-span-3 text-xs text-muted-foreground mt-1">
+            Ejemplo: Si sale el día 1 y regresa el día 5, el sistema calcula 4 noches (1, 2, 3, 4).
+          </p>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
-          <Label htmlFor="duration" className="md:text-right">Duración</Label>
+          <Label htmlFor="duration" className="md:text-right">Duración (Manual o Aplicada)</Label>
           <Input id="duration" value={formData.duration} onChange={handleChange} className="md:col-span-3" placeholder="Ej: 7 días / 6 noches" required />
         </div>
 
