@@ -12,6 +12,7 @@ import TourSeatMap from '@/components/TourSeatMap';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog'; // Import Dialog and DialogTrigger
 import ClientBookingForm from '@/components/ClientBookingForm'; // Import the new ClientBookingForm
 import { TourProviderService, SeatLayout } from '@/types/shared'; // NEW: Import shared type and SeatLayout
+import { stripHtmlTags } from '@/utils/html'; // Import stripHtmlTags
 
 interface Bus {
   id: string;
@@ -100,7 +101,7 @@ const TourDetailsPage = () => {
         console.error('Error fetching tour details:', tourError);
         setError('No se pudo cargar los detalles del tour.');
         setTour(null);
-      } else if (tourData) {
+      } else if (data) {
         setTour({
           ...tourData,
           includes: tourData.includes || [],
@@ -163,6 +164,8 @@ const TourDetailsPage = () => {
     );
   }
 
+  const cleanDescription = stripHtmlTags(tour.description);
+
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
@@ -193,7 +196,7 @@ const TourDetailsPage = () => {
             <div className="lg:col-span-2">
               <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4">Descripción del Tour</h2>
               <p className="text-gray-700 text-lg leading-relaxed mb-6">
-                {tour.description}
+                {cleanDescription}
               </p>
 
               {tour.full_content && (

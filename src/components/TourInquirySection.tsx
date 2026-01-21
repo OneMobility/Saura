@@ -68,8 +68,8 @@ const TourInquirySection = () => {
   const [contractDetails, setContractDetails] = useState<ClientContract | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [exportingClientId, setExportingClientId] = useState<string | null>(null);
-  const [generatingContractId, setGeneratingContractId] = useState<string | null>(null);
+  const [exportingContractNumber, setExportingContractNumber] = useState<string | null>(null); // Changed from ClientId to ContractNumber
+  const [generatingContractNumber, setGeneratingContractNumber] = useState<string | null>(null); // Changed from ClientId to ContractNumber
 
   const handleInquiry = async () => {
     if (contractNumber.trim() === '') {
@@ -124,7 +124,7 @@ const TourInquirySection = () => {
 
   // NEW: Document generation handlers using PUBLIC Edge Functions
   const handleDownloadBookingSheet = async (contractNumber: string, clientName: string) => {
-    setExportingClientId(contractNumber); // Use contract number for tracking
+    setExportingContractNumber(contractNumber); // Use contract number for tracking
     toast.info(`Generando hoja de reserva para ${clientName}...`);
 
     try {
@@ -163,12 +163,12 @@ const TourInquirySection = () => {
       console.error('Unexpected error during booking sheet generation:', err);
       toast.error(`Error inesperado: ${err.message}`);
     } finally {
-      setExportingClientId(null);
+      setExportingContractNumber(null);
     }
   };
 
   const handleDownloadServiceContract = async (contractNumber: string, clientName: string) => {
-    setGeneratingContractId(contractNumber); // Use contract number for tracking
+    setGeneratingContractNumber(contractNumber); // Use contract number for tracking
     toast.info(`Generando contrato de servicio para ${clientName}...`);
 
     try {
@@ -207,7 +207,7 @@ const TourInquirySection = () => {
       console.error('Unexpected error during contract generation:', err);
       toast.error(`Error inesperado: ${err.message}`);
     } finally {
-      setGeneratingContractId(null);
+      setGeneratingContractNumber(null);
     }
   };
 
@@ -337,10 +337,10 @@ const TourInquirySection = () => {
               <div className="mt-8 pt-4 border-t border-gray-200 flex flex-wrap gap-4 justify-center">
                 <Button
                   onClick={() => handleDownloadBookingSheet(contractDetails.contract_number, `${contractDetails.first_name} ${contractDetails.last_name}`)}
-                  disabled={exportingClientId === contractDetails.contract_number}
+                  disabled={exportingContractNumber === contractDetails.contract_number}
                   className="bg-purple-600 hover:bg-purple-700 text-white"
                 >
-                  {exportingClientId === contractDetails.contract_number ? (
+                  {exportingContractNumber === contractDetails.contract_number ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   ) : (
                     <FileText className="h-4 w-4 mr-2" />
@@ -349,10 +349,10 @@ const TourInquirySection = () => {
                 </Button>
                 <Button
                   onClick={() => handleDownloadServiceContract(contractDetails.contract_number, `${contractDetails.first_name} ${contractDetails.last_name}`)}
-                  disabled={generatingContractId === contractDetails.contract_number}
+                  disabled={generatingContractNumber === contractDetails.contract_number}
                   className="bg-orange-600 hover:bg-orange-700 text-white"
                 >
-                  {generatingContractId === contractDetails.contract_number ? (
+                  {generatingContractNumber === contractDetails.contract_number ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   ) : (
                     <FileSignature className="h-4 w-4 mr-2" />
