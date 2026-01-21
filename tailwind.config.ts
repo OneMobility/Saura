@@ -62,7 +62,7 @@ export default {
           border: "hsl(var(--sidebar-border))",
           ring: "hsl(var(--sidebar-ring))",
         },
-        "rosa-mexicano": "#E4007C", // Nuevo color Rosa Mexicano
+        "rosa-mexicano": "#91045A", // Color actualizado
         // NEW: Colores para el tema de boletos de autobús
         "bus-primary": {
           DEFAULT: "#1e293b", // Dark Blue

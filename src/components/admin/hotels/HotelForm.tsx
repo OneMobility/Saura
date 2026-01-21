@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'; // Import useRef
+import React, { useState, useEffect, useCallback, useRef } from 'react'; 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,7 +13,7 @@ import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'; 
 import { Calendar } from '@/components/ui/calendar'; 
-import { useSearchParams } from 'react-router-dom'; // NEW
+import { useSearchParams } from 'react-router-dom';
 
 interface Hotel {
   id?: string;
@@ -79,13 +79,13 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
   const loadedHotelIdRef = useRef<string | undefined>(undefined);
 
   const calculateQuoteCosts = useCallback(() => {
-    const totalCostDoubleRooms = formData.num_double_rooms * formData.cost_per_night_double * formData.num_nights_quoted;
-    const totalCostTripleRooms = formData.num_triple_rooms * formData.cost_per_night_triple * formData.num_nights_quoted;
-    const totalCostQuadRooms = formData.num_quad_rooms * formData.cost_per_night_quad * formData.num_nights_quoted;
+    const totalCostDoubleRooms = (formData.num_double_rooms || 0) * (formData.cost_per_night_double || 0) * (formData.num_nights_quoted || 0);
+    const totalCostTripleRooms = (formData.num_triple_rooms || 0) * (formData.cost_per_night_triple || 0) * (formData.num_nights_quoted || 0);
+    const totalCostQuadRooms = (formData.num_quad_rooms || 0) * (formData.cost_per_night_quad || 0) * (formData.num_nights_quoted || 0);
     const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
-    const costOfCourtesyRooms = formData.num_courtesy_rooms * formData.cost_per_night_quad * formData.num_nights_quoted;
+    const costOfCourtesyRooms = (formData.num_courtesy_rooms || 0) * (formData.cost_per_night_quad || 0) * (formData.num_nights_quoted || 0);
     const totalQuoteCost = totalContractedRoomsCost - costOfCourtesyRooms;
-    const remaining = totalQuoteCost - formData.total_paid;
+    const remaining = totalQuoteCost - (formData.total_paid || 0);
 
     setFormData(prev => ({
       ...prev,
@@ -124,15 +124,13 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
         }
 
         if (data) {
-          // Si estamos clonando, reseteamos campos específicos de la instancia
           const isCloning = !hotelId && !!cloneFromId;
           
           const loadedData = {
             ...data,
-            id: isCloning ? undefined : data.id, // IMPORTANTE: Quitar ID si es clon
+            id: isCloning ? undefined : data.id,
             advance_payment: isCloning ? 0 : (data.advance_payment || 0),
             total_paid: isCloning ? 0 : (data.total_paid || 0),
-            // Si clonamos, limpiamos las fechas para que el usuario las ponga
             quoted_date: isCloning ? null : data.quoted_date,
             quote_end_date: isCloning ? null : data.quote_end_date,
           };
@@ -193,17 +191,6 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
   const handleDateSelect = (date: Date | undefined) => {
     setQuotedDate(date);
     setDateInput(date ? format(date, 'dd/MM/yy') : '');
-  };
-
-  const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setDateInput(value);
-    const parsedDate = parse(value, 'dd/MM/yy', new Date());
-    if (isValid(parsedDate)) {
-      setQuotedDate(parsedDate);
-    } else {
-      setQuotedDate(undefined);
-    }
   };
 
   const handleSwitchChange = (checked: boolean) => {
@@ -357,7 +344,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
           <div className="col-span-4 bg-gray-50 p-4 rounded-md flex justify-between items-center">
             <div>
               <Label className="font-semibold">Costo Total Cotización:</Label>
-              <p className="text-xl font-bold">${formData.total_quote_cost.toFixed(2)}</p>
+              <p className="text-xl font-bold">${(formData.total_quote_cost || 0).toFixed(2)}</p>
             </div>
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
