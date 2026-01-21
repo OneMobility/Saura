@@ -59,101 +59,27 @@ const AdminHotelsPage = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('hotels')
-      .select('*')
-      .order('quoted_date', { ascending: false });
+      .select('*');
 
     if (error) {
       console.error('Error fetching hotels:', error);
-      toast.error('Error al cargar las cotizaciones de hoteles.');
+      toast.error('Error al cargar las cotizaciones.');
     } else {
       const hotelsWithCalculatedFields = (data || []).map(hotel => {
-        const totalCostDoubleRooms = (hotel.num_double_rooms || 0) * hotel.cost_per_night_double * hotel.num_nights_quoted;
-        const totalCostTripleRooms = (hotel.num_triple_rooms || 0) * hotel.cost_per_night_triple * hotel.num_nights_quoted;
-        const totalCostQuadRooms = (hotel.num_quad_rooms || 0) * hotel.cost_per_night_quad * hotel.num_nights_quoted;
-        const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
-        const costOfCourtesyRooms = (hotel.num_courtesy_rooms || 0) * hotel.cost_per_night_quad * hotel.num_nights_quoted;
-        const totalQuoteCost = totalContractedRoomsCost - costOfCourtesyRooms;
+        const total = (((hotel.num_double_rooms || 0) * hotel.cost_per_night_double) +
+                      ((hotel.num_triple_rooms || 0) * hotel.cost_per_night_triple) +
+                      ((hotel.num_quad_rooms || 0) * hotel.cost_per_night_quad) -
+                      ((hotel.num_courtesy_rooms || 0) * hotel.cost_per_night_quad)) * (hotel.num_nights_quoted || 1);
 
         return {
           ...hotel,
-          num_double_rooms: hotel.num_double_rooms || 0,
-          num_triple_rooms: hotel.num_triple_rooms || 0,
-          num_quad_rooms: hotel.num_quad_rooms || 0,
-          num_courtesy_rooms: hotel.num_courtesy_rooms || 0,
-          total_quote_cost: totalQuoteCost,
-          remaining_payment: totalQuoteCost - (hotel.total_paid || 0),
+          total_quote_cost: total,
+          remaining_payment: total - (hotel.total_paid || 0),
         };
       });
       setHotels(hotelsWithCalculatedFields);
     }
     setLoading(false);
-  };
-
-  const handleAddHotel = () => {
-    navigate('/admin/hotels/new');
-  };
-
-  const handleEditHotel = (hotel: Hotel) => {
-    navigate(`/admin/hotels/edit/${hotel.id}`);
-  };
-
-  const handleCloneHotel = (hotel: Hotel) => {
-    toast.info(`Clonando configuración de ${hotel.name}...`);
-    navigate(`/admin/hotels/new?cloneFrom=${hotel.id}`);
-  };
-
-  const handleDeleteHotel = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar esta cotización?')) {
-      return;
-    }
-    setLoading(true);
-    const { error } = await supabase
-      .from('hotels')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      console.error('Error deleting hotel quote:', error);
-      toast.error('Error al eliminar la cotización.');
-    } else {
-      toast.success('Cotización eliminada con éxito.');
-      setRefreshKey(prev => prev + 1);
-    }
-    setLoading(false);
-  };
-
-  const handleDeleteAllQuotes = async (hotelName: string, quoteIds: string[]) => {
-    if (!window.confirm(`¿Estás seguro de que quieres eliminar las ${quoteIds.length} cotizaciones de "${hotelName}"? Esta acción no se puede deshacer.`)) {
-      return;
-    }
-    
-    setLoading(true);
-    const { error } = await supabase
-      .from('hotels')
-      .delete()
-      .in('id', quoteIds);
-
-    if (error) {
-      console.error('Error deleting all hotel quotes:', error);
-      toast.error('Error al eliminar las cotizaciones del hotel.');
-    } else {
-      toast.success(`Se han eliminado ${quoteIds.length} cotizaciones de "${hotelName}".`);
-      setRefreshKey(prev => prev + 1);
-    }
-    setLoading(false);
-  };
-
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return 'N/A';
-    try {
-      return format(parseISO(dateString), 'dd/MM/yy');
-    } catch (e) {
-      return 'Inválida';
-    }
-  };
-
-  const toggleGroup = (name: string) => {
-    setOpenGroups(prev => ({ ...prev, [name]: !prev[name] }));
   };
 
   const groupedHotels = hotels.reduce((acc, hotel) => {
@@ -162,145 +88,85 @@ const AdminHotelsPage = () => {
     return acc;
   }, {} as Record<string, Hotel[]>);
 
-  if (sessionLoading || (user && isAdmin && loading)) {
-    return (
-      <div className="flex min-h-screen bg-gray-100">
-        <AdminSidebar />
-        <div className="flex flex-col flex-grow items-center justify-center">
-          <Loader2 className="h-12 w-12 animate-spin text-rosa-mexicano" />
-          <p className="mt-4 text-gray-700">Cargando hoteles...</p>
-        </div>
-      </div>
-    );
-  }
+  // Ordenar los grupos por el precio de su cotización más barata
+  const sortedGroupEntries = Object.entries(groupedHotels).sort((a, b) => {
+    const minA = Math.min(...a[1].map(h => h.total_quote_cost));
+    const minB = Math.min(...b[1].map(h => h.total_quote_cost));
+    return minA - minB;
+  });
+
+  const handleDeleteHotel = async (id: string) => {
+    if (!window.confirm('¿Eliminar esta cotización?')) return;
+    const { error } = await supabase.from('hotels').delete().eq('id', id);
+    if (!error) { toast.success('Eliminada.'); setRefreshKey(k => k + 1); }
+  };
+
+  if (sessionLoading || loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
 
   return (
     <div className="flex min-h-screen bg-gray-100">
       <AdminSidebar />
       <div className="flex flex-col flex-grow">
-        <AdminHeader pageTitle="Gestión de Cotizaciones de Hoteles">
-          <Button onClick={handleAddHotel} className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white">
-            <PlusCircle className="mr-2 h-4 w-4" /> Añadir Cotización
+        <AdminHeader pageTitle="Gestión de Hoteles">
+          <Button onClick={() => navigate('/admin/hotels/new')} className="bg-rosa-mexicano">
+            <PlusCircle className="mr-2 h-4 w-4" /> Nueva Cotización
           </Button>
         </AdminHeader>
-        <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
-          {Object.keys(groupedHotels).length === 0 ? (
-            <div className="bg-white rounded-lg shadow-lg p-12 text-center text-gray-600">
-              No hay cotizaciones de hoteles registradas.
-            </div>
-          ) : (
-            <div className="space-y-6">
-              {Object.entries(groupedHotels).map(([name, quotes]) => (
-                <div key={name} className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
-                  <div 
-                    className="bg-gray-50 p-4 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors"
-                    onClick={() => toggleGroup(name)}
-                  >
-                    <div className="flex items-center space-x-3">
-                      {openGroups[name] ? <ChevronDown className="h-5 w-5 text-gray-500" /> : <ChevronRight className="h-5 w-5 text-gray-500" />}
-                      <div>
-                        <h3 className="text-xl font-bold text-gray-800">{name}</h3>
-                        <p className="text-sm text-gray-500">{quotes[0].location}</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Badge variant="secondary" className="bg-rosa-mexicano/10 text-rosa-mexicano border-rosa-mexicano/20 mr-2">
-                        {quotes.length} {quotes.length === 1 ? 'cotización' : 'cotizaciones'}
-                      </Badge>
-                      
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-blue-600 hover:bg-blue-50"
-                        onClick={(e) => { e.stopPropagation(); handleCloneHotel(quotes[0]); }}
-                      >
-                        <Copy className="h-4 w-4 mr-1" /> Clonar Base
-                      </Button>
-
-                      <Button 
-                        variant="ghost" 
-                        size="sm" 
-                        className="text-red-600 hover:bg-red-50"
-                        onClick={(e) => { e.stopPropagation(); handleDeleteAllQuotes(name, quotes.map(q => q.id)); }}
-                      >
-                        <Trash2 className="h-4 w-4 mr-1" /> Eliminar Todas
-                      </Button>
+        <main className="flex-grow container mx-auto px-4 py-8">
+          <div className="space-y-6">
+            {sortedGroupEntries.map(([name, quotes]) => (
+              <div key={name} className="bg-white rounded-xl shadow-sm border overflow-hidden">
+                <div 
+                  className="bg-gray-50 p-4 flex items-center justify-between cursor-pointer hover:bg-gray-100"
+                  onClick={() => setOpenGroups(p => ({ ...p, [name]: !p[name] }))}
+                >
+                  <div className="flex items-center gap-3">
+                    {openGroups[name] ? <ChevronDown /> : <ChevronRight />}
+                    <div>
+                      <h3 className="text-xl font-bold">{name}</h3>
+                      <p className="text-xs text-gray-500">Desde ${Math.min(...quotes.map(q => q.total_quote_cost)).toFixed(2)}</p>
                     </div>
                   </div>
-                  
-                  {openGroups[name] && (
-                    <div className="p-0 border-t border-gray-100 overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Inicio</TableHead>
-                            <TableHead>Fin</TableHead>
-                            <TableHead>Noches</TableHead>
-                            <TableHead>Costo Total</TableHead>
-                            <TableHead>Habitaciones</TableHead>
-                            <TableHead>Estado Pago</TableHead>
-                            <TableHead>Acciones</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {quotes.map((quote) => (
-                            <TableRow key={quote.id}>
-                              <TableCell className="font-medium">{formatDate(quote.quoted_date)}</TableCell>
-                              <TableCell>{formatDate(quote.quote_end_date)}</TableCell>
-                              <TableCell>{quote.num_nights_quoted}</TableCell>
-                              <TableCell className="font-bold text-gray-900">${quote.total_quote_cost.toFixed(2)}</TableCell>
-                              <TableCell className="text-xs">
-                                D:{quote.num_double_rooms} T:{quote.num_triple_rooms} C:{quote.num_quad_rooms}
-                              </TableCell>
-                              <TableCell>
-                                <div className="flex flex-col">
-                                  <span className="text-[10px] text-gray-500">Pendiente:</span>
-                                  <span className={cn("text-xs font-bold", quote.remaining_payment > 0 ? "text-red-600" : "text-green-600")}>
-                                    ${quote.remaining_payment.toFixed(2)}
-                                  </span>
-                                </div>
-                              </TableCell>
-                              <TableCell className="flex space-x-2">
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  onClick={() => handleEditHotel(quote)}
-                                  className="h-8 w-8 text-blue-600"
-                                >
-                                  <Edit className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="outline"
-                                  size="icon"
-                                  onClick={() => handleCloneHotel(quote)}
-                                  className="h-8 w-8 text-green-600"
-                                  title="Clonar esta fecha"
-                                >
-                                  <Copy className="h-4 w-4" />
-                                </Button>
-                                <Button
-                                  variant="destructive"
-                                  size="icon"
-                                  onClick={() => handleDeleteHotel(quote.id)}
-                                  className="h-8 w-8"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </TableCell>
-                            </TableRow>
-                          ))}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  )}
+                  <Badge variant="secondary">{quotes.length} fechas</Badge>
                 </div>
-              ))}
-            </div>
-          )}
+                
+                {openGroups[name] && (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Fecha Inicio</TableHead>
+                          <TableHead>Noches</TableHead>
+                          <TableHead>Costo Total</TableHead>
+                          <TableHead>Estado</TableHead>
+                          <TableHead className="text-right">Acciones</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {quotes.sort((a, b) => a.total_quote_cost - b.total_quote_cost).map((q) => (
+                          <TableRow key={q.id}>
+                            <TableCell>{q.quoted_date ? format(parseISO(q.quoted_date), 'dd/MM/yy') : 'N/A'}</TableCell>
+                            <TableCell>{q.num_nights_quoted}</TableCell>
+                            <TableCell className="font-bold">${q.total_quote_cost.toFixed(2)}</TableCell>
+                            <TableCell>
+                              <Badge className={q.remaining_payment <= 0 ? "bg-green-500" : "bg-red-500"}>
+                                {q.remaining_payment <= 0 ? "Pagado" : `Pendiente: $${q.remaining_payment.toFixed(0)}`}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right flex justify-end gap-2">
+                              <Button variant="ghost" size="icon" onClick={() => navigate(`/admin/hotels/edit/${q.id}`)}><Edit className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon" className="text-red-500" onClick={() => handleDeleteHotel(q.id)}><Trash2 className="h-4 w-4" /></Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
         </main>
-        <footer className="bg-gray-800 text-white py-4 text-center text-sm">
-          <p>&copy; {new Date().getFullYear()} Saura Tours Admin. Todos los derechos reservados.</p>
-        </footer>
       </div>
     </div>
   );
