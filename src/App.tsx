@@ -38,6 +38,7 @@ import AdminBusRouteFormPage from "./pages/AdminBusRouteFormPage";
 import AdminBusSchedulesPage from "./pages/AdminBusSchedulesPage";
 import AdminBusPassengersPage from "./pages/AdminBusPassengersPage";
 import AdminBusTicketValidationPage from "./pages/AdminBusTicketValidationPage";
+import AdminContactMessagesPage from "./pages/AdminContactMessagesPage"; // NEW
 
 // Bus Tickets Subdomain Pages
 import DestinationsPage from "./pages/bus-tickets/DestinationsPage";
@@ -62,7 +63,6 @@ import { supabase } from "@/integrations/supabase/client";
 const queryClient = new QueryClient();
 
 const App = () => {
-  // NEW: Effect to sync site identity (Title & Favicon)
   useEffect(() => {
     const fetchSiteSettings = async () => {
       const { data } = await supabase
@@ -154,6 +154,14 @@ const App = () => {
                 element={
                   <ProtectedRoute adminOnly>
                     <AdminReviewsPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/contacto"
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminContactMessagesPage />
                   </ProtectedRoute>
                 }
               />

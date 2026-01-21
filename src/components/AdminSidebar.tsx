@@ -6,8 +6,8 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
-import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText, ChevronDown, Hotel, Truck, UserRound, Bus, Handshake, Ticket, MapPin, Map, CalendarClock, UsersRound, QrCode } from 'lucide-react'; // Added QrCode
-import { useSession } from '@/components/SessionContextProvider'; // Import useSession
+import { LayoutDashboard, Package, Newspaper, Users, Settings, TreePalm, Pin, PinOff, MessageSquareText, ChevronDown, Hotel, Handshake, UserRound, Bus, Ticket, MapPin, Map, CalendarClock, UsersRound, QrCode, Mail } from 'lucide-react';
+import { useSession } from '@/components/SessionContextProvider';
 
 interface NavItem {
   href?: string;
@@ -27,7 +27,7 @@ const navItems: NavItem[] = [
       { href: '/admin/bus-tickets/schedules', icon: CalendarClock, label: 'Horarios' },
       { href: '/admin/bus-tickets/destinations', icon: MapPin, label: 'Destinos' },
       { href: '/admin/bus-tickets/passengers', icon: UsersRound, label: 'Pasajeros' },
-      { href: '/admin/bus-tickets/validate', icon: QrCode, label: 'Validación QR' }, // NEW: QR Validation link
+      { href: '/admin/bus-tickets/validate', icon: QrCode, label: 'Validación QR' },
     ],
   },
   {
@@ -42,6 +42,7 @@ const navItems: NavItem[] = [
   },
   { href: '/admin/blog', icon: Newspaper, label: 'Blog' },
   { href: '/admin/reviews', icon: MessageSquareText, label: 'Opiniones' },
+  { href: '/admin/contacto', icon: Mail, label: 'Contacto' }, // NEW: Contacto
   { href: '/admin/users', icon: Users, label: 'Usuarios' },
   { href: '/admin/settings', icon: Settings, label: 'Configuración' },
 ];
@@ -72,7 +73,6 @@ const AdminSidebar = () => {
         onMouseEnter={() => setIsHovering(true)}
         onMouseLeave={() => setIsHovering(false)}
       >
-        {/* Sidebar Header */}
         <div className="flex items-center justify-center h-16 border-b border-gray-700">
           <Link to="/admin/dashboard" className="flex items-center space-x-2">
             <TreePalm className="h-6 w-6 text-rosa-mexicano" />
@@ -90,15 +90,13 @@ const AdminSidebar = () => {
                   className="text-white hover:bg-gray-700 rounded-full h-8 w-8 ml-2"
                 >
                   {isPinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
-                  <span className="sr-only">{isPinned ? "Desfijar barra lateral" : "Fijar barra lateral"}</span>
                 </Button>
               </>
             )}
           </Link>
         </div>
 
-        {/* Navigation Links */}
-        <nav className="flex-grow mt-4 space-y-2 px-2">
+        <nav className="flex-grow mt-4 space-y-2 px-2 overflow-y-auto">
           {navItems.map((item) => (
             item.children ? (
               <Collapsible key={item.label} defaultOpen={isParentActive(item)}>
@@ -114,7 +112,6 @@ const AdminSidebar = () => {
                           )}
                         >
                           <item.icon className="h-5 w-5" />
-                          <span className="sr-only">{item.label}</span>
                         </Button>
                       </TooltipTrigger>
                       <TooltipContent side="right">{item.label}</TooltipContent>
@@ -173,7 +170,6 @@ const AdminSidebar = () => {
                       >
                         <Link to={item.href || '#'}>
                           <item.icon className="h-5 w-5" />
-                          <span className="sr-only">{item.label}</span>
                         </Link>
                       </Button>
                     </TooltipTrigger>
@@ -200,11 +196,6 @@ const AdminSidebar = () => {
             )
           ))}
         </nav>
-
-        {/* Sidebar Footer */}
-        <div className="p-4 border-t border-gray-700">
-          {/* Footer content if needed */}
-        </div>
       </aside>
     </React.Fragment>
   );
