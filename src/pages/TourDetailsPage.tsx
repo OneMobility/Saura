@@ -3,23 +3,32 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2, MessageSquare } from 'lucide-react'; // Added MessageSquare
+import { ArrowLeft, Loader2, MessageSquare, Hotel, CalendarDays, Clock } from 'lucide-react'; // Added Hotel, CalendarDays, Clock
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { supabase } from '@/integrations/supabase/client';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns'; // Import parseISO
+import { es } from 'date-fns/locale'; // Import locale
 import TourSeatMap from '@/components/TourSeatMap';
-import { Dialog, DialogTrigger } from '@/components/ui/dialog'; // Import Dialog and DialogTrigger
-import ClientBookingForm from '@/components/ClientBookingForm'; // Import the new ClientBookingForm
-import { TourProviderService, SeatLayout } from '@/types/shared'; // NEW: Import shared type and SeatLayout
-import { stripHtmlTags } from '@/utils/html'; // Import stripHtmlTags
+import { Dialog, DialogTrigger } from '@/components/ui/dialog';
+import ClientBookingForm from '@/components/ClientBookingForm';
+import { TourProviderService, SeatLayout } from '@/types/shared';
+import { stripHtmlTags } from '@/utils/html';
 
 interface Bus {
   id: string;
   name: string;
   license_plate: string;
   total_capacity: number;
-  seat_layout_json: SeatLayout | null; // Incluir el layout de asientos
+  seat_layout_json: SeatLayout | null;
+}
+
+interface TourHotelDetail {
+  id: string;
+  hotel_quote_id: string;
+  hotels: { // Nested object for hotel quote details
+    name: string;
+  } | null;
 }
 
 interface Tour {
@@ -37,8 +46,13 @@ interface Tour {
   selling_price_child: number;
   bus_id: string | null;
   bus_capacity: number;
-  courtesies: number; // Renamed to Coordinadores
-  provider_details: TourProviderService[]; // NEW: Add provider_details
+  courtesies: number;
+  provider_details: TourProviderService[];
+  hotel_details: TourHotelDetail[]; // Updated type to include nested hotel data
+  departure_date: string | null; // NEW
+  return_date: string | null; // NEW
+  departure_time: string | null; // NEW
+  return_time: string | null; // NEW
 }
 
 const TourDetailsPage = () => {
@@ -47,8 +61,8 @@ const TourDetailsPage = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [busLayout, setBusLayout] = useState<SeatLayout | null>(null);
-  const [isBookingFormOpen, setIsBookingFormOpen] = useState(false); // State to control booking form dialog
-  const [selectedSeats, setSelectedSeats] = useState<number[]>([]); // NEW: State for selected seats
+  const [isBookingFormOpen, setIsBookingFormOpen] = useState(false);
+  const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
 
   const handleSeatsSelected = useCallback((seats: number[]) => {
     setSelectedSeats(seats);
@@ -71,9 +85,9 @@ const TourDetailsPage = () => {
         return;
       }
       const busesMap = new Map<string, Bus>();
-      busesData?.forEach(bus => busesMap.set(bus.id, bus as Bus)); // Cast to Bus interface
+      busesData?.forEach(bus => busesMap.set(bus.id, bus as Bus));
 
-      // Then fetch tour details
+      // Then fetch tour details, including nested hotel names
       const { data: tourData, error: tourError } = await supabase
         .from('tours')
         .select(`
@@ -92,8 +106,17 @@ const TourDetailsPage = () => {
           bus_id,
           bus_capacity,
           courtesies,
-          provider_details
-        `) // Select only public-facing fields
+          provider_details,
+          departure_date,
+          return_date,
+          departure_time,
+          return_time,
+          hotel_details (
+            id,
+            hotel_quote_id,
+            hotels ( name )
+          )
+        `)
         .eq('slug', id)
         .single();
 
@@ -101,7 +124,7 @@ const TourDetailsPage = () => {
         console.error('Error fetching tour details:', tourError);
         setError('No se pudo cargar los detalles del tour.');
         setTour(null);
-      } else if (tourData) { // Corrected: Use tourData here
+      } else if (tourData) {
         setTour({
           ...tourData,
           includes: tourData.includes || [],
@@ -110,10 +133,14 @@ const TourDetailsPage = () => {
           selling_price_triple_occupancy: tourData.selling_price_triple_occupancy || 0,
           selling_price_quad_occupancy: tourData.selling_price_quad_occupancy || 0,
           selling_price_child: tourData.selling_price_child || 0,
-          provider_details: tourData.provider_details || [], // Ensure provider_details is an array
+          provider_details: tourData.provider_details || [],
+          hotel_details: tourData.hotel_details || [], // Use fetched hotel details
+          departure_date: tourData.departure_date || null,
+          return_date: tourData.return_date || null,
+          departure_time: tourData.departure_time || null,
+          return_time: tourData.return_time || null,
         });
 
-        // Set the bus layout from the fetched data
         if (tourData.bus_id) {
           const bus = busesMap.get(tourData.bus_id);
           const layout = bus?.seat_layout_json || null;
@@ -135,7 +162,7 @@ const TourDetailsPage = () => {
 
   const handleWhatsAppContact = () => {
     if (!tour) return;
-    const phoneNumber = '528444041469'; // Number without '+'
+    const phoneNumber = '528444041469';
     const message = encodeURIComponent(`¡Hola! Me interesa el tour: ${tour.title}. ¿Podrían darme más información?`);
     const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
     window.open(whatsappUrl, '_blank');
@@ -165,6 +192,12 @@ const TourDetailsPage = () => {
   }
 
   const cleanDescription = stripHtmlTags(tour.description);
+  const departureDateDisplay = tour.departure_date ? format(parseISO(tour.departure_date), 'EEEE, dd MMMM yyyy', { locale: es }) : 'N/A';
+  const returnDateDisplay = tour.return_date ? format(parseISO(tour.return_date), 'EEEE, dd MMMM yyyy', { locale: es }) : 'N/A';
+  const hotelNames = tour.hotel_details
+    .map(detail => detail.hotels?.name)
+    .filter(name => name)
+    .join(', ');
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -207,13 +240,22 @@ const TourDetailsPage = () => {
                 <div>
                   <h3 className="text-xl font-semibold text-gray-800 mb-3">Detalles Clave</h3>
                   <ul className="space-y-2 text-gray-700">
-                    <li><span className="font-medium">Precio por persona (Doble):</span> ${tour.selling_price_double_occupancy.toFixed(2)}</li>
-                    <li><span className="font-medium">Precio por persona (Triple):</span> ${tour.selling_price_triple_occupancy.toFixed(2)}</li>
-                    <li><span className="font-medium">Precio por persona (Cuádruple):</span> ${tour.selling_price_quad_occupancy.toFixed(2)}</li>
-                    <li><span className="font-medium">Precio por Menor (-12 años):</span> ${tour.selling_price_child.toFixed(2)}</li>
+                    {hotelNames && (
+                      <li>
+                        <Hotel className="inline h-4 w-4 mr-2 text-gray-500" />
+                        <span className="font-medium">Hospedaje en:</span> {hotelNames}
+                      </li>
+                    )}
+                    <li>
+                      <CalendarDays className="inline h-4 w-4 mr-2 text-gray-500" />
+                      <span className="font-medium">Salida:</span> {departureDateDisplay} {tour.departure_time}
+                    </li>
+                    <li>
+                      <CalendarDays className="inline h-4 w-4 mr-2 text-gray-500" />
+                      <span className="font-medium">Regreso:</span> {returnDateDisplay} {tour.return_time}
+                    </li>
                     <li><span className="font-medium">Duración:</span> {tour.duration}</li>
-                    <li><span className="font-medium">Capacidad del autobús:</span> {tour.bus_capacity} personas</li>
-                    <li><span className="font-medium">Coordinadores (Asientos Bus):</span> {tour.courtesies}</li>
+                    <li><span className="font-medium">Coordinadores:</span> {tour.courtesies}</li>
                   </ul>
                 </div>
                 {tour.includes && tour.includes.length > 0 && (
@@ -226,6 +268,18 @@ const TourDetailsPage = () => {
                     </ul>
                   </div>
                 )}
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                <div>
+                  <h3 className="text-xl font-semibold text-gray-800 mb-3">Precios por Persona</h3>
+                  <ul className="space-y-2 text-gray-700">
+                    <li><span className="font-medium">Doble:</span> ${tour.selling_price_double_occupancy.toFixed(2)}</li>
+                    <li><span className="font-medium">Triple:</span> ${tour.selling_price_triple_occupancy.toFixed(2)}</li>
+                    <li><span className="font-medium">Cuádruple:</span> ${tour.selling_price_quad_occupancy.toFixed(2)}</li>
+                    <li><span className="font-medium">Menor (-12 años):</span> ${tour.selling_price_child.toFixed(2)}</li>
+                  </ul>
+                </div>
               </div>
 
               {tour.itinerary && tour.itinerary.length > 0 && (
@@ -241,7 +295,6 @@ const TourDetailsPage = () => {
                 </>
               )}
 
-              {/* NEW: Display Tour Provider Services */}
               {tour.provider_details && tour.provider_details.length > 0 && (
                 <div className="mt-8">
                   <h3 className="text-xl font-semibold text-gray-800 mb-3">Servicios Adicionales Disponibles</h3>
@@ -269,10 +322,10 @@ const TourDetailsPage = () => {
                     busCapacity={tour.bus_capacity}
                     courtesies={tour.courtesies}
                     seatLayoutJson={busLayout}
-                    onSeatsSelected={handleSeatsSelected} // Pass callback to capture selection
+                    onSeatsSelected={handleSeatsSelected}
                     readOnly={false}
                     adminMode={false}
-                    initialSelectedSeats={selectedSeats} // Pass current selection
+                    initialSelectedSeats={selectedSeats}
                   />
                   {selectedSeats.length > 0 && (
                     <p className="text-sm text-gray-600 mt-2">
@@ -285,7 +338,7 @@ const TourDetailsPage = () => {
                 <DialogTrigger asChild>
                   <Button
                     className="w-full bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white font-semibold py-3 text-lg"
-                    disabled={selectedSeats.length === 0} // Disable if no seats selected
+                    disabled={selectedSeats.length === 0}
                   >
                     Reservar Tour ({selectedSeats.length} personas)
                   </Button>
@@ -311,7 +364,7 @@ const TourDetailsPage = () => {
                       seat_layout_json: busLayout,
                     }}
                     tourAvailableExtraServices={tour.provider_details}
-                    initialSelectedSeats={selectedSeats} // Pass selected seats to the form
+                    initialSelectedSeats={selectedSeats}
                   />
                 )}
               </Dialog>
