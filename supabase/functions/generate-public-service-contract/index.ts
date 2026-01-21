@@ -40,9 +40,10 @@ const generateServiceContractHtml = (data: any) => {
   let includesList = '<li>N/A</li>';
   let itineraryList = '<li>N/A</li>';
   let seatNumbers = 'N/A';
-  let departureDateDisplay = '[FECHA DEL VIAJE NO DISPONIBLE EN DB]';
-  let mainDepartureDate = '[FECHA SALIDA]'; // For Clause 1
-  let returnDateDisplay = ''; // NEW: For return date display
+  
+  // --- NEW/CORRECTED DATE LOGIC FOR CONTRACT ---
+  let mainDepartureDate = '[FECHA SALIDA Y HORA]'; 
+  let returnDateSection = ''; 
 
   if (client.tour_id && tour.title) {
     tourOrRouteTitle = tour.title;
@@ -71,17 +72,8 @@ const generateServiceContractHtml = (data: any) => {
 
     if (tour.return_date) {
         const formattedReturn = format(parseISO(tour.return_date), 'dd/MM/yyyy', { locale: es });
-        returnDateDisplay = `REGRESO ${formattedReturn} ${returnTime}`;
+        returnDateSection = `<p><strong>REGRESO ${formattedReturn} ${returnTime}</strong></p>`;
     }
-
-    if (tour.departure_date && tour.return_date) {
-        const formattedDeparture = format(parseISO(tour.departure_date), 'dd/MM/yyyy', { locale: es });
-        const formattedReturn = format(parseISO(tour.return_date), 'dd/MM/yyyy', { locale: es });
-        departureDateDisplay = `del ${formattedDeparture} ${departureTime} al ${formattedReturn} ${returnTime}`;
-    } else if (tour.departure_date) {
-        departureDateDisplay = `${mainDepartureDate}`;
-    }
-
 
   } else if (client.bus_route_id && busRoute.name) {
     tourOrRouteTitle = `Ruta de Autobús: ${busRoute.name}`;
@@ -93,10 +85,11 @@ const generateServiceContractHtml = (data: any) => {
     }
     // For bus tickets, use the schedule date if available
     if (data.busSchedule?.effective_date_start) {
-        departureDateDisplay = format(parseISO(data.busSchedule.effective_date_start), 'dd/MM/yyyy', { locale: es });
-        mainDepartureDate = departureDateDisplay;
+        const formattedDate = format(parseISO(data.busSchedule.effective_date_start), 'dd/MM/yyyy', { locale: es });
+        mainDepartureDate = `${formattedDate} ${data.busSchedule.departure_time || ''}`;
     }
   }
+  // --- END NEW/CORRECTED DATE LOGIC FOR CONTRACT ---
 
   const companionsListHtml = safeCompanions.length > 0
     ? safeCompanions.map((c: any) => `<li>${c.name || 'Acompañante sin nombre'} ${c.age !== null && typeof c.age === 'number' ? `(${c.age} años)` : ''}</li>`).join('')
@@ -344,7 +337,7 @@ const generateServiceContractHtml = (data: any) => {
                     ${itineraryList}
                 </ol>
                 <p><span class="label">Duración/Salida:</span> ${tourOrRouteDuration}</p>
-                ${client.tour_id && tour.return_date ? `<p><span class="label">Regreso:</span> ${returnDateDisplay}</p>` : ''}
+                ${client.tour_id && tour.return_date ? `<p><strong>REGRESO ${format(parseISO(tour.return_date), 'dd/MM/yyyy', { locale: es })} ${tour.return_time || ''}</strong></p>` : ''}
                 <p><span class="label">Incluye:</span></p>
                 <ul>
                     ${includesList}
