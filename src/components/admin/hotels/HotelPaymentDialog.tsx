@@ -7,38 +7,37 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save } from 'lucide-react'; // Removed CalendarIcon
-import { format, parse, isValid } from 'date-fns'; // Added parse and isValid
+import { Loader2, Save } from 'lucide-react';
+import { format, parse, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
 
 interface Hotel {
   id: string;
   name: string;
-  total_quote_cost: number; // Total cost for all contracted rooms in this quote
-  total_paid: number; // Total paid to the hotel for this quote
-  remaining_payment: number; // Remaining payment for this quote
+  total_quote_cost: number;
+  total_paid: number;
+  remaining_payment: number;
 }
 
 interface HotelPaymentDialogProps {
   isOpen: boolean;
   onClose: () => void;
   hotel: Hotel | null;
-  onPaymentRegistered: () => void; // Callback to refresh hotel data
+  onPaymentRegistered: () => void;
 }
 
 const HotelPaymentDialog: React.FC<HotelPaymentDialogProps> = ({ isOpen, onClose, hotel, onPaymentRegistered }) => {
   const [amount, setAmount] = useState<number>(0);
-  const [paymentDateInput, setPaymentDateInput] = useState<string>(format(new Date(), 'dd/MM/yy', { locale: es })); // State for input string
-  const [paymentDate, setPaymentDate] = useState<Date | undefined>(new Date()); // Internal Date object
+  const [paymentDateInput, setPaymentDateInput] = useState<string>(format(new Date(), 'dd/MM/yy', { locale: es }));
+  const [paymentDate, setPaymentDate] = useState<Date | undefined>(new Date());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen && hotel) {
-      setAmount(0); // Reset amount when dialog opens
+      setAmount(0);
       const today = new Date();
-      setPaymentDate(today); // Default to today
-      setPaymentDateInput(format(today, 'dd/MM/yy', { locale: es })); // Set input string
+      setPaymentDate(today);
+      setPaymentDateInput(format(today, 'dd/MM/yy', { locale: es }));
     }
   }, [isOpen, hotel]);
 
@@ -77,7 +76,6 @@ const HotelPaymentDialog: React.FC<HotelPaymentDialogProps> = ({ isOpen, onClose
     }
 
     try {
-      // 1. Insert the new payment record
       const { error: paymentError } = await supabase
         .from('hotel_payments')
         .insert({
@@ -93,8 +91,7 @@ const HotelPaymentDialog: React.FC<HotelPaymentDialogProps> = ({ isOpen, onClose
         return;
       }
 
-      // 2. Update the hotel's total_paid amount
-      const newTotalPaid = hotel.total_paid + amount;
+      const newTotalPaid = (hotel.total_paid || 0) + amount;
       const { error: hotelUpdateError } = await supabase
         .from('hotels')
         .update({ total_paid: newTotalPaid, updated_at: new Date().toISOString() })
@@ -103,10 +100,9 @@ const HotelPaymentDialog: React.FC<HotelPaymentDialogProps> = ({ isOpen, onClose
       if (hotelUpdateError) {
         console.error('Error updating hotel total_paid:', hotelUpdateError);
         toast.error('Error al actualizar el total pagado del hotel.');
-        // Consider rolling back payment insertion if this fails, or handle with a trigger
       } else {
-        toast.success('Abono registrado y total pagado del hotel actualizado con éxito.');
-        onPaymentRegistered(); // Notify parent to refresh hotel data
+        toast.success('Abono registrado con éxito.');
+        onPaymentRegistered();
         onClose();
       }
     } catch (error) {
@@ -117,7 +113,11 @@ const HotelPaymentDialog: React.FC<HotelPaymentDialogProps> = ({ isOpen, onClose
     }
   };
 
-  const remainingAfterPayment = hotel ? hotel.remaining_payment - amount : 0;
+  // Safe values for UI display
+  const totalQuoteCost = hotel?.total_quote_cost || 0;
+  const totalPaid = hotel?.total_paid || 0;
+  const remainingPayment = hotel?.remaining_payment || 0;
+  const remainingAfterPayment = remainingPayment - amount;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -135,8 +135,8 @@ const HotelPaymentDialog: React.FC<HotelPaymentDialogProps> = ({ isOpen, onClose
             </Label>
             <Input
               id="amount"
-              type="text" // Changed to text
-              pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
+              type="text"
+              pattern="[0-9]*\.?[0-9]*"
               value={amount}
               onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
               className="col-span-3"
@@ -160,9 +160,9 @@ const HotelPaymentDialog: React.FC<HotelPaymentDialogProps> = ({ isOpen, onClose
 
           {hotel && (
             <div className="col-span-4 mt-4 p-3 bg-gray-50 rounded-md text-sm">
-              <p><span className="font-semibold">Costo Total Cotización:</span> ${hotel.total_quote_cost.toFixed(2)}</p>
-              <p><span className="font-semibold">Total Pagado Actualmente:</span> ${hotel.total_paid.toFixed(2)}</p>
-              <p><span className="font-semibold">Deuda Actual:</span> ${hotel.remaining_payment.toFixed(2)}</p>
+              <p><span className="font-semibold">Costo Total Cotización:</span> ${totalQuoteCost.toFixed(2)}</p>
+              <p><span className="font-semibold">Total Pagado Actualmente:</span> ${totalPaid.toFixed(2)}</p>
+              <p><span className="font-semibold">Deuda Actual:</span> ${remainingPayment.toFixed(2)}</p>
               <p className="mt-2 font-bold">
                 <span className="font-semibold">Deuda Después del Abono:</span> ${remainingAfterPayment.toFixed(2)}
               </p>
