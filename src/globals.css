@@ -35,55 +35,43 @@
     --radius: 0.5rem;
 
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
 
-    /* NEW: Bus Tickets Theme Colors */
-    --bus-primary: 217.2 32.6% 17.5%; /* #1e293b (Dark Blue) */
-    --bus-primary-foreground: 0 0% 100%; /* White text on blue */
-    --bus-secondary: 50.6 100% 50%; /* #ffd700 (Yellow) */
-    --bus-secondary-foreground: 222.2 47.4% 11.2%; /* Dark text on yellow */
-    --bus-background: 0 0% 100%; /* White background */
-    --bus-foreground: 222.2 84% 4.9%; /* Dark text */
+    /* NEW: Color de marca dinámico */
+    --primary-brand-color: #91045A;
+
+    /* Bus Tickets Theme Colors */
+    --bus-primary: 217.2 32.6% 17.5%;
+    --bus-primary-foreground: 0 0% 100%;
+    --bus-secondary: 50.6 100% 50%;
+    --bus-secondary-foreground: 222.2 47.4% 11.2%;
+    --bus-background: 0 0% 100%;
+    --bus-foreground: 222.2 84% 4.9%;
   }
 
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
-
     --card: 222.2 84% 4.9%;
     --card-foreground: 210 40% 98%;
-
     --popover: 222.2 84% 4.9%;
     --popover-foreground: 210 40% 98%;
-
     --primary: 210 40% 98%;
     --primary-foreground: 222.2 47.4% 11.2%;
-
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
-
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
-
     --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
-
     --destructive: 0 62.8% 30.6%;
     --destructive-foreground: 210 40% 98%;
-
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
@@ -95,14 +83,6 @@
     --sidebar-accent-foreground: 240 4.8% 95.9%;
     --sidebar-border: 240 3.7% 15.9%;
     --sidebar-ring: 217.2 91.2% 59.8%;
-
-    /* NEW: Bus Tickets Theme Colors for Dark Mode (can be adjusted) */
-    --bus-primary: 217.2 32.6% 25%; /* Lighter dark blue for dark mode */
-    --bus-primary-foreground: 0 0% 100%;
-    --bus-secondary: 50.6 100% 60%; /* Lighter yellow for dark mode */
-    --bus-secondary-foreground: 222.2 47.4% 11.2%;
-    --bus-background: 222.2 84% 4.9%; /* Dark background */
-    --bus-foreground: 210 40% 98%; /* Light text */
   }
 }
 
@@ -115,7 +95,6 @@
     @apply bg-background text-foreground;
   }
 
-  /* NEW: Bus Tickets Theme Class */
   .bus-tickets-theme {
     --background: var(--bus-background);
     --foreground: var(--bus-foreground);
@@ -123,47 +102,8 @@
     --primary-foreground: var(--bus-primary-foreground);
     --secondary: var(--bus-secondary);
     --secondary-foreground: var(--bus-secondary-foreground);
-    --input: 214.3 31.8% 91.4%; /* Keep default input border for contrast */
-    --ring: var(--bus-primary); /* Use bus-primary for ring focus */
-    --border: 214.3 31.8% 91.4%; /* Keep default border for contrast */
-  }
-
-  .dark .bus-tickets-theme {
-    --background: var(--bus-background);
-    --foreground: var(--bus-foreground);
-    --primary: var(--bus-primary);
-    --primary-foreground: var(--bus-primary-foreground);
-    --secondary: var(--bus-secondary);
-    --secondary-foreground: var(--bus-secondary-foreground);
-    --input: 217.2 32.6% 17.5%;
+    --input: 214.3 31.8% 91.4%;
     --ring: var(--bus-primary);
-    --border: 217.2 32.6% 17.5%;
-  }
-
-  /* Quill Editor Customizations */
-  .ql-toolbar {
-    @apply bg-gray-100 border-b border-gray-200 rounded-t-md;
-  }
-
-  .ql-container {
-    @apply border-t-0 border-gray-200 rounded-b-md;
-    min-height: 150px; /* Default min-height for content area */
-  }
-
-  .ql-editor {
-    @apply text-gray-800;
-    min-height: 150px; /* Ensure content area has min height */
-  }
-
-  .dark .ql-toolbar {
-    @apply bg-gray-800 border-gray-700;
-  }
-
-  .dark .ql-container {
-    @apply border-gray-700;
-  }
-
-  .dark .ql-editor {
-    @apply text-gray-200;
+    --border: 214.3 31.8% 91.4%;
   }
 }

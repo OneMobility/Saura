@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Save, Loader2, Upload } from 'lucide-react';
+import { Save, Loader2, Upload, Palette } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 interface AgencySetting {
@@ -19,6 +19,7 @@ interface AgencySetting {
   logo_url: string | null;
   favicon_url: string | null;
   contact_image_url: string | null;
+  primary_color: string;
 }
 
 const AgencySettings = () => {
@@ -30,6 +31,7 @@ const AgencySettings = () => {
     logo_url: null,
     favicon_url: null,
     contact_image_url: null,
+    primary_color: '#91045A',
   });
   
   const [loading, setLoading] = useState(true);
@@ -44,13 +46,16 @@ const AgencySettings = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('agency_settings')
-      .select('id, agency_name, agency_phone, agency_email, agency_address, logo_url, favicon_url, contact_image_url')
+      .select('*')
       .single();
 
     if (error && error.code !== 'PGRST116') {
       console.error('Error fetching settings:', error);
     } else if (data) {
-      setAgencyInfo(data);
+      setAgencyInfo({
+        ...data,
+        primary_color: data.primary_color || '#91045A'
+      });
     }
     setLoading(false);
   };
@@ -96,12 +101,18 @@ const AgencySettings = () => {
         logo_url: agencyInfo.logo_url,
         favicon_url: agencyInfo.favicon_url,
         contact_image_url: agencyInfo.contact_image_url,
+        primary_color: agencyInfo.primary_color,
         updated_at: new Date().toISOString(),
       })
       .eq('id', agencyInfo.id);
 
-    if (error) toast.error('Error al guardar.');
-    else toast.success('Información de la agencia actualizada.');
+    if (error) {
+      toast.error('Error al guardar.');
+    } else {
+      toast.success('Información de la agencia actualizada.');
+      // Actualizar variable CSS localmente para feedback inmediato
+      document.documentElement.style.setProperty('--primary-brand-color', agencyInfo.primary_color);
+    }
     
     setIsSubmitting(false);
   };
@@ -112,7 +123,7 @@ const AgencySettings = () => {
     <Card className="p-6">
       <CardHeader>
         <CardTitle>Información de la Agencia</CardTitle>
-        <CardDescription>Datos de contacto y branding oficial.</CardDescription>
+        <CardDescription>Datos de contacto, branding y color de identidad.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-6">
@@ -122,6 +133,26 @@ const AgencySettings = () => {
               <Input id="agency_name" value={agencyInfo.agency_name} onChange={handleChange} required />
             </div>
             <div className="space-y-2">
+              <Label htmlFor="primary_color" className="flex items-center gap-2">
+                <Palette className="h-4 w-4" /> Color de Identidad (Rosa Mexicano)
+              </Label>
+              <div className="flex gap-2">
+                <Input 
+                  id="primary_color" 
+                  type="color" 
+                  value={agencyInfo.primary_color} 
+                  onChange={handleChange} 
+                  className="w-12 h-10 p-1 rounded cursor-pointer"
+                />
+                <Input 
+                  value={agencyInfo.primary_color} 
+                  onChange={(e) => setAgencyInfo(p => ({...p, primary_color: e.target.value}))}
+                  placeholder="#000000"
+                  className="flex-grow uppercase"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="agency_email">Email Público</Label>
               <Input id="agency_email" type="email" value={agencyInfo.agency_email} onChange={handleChange} />
             </div>
@@ -129,7 +160,7 @@ const AgencySettings = () => {
               <Label htmlFor="agency_phone">WhatsApp de la Agencia</Label>
               <Input id="agency_phone" value={agencyInfo.agency_phone} onChange={handleChange} />
             </div>
-            <div className="space-y-2">
+            <div className="space-y-2 md:col-span-2">
               <Label htmlFor="agency_address">Dirección Física</Label>
               <Input id="agency_address" value={agencyInfo.agency_address} onChange={handleChange} />
             </div>

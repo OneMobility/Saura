@@ -39,7 +39,7 @@ import AdminBusSchedulesPage from "./pages/AdminBusSchedulesPage";
 import AdminBusPassengersPage from "./pages/AdminBusPassengersPage";
 import AdminBusTicketValidationPage from "./pages/AdminBusTicketValidationPage";
 import AdminContactMessagesPage from "./pages/AdminContactMessagesPage";
-import AdminContactMessageDetailsPage from "./pages/AdminContactMessageDetailsPage"; // NEW
+import AdminContactMessageDetailsPage from "./pages/AdminContactMessageDetailsPage";
 
 // Bus Tickets Subdomain Pages
 import DestinationsPage from "./pages/bus-tickets/DestinationsPage";
@@ -68,7 +68,7 @@ const App = () => {
     const fetchSiteSettings = async () => {
       const { data } = await supabase
         .from('agency_settings')
-        .select('agency_name, favicon_url')
+        .select('agency_name, favicon_url, primary_color')
         .single();
 
       if (data) {
@@ -81,6 +81,9 @@ const App = () => {
           link.rel = 'shortcut icon';
           link.href = data.favicon_url;
           document.getElementsByTagName('head')[0].appendChild(link);
+        }
+        if (data.primary_color) {
+          document.documentElement.style.setProperty('--primary-brand-color', data.primary_color);
         }
       }
     };
