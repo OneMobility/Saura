@@ -81,6 +81,7 @@ const TourInquirySection = () => {
     setContractDetails(null);
 
     try {
+      // This function is public and uses the contract number to fetch data via Service Role Key
       const { data, error: functionError } = await supabase.functions.invoke('get-public-contract-details', {
         body: { contractNumber: contractNumber.trim() },
       });
@@ -121,27 +122,23 @@ const TourInquirySection = () => {
     window.open(whatsappUrl, '_blank');
   };
 
-  // NEW: Document generation handlers (only visible to admin)
-  const handleDownloadBookingSheet = async (clientId: string, clientName: string) => {
-    if (!session?.access_token) {
-      toast.error('Error de autenticación. Por favor, inicia sesión como administrador.');
-      return;
-    }
-    setExportingClientId(clientId);
+  // NEW: Document generation handlers using PUBLIC Edge Functions
+  const handleDownloadBookingSheet = async (contractNumber: string, clientName: string) => {
+    setExportingClientId(contractNumber); // Use contract number for tracking
     toast.info(`Generando hoja de reserva para ${clientName}...`);
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const functionName = 'generate-booking-sheet';
+      const functionName = 'generate-public-booking-sheet'; // Use PUBLIC function
       const edgeFunctionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
 
       const response = await fetch(edgeFunctionUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
+          // NO Authorization header needed for public function
         },
-        body: JSON.stringify({ clientId }),
+        body: JSON.stringify({ contractNumber }),
       });
 
       if (!response.ok) {
@@ -170,26 +167,22 @@ const TourInquirySection = () => {
     }
   };
 
-  const handleDownloadServiceContract = async (clientId: string, clientName: string) => {
-    if (!session?.access_token) {
-      toast.error('Error de autenticación. Por favor, inicia sesión como administrador.');
-      return;
-    }
-    setGeneratingContractId(clientId);
+  const handleDownloadServiceContract = async (contractNumber: string, clientName: string) => {
+    setGeneratingContractId(contractNumber); // Use contract number for tracking
     toast.info(`Generando contrato de servicio para ${clientName}...`);
 
     try {
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const functionName = 'generate-service-contract';
+      const functionName = 'generate-public-service-contract'; // Use PUBLIC function
       const edgeFunctionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
 
       const response = await fetch(edgeFunctionUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session.access_token}`,
+          // NO Authorization header needed for public function
         },
-        body: JSON.stringify({ clientId }),
+        body: JSON.stringify({ contractNumber }),
       });
 
       if (!response.ok) {
@@ -339,15 +332,15 @@ const TourInquirySection = () => {
               <p>{stripHtmlTags(contractDetails.tour_description)}</p>
             </div>
 
-            {/* NEW: Document Download Buttons (Admin Only) */}
-            {isAdmin && contractDetails.id && (
+            {/* Document Download Buttons (Now Public) */}
+            {contractDetails.id && (
               <div className="mt-8 pt-4 border-t border-gray-200 flex flex-wrap gap-4 justify-center">
                 <Button
-                  onClick={() => handleDownloadBookingSheet(contractDetails.id, `${contractDetails.first_name} ${contractDetails.last_name}`)}
-                  disabled={exportingClientId === contractDetails.id}
+                  onClick={() => handleDownloadBookingSheet(contractDetails.contract_number, `${contractDetails.first_name} ${contractDetails.last_name}`)}
+                  disabled={exportingClientId === contractDetails.contract_number}
                   className="bg-purple-600 hover:bg-purple-700 text-white"
                 >
-                  {exportingClientId === contractDetails.id ? (
+                  {exportingClientId === contractDetails.contract_number ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   ) : (
                     <FileText className="h-4 w-4 mr-2" />
@@ -355,11 +348,11 @@ const TourInquirySection = () => {
                   Descargar Hoja de Reserva
                 </Button>
                 <Button
-                  onClick={() => handleDownloadServiceContract(contractDetails.id, `${contractDetails.first_name} ${contractDetails.last_name}`)}
-                  disabled={generatingContractId === contractDetails.id}
+                  onClick={() => handleDownloadServiceContract(contractDetails.contract_number, `${contractDetails.first_name} ${contractDetails.last_name}`)}
+                  disabled={generatingContractId === contractDetails.contract_number}
                   className="bg-orange-600 hover:bg-orange-700 text-white"
                 >
-                  {generatingContractId === contractDetails.id ? (
+                  {generatingContractId === contractDetails.contract_number ? (
                     <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   ) : (
                     <FileSignature className="h-4 w-4 mr-2" />
