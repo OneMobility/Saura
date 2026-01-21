@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Save, DollarSign } from 'lucide-react'; // Removed CalendarIcon
 import { format, parse, isValid, parseISO, addDays } from 'date-fns'; // Added addDays
+import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 
 interface Hotel {
@@ -134,7 +135,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
             num_double_rooms: data.num_double_rooms || 0,
             num_triple_rooms: data.num_triple_rooms || 0,
             num_quad_rooms: data.num_quad_rooms || 0,
-            num_courtesy_rooms: data.num_courtesy_rooms || 0,
+            num_courtesy_rooms: data.num_courtesy_rooms || 0, // Set new field
             total_quote_cost: totalQuoteCost,
             remaining_payment: totalQuoteCost - (data.total_paid || 0),
             quote_end_date: data.quote_end_date || null, // Load new field
@@ -205,13 +206,13 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
       // Recalculate quote_end_date if quoted_date or num_nights_quoted changes
       if (id === 'quoted_date' || id === 'num_nights_quoted') {
         const currentQuotedDate = id === 'quoted_date' ? newValue : prev.quoted_date;
-        const currentNumNights = id === 'num_nights_quoted' ? newValue : prev.num_nights_quoted;
+        const currentNumNights = id === 'num_nights_quoted' ? (isNumeric ? (newValue as number) : prev.num_nights_quoted) : prev.num_nights_quoted;
 
         if (currentQuotedDate && currentNumNights > 0) {
           const parsedDate = parseISO(currentQuotedDate as string);
           if (isValid(parsedDate)) {
             // End date is start date + num_nights_quoted
-            const endDate = addDays(parsedDate, currentNumNights as number);
+            const endDate = addDays(parsedDate, currentNumNights);
             updatedData.quote_end_date = format(endDate, 'yyyy-MM-dd');
           } else {
             updatedData.quote_end_date = null;
@@ -234,7 +235,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
     if (isValid(parsedDate)) {
       const quoted_date = format(parsedDate, 'yyyy-MM-dd');
       
-      // Calculate quote_end_date
+      // Calculate quote_end_date: quoted_date + num_nights_quoted
       const numNights = formData.num_nights_quoted || 1;
       const endDate = addDays(parsedDate, numNights);
       const quote_end_date = format(endDate, 'yyyy-MM-dd');
@@ -294,6 +295,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
     if (formData.quoted_date && formData.num_nights_quoted > 0) {
       const parsedDate = parseISO(formData.quoted_date);
       if (isValid(parsedDate)) {
+        // Calculate end date as start date + num_nights_quoted
         finalQuoteEndDate = format(addDays(parsedDate, formData.num_nights_quoted), 'yyyy-MM-dd');
       }
     }
