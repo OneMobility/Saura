@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Save, Loader2, CreditCard } from 'lucide-react';
+import { Save, Loader2, CreditCard, Landmark } from 'lucide-react';
 
 interface PaymentSetting {
   id?: string;
@@ -18,6 +18,9 @@ interface PaymentSetting {
   stripe_public_key: string | null;
   stripe_commission_percentage: number;
   stripe_fixed_fee: number;
+  bank_name: string | null;
+  bank_clabe: string | null;
+  bank_holder: string | null;
 }
 
 const PaymentSettings = () => {
@@ -29,6 +32,9 @@ const PaymentSettings = () => {
     stripe_public_key: '',
     stripe_commission_percentage: 4.0,
     stripe_fixed_fee: 5.0,
+    bank_name: '',
+    bank_clabe: '',
+    bank_holder: '',
   });
   
   const [loading, setLoading] = useState(true);
@@ -81,6 +87,9 @@ const PaymentSettings = () => {
         stripe_public_key: paymentInfo.stripe_public_key,
         stripe_commission_percentage: paymentInfo.stripe_commission_percentage,
         stripe_fixed_fee: paymentInfo.stripe_fixed_fee,
+        bank_name: paymentInfo.bank_name,
+        bank_clabe: paymentInfo.bank_clabe,
+        bank_holder: paymentInfo.bank_holder,
         updated_at: new Date().toISOString(),
       })
       .eq('id', paymentInfo.id);
@@ -97,14 +106,34 @@ const PaymentSettings = () => {
     <Card className="p-6">
       <CardHeader>
         <CardTitle>Configuración de Pasarelas de Pago</CardTitle>
-        <CardDescription>Gestiona las llaves públicas y comisiones de Mercado Pago y Stripe.</CardDescription>
+        <CardDescription>Gestiona las llaves de pago y los datos para transferencia bancaria.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-8">
-          <div className="p-4 bg-muted rounded-lg mb-6">
+          <div className="p-4 bg-muted rounded-lg mb-6 border-l-4 border-rosa-mexicano">
             <Label htmlFor="advance_payment_amount" className="text-lg font-bold">Monto del Anticipo por Persona ($)</Label>
             <Input id="advance_payment_amount" type="number" value={paymentInfo.advance_payment_amount} onChange={handleChange} className="mt-2 bg-white" />
-            <p className="text-xs text-muted-foreground mt-1">Este es el monto neto que el cliente deberá pagar al reservar en línea.</p>
+            <p className="text-xs text-muted-foreground mt-1">Monto neto que el cliente paga para asegurar su lugar.</p>
+          </div>
+
+          <div className="border-t pt-6">
+            <h3 className="text-lg font-bold flex items-center gap-2 mb-4 text-green-600">
+              <Landmark className="h-5 w-5" /> Transferencia Bancaria
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="bank_name">Banco</Label>
+                <Input id="bank_name" value={paymentInfo.bank_name || ''} onChange={handleChange} placeholder="Ej: BBVA, Banamex..." />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bank_clabe">CLABE Interbancaria</Label>
+                <Input id="bank_clabe" value={paymentInfo.bank_clabe || ''} onChange={handleChange} placeholder="18 dígitos" />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="bank_holder">Titular de la Cuenta</Label>
+                <Input id="bank_holder" value={paymentInfo.bank_holder || ''} onChange={handleChange} placeholder="Nombre completo" />
+              </div>
+            </div>
           </div>
 
           <div className="border-t pt-6">
@@ -113,7 +142,7 @@ const PaymentSettings = () => {
             </h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <div className="space-y-2">
-                <Label htmlFor="mp_public_key">Public Key (Producción/Pruebas)</Label>
+                <Label htmlFor="mp_public_key">Public Key</Label>
                 <Input id="mp_public_key" value={paymentInfo.mp_public_key || ''} onChange={handleChange} placeholder="APP_USR-..." />
               </div>
               <div className="grid grid-cols-2 gap-4">
@@ -149,7 +178,6 @@ const PaymentSettings = () => {
                 </div>
               </div>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground italic">Nota: La "Secret Key" debe configurarse directamente en los secretos de Supabase.</p>
           </div>
 
           <Button type="submit" disabled={isSubmitting} className="bg-rosa-mexicano w-full">
