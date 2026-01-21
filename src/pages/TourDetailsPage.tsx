@@ -3,7 +3,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, MessageSquare } from 'lucide-react'; // Added MessageSquare
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { supabase } from '@/integrations/supabase/client';
@@ -117,10 +117,8 @@ const TourDetailsPage = () => {
           const bus = busesMap.get(tourData.bus_id);
           const layout = bus?.seat_layout_json || null;
           setBusLayout(layout);
-          // console.log(`[TourDetailsPage] Bus ID: ${tourData.bus_id} | Layout Loaded: ${layout ? 'Sí' : 'No'}`); // REMOVED DEBUG LOG
         } else {
           setBusLayout(null);
-          // console.log(`[TourDetailsPage] No Bus ID assigned to tour.`); // REMOVED DEBUG LOG
         }
       } else {
         setError('Tour no encontrado.');
@@ -133,6 +131,14 @@ const TourDetailsPage = () => {
       fetchTourDetails();
     }
   }, [id]);
+
+  const handleWhatsAppContact = () => {
+    if (!tour) return;
+    const phoneNumber = '528444041469'; // Number without '+'
+    const message = encodeURIComponent(`¡Hola! Me interesa el tour: ${tour.title}. ¿Podrían darme más información?`);
+    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
+    window.open(whatsappUrl, '_blank');
+  };
 
   if (loading) {
     return (
@@ -270,7 +276,6 @@ const TourDetailsPage = () => {
                       Asientos seleccionados: {selectedSeats.join(', ')}
                     </p>
                   )}
-                  {/* REMOVED DEBUGGING INDICATOR */}
                 </div>
               )}
               <Dialog open={isBookingFormOpen} onOpenChange={setIsBookingFormOpen}>
@@ -307,8 +312,12 @@ const TourDetailsPage = () => {
                   />
                 )}
               </Dialog>
-              <Button variant="outline" className="w-full mt-4 bg-white text-rosa-mexicano hover:bg-gray-100 border-rosa-mexicano hover:border-rosa-mexicano/90">
-                Contactar Asesor
+              <Button 
+                variant="outline" 
+                className="w-full mt-4 bg-white text-rosa-mexicano hover:bg-gray-100 border-rosa-mexicano hover:border-rosa-mexicano/90"
+                onClick={handleWhatsAppContact}
+              >
+                <MessageSquare className="mr-2 h-4 w-4" /> Contactar Asesor
               </Button>
             </div>
           </div>
