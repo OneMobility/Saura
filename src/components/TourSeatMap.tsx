@@ -62,8 +62,10 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
 
       // Create a flat list of all potential seat numbers from the layout
       const layoutSeatNumbers: number[] = [];
-      if (seatLayoutJson) {
-        seatLayoutJson.forEach(row => {
+      const currentLayout = seatLayoutJson || []; // Use empty array if null
+      
+      if (currentLayout.length > 0) {
+        currentLayout.forEach(row => {
           row.forEach(item => {
             if (item.type === 'seat' && item.number !== undefined) {
               layoutSeatNumbers.push(item.number);
@@ -249,7 +251,9 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
     );
   }
 
-  if (!seatLayoutJson || seatLayoutJson.length === 0) {
+  const currentLayout = seatLayoutJson || [];
+
+  if (currentLayout.length === 0) {
     return (
       <div className="p-4 border rounded-lg bg-muted text-center text-muted-foreground">
         <p>No hay una disposición de asientos definida para este autobús.</p>
@@ -261,7 +265,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
   }
 
   // Determine the number of columns for the grid based on the widest row
-  const maxCols = seatLayoutJson.reduce((max, row) => Math.max(max, row.length), 0);
+  const maxCols = currentLayout.reduce((max, row) => Math.max(max, row.length), 0);
 
   return (
     <div className="p-4 border rounded-lg bg-muted">
@@ -279,7 +283,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
         </p>
       )}
       <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${maxCols}, minmax(0, 1fr))` }}>
-        {seatLayoutJson.map((row, rowIndex) => (
+        {currentLayout.map((row, rowIndex) => (
           <React.Fragment key={rowIndex}>
             {row.map((item, colIndex) => {
               const seat = item.type === 'seat' ? seats.find(s => s.seat_number === item.number) : null;
