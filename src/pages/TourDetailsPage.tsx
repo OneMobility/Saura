@@ -3,12 +3,12 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
-import { ArrowLeft, Loader2, MessageSquare, Hotel, CalendarDays, Clock } from 'lucide-react'; // Added Hotel, CalendarDays, Clock
+import { ArrowLeft, Loader2, MessageSquare, Hotel, CalendarDays, Clock } from 'lucide-react';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
 import { supabase } from '@/integrations/supabase/client';
-import { format, parseISO } from 'date-fns'; // Import parseISO
-import { es } from 'date-fns/locale'; // Import locale
+import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 import TourSeatMap from '@/components/TourSeatMap';
 import { Dialog, DialogTrigger } from '@/components/ui/dialog';
 import ClientBookingForm from '@/components/ClientBookingForm';
@@ -23,12 +23,10 @@ interface Bus {
   seat_layout_json: SeatLayout | null;
 }
 
+// Interface for the structure stored in the tour's hotel_details JSONB field
 interface TourHotelDetail {
   id: string;
-  hotel_quote_id: string;
-  hotels: { // Nested object for hotel quote details
-    name: string;
-  } | null;
+  hotel_quote_id: string; // This is the ID of the hotel quote in the 'hotels' table
 }
 
 interface Tour {
@@ -48,11 +46,11 @@ interface Tour {
   bus_capacity: number;
   courtesies: number;
   provider_details: TourProviderService[];
-  hotel_details: TourHotelDetail[]; // Updated type to include nested hotel data
-  departure_date: string | null; // NEW
-  return_date: string | null; // NEW
-  departure_time: string | null; // NEW
-  return_time: string | null; // NEW
+  hotel_details: TourHotelDetail[]; // Use the simplified structure
+  departure_date: string | null;
+  return_date: string | null;
+  departure_time: string | null;
+  return_time: string | null;
 }
 
 const TourDetailsPage = () => {
@@ -63,6 +61,7 @@ const TourDetailsPage = () => {
   const [busLayout, setBusLayout] = useState<SeatLayout | null>(null);
   const [isBookingFormOpen, setIsBookingFormOpen] = useState(false);
   const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
+  const [hotelNames, setHotelNames] = useState<string>(''); // State to hold formatted hotel names
 
   const handleSeatsSelected = useCallback((seats: number[]) => {
     setSelectedSeats(seats);
@@ -85,7 +84,7 @@ const TourDetailsPage = () => {
       const busesMap = new Map<string, Bus>();
       busesData?.forEach(bus => busesMap.set(bus.id, bus as Bus));
 
-      // 2. Fetch tour details, including nested hotel names
+      // 2. Fetch tour details (simplified query)
       const { data: tourData, error: tourError } = await supabase
         .from('tours')
         .select(`
@@ -105,15 +104,11 @@ const TourDetailsPage = () => {
           bus_capacity,
           courtesies,
           provider_details,
+          hotel_details,
           departure_date,
           return_date,
           departure_time,
-          return_time,
-          hotel_details:hotel_details (
-            id,
-            hotel_quote_id,
-            hotels ( name )
-          )
+          return_time
         `)
         .eq('slug', id)
         .single();
@@ -122,8 +117,12 @@ const TourDetailsPage = () => {
         console.error('Error fetching tour details:', tourError);
         setError('No se pudo cargar los detalles del tour. Asegúrate de que el slug sea correcto.');
         setTour(null);
-      } else if (tourData) {
-        setTour({
+        setLoading(false);
+        return;
+      } 
+      
+      if (tourData) {
+        const tourDetails = {
           ...tourData,
           includes: tourData.includes || [],
           itinerary: tourData.itinerary || [],
@@ -137,15 +136,38 @@ const TourDetailsPage = () => {
           return_date: tourData.return_date || null,
           departure_time: tourData.departure_time || null,
           return_time: tourData.return_time || null,
-        });
+        } as Tour;
 
-        if (tourData.bus_id) {
-          const bus = busesMap.get(tourData.bus_id);
+        // 3. Fetch hotel names based on IDs in hotel_details (JSONB field)
+        const hotelQuoteIds = tourDetails.hotel_details.map(d => d.hotel_quote_id).filter(Boolean);
+        
+        if (hotelQuoteIds.length > 0) {
+          const { data: hotelsData, error: hotelsError } = await supabase
+            .from('hotels')
+            .select('id, name')
+            .in('id', hotelQuoteIds);
+
+          if (hotelsError) {
+            console.error('Error fetching linked hotel names:', hotelsError);
+            setHotelNames('Error al cargar nombres de hoteles');
+          } else {
+            const names = (hotelsData || []).map(h => h.name).join(', ');
+            setHotelNames(names);
+          }
+        } else {
+          setHotelNames('N/A');
+        }
+
+        // Set bus layout
+        if (tourDetails.bus_id) {
+          const bus = busesMap.get(tourDetails.bus_id);
           const layout = bus?.seat_layout_json || null;
           setBusLayout(layout);
         } else {
           setBusLayout(null);
         }
+        
+        setTour(tourDetails);
       } else {
         setError('Tour no encontrado.');
         setTour(null);
@@ -192,10 +214,6 @@ const TourDetailsPage = () => {
   const cleanDescription = stripHtmlTags(tour.description);
   const departureDateDisplay = tour.departure_date ? format(parseISO(tour.departure_date), 'EEEE, dd MMMM yyyy', { locale: es }) : 'N/A';
   const returnDateDisplay = tour.return_date ? format(parseISO(tour.return_date), 'EEEE, dd MMMM yyyy', { locale: es }) : 'N/A';
-  const hotelNames = tour.hotel_details
-    .map(detail => detail.hotels?.name)
-    .filter(name => name)
-    .join(', ');
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -238,7 +256,7 @@ const TourDetailsPage = () => {
                 <div>
                   <h3 className="text-xl font-semibold text-gray-800 mb-3">Detalles Clave</h3>
                   <ul className="space-y-2 text-gray-700">
-                    {hotelNames && (
+                    {hotelNames && hotelNames !== 'N/A' && (
                       <li>
                         <Hotel className="inline h-4 w-4 mr-2 text-gray-500" />
                         <span className="font-medium">Hospedaje en:</span> {hotelNames}
