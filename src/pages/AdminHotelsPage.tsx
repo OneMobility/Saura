@@ -31,6 +31,7 @@ interface Hotel {
   is_active: boolean;
   advance_payment: number;
   total_paid: number;
+  quote_end_date: string | null; // NEW: Quote End Date
   created_at: string;
   // Calculated fields for display
   total_quote_cost: number; // Total cost for all contracted rooms in this quote
@@ -80,6 +81,7 @@ const AdminHotelsPage = () => {
           num_triple_rooms: hotel.num_triple_rooms || 0,
           num_quad_rooms: hotel.num_quad_rooms || 0,
           num_courtesy_rooms: hotel.num_courtesy_rooms || 0, // Set new field
+          quote_end_date: hotel.quote_end_date || null, // Include new field
           total_quote_cost: totalQuoteCost,
           remaining_payment: totalQuoteCost - (hotel.total_paid || 0),
         };
@@ -147,12 +149,13 @@ const AdminHotelsPage = () => {
                     <TableRow>
                       <TableHead>Hotel</TableHead>
                       <TableHead>Ubicación</TableHead>
-                      <TableHead>Fecha Cotizada</TableHead>
+                      <TableHead>Inicio Cotización</TableHead>
+                      <TableHead>Fin Cotización</TableHead> {/* NEW COLUMN */}
                       <TableHead>Noches</TableHead>
                       <TableHead>Hab. Dobles</TableHead>
                       <TableHead>Hab. Triples</TableHead>
                       <TableHead>Hab. Cuádruples</TableHead>
-                      <TableHead>Hab. Coordinadores</TableHead> {/* Changed label */}
+                      <TableHead>Hab. Coordinadores</TableHead>
                       <TableHead>Costo Total Cotización</TableHead>
                       <TableHead>Anticipo</TableHead>
                       <TableHead>Total Pagado</TableHead>
@@ -167,11 +170,12 @@ const AdminHotelsPage = () => {
                         <TableCell className="font-medium">{hotel.name}</TableCell>
                         <TableCell>{hotel.location}</TableCell>
                         <TableCell>{hotel.quoted_date ? format(parseISO(hotel.quoted_date), 'dd/MM/yy') : 'N/A'}</TableCell>
+                        <TableCell>{hotel.quote_end_date ? format(parseISO(hotel.quote_end_date), 'dd/MM/yy') : 'N/A'}</TableCell> {/* Display new field */}
                         <TableCell>{hotel.num_nights_quoted}</TableCell>
                         <TableCell>{hotel.num_double_rooms}</TableCell>
                         <TableCell>{hotel.num_triple_rooms}</TableCell>
                         <TableCell>{hotel.num_quad_rooms}</TableCell>
-                        <TableCell>{hotel.num_courtesy_rooms}</TableCell> {/* Display new field */}
+                        <TableCell>{hotel.num_courtesy_rooms}</TableCell>
                         <TableCell>${hotel.total_quote_cost.toFixed(2)}</TableCell>
                         <TableCell>${hotel.advance_payment.toFixed(2)}</TableCell>
                         <TableCell>${hotel.total_paid.toFixed(2)}</TableCell>

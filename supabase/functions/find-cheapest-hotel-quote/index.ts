@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-import { differenceInDays, parseISO } from 'https://esm.sh/date-fns@2.30.0';
+import { differenceInDays, parseISO, isSameDay, isAfter, isBefore, isEqual } from 'https://esm.sh/date-fns@2.30.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -91,7 +91,7 @@ serve(async (req) => {
     // Fetch all active hotel quotes, including room counts and costs
     const { data: quotes, error: quotesError } = await supabaseAdmin
       .from('hotels')
-      .select('id, name, location, num_nights_quoted, cost_per_night_double, cost_per_night_triple, cost_per_night_quad, num_double_rooms, num_triple_rooms, num_quad_rooms, num_courtesy_rooms, quoted_date');
+      .select('id, name, location, num_nights_quoted, cost_per_night_double, cost_per_night_triple, cost_per_night_quad, num_double_rooms, num_triple_rooms, num_quad_rooms, num_courtesy_rooms, quoted_date, quote_end_date');
 
     if (quotesError) {
       console.error('[find-cheapest-hotel-quote] Error fetching hotel quotes:', quotesError.message);
@@ -102,11 +102,32 @@ serve(async (req) => {
     let minEstimatedTotalCost = Infinity;
 
     for (const quote of quotes) {
+      // --- NEW: Date Matching Logic ---
+      if (!quote.quoted_date || !quote.quote_end_date) {
+        console.log(`[find-cheapest-hotel-quote] Skipping quote ${quote.id}: Missing quoted_date or quote_end_date.`);
+        continue;
+      }
+
+      const quoteStartDate = parseISO(quote.quoted_date);
+      const quoteEndDate = parseISO(quote.quote_end_date);
+
+      // Check if the tour dates are fully contained within the quote dates
+      // Tour must start on or after quote start date AND tour must end on or before quote end date.
+      const isDateMatch = (isEqual(departureDate, quoteStartDate) || isAfter(departureDate, quoteStartDate)) &&
+                          (isEqual(returnDate, quoteEndDate) || isBefore(returnDate, quoteEndDate));
+
+      if (!isDateMatch) {
+        console.log(`[find-cheapest-hotel-quote] Skipping quote ${quote.id}: Dates do not match tour range.`);
+        continue;
+      }
+      // --- END NEW: Date Matching Logic ---
+
+
       const numNightsQuote = quote.num_nights_quoted || 1;
       
       // 1. Calculate the total contracted cost for the quote (before adjusting for tour duration)
       const costDouble = (quote.num_double_rooms || 0) * quote.cost_per_night_double * numNightsQuote;
-      const costTriple = (quote.num_triple_rooms || 0) * quote.cost_per_night_triple * numNightsQuote;
+      const costTriple = (quote.num_triple_rooms || 0) * quote.cost_per_night_triple * quote.num_nights_quoted;
       const costQuad = (quote.num_quad_rooms || 0) * quote.cost_per_night_quad * numNightsQuote;
       const costCourtesy = (quote.num_courtesy_rooms || 0) * quote.cost_per_night_quad * numNightsQuote;
       
@@ -134,7 +155,7 @@ serve(async (req) => {
     }
 
     if (!cheapestQuote) {
-      return jsonResponse({ error: 'No active hotel quotes found with positive cost.' }, 404);
+      return jsonResponse({ error: 'No active hotel quotes found matching the tour dates.' }, 404);
     }
 
     return jsonResponse({ cheapestQuote }, 200);

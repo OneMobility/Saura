@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Save, DollarSign } from 'lucide-react'; // Removed CalendarIcon
-import { format, parse, isValid, parseISO } from 'date-fns';
+import { format, parse, isValid, parseISO, addDays } from 'date-fns'; // Added addDays
 import { cn } from '@/lib/utils';
 
 interface Hotel {
@@ -30,6 +30,8 @@ interface Hotel {
   is_active: boolean;
   advance_payment: number;
   total_paid: number;
+  // NEW: quote_end_date
+  quote_end_date: string | null;
   // calculated fields
   total_quote_cost: number;
   remaining_payment: number;
@@ -61,6 +63,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
     is_active: true,
     advance_payment: 0,
     total_paid: 0,
+    quote_end_date: null, // Initialize new field
     total_quote_cost: 0,
     remaining_payment: 0,
   });
@@ -134,6 +137,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
             num_courtesy_rooms: data.num_courtesy_rooms || 0,
             total_quote_cost: totalQuoteCost,
             remaining_payment: totalQuoteCost - (data.total_paid || 0),
+            quote_end_date: data.quote_end_date || null, // Load new field
           };
           setFormData(loadedData);
           setDateInput(data.quoted_date ? format(parseISO(data.quoted_date), 'dd/MM/yy') : '');
@@ -164,6 +168,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
           is_active: true,
           advance_payment: 0,
           total_paid: 0,
+          quote_end_date: null, // Reset new field
           total_quote_cost: 0,
           remaining_payment: 0,
         });
@@ -191,15 +196,33 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
-    setFormData((prev) => ({
-      ...prev,
-      [id]: ['num_nights_quoted', 'cost_per_night_double', 'cost_per_night_triple', 'cost_per_night_quad', 'num_double_rooms', 'num_triple_rooms', 'num_quad_rooms', 'num_courtesy_rooms', 'advance_payment', 'total_paid'].includes(id) ? parseFloat(value) || 0 : value,
-    }));
-  };
+    setFormData((prev) => {
+      const isNumeric = ['num_nights_quoted', 'cost_per_night_double', 'cost_per_night_triple', 'cost_per_night_quad', 'num_double_rooms', 'num_triple_rooms', 'num_quad_rooms', 'num_courtesy_rooms', 'advance_payment', 'total_paid'].includes(id);
+      const newValue = isNumeric ? parseFloat(value) || 0 : value;
+      
+      const updatedData = { ...prev, [id]: newValue };
 
-  const handleDateSelect = (date: Date | undefined) => {
-    const formattedDate = date ? format(date, 'dd/MM/yy') : null;
-    setFormData((prev) => ({ ...prev, quoted_date: formattedDate }));
+      // Recalculate quote_end_date if quoted_date or num_nights_quoted changes
+      if (id === 'quoted_date' || id === 'num_nights_quoted') {
+        const currentQuotedDate = id === 'quoted_date' ? newValue : prev.quoted_date;
+        const currentNumNights = id === 'num_nights_quoted' ? newValue : prev.num_nights_quoted;
+
+        if (currentQuotedDate && currentNumNights > 0) {
+          const parsedDate = parseISO(currentQuotedDate as string);
+          if (isValid(parsedDate)) {
+            // End date is start date + num_nights_quoted
+            const endDate = addDays(parsedDate, currentNumNights as number);
+            updatedData.quote_end_date = format(endDate, 'yyyy-MM-dd');
+          } else {
+            updatedData.quote_end_date = null;
+          }
+        } else {
+          updatedData.quote_end_date = null;
+        }
+      }
+
+      return updatedData;
+    });
   };
 
   const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -209,9 +232,20 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
     const parsedDate = parse(value, 'dd/MM/yy', new Date());
     
     if (isValid(parsedDate)) {
-      setFormData((prev) => ({ ...prev, quoted_date: format(parsedDate, 'yyyy-MM-dd') }));
+      const quoted_date = format(parsedDate, 'yyyy-MM-dd');
+      
+      // Calculate quote_end_date
+      const numNights = formData.num_nights_quoted || 1;
+      const endDate = addDays(parsedDate, numNights);
+      const quote_end_date = format(endDate, 'yyyy-MM-dd');
+
+      setFormData((prev) => ({ 
+        ...prev, 
+        quoted_date,
+        quote_end_date,
+      }));
     } else {
-      setFormData((prev) => ({ ...prev, quoted_date: null }));
+      setFormData((prev) => ({ ...prev, quoted_date: null, quote_end_date: null }));
     }
   };
 
@@ -255,6 +289,15 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
       return;
     }
 
+    // Final calculation of quote_end_date before saving
+    let finalQuoteEndDate = formData.quote_end_date;
+    if (formData.quoted_date && formData.num_nights_quoted > 0) {
+      const parsedDate = parseISO(formData.quoted_date);
+      if (isValid(parsedDate)) {
+        finalQuoteEndDate = format(addDays(parsedDate, formData.num_nights_quoted), 'yyyy-MM-dd');
+      }
+    }
+
 
     const dataToSave = {
       name: formData.name,
@@ -274,6 +317,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
       is_active: formData.is_active,
       advance_payment: formData.advance_payment,
       total_paid: formData.total_paid,
+      quote_end_date: finalQuoteEndDate, // Save the calculated end date
     };
 
     if (hotelId) {
@@ -317,6 +361,8 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
     );
   }
 
+  const quoteEndDateDisplay = formData.quote_end_date ? format(parseISO(formData.quote_end_date), 'dd/MM/yy') : 'N/A';
+
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
       <h2 className="text-2xl font-bold text-gray-800 mb-6">{hotelId ? 'Editar Cotización de Hotel' : 'Añadir Nueva Cotización de Hotel'}</h2>
@@ -348,7 +394,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
 
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="quoted_date" className="text-right">
-              Fecha Cotizada
+              Fecha Inicio Cotización
             </Label>
             <div className="relative col-span-3">
               <Input
@@ -378,6 +424,17 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
               onChange={handleChange}
               className="col-span-3"
               required
+            />
+          </div>
+          
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label className="text-right font-semibold">
+              Fecha Fin Cotización
+            </Label>
+            <Input
+              value={quoteEndDateDisplay}
+              readOnly
+              className="col-span-3 bg-gray-100 cursor-not-allowed"
             />
           </div>
 
