@@ -132,18 +132,8 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave, onBusDataLoaded, onReg
   };
 
   const handleLayoutChange = useCallback((layout: SeatLayout | null, seatCount: number) => {
-    setCurrentSeatLayout(prevLayout => {
-      if (JSON.stringify(layout) !== JSON.stringify(prevLayout)) {
-        return layout;
-      }
-      return prevLayout;
-    });
-    setCurrentSeatCount(prevCount => {
-      if (seatCount !== prevCount) {
-        return seatCount;
-      }
-      return prevCount;
-    });
+    setCurrentSeatLayout(layout); // Update currentSeatLayout directly
+    setCurrentSeatCount(seatCount);
   }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -191,7 +181,7 @@ const BusForm: React.FC<BusFormProps> = ({ busId, onSave, onBusDataLoaded, onReg
       license_plate: formData.license_plate,
       rental_cost: formData.rental_cost,
       total_capacity: formData.total_capacity,
-      seat_layout_json: currentSeatLayout,
+      seat_layout_json: currentSeatLayout, // Aseguramos que se guarda el layout
       advance_payment: formData.advance_payment,
       total_paid: formData.total_paid,
     };
