@@ -81,8 +81,8 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
   }, []);
 
   const handleWhatsAppRedirect = (contract: string, name: string) => {
-    const phone = '528444041469';
-    const message = encodeURIComponent(`¡Hola! Acabo de realizar una reserva.\n\n*Contrato:* ${contract}\n*Cliente:* ${name}\n*Tour:* ${tourTitle}\n\nQuedo a la espera de instrucciones para el pago.`);
+    const phone = '528444041469'; // Número configurado
+    const message = encodeURIComponent(`¡Hola Saura Tours! 👋\n\nAcabo de realizar una reserva.\n\n📝 *Detalles de mi Reserva:*\n• *Contrato:* ${contract}\n• *Cliente:* ${name}\n• *Tour:* ${tourTitle}\n\nQuedo a la espera de instrucciones para realizar mi pago manual. ¡Muchas gracias!`);
     window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
   };
 
@@ -143,7 +143,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
           </DialogHeader>
           <div className="bg-muted p-4 rounded-lg text-sm space-y-3">
             <p>✅ <strong>Guarda este número:</strong> Lo necesitarás para consultar tu contrato y hoja de reserva.</p>
-            <p>📱 Se ha abierto una ventana de <strong>WhatsApp</strong> para dar seguimiento a tu pago manual.</p>
+            <p>📱 Se ha abierto una ventana de <strong>WhatsApp</strong> para que nos envíes tu comprobante o solicites datos de pago.</p>
           </div>
           <DialogFooter className="mt-6">
             <Button onClick={onClose} className="w-full bg-rosa-mexicano">Entendido</Button>
