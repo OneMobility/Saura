@@ -8,7 +8,7 @@ import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, Info, Image as ImageIcon, MapPin, Clock, Hotel, Timer, ListChecks } from 'lucide-react';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { v4 as uuidv4 } from 'uuid';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
@@ -202,6 +202,14 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     const formatted = date ? format(date, 'yyyy-MM-dd') : null;
     if (field === 'departure_date') { setDepartureDate(date); setFormData(p => ({ ...p, departure_date: formatted })); }
     else { setReturnDate(date); setFormData(p => ({ ...p, return_date: formatted })); }
+  };
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      setImageUrlPreview(URL.createObjectURL(file));
+    }
   };
 
   const addInclude = () => setFormData(p => ({ ...p, includes: [...p.includes, ''] }));
