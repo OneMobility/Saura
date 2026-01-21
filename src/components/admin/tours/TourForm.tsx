@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, Info, Image as ImageIcon, MapPin, Clock } from 'lucide-react';
+import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, Info, Image as ImageIcon, MapPin, Clock, Hotel } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { v4 as uuidv4 } from 'uuid';
 import { format, parseISO, differenceInDays } from 'date-fns';
@@ -419,7 +419,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
                 </div>
 
                 <div className="space-y-3">
-                  <Label className="flex items-center gap-2"><HotelIcon className="h-4 w-4" /> Hoteles Vinculados</Label>
+                  <Label className="flex items-center gap-2"><Hotel className="h-4 w-4" /> Hoteles Vinculados</Label>
                   {formData.hotel_details.map((detail, index) => (
                     <div key={detail.id} className="flex gap-2">
                       <Select value={detail.hotel_quote_id} onValueChange={val => {
