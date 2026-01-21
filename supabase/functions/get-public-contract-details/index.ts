@@ -36,7 +36,7 @@ serve(async (req) => {
         identification_number, number_of_people, companions, total_amount,
         advance_payment, total_paid, status, contractor_age, room_details,
         tour_id, bus_route_id,
-        tours (title, description, image_url),
+        tours (title, description, image_url, departure_date, return_date, departure_time, return_time),
         bus_routes (name, all_stops)
       `)
       .ilike('contract_number', contractNumber.trim())
