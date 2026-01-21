@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, Info } from 'lucide-react';
+import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, Info, Image as ImageIcon, MapPin, Clock } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { v4 as uuidv4 } from 'uuid';
 import { format, parseISO, differenceInDays } from 'date-fns';
@@ -18,6 +18,8 @@ import { Calendar } from '@/components/ui/calendar';
 import { useNavigate } from 'react-router-dom';
 import { TourProviderService, AvailableProvider, SeatLayout } from '@/types/shared';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import RichTextEditor from '@/components/RichTextEditor';
 
 interface HotelQuote {
   id: string;
@@ -94,6 +96,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     selling_price_child: 0, other_income: 0, departure_date: null, return_date: null, departure_time: '08:00', return_time: '18:00',
   });
   
+  // Estados de simulación
   const [desiredProfitFixed, setDesiredProfitFixed] = useState(45000);
   const [projectedSales, setProjectedSales] = useState({ double: 0, triple: 0, quad: 0, child: 0 });
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -107,6 +110,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
   const [departureDate, setDepartureDate] = useState<Date | undefined>(undefined);
   const [returnDate, setReturnDate] = useState<Date | undefined>(undefined);
 
+  // Carga de dependencias
   useEffect(() => {
     const fetchData = async () => {
       const [hotelsRes, busesRes, providersRes] = await Promise.all([
@@ -132,6 +136,21 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     fetchData();
   }, []);
 
+  // Organizar hoteles agrupados para el selector
+  const groupedAndSortedQuotes = useMemo(() => {
+    const groups: Record<string, HotelQuote[]> = {};
+    availableHotelQuotes.forEach(quote => {
+      if (!groups[quote.name]) groups[quote.name] = [];
+      groups[quote.name].push(quote);
+    });
+    return Object.entries(groups).sort((a, b) => {
+      const minA = Math.min(...a[1].map(q => q.estimated_total_cost));
+      const minB = Math.min(...b[1].map(q => q.estimated_total_cost));
+      return minA - minB;
+    });
+  }, [availableHotelQuotes]);
+
+  // Carga de datos del tour si es edición
   useEffect(() => {
     const fetchTourData = async () => {
       if (tourId) {
@@ -153,6 +172,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     fetchTourData();
   }, [tourId]);
 
+  // Lógica financiera avanzada
   const financialSummary = useMemo(() => {
     const bus = availableBuses.find(b => b.id === formData.bus_id);
     const busCost = bus?.rental_cost || 0;
@@ -163,7 +183,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     }, 0);
 
     const totalCost = busCost + providerCost + hotelCost;
-    const capacity = formData.bus_capacity - formData.courtesies;
+    const capacity = (formData.bus_capacity || bus?.total_capacity || 0) - formData.courtesies;
     
     const currentRevenue = (projectedSales.double * formData.selling_price_double_occupancy) +
                            (projectedSales.triple * formData.selling_price_triple_occupancy) +
@@ -181,30 +201,29 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     const avgRequiredPerPerson = capacity > 0 ? targetRevenue / capacity : 0;
 
     return {
+      busCost, hotelCost, providerCost,
       totalCost,
       capacity,
       currentRevenue,
       projectedProfit,
-      beQuad,
-      beTriple,
-      beDouble,
+      beQuad, beTriple, beDouble,
       recPrice: {
         quad: avgRequiredPerPerson,
-        triple: avgRequiredPerPerson * 1.1,
+        triple: avgRequiredPerPerson * 1.12,
         double: avgRequiredPerPerson * 1.25,
-        child: avgRequiredPerPerson * 0.7
+        child: avgRequiredPerPerson * 0.75
       }
     };
   }, [formData, projectedSales, desiredProfitFixed, availableBuses, availableHotelQuotes]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [id]: ['bus_capacity', 'courtesies', 'selling_price_double_occupancy', 'selling_price_triple_occupancy', 'selling_price_quad_occupancy', 'selling_price_child', 'other_income'].includes(id) 
-        ? parseFloat(value) || 0 
-        : value
-    }));
+    setFormData(prev => {
+      const numericFields = ['bus_capacity', 'courtesies', 'selling_price_double_occupancy', 'selling_price_triple_occupancy', 'selling_price_quad_occupancy', 'selling_price_child', 'other_income'];
+      const updated = { ...prev, [id]: numericFields.includes(id) ? parseFloat(value) || 0 : value };
+      if (id === 'title') updated.slug = value.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
+      return updated;
+    });
   };
 
   const handleDateSelect = (field: 'departure_date' | 'return_date', date: Date | undefined) => {
@@ -213,13 +232,32 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     else { setReturnDate(date); setFormData(p => ({ ...p, return_date: formatted })); }
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      setImageUrlPreview(URL.createObjectURL(file));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    
+
+    let finalImageUrl = formData.image_url;
+    if (imageFile) {
+      const fileName = `${uuidv4()}-${imageFile.name}`;
+      const { error: uploadError } = await supabase.storage.from('tour-images').upload(fileName, imageFile);
+      if (!uploadError) {
+        const { data: { publicUrl } } = supabase.storage.from('tour-images').getPublicUrl(fileName);
+        finalImageUrl = publicUrl;
+      }
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
     const dataToSave = { 
       ...formData, 
+      image_url: finalImageUrl,
       user_id: user?.id,
       total_base_cost: financialSummary.totalCost,
       paying_clients_count: financialSummary.capacity,
@@ -230,62 +268,70 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
       ? await supabase.from('tours').update(dataToSave).eq('id', tourId)
       : await supabase.from('tours').insert(dataToSave);
       
-    if (error) toast.error('Error al guardar.');
-    else { toast.success('Tour guardado.'); onSave(); }
+    if (error) toast.error('Error al guardar el tour.');
+    else { toast.success('Tour publicado con éxito.'); onSave(); }
     setIsSubmitting(false);
   };
 
+  if (loadingInitialData) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-12 w-12 text-rosa-mexicano" /></div>;
+
   return (
-    <div className="space-y-8">
-      <Card>
-        <CardHeader>
+    <div className="space-y-8 pb-20">
+      {/* 1. Análisis Financiero (Simulador) */}
+      <Card className="border-t-4 border-rosa-mexicano shadow-xl">
+        <CardHeader className="bg-gray-50/50">
           <CardTitle className="text-2xl font-bold flex items-center gap-2">
-            <TrendingUp className="text-rosa-mexicano" /> Análisis de Rentabilidad
+            <TrendingUp className="text-rosa-mexicano" /> Calculadora de Rentabilidad Avanzada
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6">
+        <CardContent className="space-y-8 pt-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="p-4 bg-muted/50 rounded-xl border border-dashed">
-              <h3 className="text-sm font-bold uppercase text-gray-500 mb-4">Estructura de Gastos</h3>
-              <div className="space-y-2">
-                <div className="flex justify-between text-sm"><span>Transporte:</span> <span className="font-bold">${(availableBuses.find(b => b.id === formData.bus_id)?.rental_cost || 0).toLocaleString()}</span></div>
-                <div className="flex justify-between text-sm"><span>Proveedores:</span> <span className="font-bold">${formData.provider_details.reduce((s, p) => s + (p.cost_per_unit_snapshot * p.quantity), 0).toLocaleString()}</span></div>
-                <div className="pt-2 mt-2 border-t flex justify-between text-lg font-black text-rosa-mexicano">
-                  <span>COSTO TOTAL:</span>
+            {/* Gastos Reales */}
+            <div className="p-5 bg-muted/40 rounded-2xl border border-dashed border-gray-300">
+              <h3 className="text-xs font-black uppercase text-gray-500 mb-4 tracking-widest">Gastos del Tour</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between text-sm"><span>🚌 Transporte:</span> <span className="font-bold">${financialSummary.busCost.toLocaleString()}</span></div>
+                <div className="flex justify-between text-sm"><span>🏨 Hospedaje:</span> <span className="font-bold">${financialSummary.hotelCost.toLocaleString()}</span></div>
+                <div className="flex justify-between text-sm"><span>🎟️ Proveedores:</span> <span className="font-bold">${financialSummary.providerCost.toLocaleString()}</span></div>
+                <div className="pt-3 mt-2 border-t-2 border-rosa-mexicano/20 flex justify-between text-xl font-black text-rosa-mexicano">
+                  <span>EGRESO TOTAL:</span>
                   <span>${financialSummary.totalCost.toLocaleString()}</span>
                 </div>
               </div>
             </div>
 
-            <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100">
-              <h3 className="text-sm font-bold uppercase text-blue-600 mb-4 flex items-center gap-1">
+            {/* Punto de Equilibrio */}
+            <div className="p-5 bg-blue-50/60 rounded-2xl border border-blue-100">
+              <h3 className="text-xs font-black uppercase text-blue-600 mb-4 flex items-center gap-1 tracking-widest">
                 <AlertCircle className="h-4 w-4" /> Punto de Equilibrio
               </h3>
-              <div className="space-y-2">
-                <p className="text-xs text-blue-800">Mínimo para cubrir costos:</p>
-                <div className="flex justify-between text-sm"><span>Solo Cuádruple:</span> <span className="font-bold">{financialSummary.beQuad} pax</span></div>
-                <div className="flex justify-between text-sm"><span>Solo Triple:</span> <span className="font-bold">{financialSummary.beTriple} pax</span></div>
-                <div className="flex justify-between text-sm"><span>Solo Doble:</span> <span className="font-bold">{financialSummary.beDouble} pax</span></div>
+              <div className="space-y-3">
+                <p className="text-[10px] leading-tight text-blue-800 font-medium">Asientos necesarios para cubrir costos según tipo de venta dominante:</p>
+                <div className="flex justify-between text-sm"><span>Solo Cuádruple:</span> <span className="font-bold bg-blue-100 px-2 rounded">{financialSummary.beQuad} pax</span></div>
+                <div className="flex justify-between text-sm"><span>Solo Triple:</span> <span className="font-bold bg-blue-100 px-2 rounded">{financialSummary.beTriple} pax</span></div>
+                <div className="flex justify-between text-sm"><span>Solo Doble:</span> <span className="font-bold bg-blue-100 px-2 rounded">{financialSummary.beDouble} pax</span></div>
+                <p className="text-[10px] text-gray-500 italic mt-2">* Basado en {financialSummary.capacity} asientos vendibles.</p>
               </div>
             </div>
 
-            <div className="p-4 bg-green-50/50 rounded-xl border border-green-100">
-              <h3 className="text-sm font-bold uppercase text-green-600 mb-4 flex items-center gap-1">
-                <Calculator className="h-4 w-4" /> Utilidad Meta
+            {/* Utilidad Meta y Recomendación */}
+            <div className="p-5 bg-green-50/60 rounded-2xl border border-green-100">
+              <h3 className="text-xs font-black uppercase text-green-600 mb-4 flex items-center gap-1 tracking-widest">
+                <Calculator className="h-4 w-4" /> Utilidad Deseada
               </h3>
               <div className="space-y-4">
                 <div>
-                  <Label className="text-xs">Meta de ganancia fija:</Label>
+                  <Label className="text-[10px] font-bold">Meta de ganancia neta ($):</Label>
                   <Input 
                     type="number" 
                     value={desiredProfitFixed} 
                     onChange={e => setDesiredProfitFixed(parseFloat(e.target.value) || 0)}
-                    className="h-8 bg-white"
+                    className="h-9 bg-white font-bold border-green-200"
                   />
                 </div>
-                <div className="space-y-1">
-                  <p className="text-[10px] font-bold text-gray-500">PRECIOS RECOMENDADOS:</p>
-                  <div className="grid grid-cols-2 gap-x-2 text-[10px] font-bold">
+                <div className="p-3 bg-white/80 rounded-xl border border-green-100">
+                  <p className="text-[10px] font-black text-gray-400 mb-2">PRECIOS RECOMENDADOS:</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs font-black">
                     <div className="text-green-700">QUAD: ${financialSummary.recPrice.quad.toFixed(0)}</div>
                     <div className="text-green-700">TRIP: ${financialSummary.recPrice.triple.toFixed(0)}</div>
                     <div className="text-green-700">DBL: ${financialSummary.recPrice.double.toFixed(0)}</div>
@@ -296,38 +342,41 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
             </div>
           </div>
 
-          <div className="p-6 bg-gray-50 rounded-2xl border">
-            <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <TrendingUp className="h-5 w-5 text-rosa-mexicano" /> Simulador de Escenario de Ventas
-            </h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+          {/* Simulador de Mezcla de Ventas */}
+          <div className="p-6 bg-gray-900 rounded-3xl text-white shadow-2xl overflow-hidden relative">
+            <div className="absolute top-0 right-0 p-8 opacity-10"><TrendingUp className="h-40 w-40" /></div>
+            <h3 className="text-lg font-bold mb-6 flex items-center gap-2">Simulador de Escenario Mixto</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 relative z-10">
               {['double', 'triple', 'quad', 'child'].map((type) => (
-                <div key={type} className="space-y-1">
-                  <Label className="capitalize text-xs">Ventas {type}</Label>
+                <div key={type} className="space-y-2">
+                  <Label className="capitalize text-xs font-bold text-gray-400">Ventas {type}</Label>
                   <Input 
                     type="number" 
                     value={projectedSales[type as keyof typeof projectedSales]}
                     onChange={e => setProjectedSales({...projectedSales, [type]: parseInt(e.target.value) || 0})}
-                    className="bg-white"
+                    className="bg-white/10 border-white/20 text-white font-bold h-12 text-xl focus:bg-white/20"
                   />
                 </div>
               ))}
             </div>
-            <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-white rounded-xl border shadow-sm">
+            <div className="mt-8 flex flex-wrap items-center justify-between gap-6 pt-6 border-t border-white/10 relative z-10">
               <div>
-                <span className="text-sm text-gray-500 block">Asientos Ocupados</span>
-                <span className={cn(
-                  "text-2xl font-black",
-                  (projectedSales.double + projectedSales.triple + projectedSales.quad + projectedSales.child) > financialSummary.capacity ? "text-red-500" : "text-gray-900"
-                )}>
-                  {projectedSales.double + projectedSales.triple + projectedSales.quad + projectedSales.child} / {financialSummary.capacity}
-                </span>
+                <span className="text-xs text-gray-400 font-bold uppercase tracking-widest block mb-1">Capacidad Bus</span>
+                <div className="flex items-center gap-3">
+                  <span className={cn(
+                    "text-4xl font-black",
+                    (projectedSales.double + projectedSales.triple + projectedSales.quad + projectedSales.child) > financialSummary.capacity ? "text-red-500" : "text-rosa-mexicano"
+                  )}>
+                    {projectedSales.double + projectedSales.triple + projectedSales.quad + projectedSales.child}
+                  </span>
+                  <span className="text-xl text-gray-500">/ {financialSummary.capacity} pax</span>
+                </div>
               </div>
               <div className="text-right">
-                <span className="text-sm text-gray-500 block">Utilidad Proyectada</span>
+                <span className="text-xs text-gray-400 font-bold uppercase tracking-widest block mb-1">Utilidad Estimada</span>
                 <span className={cn(
-                  "text-3xl font-black",
-                  financialSummary.projectedProfit >= 0 ? "text-green-600" : "text-red-600"
+                  "text-5xl font-black tracking-tighter",
+                  financialSummary.projectedProfit >= 0 ? "text-green-400" : "text-red-500"
                 )}>
                   ${financialSummary.projectedProfit.toLocaleString()}
                 </span>
@@ -337,33 +386,193 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
         </CardContent>
       </Card>
 
-      <form onSubmit={handleSubmit} className="bg-white rounded-lg shadow-lg p-6 space-y-6">
-        <h2 className="text-xl font-bold border-b pb-2">Configuración de Precios de Venta</h2>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="space-y-2">
-            <Label>Doble (Precio por persona)</Label>
-            <Input type="number" id="selling_price_double_occupancy" value={formData.selling_price_double_occupancy} onChange={handleChange} className="font-bold border-rosa-mexicano" />
+      {/* 2. Formulario de Datos y Logística */}
+      <form onSubmit={handleSubmit} className="space-y-8">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
+          {/* Columna Izquierda: Logística y Precios */}
+          <div className="space-y-8">
+            <Card>
+              <CardHeader><CardTitle className="text-lg">Logística del Viaje</CardTitle></CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label>Nombre del Tour</Label>
+                  <Input id="title" value={formData.title} onChange={handleChange} placeholder="Ej: Semana Santa en Huasteca" required />
+                </div>
+                
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Autobús</Label>
+                    <Select value={formData.bus_id || ''} onValueChange={val => {
+                      const bus = availableBuses.find(b => b.id === val);
+                      setFormData(p => ({ ...p, bus_id: val, bus_capacity: bus?.total_capacity || 0, bus_cost: bus?.rental_cost || 0 }));
+                    }}>
+                      <SelectTrigger><SelectValue placeholder="Elegir Bus" /></SelectTrigger>
+                      <SelectContent>
+                        {availableBuses.map(b => <SelectItem key={b.id} value={b.id}>{b.name} (${b.rental_cost})</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Coordinadores (Lugares ocupados)</Label>
+                    <Input type="number" id="courtesies" value={formData.courtesies} onChange={handleChange} />
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <Label className="flex items-center gap-2"><HotelIcon className="h-4 w-4" /> Hoteles Vinculados</Label>
+                  {formData.hotel_details.map((detail, index) => (
+                    <div key={detail.id} className="flex gap-2">
+                      <Select value={detail.hotel_quote_id} onValueChange={val => {
+                        const newH = [...formData.hotel_details]; newH[index].hotel_quote_id = val;
+                        setFormData({...formData, hotel_details: newH});
+                      }}>
+                        <SelectTrigger className="flex-grow">
+                          <SelectValue placeholder="Seleccionar Cotización" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {groupedAndSortedQuotes.map(([name, quotes]) => (
+                            <SelectGroup key={name}>
+                              <SelectLabel className="bg-muted py-1 px-2 text-rosa-mexicano font-bold">{name}</SelectLabel>
+                              {quotes.map(q => (
+                                <SelectItem key={q.id} value={q.id}>
+                                  ${q.estimated_total_cost.toFixed(0)} - {q.num_nights_quoted} Noches ({format(parseISO(q.quoted_date!), 'dd/MM')})
+                                </SelectItem>
+                              ))}
+                            </SelectGroup>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button variant="ghost" size="icon" onClick={() => setFormData({...formData, hotel_details: formData.hotel_details.filter(d => d.id !== detail.id)})}>
+                        <MinusCircle className="h-4 w-4 text-red-500" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" className="w-full border-dashed" onClick={() => setFormData({...formData, hotel_details: [...formData.hotel_details, { id: uuidv4(), hotel_quote_id: '' }]})}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Vincular otro Hotel
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-rosa-mexicano/30">
+              <CardHeader><CardTitle className="text-lg">Precios de Venta Oficiales</CardTitle></CardHeader>
+              <CardContent className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label>Doble (p/p)</Label>
+                  <Input type="number" id="selling_price_double_occupancy" value={formData.selling_price_double_occupancy} onChange={handleChange} className="border-rosa-mexicano/50 font-bold" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Triple (p/p)</Label>
+                  <Input type="number" id="selling_price_triple_occupancy" value={formData.selling_price_triple_occupancy} onChange={handleChange} className="border-rosa-mexicano/50 font-bold" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Cuádruple (p/p)</Label>
+                  <Input type="number" id="selling_price_quad_occupancy" value={formData.selling_price_quad_occupancy} onChange={handleChange} className="border-rosa-mexicano/50 font-bold" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Niño (-12 años)</Label>
+                  <Input type="number" id="selling_price_child" value={formData.selling_price_child} onChange={handleChange} className="border-rosa-mexicano/50 font-bold" />
+                </div>
+                <div className="space-y-2 col-span-2 pt-2 border-t">
+                  <Label>Otros Ingresos (Ej: Patrocinios)</Label>
+                  <Input type="number" id="other_income" value={formData.other_income} onChange={handleChange} />
+                </div>
+              </CardContent>
+            </Card>
           </div>
-          <div className="space-y-2">
-            <Label>Triple (Precio por persona)</Label>
-            <Input type="number" id="selling_price_triple_occupancy" value={formData.selling_price_triple_occupancy} onChange={handleChange} className="font-bold border-rosa-mexicano" />
-          </div>
-          <div className="space-y-2">
-            <Label>Cuádruple (Precio por persona)</Label>
-            <Input type="number" id="selling_price_quad_occupancy" value={formData.selling_price_quad_occupancy} onChange={handleChange} className="font-bold border-rosa-mexicano" />
-          </div>
-          <div className="space-y-2">
-            <Label>Niño (Hasta 12 años)</Label>
-            <Input type="number" id="selling_price_child" value={formData.selling_price_child} onChange={handleChange} className="font-bold border-rosa-mexicano" />
+
+          {/* Columna Derecha: Multimedia y Fechas */}
+          <div className="space-y-8">
+            <Card>
+              <CardHeader><CardTitle className="text-lg">Fechas y Foto</CardTitle></CardHeader>
+              <CardContent className="space-y-6">
+                <div className="grid grid-cols-1 gap-4">
+                  <div className="space-y-2">
+                    <Label>Foto de Portada</Label>
+                    <div className="relative group cursor-pointer border-2 border-dashed rounded-xl h-48 flex items-center justify-center overflow-hidden">
+                      {imageUrlPreview ? (
+                        <img src={imageUrlPreview} className="w-full h-full object-cover" alt="Preview" />
+                      ) : (
+                        <div className="text-center text-gray-400"><ImageIcon className="mx-auto mb-2" /><span>Subir Imagen</span></div>
+                      )}
+                      <Input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleFileChange} />
+                    </div>
+                  </div>
+                  
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label>Fecha Salida</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button variant="outline" className="w-full justify-start">{departureDate ? format(departureDate, 'dd/MM/yy') : 'Fecha'}</Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={departureDate} onSelect={d => handleDateSelect('departure_date', d)} locale={es} /></PopoverContent>
+                      </Popover>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Hora</Label>
+                      <Input id="departure_time" value={formData.departure_time || ''} onChange={handleChange} placeholder="08:00" />
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Descripción Corta (Venta)</Label>
+                  <Textarea id="description" value={formData.description} onChange={handleChange} placeholder="Engancha a tus clientes..." className="h-24" />
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle className="text-lg">Itinerario y Detalles</CardTitle></CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-4">
+                  <Label>Días del Viaje</Label>
+                  {formData.itinerary.map((item, index) => (
+                    <div key={index} className="flex gap-2 items-start bg-gray-50 p-3 rounded-lg">
+                      <div className="bg-rosa-mexicano text-white rounded-full h-6 w-6 flex-shrink-0 flex items-center justify-center text-xs font-bold mt-2">{item.day}</div>
+                      <Textarea 
+                        value={item.activity} 
+                        onChange={e => {
+                          const newI = [...formData.itinerary]; newI[index].activity = e.target.value;
+                          setFormData({...formData, itinerary: newI});
+                        }} 
+                        className="bg-white" 
+                        placeholder="Actividades del día..."
+                      />
+                      <Button variant="ghost" size="icon" onClick={() => setFormData({...formData, itinerary: formData.itinerary.filter((_, i) => i !== index)})}>
+                        <MinusCircle className="h-4 w-4 text-red-400" />
+                      </Button>
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" className="w-full" onClick={() => setFormData({...formData, itinerary: [...formData.itinerary, { day: formData.itinerary.length + 1, activity: '' }]})}>
+                    <PlusCircle className="mr-2 h-4 w-4" /> Añadir Día
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         </div>
 
-        <div className="flex gap-4">
-          <Button type="submit" disabled={isSubmitting} className="flex-grow bg-rosa-mexicano py-6 text-lg">
+        {/* Sección de Texto Largo (Debajo de las columnas) */}
+        <Card>
+          <CardHeader><CardTitle className="text-lg">Información Detallada (Página del Tour)</CardTitle></CardHeader>
+          <CardContent>
+            <RichTextEditor 
+              value={formData.full_content} 
+              onChange={val => setFormData({...formData, full_content: val})} 
+              placeholder="Detalles sobre puntos de reunión, recomendaciones, equipo necesario..."
+              className="min-h-[300px]"
+            />
+          </CardContent>
+        </Card>
+
+        <div className="fixed bottom-6 right-6 flex gap-4 z-50">
+          <Button type="button" variant="outline" onClick={() => navigate('/admin/tours')} className="bg-white shadow-lg">Cancelar</Button>
+          <Button type="submit" disabled={isSubmitting} className="bg-rosa-mexicano text-white shadow-lg px-8 py-6 h-auto text-lg font-bold rounded-2xl">
             {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
             {tourId ? 'Actualizar Tour' : 'Publicar Tour'}
           </Button>
-          <Button type="button" variant="outline" onClick={() => navigate('/admin/tours')} className="py-6">Cancelar</Button>
         </div>
       </form>
     </div>
