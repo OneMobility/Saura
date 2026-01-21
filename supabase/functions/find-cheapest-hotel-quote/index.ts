@@ -80,19 +80,18 @@ serve(async (req) => {
       return jsonResponse({ error: 'Return date must be after departure date.' }, 400);
     }
 
-    // Calculate number of nights (return date - departure date)
-    const numNights = differenceInDays(returnDate, departureDate);
-    console.log(`[find-cheapest-hotel-quote] Calculated nights: ${numNights}`);
+    // Calculate number of nights for the tour
+    const numNightsTour = differenceInDays(returnDate, departureDate);
+    console.log(`[find-cheapest-hotel-quote] Calculated nights for tour: ${numNightsTour}`);
 
-    if (numNights <= 0) {
+    if (numNightsTour <= 0) {
         return jsonResponse({ error: 'Number of nights must be greater than zero.' }, 400);
     }
 
-    // Fetch all active hotel quotes
+    // Fetch all active hotel quotes, including room counts and costs
     const { data: quotes, error: quotesError } = await supabaseAdmin
       .from('hotels')
-      .select('id, name, location, cost_per_night_double, num_nights_quoted, num_double_rooms, num_courtesy_rooms, total_paid')
-      .eq('is_active', true);
+      .select('id, name, location, num_nights_quoted, cost_per_night_double, cost_per_night_triple, cost_per_night_quad, num_double_rooms, num_triple_rooms, num_quad_rooms, num_courtesy_rooms, quoted_date');
 
     if (quotesError) {
       console.error('[find-cheapest-hotel-quote] Error fetching hotel quotes:', quotesError.message);
@@ -100,35 +99,42 @@ serve(async (req) => {
     }
 
     let cheapestQuote = null;
-    let minTotalCost = Infinity;
+    let minEstimatedTotalCost = Infinity;
 
     for (const quote of quotes) {
-      // Calculate the total cost for a single double room for the required number of nights
-      // We use the cost_per_night_double from the quote, assuming the quote's num_nights_quoted is the basis for that price.
-      // If the quote's num_nights_quoted is different from the tour's numNights, we need to adjust the cost.
+      const numNightsQuote = quote.num_nights_quoted || 1;
       
-      // Calculate cost per night (based on the quote's duration)
-      const quoteCostPerNight = quote.cost_per_night_double / (quote.num_nights_quoted || 1);
+      // 1. Calculate the total contracted cost for the quote (before adjusting for tour duration)
+      const costDouble = (quote.num_double_rooms || 0) * quote.cost_per_night_double * numNightsQuote;
+      const costTriple = (quote.num_triple_rooms || 0) * quote.cost_per_night_triple * numNightsQuote;
+      const costQuad = (quote.num_quad_rooms || 0) * quote.cost_per_night_quad * numNightsQuote;
+      const costCourtesy = (quote.num_courtesy_rooms || 0) * quote.cost_per_night_quad * numNightsQuote;
       
-      // Calculate the estimated total cost for the tour's duration
-      const estimatedTotalCost = quoteCostPerNight * numNights;
+      const totalQuoteCost = (costDouble + costTriple + costQuad) - costCourtesy;
 
-      if (estimatedTotalCost < minTotalCost) {
-        minTotalCost = estimatedTotalCost;
+      if (totalQuoteCost <= 0) continue; // Skip quotes with zero or negative cost
+
+      // 2. Calculate the average cost per night for the entire contracted quote
+      const averageCostPerNightQuote = totalQuoteCost / numNightsQuote;
+
+      // 3. Estimate the total cost if this quote were applied to the tour's duration
+      const estimatedTotalCost = averageCostPerNightQuote * numNightsTour;
+
+      if (estimatedTotalCost < minEstimatedTotalCost) {
+        minEstimatedTotalCost = estimatedTotalCost;
         cheapestQuote = {
           id: quote.id,
           name: quote.name,
           location: quote.location,
           estimated_total_cost: estimatedTotalCost,
-          cost_per_night_double: quote.cost_per_night_double,
-          num_nights_quoted: quote.num_nights_quoted,
-          num_nights_tour: numNights,
+          num_nights_tour: numNightsTour,
+          quoted_date: quote.quoted_date,
         };
       }
     }
 
     if (!cheapestQuote) {
-      return jsonResponse({ error: 'No active hotel quotes found.' }, 404);
+      return jsonResponse({ error: 'No active hotel quotes found with positive cost.' }, 404);
     }
 
     return jsonResponse({ cheapestQuote }, 200);

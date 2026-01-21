@@ -206,7 +206,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const [breakevenResult, setBreakevenResult] = useState<BreakevenResult | null>(null);
 
   // NEW: Cheapest Hotel Quote state
-  const [cheapestHotelQuote, setCheapestHotelQuote] = useState<{ name: string; estimated_total_cost: number; id: string } | null>(null);
+  const [cheapestHotelQuote, setCheapestHotelQuote] = useState<{ name: string; estimated_total_cost: number; id: string; quoted_date: string | null } | null>(null);
   const [loadingCheapestHotel, setLoadingCheapestHotel] = useState(false);
 
 
@@ -1366,7 +1366,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             <HotelIcon className="mr-2 h-5 w-5" /> Búsqueda de Hotel Más Barato
           </h3>
           <p className="text-sm text-gray-700 mb-4">
-            Busca la cotización de hotel activa más barata para la duración de este tour (basado en costo por noche doble).
+            Busca la cotización de hotel activa más barata para la duración de este tour (basado en el costo total de la cotización ajustado por noche).
           </p>
           <div className="flex justify-end">
             <Button 
@@ -1386,7 +1386,10 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
                 <span className="font-bold">{cheapestHotelQuote.name}</span> ({cheapestHotelQuote.location})
               </p>
               <p className="text-blue-800 text-sm">
-                Costo Estimado para {cheapestHotelQuote.num_nights_tour} noches (Doble): <span className="font-bold">${cheapestHotelQuote.estimated_total_cost.toFixed(2)}</span>
+                Costo Estimado para {cheapestHotelQuote.num_nights_tour} noches: <span className="font-bold">${cheapestHotelQuote.estimated_total_cost.toFixed(2)}</span>
+              </p>
+              <p className="text-blue-800 text-sm">
+                Fecha de Cotización: <span className="font-bold">{cheapestHotelQuote.quoted_date ? format(parseISO(cheapestHotelQuote.quoted_date), 'dd/MM/yyyy', { locale: es }) : 'N/A'}</span>
               </p>
               <Button 
                 type="button" 
