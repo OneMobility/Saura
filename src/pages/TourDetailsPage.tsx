@@ -73,21 +73,19 @@ const TourDetailsPage = () => {
       setLoading(true);
       setError(null);
 
-      // Fetch all buses to get their layouts
+      // 1. Fetch all buses to get their layouts
       const { data: busesData, error: busesError } = await supabase
         .from('buses')
         .select('id, seat_layout_json');
 
       if (busesError) {
         console.error('Error fetching buses:', busesError);
-        setError('Error al cargar la información de autobuses.');
-        setLoading(false);
-        return;
+        // Continue even if buses fail, but log error
       }
       const busesMap = new Map<string, Bus>();
       busesData?.forEach(bus => busesMap.set(bus.id, bus as Bus));
 
-      // Then fetch tour details, including nested hotel names
+      // 2. Fetch tour details, including nested hotel names
       const { data: tourData, error: tourError } = await supabase
         .from('tours')
         .select(`
@@ -111,7 +109,7 @@ const TourDetailsPage = () => {
           return_date,
           departure_time,
           return_time,
-          hotel_details (
+          hotel_details:hotel_details (
             id,
             hotel_quote_id,
             hotels ( name )
@@ -122,7 +120,7 @@ const TourDetailsPage = () => {
 
       if (tourError) {
         console.error('Error fetching tour details:', tourError);
-        setError('No se pudo cargar los detalles del tour.');
+        setError('No se pudo cargar los detalles del tour. Asegúrate de que el slug sea correcto.');
         setTour(null);
       } else if (tourData) {
         setTour({
@@ -134,7 +132,7 @@ const TourDetailsPage = () => {
           selling_price_quad_occupancy: tourData.selling_price_quad_occupancy || 0,
           selling_price_child: tourData.selling_price_child || 0,
           provider_details: tourData.provider_details || [],
-          hotel_details: tourData.hotel_details || [], // Use fetched hotel details
+          hotel_details: tourData.hotel_details || [],
           departure_date: tourData.departure_date || null,
           return_date: tourData.return_date || null,
           departure_time: tourData.departure_time || null,
