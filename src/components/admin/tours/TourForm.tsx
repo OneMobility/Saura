@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, ImageIcon, MapPin, Clock, Hotel, ListChecks, Armchair } from 'lucide-react';
+import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, ImageIcon, MapPin, Clock, Hotel, ListChecks, Armchair, Info } from 'lucide-react';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { v4 as uuidv4 } from 'uuid';
 import { format, parseISO } from 'date-fns';
@@ -290,9 +290,9 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
               </h3>
               <div className="space-y-3">
                 <p className="text-[10px] leading-tight text-blue-800 font-medium">Pax necesarios para cubrir gastos:</p>
-                <div className="flex justify-between text-sm"><span>En Cuádruple:</span> <span className="font-bold">{financialSummary.beQuad} pax</span></div>
-                <div className="flex justify-between text-sm"><span>En Triple:</span> <span className="font-bold">{financialSummary.beTriple} pax</span></div>
-                <div className="flex justify-between text-sm"><span>En Doble:</span> <span className="font-bold">{financialSummary.beDouble} pax</span></div>
+                <div className="flex justify-between text-sm"><span>En Cuádruple:</span> <span className="font-bold">{Math.ceil(financialSummary.totalCost / (formData.selling_price_quad_occupancy || 1))} pax</span></div>
+                <div className="flex justify-between text-sm"><span>En Triple:</span> <span className="font-bold">{Math.ceil(financialSummary.totalCost / (formData.selling_price_triple_occupancy || 1))} pax</span></div>
+                <div className="flex justify-between text-sm"><span>En Doble:</span> <span className="font-bold">{Math.ceil(financialSummary.totalCost / (formData.selling_price_double_occupancy || 1))} pax</span></div>
               </div>
             </div>
 
