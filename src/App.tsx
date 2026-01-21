@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect } from "react";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
@@ -37,7 +37,7 @@ import AdminBusRoutesPage from "./pages/AdminBusRoutesPage";
 import AdminBusRouteFormPage from "./pages/AdminBusRouteFormPage";
 import AdminBusSchedulesPage from "./pages/AdminBusSchedulesPage";
 import AdminBusPassengersPage from "./pages/AdminBusPassengersPage";
-import AdminBusTicketValidationPage from "./pages/AdminBusTicketValidationPage"; // NEW: Import AdminBusTicketValidationPage
+import AdminBusTicketValidationPage from "./pages/AdminBusTicketValidationPage";
 
 // Bus Tickets Subdomain Pages
 import DestinationsPage from "./pages/bus-tickets/DestinationsPage";
@@ -57,10 +57,35 @@ import { SessionContextProvider } from "./components/SessionContextProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
 import ScrollToTop from "./components/ScrollToTop";
 import Login from "./pages/Login";
+import { supabase } from "@/integrations/supabase/client";
 
 const queryClient = new QueryClient();
 
 const App = () => {
+  // NEW: Effect to sync site identity (Title & Favicon)
+  useEffect(() => {
+    const fetchSiteSettings = async () => {
+      const { data } = await supabase
+        .from('agency_settings')
+        .select('agency_name, favicon_url')
+        .single();
+
+      if (data) {
+        if (data.agency_name) {
+          document.title = data.agency_name;
+        }
+        if (data.favicon_url) {
+          const link: HTMLLinkElement = document.querySelector("link[rel*='icon']") || document.createElement('link');
+          link.type = 'image/x-icon';
+          link.rel = 'shortcut icon';
+          link.href = data.favicon_url;
+          document.getElementsByTagName('head')[0].appendChild(link);
+        }
+      }
+    };
+    fetchSiteSettings();
+  }, []);
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -77,7 +102,6 @@ const App = () => {
               <Route path="/blog/:id" element={<BlogPostPage />} />
               <Route path="/contact" element={<ContactPage />} />
               
-              {/* NEW: Bus Tickets Subdomain Routes */}
               <Route path="/bus-tickets" element={<BusTicketsPage />} />
               <Route path="/bus-tickets/destinations" element={<DestinationsPage />} />
               <Route path="/bus-tickets/about" element={<AboutUsPage />} />
@@ -310,14 +334,13 @@ const App = () => {
                 }
               />
               <Route
-                path="/admin/bus-tickets/validate" // NEW: Route for AdminBusTicketValidationPage
+                path="/admin/bus-tickets/validate"
                 element={
                   <ProtectedRoute adminOnly>
                     <AdminBusTicketValidationPage />
                   </ProtectedRoute>
                 }
               />
-              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
               <Route path="*" element={<NotFound />} />
             </Routes>
           </SessionContextProvider>
