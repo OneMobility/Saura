@@ -414,7 +414,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       const costTriple = (hotelQuote.num_triple_rooms || 0) * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
       const costQuad = (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
       
-      const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
+      const totalContractedRoomsCost = costDouble + costTriple + costQuad; // FIX APPLIED HERE
 
       // Subtract the value of courtesy rooms from the total contracted cost
       // Courtesy rooms are always valued at the quad occupancy rate
