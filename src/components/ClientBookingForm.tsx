@@ -29,11 +29,14 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
   const [generatedContract, setGeneratedContract] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [settings, setSettings] = useState<any>(null);
+  const [loadingSettings, setLoadingSettings] = useState(true);
 
   useEffect(() => {
     const fetchSettings = async () => {
+      setLoadingSettings(true);
       const { data } = await supabase.from('agency_settings').select('*').single();
       if (data) setSettings(data);
+      setLoadingSettings(false);
     };
     fetchSettings();
   }, []);
@@ -96,6 +99,11 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     }
   };
 
+  // Validaciones de visibilidad
+  const hasMercadoPago = !!settings?.mp_public_key;
+  const hasStripe = !!settings?.stripe_public_key;
+  const hasBankInfo = !!settings?.bank_name && !!settings?.bank_clabe;
+
   if (showSuccess) {
     return (
       <Dialog open={isOpen} onOpenChange={onClose}>
@@ -137,42 +145,59 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
             <Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
           </div>
 
-          {showTransferInfo && settings?.bank_name && (
-            <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl space-y-3 animate-in fade-in slide-in-from-top-2">
-              <h4 className="font-bold text-blue-800 flex items-center gap-2">
-                <Landmark className="h-4 w-4" /> Datos de Transferencia
-              </h4>
-              <div className="text-sm text-blue-900 space-y-1">
-                <p><strong>Banco:</strong> {settings.bank_name}</p>
-                <p><strong>CLABE:</strong> {settings.bank_clabe}</p>
-                <p><strong>Titular:</strong> {settings.bank_holder}</p>
-                <p className="font-bold text-rosa-mexicano mt-2">Monto a depositar: ${settings.advance_payment_amount || 0} por persona</p>
-              </div>
-              <p className="text-xs text-blue-700 italic flex gap-1 items-start">
-                <Info className="h-3 w-3 mt-0.5 shrink-0" /> Al realizar una transferencia debes enviar tu comprobante por mensaje.
-              </p>
-              <Button onClick={(e) => handleSubmit(e, 'transferencia')} disabled={isSubmitting} className="w-full bg-green-600 hover:bg-green-700 text-white">
-                {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <MessageSquare className="mr-2 h-4 w-4" />}
-                Confirmar y enviar comprobante por WhatsApp
-              </Button>
+          {loadingSettings ? (
+            <div className="flex justify-center py-8">
+              <Loader2 className="animate-spin text-rosa-mexicano" />
             </div>
-          )}
+          ) : (
+            <>
+              {showTransferInfo && hasBankInfo && (
+                <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl space-y-3 animate-in fade-in slide-in-from-top-2">
+                  <h4 className="font-bold text-blue-800 flex items-center gap-2">
+                    <Landmark className="h-4 w-4" /> Datos de Transferencia
+                  </h4>
+                  <div className="text-sm text-blue-900 space-y-1">
+                    <p><strong>Banco:</strong> {settings.bank_name}</p>
+                    <p><strong>CLABE:</strong> {settings.bank_clabe}</p>
+                    <p><strong>Titular:</strong> {settings.bank_holder}</p>
+                    <p className="font-bold text-rosa-mexicano mt-2">Monto a depositar: ${settings.advance_payment_amount || 0} por persona</p>
+                  </div>
+                  <p className="text-xs text-blue-700 italic flex gap-1 items-start">
+                    <Info className="h-3 w-3 mt-0.5 shrink-0" /> Al realizar una transferencia debes enviar tu comprobante por mensaje.
+                  </p>
+                  <Button onClick={(e) => handleSubmit(e, 'transferencia')} disabled={isSubmitting} className="w-full bg-green-600 hover:bg-green-700 text-white">
+                    {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <MessageSquare className="mr-2 h-4 w-4" />}
+                    Confirmar y enviar comprobante por WhatsApp
+                  </Button>
+                </div>
+              )}
 
-          {!showTransferInfo && (
-            <div className="grid grid-cols-1 gap-3 mt-4">
-              <Button type="button" onClick={() => handleSubmit(null as any, 'mercadopago')} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 py-6 text-base">
-                <CreditCard className="mr-2 h-4 w-4" /> Mercado Pago
-              </Button>
-              <Button type="button" onClick={() => handleSubmit(null as any, 'stripe')} disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700 py-6 text-base">
-                <CreditCard className="mr-2 h-4 w-4" /> Stripe
-              </Button>
-              <Button type="button" variant="outline" onClick={() => setShowTransferInfo(true)} disabled={isSubmitting} className="py-6 border-green-600 text-green-700 hover:bg-green-50">
-                <Landmark className="mr-2 h-4 w-4" /> Transferencia Bancaria
-              </Button>
-              <Button type="button" variant="ghost" onClick={() => handleSubmit(null as any, 'manual')} disabled={isSubmitting} className="py-6 text-rosa-mexicano hover:text-rosa-mexicano hover:bg-rosa-mexicano/10">
-                Otro / Pagar después por WhatsApp
-              </Button>
-            </div>
+              {!showTransferInfo && (
+                <div className="grid grid-cols-1 gap-3 mt-4">
+                  {hasMercadoPago && (
+                    <Button type="button" onClick={() => handleSubmit(null as any, 'mercadopago')} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 py-6 text-base">
+                      <CreditCard className="mr-2 h-4 w-4" /> Mercado Pago
+                    </Button>
+                  )}
+                  
+                  {hasStripe && (
+                    <Button type="button" onClick={() => handleSubmit(null as any, 'stripe')} disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700 py-6 text-base">
+                      <CreditCard className="mr-2 h-4 w-4" /> Stripe
+                    </Button>
+                  )}
+                  
+                  {hasBankInfo && (
+                    <Button type="button" variant="outline" onClick={() => setShowTransferInfo(true)} disabled={isSubmitting} className="py-6 border-green-600 text-green-700 hover:bg-green-50">
+                      <Landmark className="mr-2 h-4 w-4" /> Transferencia Bancaria
+                    </Button>
+                  )}
+                  
+                  <Button type="button" variant="ghost" onClick={() => handleSubmit(null as any, 'manual')} disabled={isSubmitting} className="py-6 text-rosa-mexicano hover:text-rosa-mexicano hover:bg-rosa-mexicano/10">
+                    Otro / Pagar después por WhatsApp
+                  </Button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </DialogContent>
