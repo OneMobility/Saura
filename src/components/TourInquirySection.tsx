@@ -6,10 +6,12 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2 } from 'lucide-react';
+import { Loader2, MessageSquare, FileText, FileSignature, Download } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { SeatLayout } from '@/types/shared'; // Import SeatLayout
+import { useSession } from '@/components/SessionContextProvider'; // Import useSession
+import { stripHtmlTags } from '@/utils/html'; // Import stripHtmlTags
 
 interface BusPassenger {
   id: string;
@@ -37,6 +39,7 @@ interface Payment {
 }
 
 interface ClientContract {
+  id: string; // Added ID for document generation
   first_name: string;
   last_name: string;
   email: string;
@@ -60,10 +63,13 @@ interface ClientContract {
 }
 
 const TourInquirySection = () => {
+  const { user, isAdmin, session } = useSession(); // Get session info
   const [contractNumber, setContractNumber] = useState('');
   const [contractDetails, setContractDetails] = useState<ClientContract | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [exportingClientId, setExportingClientId] = useState<string | null>(null);
+  const [generatingContractId, setGeneratingContractId] = useState<string | null>(null);
 
   const handleInquiry = async () => {
     if (contractNumber.trim() === '') {
@@ -108,11 +114,115 @@ const TourInquirySection = () => {
     return parts.join(', ') || 'N/A';
   };
 
+  const handleWhatsAppContact = () => {
+    const phoneNumber = '528444041469'; // Number without '+'
+    const message = encodeURIComponent(`¡Hola! Necesito ayuda con mi contrato ${contractNumber.trim() || '[Número de Contrato]'}.`);
+    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
+    window.open(whatsappUrl, '_blank');
+  };
+
+  // NEW: Document generation handlers (only visible to admin)
+  const handleDownloadBookingSheet = async (clientId: string, clientName: string) => {
+    if (!session?.access_token) {
+      toast.error('Error de autenticación. Por favor, inicia sesión como administrador.');
+      return;
+    }
+    setExportingClientId(clientId);
+    toast.info(`Generando hoja de reserva para ${clientName}...`);
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const functionName = 'generate-booking-sheet';
+      const edgeFunctionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
+
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ clientId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error from Edge Function:', errorData);
+        toast.error(`Error al generar la hoja de reserva: ${errorData.error || 'Error desconocido.'}`);
+        return;
+      }
+
+      const htmlContent = await response.text();
+
+      const newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.document.write(htmlContent);
+        newWindow.document.close();
+        newWindow.focus();
+        toast.success('Hoja de reserva generada. Puedes imprimirla desde la nueva pestaña.');
+      } else {
+        toast.error('No se pudo abrir una nueva ventana. Por favor, permite pop-ups.');
+      }
+    } catch (err: any) {
+      console.error('Unexpected error during booking sheet generation:', err);
+      toast.error(`Error inesperado: ${err.message}`);
+    } finally {
+      setExportingClientId(null);
+    }
+  };
+
+  const handleDownloadServiceContract = async (clientId: string, clientName: string) => {
+    if (!session?.access_token) {
+      toast.error('Error de autenticación. Por favor, inicia sesión como administrador.');
+      return;
+    }
+    setGeneratingContractId(clientId);
+    toast.info(`Generando contrato de servicio para ${clientName}...`);
+
+    try {
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const functionName = 'generate-service-contract';
+      const edgeFunctionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
+
+      const response = await fetch(edgeFunctionUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ clientId }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error from Edge Function (contract):', errorData);
+        toast.error(`Error al generar el contrato de servicio: ${errorData.error || 'Error desconocido.'}`);
+        return;
+      }
+
+      const htmlContent = await response.text();
+
+      const newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.document.write(htmlContent);
+        newWindow.document.close();
+        newWindow.focus();
+        toast.success('Contrato de servicio generado. Puedes imprimirlo desde la nueva pestaña.');
+      } else {
+        toast.error('No se pudo abrir una nueva ventana. Por favor, permite pop-ups.');
+      }
+    } catch (err: any) {
+      console.error('Unexpected error during contract generation:', err);
+      toast.error(`Error inesperado: ${err.message}`);
+    } finally {
+      setGeneratingContractId(null);
+    }
+  };
+
   return (
     <section className="py-12 px-4 md:px-8 lg:px-16 bg-rosa-mexicano text-white">
       <div className="max-w-2xl mx-auto text-center">
         <h2 className="text-3xl md:text-4xl font-bold mb-4">
-          Consulta tu Tour
+          Consulta tu Contrato
         </h2>
         <p className="text-lg mb-8">
           Introduce tu número de contrato para ver los detalles de tu reserva.
@@ -138,6 +248,15 @@ const TourInquirySection = () => {
             {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Consultar'}
           </Button>
         </div>
+        
+        <Button
+          onClick={handleWhatsAppContact}
+          variant="outline"
+          className="bg-transparent border-white text-white hover:bg-white/10 font-semibold px-6 py-3 mt-4"
+          disabled={loading}
+        >
+          <MessageSquare className="mr-2 h-4 w-4" /> Ayuda por WhatsApp
+        </Button>
 
         {error && (
           <p className="text-red-200 mt-6 text-lg">{error}</p>
@@ -217,8 +336,38 @@ const TourInquirySection = () => {
             <div className="mb-6">
               <h4 className="text-xl font-semibold mb-2">Descripción del Viaje:</h4>
               <img src={contractDetails.tour_image_url} alt={contractDetails.tour_title} className="w-full h-48 object-cover rounded-md mb-4" />
-              <p>{contractDetails.tour_description}</p>
+              <p>{stripHtmlTags(contractDetails.tour_description)}</p>
             </div>
+
+            {/* NEW: Document Download Buttons (Admin Only) */}
+            {isAdmin && contractDetails.id && (
+              <div className="mt-8 pt-4 border-t border-gray-200 flex flex-wrap gap-4 justify-center">
+                <Button
+                  onClick={() => handleDownloadBookingSheet(contractDetails.id, `${contractDetails.first_name} ${contractDetails.last_name}`)}
+                  disabled={exportingClientId === contractDetails.id}
+                  className="bg-purple-600 hover:bg-purple-700 text-white"
+                >
+                  {exportingClientId === contractDetails.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <FileText className="h-4 w-4 mr-2" />
+                  )}
+                  Descargar Hoja de Reserva
+                </Button>
+                <Button
+                  onClick={() => handleDownloadServiceContract(contractDetails.id, `${contractDetails.first_name} ${contractDetails.last_name}`)}
+                  disabled={generatingContractId === contractDetails.id}
+                  className="bg-orange-600 hover:bg-orange-700 text-white"
+                >
+                  {generatingContractId === contractDetails.id ? (
+                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
+                  ) : (
+                    <FileSignature className="h-4 w-4 mr-2" />
+                  )}
+                  Descargar Contrato
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </div>
