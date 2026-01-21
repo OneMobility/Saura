@@ -101,7 +101,7 @@ const TourDetailsPage = () => {
         console.error('Error fetching tour details:', tourError);
         setError('No se pudo cargar los detalles del tour.');
         setTour(null);
-      } else if (data) {
+      } else if (tourData) { // Corrected: Use tourData here
         setTour({
           ...tourData,
           includes: tourData.includes || [],
