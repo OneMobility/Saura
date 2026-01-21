@@ -5,6 +5,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Link } from 'react-router-dom'; // Import Link from react-router-dom
+import { stripHtmlTags } from '@/utils/html'; // Import stripHtmlTags
 
 interface ParallaxCardProps {
   imageUrl: string;
@@ -55,6 +56,8 @@ const ParallaxCard: React.FC<ParallaxCardProps> = ({
     }
   }, [handleScroll, isMobile]);
 
+  const cleanDescription = stripHtmlTags(description);
+
   return (
     <Card
       ref={cardRef}
@@ -77,7 +80,7 @@ const ParallaxCard: React.FC<ParallaxCardProps> = ({
       </CardHeader>
       <CardContent className="flex-grow">
         <CardDescription className="text-gray-600 text-base">
-          {description}
+          {cleanDescription}
         </CardDescription>
       </CardContent>
       <CardFooter className="flex justify-end">
