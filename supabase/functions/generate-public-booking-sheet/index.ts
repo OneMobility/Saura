@@ -38,6 +38,8 @@ const generateBookingSheetHtml = (data: any) => {
   let tourOrRouteDuration = 'N/A';
   let seatNumbers = 'N/A';
   let passengersListHtml = '';
+  let departureDateDisplay = 'N/A';
+  let returnDateDisplay = 'N/A';
 
   if (client.tour_id && tour.title) {
     tourOrRouteTitle = tour.title;
@@ -54,6 +56,17 @@ const generateBookingSheetHtml = (data: any) => {
       ? safeCompanions.map((c: any) => `<li>${c.name || 'Acompañante sin nombre'} ${c.age !== null && typeof c.age === 'number' ? `(${c.age} años)` : ''}</li>`).join('')
       : '<li>N/A</li>';
 
+    // NEW: Tour Dates and Times
+    if (tour.departure_date) {
+        const formattedDate = format(parseISO(tour.departure_date), 'dd/MM/yyyy', { locale: es });
+        departureDateDisplay = `${formattedDate} ${tour.departure_time || ''}`;
+    }
+    if (tour.return_date) {
+        const formattedDate = format(parseISO(tour.return_date), 'dd/MM/yyyy', { locale: es });
+        returnDateDisplay = `${formattedDate} ${tour.return_time || ''}`;
+    }
+
+
   } else if (client.bus_route_id && busRoute.name) {
     tourOrRouteTitle = `Ruta de Autobús: ${busRoute.name}`;
     tourOrRouteDuration = data.busSchedule?.departure_time ? `Salida: ${data.busSchedule.departure_time}` : 'N/A';
@@ -66,6 +79,12 @@ const generateBookingSheetHtml = (data: any) => {
         : '<li>N/A</li>';
     } else {
       passengersListHtml = '<li>N/A</li>';
+    }
+    // Bus ticket dates
+    if (data.busSchedule?.effective_date_start) {
+        const formattedDate = format(parseISO(data.busSchedule.effective_date_start), 'dd/MM/yyyy', { locale: es });
+        departureDateDisplay = `${formattedDate} ${data.busSchedule.departure_time || ''}`;
+        returnDateDisplay = 'N/A (Viaje de un día)';
     }
   }
 
@@ -326,7 +345,9 @@ const generateBookingSheetHtml = (data: any) => {
                         <h2>Detalles de la Reserva</h2>
                         <p><span class="label">Número de Reserva:</span> ${client.contract_number || 'N/A'}</p>
                         <p><span class="label">Viaje:</span> ${tourOrRouteTitle}</p>
-                        <p><span class="label">Duración/Salida:</span> ${tourOrRouteDuration}</p>
+                        <p><span class="label">Duración:</span> ${tourOrRouteDuration}</p>
+                        <p><span class="label">Salida:</span> ${departureDateDisplay}</p>
+                        <p><span class="label">Regreso:</span> ${returnDateDisplay}</p>
                         <p><span class="label">Personas:</span> ${client.number_of_people || 'N/A'}</p>
                         <p><span class="label">Habitación:</span> ${formatRoomDetails(client.room_details)}</p>
                         <p><span class="label">Asientos:</span> ${seatNumbers}</p>
@@ -430,7 +451,9 @@ serve(async (req) => {
           includes,
           itinerary,
           departure_date,
-          return_date
+          return_date,
+          departure_time,
+          return_time
         ),
         bus_routes (
           name,
@@ -477,7 +500,7 @@ serve(async (req) => {
       if (busPassengers.length > 0) {
         const { data: fetchedSchedule, error: scheduleError } = await supabaseAdmin
           .from('bus_schedules')
-          .select('departure_time')
+          .select('departure_time, effective_date_start')
           .eq('id', busPassengers[0].schedule_id)
           .single();
         if (scheduleError) console.error('[generate-public-booking-sheet] Error fetching bus schedule:', scheduleError.message);

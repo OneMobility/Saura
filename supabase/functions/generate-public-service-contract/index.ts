@@ -33,7 +33,7 @@ const generateServiceContractHtml = (data: any) => {
   const contractDate = format(new Date(client.created_at), 'dd/MM/yyyy', { locale: es });
 
   const safeCompanions = Array.isArray(client.companions) ? client.companions : [];
-  const safeExtraServices = Array.isArray(client.extra_services) ? safeExtraServices : [];
+  const safeExtraServices = Array.isArray(client.extra_services) ? client.extra_services : [];
 
   let tourOrRouteTitle = 'N/A';
   let tourOrRouteDuration = 'N/A';
@@ -42,6 +42,7 @@ const generateServiceContractHtml = (data: any) => {
   let seatNumbers = 'N/A';
   let departureDateDisplay = '[FECHA DEL VIAJE NO DISPONIBLE EN DB]';
   let mainDepartureDate = '[FECHA SALIDA]'; // For Clause 1
+  let returnDateDisplay = ''; // NEW: For return date display
 
   if (client.tour_id && tour.title) {
     tourOrRouteTitle = tour.title;
@@ -59,16 +60,28 @@ const generateServiceContractHtml = (data: any) => {
       seatNumbers = tourSeats.map((s: any) => s.seat_number).sort((a: number, b: number) => a - b).join(', ');
     }
     
-    // Format departure and return dates
+    // Format departure and return dates/times
+    const departureTime = tour.departure_time || '';
+    const returnTime = tour.return_time || '';
+
+    if (tour.departure_date) {
+        const formattedDeparture = format(parseISO(tour.departure_date), 'dd/MM/yyyy', { locale: es });
+        mainDepartureDate = `${formattedDeparture} ${departureTime}`;
+    }
+
+    if (tour.return_date) {
+        const formattedReturn = format(parseISO(tour.return_date), 'dd/MM/yyyy', { locale: es });
+        returnDateDisplay = `REGRESO ${formattedReturn} ${returnTime}`;
+    }
+
     if (tour.departure_date && tour.return_date) {
         const formattedDeparture = format(parseISO(tour.departure_date), 'dd/MM/yyyy', { locale: es });
         const formattedReturn = format(parseISO(tour.return_date), 'dd/MM/yyyy', { locale: es });
-        departureDateDisplay = `del ${formattedDeparture} al ${formattedReturn}`;
-        mainDepartureDate = formattedDeparture; // Use only departure date for Clause 1
+        departureDateDisplay = `del ${formattedDeparture} ${departureTime} al ${formattedReturn} ${returnTime}`;
     } else if (tour.departure_date) {
-        departureDateDisplay = format(parseISO(tour.departure_date), 'dd/MM/yyyy', { locale: es });
-        mainDepartureDate = departureDateDisplay;
+        departureDateDisplay = `${mainDepartureDate}`;
     }
+
 
   } else if (client.bus_route_id && busRoute.name) {
     tourOrRouteTitle = `Ruta de Autobús: ${busRoute.name}`;
@@ -331,6 +344,7 @@ const generateServiceContractHtml = (data: any) => {
                     ${itineraryList}
                 </ol>
                 <p><span class="label">Duración/Salida:</span> ${tourOrRouteDuration}</p>
+                ${client.tour_id && tour.return_date ? `<p><span class="label">Regreso:</span> ${returnDateDisplay}</p>` : ''}
                 <p><span class="label">Incluye:</span></p>
                 <ul>
                     ${includesList}
@@ -512,7 +526,9 @@ serve(async (req) => {
           includes,
           itinerary,
           departure_date,
-          return_date
+          return_date,
+          departure_time,
+          return_time
         ),
         bus_routes (
           name,

@@ -94,6 +94,8 @@ interface Tour {
   user_id?: string;
   departure_date: string | null; // NEW: Departure Date
   return_date: string | null; // NEW: Return Date
+  departure_time: string | null; // NEW: Departure Time
+  return_time: string | null; // NEW: Return Time
 }
 
 interface TourFormProps {
@@ -173,6 +175,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     other_income: 0, // Initialize new field
     departure_date: null, // NEW
     return_date: null, // NEW
+    departure_time: '08:00', // Default time
+    return_time: '18:00', // Default time
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrlPreview, setImageUrlPreview] = useState<string>('');
@@ -290,6 +294,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             other_income: data.other_income || 0, // Set new field
             departure_date: data.departure_date || null, // NEW
             return_date: data.return_date || null, // NEW
+            departure_time: data.departure_time || '08:00', // NEW
+            return_time: data.return_time || '18:00', // NEW
           });
           setImageUrlPreview(data.image_url);
 
@@ -337,6 +343,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           other_income: 0, // Reset new field
           departure_date: null, // NEW
           return_date: null, // NEW
+          departure_time: '08:00', // Default time
+          return_time: '18:00', // Default time
         });
         setImageFile(null);
         setImageUrlPreview('');
@@ -414,7 +422,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       const costTriple = (hotelQuote.num_triple_rooms || 0) * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
       const costQuad = (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
       
-      const totalContractedRoomsCost = costDouble + costTriple + costQuad; // FIX APPLIED HERE
+      const totalContractedRoomsCost = costDouble + costTriple + costQuad;
 
       // Subtract the value of courtesy rooms from the total contracted cost
       // Courtesy rooms are always valued at the quad occupancy rate
@@ -534,6 +542,11 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       setReturnDate(isValid(parsedDate) ? parsedDate : undefined);
       setFormData((prev) => ({ ...prev, return_date: formattedDate }));
     }
+  };
+
+  const handleTimeChange = (field: 'departure_time' | 'return_time', e: React.ChangeEvent<HTMLInputElement>) => {
+    const { value } = e.target;
+    setFormData((prev) => ({ ...prev, [field]: value }));
   };
 
   const generateSlug = (title: string) => {
@@ -943,6 +956,12 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       return;
     }
 
+    if (!formData.departure_time || !formData.return_time) {
+      toast.error('Por favor, introduce la hora de salida y regreso.');
+      setIsSubmitting(false);
+      return;
+    }
+
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -969,6 +988,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       other_income: formData.other_income, // NEW: Save other_income
       departure_date: formData.departure_date, // NEW: Save departure date
       return_date: formData.return_date, // NEW: Save return date
+      departure_time: formData.departure_time, // NEW: Save departure time
+      return_time: formData.return_time, // NEW: Save return time
     };
 
     if (tourId) {
@@ -1079,7 +1100,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
               <Button
                 variant={"outline"}
                 className={cn(
-                  "md:col-span-3 justify-start text-left font-normal",
+                  "md:col-span-2 justify-start text-left font-normal",
                   !departureDate && "text-muted-foreground"
                 )}
               >
@@ -1098,12 +1119,14 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             </PopoverContent>
           </Popover>
           <Input
-            id="departure_date_input"
+            id="departure_time"
             type="text"
-            value={departureDateInput}
-            onChange={(e) => handleDateInputChange('departure_date', e)}
-            placeholder="DD/MM/AA"
-            className="md:col-span-3 hidden"
+            pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]"
+            value={formData.departure_time || ''}
+            onChange={(e) => handleTimeChange('departure_time', e)}
+            placeholder="HH:MM"
+            className="md:col-span-1"
+            required
           />
         </div>
 
@@ -1114,7 +1137,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
               <Button
                 variant={"outline"}
                 className={cn(
-                  "md:col-span-3 justify-start text-left font-normal",
+                  "md:col-span-2 justify-start text-left font-normal",
                   !returnDate && "text-muted-foreground"
                 )}
               >
@@ -1133,12 +1156,14 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             </PopoverContent>
           </Popover>
           <Input
-            id="return_date_input"
+            id="return_time"
             type="text"
-            value={returnDateInput}
-            onChange={(e) => handleDateInputChange('return_date', e)}
-            placeholder="DD/MM/AA"
-            className="md:col-span-3 hidden"
+            pattern="([01]?[0-9]|2[0-3]):[0-5][0-9]"
+            value={formData.return_time || ''}
+            onChange={(e) => handleTimeChange('return_time', e)}
+            placeholder="HH:MM"
+            className="md:col-span-1"
+            required
           />
         </div>
 
