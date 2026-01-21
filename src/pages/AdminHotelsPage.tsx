@@ -13,6 +13,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { format, parseISO } from 'date-fns';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils'; // NEW: Import cn utility
 
 interface Hotel {
   id: string;
@@ -98,9 +99,6 @@ const AdminHotelsPage = () => {
   };
 
   const handleCloneHotel = (hotel: Hotel) => {
-    // Almacenamos los datos para clonar en el estado local o vía URL (aquí simulamos navegación)
-    // Para simplificar, pasamos los datos básicos por navegación si el componente form los aceptara, 
-    // pero lo ideal es ir a /new y que el form sepa que es un clon.
     toast.info(`Clonando configuración de ${hotel.name}...`);
     navigate(`/admin/hotels/new?cloneFrom=${hotel.id}`);
   };
@@ -138,7 +136,6 @@ const AdminHotelsPage = () => {
     setOpenGroups(prev => ({ ...prev, [name]: !prev[name] }));
   };
 
-  // Agrupar hoteles por nombre
   const groupedHotels = hotels.reduce((acc, hotel) => {
     if (!acc[hotel.name]) acc[hotel.name] = [];
     acc[hotel.name].push(hotel);
