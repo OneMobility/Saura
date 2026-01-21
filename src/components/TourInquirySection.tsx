@@ -1,366 +1,110 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, MessageSquare, FileText, FileSignature, Download } from 'lucide-react';
+import { Loader2, MessageSquare, CreditCard, Download } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { SeatLayout } from '@/types/shared'; // Import SeatLayout
-import { useSession } from '@/components/SessionContextProvider'; // Import useSession
-import { stripHtmlTags } from '@/utils/html'; // Import stripHtmlTags
-
-interface BusPassenger {
-  id: string;
-  first_name: string;
-  last_name: string;
-  age: number | null;
-  identification_number: string | null;
-  is_contractor: boolean;
-  seat_number: number;
-  email: string | null;
-  phone: string | null;
-}
-
-interface RoomDetails {
-  double_rooms: number;
-  triple_rooms: number;
-  quad_rooms: number;
-}
-
-interface Payment {
-  id: string;
-  amount: number;
-  payment_date: string;
-  created_at: string;
-}
-
-interface ClientContract {
-  id: string; // Added ID for document generation
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone: string | null;
-  address: string | null;
-  contract_number: string;
-  identification_number: string | null;
-  number_of_people: number;
-  companions: BusPassenger[]; // Changed to BusPassenger for bus tickets
-  total_amount: number;
-  advance_payment: number;
-  total_paid: number;
-  status: string;
-  contractor_age: number | null;
-  room_details: RoomDetails;
-  tour_title: string;
-  tour_description: string;
-  tour_image_url: string;
-  assigned_seat_numbers: number[];
-  payments_history: Payment[];
-}
+import { stripHtmlTags } from '@/utils/html';
 
 const TourInquirySection = () => {
-  const { user, isAdmin, session } = useSession(); // Get session info
   const [contractNumber, setContractNumber] = useState('');
-  const [contractDetails, setContractDetails] = useState<ClientContract | null>(null);
+  const [contractDetails, setContractDetails] = useState<any>(null);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [exportingContractNumber, setExportingContractNumber] = useState<string | null>(null); // Changed from ClientId to ContractNumber
-  const [generatingContractNumber, setGeneratingContractNumber] = useState<string | null>(null); // Changed from ClientId to ContractNumber
+  const [isPaying, setIsPaying] = useState(false);
 
   const handleInquiry = async () => {
-    if (contractNumber.trim() === '') {
-      toast.error('Por favor, introduce un número de contrato.');
-      return;
-    }
+    if (!contractNumber.trim()) return;
     setLoading(true);
-    setError(null);
-    setContractDetails(null);
-
     try {
-      // This function is public and uses the contract number to fetch data via Service Role Key
-      const { data, error: functionError } = await supabase.functions.invoke('get-public-contract-details', {
+      const { data, error } = await supabase.functions.invoke('get-public-contract-details', {
         body: { contractNumber: contractNumber.trim() },
       });
-
-      if (functionError) {
-        throw functionError;
-      }
-
-      if (data.error) {
-        setError(data.error);
-        toast.error(data.error);
-      } else {
-        setContractDetails(data.contractDetails);
-        toast.success('¡Contrato encontrado!');
-      }
-    } catch (err: any) {
-      console.error('Unexpected error during inquiry:', err);
-      const errorMessage = err.message || 'Ocurrió un error inesperado. Intenta de nuevo.';
-      setError(errorMessage);
-      toast.error(errorMessage);
+      if (error) throw error;
+      setContractDetails(data.contractDetails);
+    } catch (err) {
+      toast.error('Contrato no encontrado.');
     } finally {
       setLoading(false);
     }
   };
 
-  const formatRoomDetails = (details: RoomDetails) => {
-    const parts = [];
-    if (details.quad_rooms > 0) parts.push(`${details.quad_rooms} Cuádruple(s)`);
-    if (details.triple_rooms > 0) parts.push(`${details.triple_rooms} Triple(s)`);
-    if (details.double_rooms > 0) parts.push(`${details.double_rooms} Doble(s)`);
-    return parts.join(', ') || 'N/A';
-  };
+  const handleOnlinePayment = async () => {
+    if (!contractDetails) return;
+    const remaining = contractDetails.total_amount - contractDetails.total_paid;
+    if (remaining <= 0) return toast.success('Este contrato ya está liquidado.');
 
-  const handleWhatsAppContact = () => {
-    const phoneNumber = '528444041469'; // Number without '+'
-    const message = encodeURIComponent(`¡Hola! Necesito ayuda con mi contrato ${contractNumber.trim() || '[Número de Contrato]'}.`);
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
-    window.open(whatsappUrl, '_blank');
-  };
-
-  // NEW: Document generation handlers using PUBLIC Edge Functions
-  const handleDownloadBookingSheet = async (contractNumber: string, clientName: string) => {
-    setExportingContractNumber(contractNumber); // Use contract number for tracking
-    toast.info(`Generando hoja de reserva para ${clientName}...`);
-
+    setIsPaying(true);
     try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const functionName = 'generate-public-booking-sheet'; // Use PUBLIC function
-      const edgeFunctionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
-
-      const response = await fetch(edgeFunctionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // NO Authorization header needed for public function
-        },
-        body: JSON.stringify({ contractNumber }),
+      const { data, error } = await supabase.functions.invoke('mercadopago-checkout', {
+        body: { 
+          clientId: contractDetails.id, 
+          amount: remaining, 
+          description: `Abono Contrato: ${contractDetails.contract_number}` 
+        }
       });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error from Edge Function:', errorData);
-        toast.error(`Error al generar la hoja de reserva: ${errorData.error || 'Error desconocido.'}`);
-        return;
-      }
-
-      const htmlContent = await response.text();
-
-      const newWindow = window.open('', '_blank');
-      if (newWindow) {
-        newWindow.document.write(htmlContent);
-        newWindow.document.close();
-        newWindow.focus();
-        toast.success('Hoja de reserva generada. Puedes imprimirla desde la nueva pestaña.');
-      } else {
-        toast.error('No se pudo abrir una nueva ventana. Por favor, permite pop-ups.');
-      }
-    } catch (err: any) {
-      console.error('Unexpected error during booking sheet generation:', err);
-      toast.error(`Error inesperado: ${err.message}`);
+      if (error) throw error;
+      window.location.href = data.init_point;
+    } catch (error) {
+      toast.error('Error al iniciar el pago.');
     } finally {
-      setExportingContractNumber(null);
-    }
-  };
-
-  const handleDownloadServiceContract = async (contractNumber: string, clientName: string) => {
-    setGeneratingContractNumber(contractNumber); // Use contract number for tracking
-    toast.info(`Generando contrato de servicio para ${clientName}...`);
-
-    try {
-      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const functionName = 'generate-public-service-contract'; // Use PUBLIC function
-      const edgeFunctionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
-
-      const response = await fetch(edgeFunctionUrl, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          // NO Authorization header needed for public function
-        },
-        body: JSON.stringify({ contractNumber }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.error('Error from Edge Function (contract):', errorData);
-        toast.error(`Error al generar el contrato de servicio: ${errorData.error || 'Error desconocido.'}`);
-        return;
-      }
-
-      const htmlContent = await response.text();
-
-      const newWindow = window.open('', '_blank');
-      if (newWindow) {
-        newWindow.document.write(htmlContent);
-        newWindow.document.close();
-        newWindow.focus();
-        toast.success('Contrato de servicio generado. Puedes imprimirlo desde la nueva pestaña.');
-      } else {
-        toast.error('No se pudo abrir una nueva ventana. Por favor, permite pop-ups.');
-      }
-    } catch (err: any) {
-      console.error('Unexpected error during contract generation:', err);
-      toast.error(`Error inesperado: ${err.message}`);
-    } finally {
-      setGeneratingContractNumber(null);
+      setIsPaying(false);
     }
   };
 
   return (
     <section className="py-12 px-4 md:px-8 lg:px-16 bg-rosa-mexicano text-white">
       <div className="max-w-2xl mx-auto text-center">
-        <h2 className="text-3xl md:text-4xl font-bold mb-4">
-          Consulta tu Contrato
-        </h2>
-        <p className="text-lg mb-8">
-          Introduce tu número de contrato para ver los detalles de tu reserva.
-        </p>
-        <div className="flex flex-col sm:flex-row gap-4 max-w-md mx-auto">
-          <div className="grid w-full items-center gap-1.5">
-            <Label htmlFor="contract-number" className="sr-only">Número de Contrato</Label>
-            <Input
-              type="text"
-              id="contract-number"
-              placeholder="Introduce tu número de contrato"
-              className="bg-white text-gray-800 placeholder:text-gray-500 border-none focus-visible:ring-offset-0 focus-visible:ring-2 focus-visible:ring-white"
-              value={contractNumber}
-              onChange={(e) => setContractNumber(e.target.value)}
-              disabled={loading}
-            />
-          </div>
-          <Button
-            onClick={handleInquiry}
-            className="bg-white text-rosa-mexicano hover:bg-gray-100 font-semibold px-6 py-3"
-            disabled={loading}
-          >
-            {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : 'Consultar'}
+        <h2 className="text-3xl font-bold mb-4">Consulta tu Contrato</h2>
+        <div className="flex gap-2 max-w-md mx-auto mb-8">
+          <Input 
+            className="bg-white text-black" 
+            placeholder="Número de contrato" 
+            value={contractNumber}
+            onChange={e => setContractNumber(e.target.value)}
+          />
+          <Button onClick={handleInquiry} disabled={loading} className="bg-white text-rosa-mexicano hover:bg-gray-100">
+            {loading ? <Loader2 className="animate-spin" /> : 'Consultar'}
           </Button>
         </div>
-        
-        <Button
-          onClick={handleWhatsAppContact}
-          variant="outline"
-          className="bg-transparent border-white text-white hover:bg-white/10 font-semibold px-6 py-3 mt-4"
-          disabled={loading}
-        >
-          <MessageSquare className="mr-2 h-4 w-4" /> Ayuda por WhatsApp
-        </Button>
-
-        {error && (
-          <p className="text-red-200 mt-6 text-lg">{error}</p>
-        )}
 
         {contractDetails && (
-          <div className="mt-10 bg-white text-gray-800 p-6 rounded-lg shadow-xl text-left">
-            <h3 className="text-2xl font-bold mb-4 text-rosa-mexicano">Detalles de tu Contrato</h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+          <div className="bg-white text-black p-6 rounded-xl text-left shadow-2xl">
+            <div className="flex justify-between items-start mb-6">
               <div>
-                <p><span className="font-semibold">Contrato:</span> {contractDetails.contract_number}</p>
-                <p><span className="font-semibold">Cliente:</span> {contractDetails.first_name} {contractDetails.last_name}</p>
-                {contractDetails.contractor_age !== null && <p><span className="font-semibold">Edad Contratante:</span> {contractDetails.contractor_age}</p>}
-                {contractDetails.identification_number && <p><span className="font-semibold">Identificación:</span> {contractDetails.identification_number}</p>}
-                <p><span className="font-semibold">Email:</span> {contractDetails.email}</p>
-                {contractDetails.phone && <p><span className="font-semibold">Teléfono:</span> {contractDetails.phone}</p>}
-                {contractDetails.address && <p><span className="font-semibold">Dirección:</span> {contractDetails.address}</p>}
+                <h3 className="text-xl font-bold text-rosa-mexicano">Contrato: {contractDetails.contract_number}</h3>
+                <p className="text-sm text-gray-500">{contractDetails.first_name} {contractDetails.last_name}</p>
               </div>
-              <div>
-                <p><span className="font-semibold">Viaje:</span> {contractDetails.tour_title}</p>
-                <p><span className="font-semibold">Personas:</span> {contractDetails.number_of_people}</p>
-                <p><span className="font-semibold">Habitaciones:</span> {formatRoomDetails(contractDetails.room_details)}</p>
-                <p><span className="font-semibold">Asientos Asignados:</span> {contractDetails.assigned_seat_numbers.length > 0 ? contractDetails.assigned_seat_numbers.join(', ') : 'N/A'}</p>
-                <p><span className="font-semibold">Estado:</span> {contractDetails.status}</p>
+              <div className="text-right">
+                <p className="text-xs uppercase text-gray-400">Adeudo actual</p>
+                <p className="text-2xl font-black text-red-600">${(contractDetails.total_amount - contractDetails.total_paid).toFixed(2)}</p>
               </div>
             </div>
 
-            <div className="mb-6">
-              <h4 className="text-xl font-semibold mb-2">Pasajeros:</h4>
-              {contractDetails.companions.length > 0 ? (
-                <ul className="list-disc list-inside">
-                  {contractDetails.companions.map((p, index) => (
-                    <li key={p.id || index}>{p.first_name} {p.last_name} (Asiento: {p.seat_number}) {p.age !== null && `(${p.age} años)`} {p.is_contractor && '(Contratante)'}</li>
-                  ))}
-                </ul>
-              ) : (
-                <p>No se registraron pasajeros.</p>
-              )}
-            </div>
-
-            <div className="mb-6">
-              <h4 className="text-xl font-semibold mb-2">Resumen de Pagos:</h4>
-              <p><span className="font-semibold">Monto Total:</span> ${contractDetails.total_amount.toFixed(2)}</p>
-              <p><span className="font-semibold">Anticipo:</span> ${contractDetails.advance_payment.toFixed(2)}</p>
-              <p><span className="font-semibold">Total Pagado:</span> ${contractDetails.total_paid.toFixed(2)}</p>
-              <p className="text-lg font-bold text-red-600">
-                <span className="font-semibold">Falta por Pagar:</span> ${(contractDetails.total_amount - contractDetails.total_paid).toFixed(2)}
-              </p>
-            </div>
-
-            <div className="mb-6">
-              <h4 className="text-xl font-semibold mb-2">Historial de Abonos:</h4>
-              {contractDetails.payments_history.length > 0 ? (
-                <div className="overflow-x-auto">
-                  <table className="min-w-full bg-white border border-gray-200 rounded-md">
-                    <thead>
-                      <tr>
-                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-700">Fecha</th>
-                        <th className="py-2 px-4 border-b text-left text-sm font-semibold text-gray-700">Monto</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {contractDetails.payments_history.map((payment) => (
-                        <tr key={payment.id}>
-                          <td className="py-2 px-4 border-b text-sm text-gray-800">{format(parseISO(payment.payment_date), 'dd/MM/yyyy', { locale: es })}</td>
-                          <td className="py-2 px-4 border-b text-sm text-gray-800">${payment.amount.toFixed(2)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <p>No hay abonos registrados para este contrato.</p>
-              )}
-            </div>
-
-            <div className="mb-6">
-              <h4 className="text-xl font-semibold mb-2">Descripción del Viaje:</h4>
-              <img src={contractDetails.tour_image_url} alt={contractDetails.tour_title} className="w-full h-48 object-cover rounded-md mb-4" />
-              <p>{stripHtmlTags(contractDetails.tour_description)}</p>
-            </div>
-
-            {/* Document Download Buttons (Now Public) */}
-            {contractDetails.id && (
-              <div className="mt-8 pt-4 border-t border-gray-200 flex flex-wrap gap-4 justify-center">
-                <Button
-                  onClick={() => handleDownloadBookingSheet(contractDetails.contract_number, `${contractDetails.first_name} ${contractDetails.last_name}`)}
-                  disabled={exportingContractNumber === contractDetails.contract_number}
-                  className="bg-purple-600 hover:bg-purple-700 text-white"
-                >
-                  {exportingContractNumber === contractDetails.contract_number ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <FileText className="h-4 w-4 mr-2" />
-                  )}
-                  Descargar Hoja de Reserva
-                </Button>
-                <Button
-                  onClick={() => handleDownloadServiceContract(contractDetails.contract_number, `${contractDetails.first_name} ${contractDetails.last_name}`)}
-                  disabled={generatingContractNumber === contractDetails.contract_number}
-                  className="bg-orange-600 hover:bg-orange-700 text-white"
-                >
-                  {generatingContractNumber === contractDetails.contract_number ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : (
-                    <FileSignature className="h-4 w-4 mr-2" />
-                  )}
-                  Descargar Contrato
-                </Button>
+            <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
+              <div className="bg-gray-50 p-3 rounded">
+                <p className="text-gray-400">Total del Tour</p>
+                <p className="font-bold">${contractDetails.total_amount.toFixed(2)}</p>
               </div>
-            )}
+              <div className="bg-gray-50 p-3 rounded">
+                <p className="text-gray-400">Total Pagado</p>
+                <p className="font-bold text-green-600">${contractDetails.total_paid.toFixed(2)}</p>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-3">
+              <Button onClick={handleOnlinePayment} disabled={isPaying} className="bg-blue-600 hover:bg-blue-700 w-full py-6 text-lg">
+                {isPaying ? <Loader2 className="animate-spin mr-2" /> : <CreditCard className="mr-2" />}
+                Liquidar / Abonar en Línea
+              </Button>
+              <Button variant="outline" onClick={() => window.open(`https://wa.me/528444041469`, '_blank')} className="w-full border-rosa-mexicano text-rosa-mexicano">
+                <MessageSquare className="mr-2" /> Consultar por WhatsApp
+              </Button>
+            </div>
           </div>
         )}
       </div>
