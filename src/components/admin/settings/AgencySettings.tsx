@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Save, Loader2, CreditCard } from 'lucide-react';
+import { Save, Loader2, Upload } from 'lucide-react';
+import { v4 as uuidv4 } from 'uuid';
 
 interface AgencySetting {
   id?: string;
@@ -18,11 +19,6 @@ interface AgencySetting {
   logo_url: string | null;
   favicon_url: string | null;
   contact_image_url: string | null;
-  mp_public_key: string | null;
-  advance_payment_amount: number;
-  mp_commission_percentage: number;
-  mp_fixed_fee: number;
-  stripe_public_key: string | null;
 }
 
 const AgencySettings = () => {
@@ -34,15 +30,11 @@ const AgencySettings = () => {
     logo_url: null,
     favicon_url: null,
     contact_image_url: null,
-    mp_public_key: '',
-    advance_payment_amount: 0,
-    mp_commission_percentage: 3.99,
-    mp_fixed_fee: 4.0,
-    stripe_public_key: '',
   });
   
   const [loading, setLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [uploading, setUploading] = useState<string | null>(null);
 
   useEffect(() => {
     fetchAgencySettings();
@@ -52,7 +44,7 @@ const AgencySettings = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('agency_settings')
-      .select('*')
+      .select('id, agency_name, agency_phone, agency_email, agency_address, logo_url, favicon_url, contact_image_url')
       .single();
 
     if (error && error.code !== 'PGRST116') {
@@ -65,29 +57,51 @@ const AgencySettings = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
-    setAgencyInfo((prev) => ({ 
-      ...prev, 
-      [id]: ['advance_payment_amount', 'mp_commission_percentage', 'mp_fixed_fee'].includes(id) 
-        ? parseFloat(value) || 0 
-        : value 
-    }));
+    setAgencyInfo((prev) => ({ ...prev, [id]: value }));
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, field: keyof AgencySetting) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploading(field);
+    const fileName = `${uuidv4()}-${file.name}`;
+    const { error: uploadError } = await supabase.storage
+      .from('tour-images')
+      .upload(`agency/${fileName}`, file);
+
+    if (uploadError) {
+      toast.error('Error al subir imagen.');
+      setUploading(null);
+      return;
+    }
+
+    const { data: { publicUrl } } = supabase.storage.from('tour-images').getPublicUrl(`agency/${fileName}`);
+    setAgencyInfo(prev => ({ ...prev, [field]: publicUrl }));
+    setUploading(null);
+    toast.success('Imagen lista para guardar.');
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
 
-    const dataToSave = {
-      ...agencyInfo,
-      updated_at: new Date().toISOString(),
-    };
-
-    const { error } = agencyInfo.id 
-      ? await supabase.from('agency_settings').update(dataToSave).eq('id', agencyInfo.id)
-      : await supabase.from('agency_settings').insert(dataToSave);
+    const { error } = await supabase
+      .from('agency_settings')
+      .update({
+        agency_name: agencyInfo.agency_name,
+        agency_phone: agencyInfo.agency_phone,
+        agency_email: agencyInfo.agency_email,
+        agency_address: agencyInfo.agency_address,
+        logo_url: agencyInfo.logo_url,
+        favicon_url: agencyInfo.favicon_url,
+        contact_image_url: agencyInfo.contact_image_url,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', agencyInfo.id);
 
     if (error) toast.error('Error al guardar.');
-    else toast.success('Configuración actualizada correctamente.');
+    else toast.success('Información de la agencia actualizada.');
     
     setIsSubmitting(false);
   };
@@ -97,62 +111,51 @@ const AgencySettings = () => {
   return (
     <Card className="p-6">
       <CardHeader>
-        <CardTitle>Configuración de Pagos y Agencia</CardTitle>
-        <CardDescription>Gestiona los datos de contacto y las pasarelas de pago.</CardDescription>
+        <CardTitle>Información de la Agencia</CardTitle>
+        <CardDescription>Datos de contacto y branding oficial.</CardDescription>
       </CardHeader>
       <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-8">
+        <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
-              <Label htmlFor="agency_name">Nombre de la Agencia</Label>
+              <Label htmlFor="agency_name">Nombre Comercial</Label>
               <Input id="agency_name" value={agencyInfo.agency_name} onChange={handleChange} required />
             </div>
             <div className="space-y-2">
-              <Label htmlFor="agency_phone">Teléfono de Contacto</Label>
+              <Label htmlFor="agency_email">Email Público</Label>
+              <Input id="agency_email" type="email" value={agencyInfo.agency_email} onChange={handleChange} />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="agency_phone">WhatsApp de la Agencia</Label>
               <Input id="agency_phone" value={agencyInfo.agency_phone} onChange={handleChange} />
             </div>
-          </div>
-
-          <div className="border-t pt-6">
-            <h3 className="text-lg font-bold flex items-center gap-2 mb-4 text-rosa-mexicano">
-              <CreditCard className="h-5 w-5" /> Integración Mercado Pago
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="mp_public_key">Mercado Pago Public Key</Label>
-                <Input id="mp_public_key" value={agencyInfo.mp_public_key || ''} onChange={handleChange} placeholder="APP_USR-..." />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="advance_payment_amount">Monto del Anticipo por Persona ($)</Label>
-                <Input id="advance_payment_amount" type="number" value={agencyInfo.advance_payment_amount} onChange={handleChange} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="mp_commission_percentage">Comisión MP (%)</Label>
-                <Input id="mp_commission_percentage" type="number" step="0.01" value={agencyInfo.mp_commission_percentage} onChange={handleChange} />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="mp_fixed_fee">Cargo Fijo MP ($)</Label>
-                <Input id="mp_fixed_fee" type="number" step="0.01" value={agencyInfo.mp_fixed_fee} onChange={handleChange} />
-              </div>
+            <div className="space-y-2">
+              <Label htmlFor="agency_address">Dirección Física</Label>
+              <Input id="agency_address" value={agencyInfo.agency_address} onChange={handleChange} />
             </div>
           </div>
 
-          <div className="border-t pt-6">
-            <h3 className="text-lg font-bold flex items-center gap-2 mb-4 text-blue-600">
-              <CreditCard className="h-5 w-5" /> Integración Stripe
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-2">
-                <Label htmlFor="stripe_public_key">Stripe Public Key</Label>
-                <Input id="stripe_public_key" value={agencyInfo.stripe_public_key || ''} onChange={handleChange} placeholder="pk_live_..." />
-              </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-4 border-t">
+            <div className="space-y-2">
+              <Label>Logo Principal</Label>
+              <Input type="file" onChange={(e) => handleFileUpload(e, 'logo_url')} />
+              {agencyInfo.logo_url && <img src={agencyInfo.logo_url} className="h-16 object-contain mt-2" alt="Logo" />}
             </div>
-            <p className="mt-2 text-xs text-muted-foreground">La Secret Key de Stripe debe configurarse en los secretos de las Edge Functions.</p>
+            <div className="space-y-2">
+              <Label>Favicon (Ícono pestaña)</Label>
+              <Input type="file" onChange={(e) => handleFileUpload(e, 'favicon_url')} />
+              {agencyInfo.favicon_url && <img src={agencyInfo.favicon_url} className="w-8 h-8 object-contain mt-2" alt="Favicon" />}
+            </div>
+            <div className="space-y-2">
+              <Label>Imagen Banner Contacto</Label>
+              <Input type="file" onChange={(e) => handleFileUpload(e, 'contact_image_url')} />
+              {agencyInfo.contact_image_url && <img src={agencyInfo.contact_image_url} className="h-16 w-full object-cover mt-2 rounded" alt="Banner" />}
+            </div>
           </div>
 
-          <Button type="submit" disabled={isSubmitting} className="bg-rosa-mexicano w-full md:w-auto">
+          <Button type="submit" disabled={isSubmitting || uploading !== null} className="bg-rosa-mexicano">
             {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            Guardar Configuración
+            Guardar Cambios de Agencia
           </Button>
         </form>
       </CardContent>
