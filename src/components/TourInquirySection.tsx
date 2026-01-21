@@ -75,140 +75,26 @@ const TourInquirySection = () => {
     setContractDetails(null);
 
     try {
-      // Fetch all destinations to map IDs to names for bus routes
-      const { data: destinationsData, error: destinationsError } = await supabase
-        .from('bus_destinations')
-        .select('id, name');
-      if (destinationsError) throw destinationsError;
-      const destinationMap = new Map(destinationsData.map(d => [d.id, d.name]));
+      const { data, error: functionError } = await supabase.functions.invoke('get-public-contract-details', {
+        body: { contractNumber: contractNumber.trim() },
+      });
 
-      const { data: clientData, error: clientError } = await supabase
-        .from('clients')
-        .select(`
-          id,
-          first_name,
-          last_name,
-          email,
-          phone,
-          address,
-          contract_number,
-          identification_number,
-          number_of_people,
-          companions,
-          total_amount,
-          advance_payment,
-          total_paid,
-          status,
-          contractor_age,
-          room_details,
-          tour_id,
-          bus_route_id,
-          tours (
-            title,
-            description,
-            image_url
-          ),
-          bus_routes (
-            name,
-            all_stops
-          )
-        `)
-        .eq('contract_number', contractNumber.trim())
-        .single();
-
-      if (clientError) {
-        console.error('Error fetching contract:', clientError);
-        if (clientError.code === 'PGRST116') {
-          setError('Número de contrato no encontrado. Por favor, verifica e intenta de nuevo.');
-        } else {
-          setError('Error al consultar el contrato. Intenta de nuevo más tarde.');
-        }
-        toast.error(clientError.code === 'PGRST116' ? 'Número de contrato no encontrado.' : 'Error al consultar el contrato.');
-        setLoading(false);
-        return;
+      if (functionError) {
+        throw functionError;
       }
 
-      if (clientData) {
-        let tourTitle = 'N/A';
-        let tourDescription = 'N/A';
-        let tourImageUrl = 'https://via.placeholder.com/400x200?text=Imagen+No+Disponible';
-        let assignedSeats: number[] = [];
-        let companionsList: BusPassenger[] = [];
-        let roomDetailsForClient: RoomDetails = { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 };
-
-        if (clientData.tour_id && clientData.tours) {
-          tourTitle = clientData.tours.title || 'N/A';
-          tourDescription = clientData.tours.description || 'N/A';
-          tourImageUrl = clientData.tours.image_url || tourImageUrl;
-          assignedSeats = (await supabase.from('tour_seat_assignments').select('seat_number').eq('client_id', clientData.id)).data?.map(s => s.seat_number).sort((a: number, b: number) => a - b) || [];
-          companionsList = (clientData.companions || []).map((c: any) => ({ ...c, is_contractor: false, seat_number: 0 })); // Map old companions to new interface
-          roomDetailsForClient = clientData.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 };
-        } else if (clientData.bus_route_id && clientData.bus_routes) {
-          tourTitle = `Ruta de Autobús: ${clientData.bus_routes.name || 'N/A'}`;
-          tourDescription = `Viaje de ${destinationMap.get(clientData.bus_routes.all_stops[0]) || 'N/A'} a ${destinationMap.get(clientData.bus_routes.all_stops[clientData.bus_routes.all_stops.length - 1]) || 'N/A'}`;
-          tourImageUrl = 'https://images.unsplash.com/photo-1544620347-c4fd4a8d462c?q=80&w=2069&auto=format&fit=crop&ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D'; // Generic bus image
-          
-          // Fetch passengers from the new bus_passengers table
-          const { data: busPassengersData, error: busPassengersError } = await supabase
-            .from('bus_passengers')
-            .select('*')
-            .eq('client_id', clientData.id)
-            .order('seat_number', { ascending: true });
-
-          if (busPassengersError) {
-            console.error('Error fetching bus passengers:', busPassengersError);
-            toast.error('Error al cargar los pasajeros del autobús.');
-            setLoading(false);
-            return;
-          }
-          companionsList = busPassengersData || [];
-          assignedSeats = companionsList.map(p => p.seat_number).sort((a: number, b: number) => a - b);
-          roomDetailsForClient = { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }; // Not applicable for bus tickets
-        }
-
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
-        const functionName = 'get-public-client-payments';
-        const edgeFunctionUrl = `${supabaseUrl}/functions/v1/${functionName}`;
-
-        const paymentsResponse = await fetch(edgeFunctionUrl, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ contractNumber: contractNumber.trim() }),
-        });
-
-        let paymentsHistory: Payment[] = [];
-        if (paymentsResponse.ok) {
-          const paymentsData = await paymentsResponse.json();
-          paymentsHistory = paymentsData.payments || [];
-        } else {
-          const errorData = await paymentsResponse.json();
-          console.error('Error fetching public payments from Edge Function:', errorData);
-          toast.error(`Error al cargar el historial de pagos: ${errorData.error || 'Error desconocido.'}`);
-        }
-
-        setContractDetails({
-          ...clientData,
-          tour_title: tourTitle,
-          tour_description: tourDescription,
-          tour_image_url: tourImageUrl,
-          companions: companionsList, // Use the new companionsList
-          identification_number: clientData.identification_number || null,
-          contractor_age: clientData.contractor_age || null,
-          room_details: roomDetailsForClient,
-          assigned_seat_numbers: assignedSeats,
-          payments_history: paymentsHistory,
-        });
-        toast.success('¡Contrato encontrado!');
+      if (data.error) {
+        setError(data.error);
+        toast.error(data.error);
       } else {
-        setError('Número de contrato no encontrado. Por favor, verifica e intenta de nuevo.');
-        toast.error('Número de contrato no encontrado.');
+        setContractDetails(data.contractDetails);
+        toast.success('¡Contrato encontrado!');
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error('Unexpected error during inquiry:', err);
-      setError('Ocurrió un error inesperado. Intenta de nuevo.');
-      toast.error('Error inesperado.');
+      const errorMessage = err.message || 'Ocurrió un error inesperado. Intenta de nuevo.';
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setLoading(false);
     }
