@@ -119,6 +119,16 @@ const AdminHotelsPage = () => {
     setLoading(false);
   };
 
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
+    try {
+      return format(parseISO(dateString), 'dd/MM/yy');
+    } catch (e) {
+      console.error("Error formatting date:", dateString, e);
+      return 'Inválida';
+    }
+  };
+
   if (sessionLoading || (user && isAdmin && loading)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
@@ -169,8 +179,8 @@ const AdminHotelsPage = () => {
                       <TableRow key={hotel.id}>
                         <TableCell className="font-medium">{hotel.name}</TableCell>
                         <TableCell>{hotel.location}</TableCell>
-                        <TableCell>{hotel.quoted_date ? format(parseISO(hotel.quoted_date), 'dd/MM/yy') : 'N/A'}</TableCell>
-                        <TableCell>{hotel.quote_end_date ? format(parseISO(hotel.quote_end_date), 'dd/MM/yy') : 'N/A'}</TableCell> {/* Display new field */}
+                        <TableCell>{formatDate(hotel.quoted_date)}</TableCell>
+                        <TableCell>{formatDate(hotel.quote_end_date)}</TableCell> {/* Display new field */}
                         <TableCell>{hotel.num_nights_quoted}</TableCell>
                         <TableCell>{hotel.num_double_rooms}</TableCell>
                         <TableCell>{hotel.num_triple_rooms}</TableCell>
