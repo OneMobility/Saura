@@ -4,10 +4,9 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, Info, Image as ImageIcon, MapPin, Clock, Hotel, Timer, ListChecks } from 'lucide-react';
+import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, ImageIcon, MapPin, Clock, Hotel, ListChecks, Armchair } from 'lucide-react';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { v4 as uuidv4 } from 'uuid';
 import { format, parseISO } from 'date-fns';
@@ -20,6 +19,7 @@ import { TourProviderService, AvailableProvider, SeatLayout } from '@/types/shar
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import RichTextEditor from '@/components/RichTextEditor';
+import TourSeatMap from '@/components/TourSeatMap';
 
 interface HotelQuote {
   id: string;
@@ -82,7 +82,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     selling_price_child: 0, other_income: 0, departure_date: null, return_date: null, departure_time: '08:00', return_time: '18:00',
   });
   
-  // Estados de simulación financiera
   const [desiredProfitFixed, setDesiredProfitFixed] = useState(45000);
   const [projectedSales, setProjectedSales] = useState({ double: 0, triple: 0, quad: 0, child: 0 });
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -96,7 +95,11 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
   const [departureDate, setDepartureDate] = useState<Date | undefined>(undefined);
   const [returnDate, setReturnDate] = useState<Date | undefined>(undefined);
 
-  // Carga de dependencias
+  // Layout del bus seleccionado para el mapa
+  const selectedBusLayout = useMemo(() => {
+    return availableBuses.find(b => b.id === formData.bus_id)?.seat_layout_json || null;
+  }, [formData.bus_id, availableBuses]);
+
   useEffect(() => {
     const fetchData = async () => {
       const [hotelsRes, busesRes, providersRes] = await Promise.all([
@@ -156,7 +159,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     fetchTourData();
   }, [tourId]);
 
-  // Lógica financiera avanzada (Puntos de equilibrio y escenarios)
   const financialSummary = useMemo(() => {
     const bus = availableBuses.find(b => b.id === formData.bus_id);
     const busCost = bus?.rental_cost || 0;
@@ -169,7 +171,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     const totalCost = busCost + providerCost + hotelCost;
     const capacity = (formData.bus_capacity || bus?.total_capacity || 0) - formData.courtesies;
     
-    // Ingresos según simulador manual
     const currentRevenue = (projectedSales.double * formData.selling_price_double_occupancy) +
                            (projectedSales.triple * formData.selling_price_triple_occupancy) +
                            (projectedSales.quad * formData.selling_price_quad_occupancy) +
@@ -178,17 +179,11 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     
     const projectedProfit = currentRevenue - totalCost;
 
-    // Cálculo de puntos de equilibrio (asientos necesarios según tipo dominante)
-    const beQuad = formData.selling_price_quad_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_quad_occupancy) : 0;
-    const beTriple = formData.selling_price_triple_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_triple_occupancy) : 0;
-    const beDouble = formData.selling_price_double_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_double_occupancy) : 0;
-
     const targetRevenue = totalCost + desiredProfitFixed;
     const avgRequiredPerPerson = capacity > 0 ? targetRevenue / capacity : 0;
 
     return {
       busCost, hotelCost, providerCost, totalCost, capacity, projectedProfit,
-      beQuad, beTriple, beDouble,
       recPrice: {
         quad: avgRequiredPerPerson,
         triple: avgRequiredPerPerson * 1.12,
@@ -265,16 +260,16 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
 
   return (
     <div className="space-y-8 pb-20">
-      {/* SECCIÓN FINANCIERA COMPLETA */}
+      {/* SECCIÓN FINANCIERA */}
       <Card className="border-t-4 border-rosa-mexicano shadow-xl overflow-hidden">
         <CardHeader className="bg-gray-50/50">
           <CardTitle className="text-2xl font-bold flex items-center gap-2">
-            <TrendingUp className="text-rosa-mexicano" /> Simulador Financiero de Rentabilidad
+            <TrendingUp className="text-rosa-mexicano" /> Simulador de Rentabilidad
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-8 pt-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Gastos Totales */}
+            {/* Gastos */}
             <div className="p-5 bg-muted/40 rounded-2xl border border-dashed border-gray-300">
               <h3 className="text-xs font-black uppercase text-gray-500 mb-4 tracking-widest">Egresos del Tour</h3>
               <div className="space-y-3">
@@ -298,37 +293,33 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
                 <div className="flex justify-between text-sm"><span>En Cuádruple:</span> <span className="font-bold">{financialSummary.beQuad} pax</span></div>
                 <div className="flex justify-between text-sm"><span>En Triple:</span> <span className="font-bold">{financialSummary.beTriple} pax</span></div>
                 <div className="flex justify-between text-sm"><span>En Doble:</span> <span className="font-bold">{financialSummary.beDouble} pax</span></div>
-                <p className="text-[10px] text-gray-500 italic mt-2">* Basado en {financialSummary.capacity} asientos libres.</p>
               </div>
             </div>
 
-            {/* Utilidad Deseada */}
+            {/* Recomendador */}
             <div className="p-5 bg-green-50/60 rounded-2xl border border-green-100">
               <h3 className="text-xs font-black uppercase text-green-600 mb-4 flex items-center gap-1 tracking-widest">
-                <Calculator className="h-4 w-4" /> Recomendador de Precios
+                <Calculator className="h-4 w-4" /> Sugerencias de Precio
               </h3>
               <div className="space-y-4">
                 <div>
-                  <Label className="text-[10px] font-bold">Ganancia meta ($):</Label>
+                  <Label className="text-[10px] font-bold text-gray-500">Ganancia meta ($):</Label>
                   <Input type="number" value={desiredProfitFixed} onChange={e => setDesiredProfitFixed(parseFloat(e.target.value) || 0)} className="h-8 bg-white font-bold" />
                 </div>
-                <div className="p-3 bg-white/80 rounded-xl border border-green-100">
-                  <p className="text-[10px] font-black text-gray-400 mb-2">P-VENTA RECOMENDADOS:</p>
-                  <div className="grid grid-cols-2 gap-2 text-xs font-black">
-                    <div className="text-green-700">QUAD: ${financialSummary.recPrice.quad.toFixed(0)}</div>
-                    <div className="text-green-700">TRIP: ${financialSummary.recPrice.triple.toFixed(0)}</div>
-                    <div className="text-green-700">DBL: ${financialSummary.recPrice.double.toFixed(0)}</div>
-                    <div className="text-green-700">NIÑO: ${financialSummary.recPrice.child.toFixed(0)}</div>
-                  </div>
+                <div className="p-3 bg-white/80 rounded-xl border border-green-100 grid grid-cols-2 gap-2 text-[11px] font-black text-green-700">
+                  <div>QUAD: ${financialSummary.recPrice.quad.toFixed(0)}</div>
+                  <div>TRIP: ${financialSummary.recPrice.triple.toFixed(0)}</div>
+                  <div>DBL: ${financialSummary.recPrice.double.toFixed(0)}</div>
+                  <div>NIÑO: ${financialSummary.recPrice.child.toFixed(0)}</div>
                 </div>
               </div>
             </div>
           </div>
 
           {/* Mezcla de Ventas Realista */}
-          <div className="p-6 bg-gray-900 rounded-3xl text-white shadow-2xl overflow-hidden relative">
-            <h3 className="text-lg font-bold mb-6 flex items-center gap-2">Mezcla de Ventas y Utilidad Proyectada</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 relative z-10">
+          <div className="p-6 bg-gray-900 rounded-3xl text-white shadow-2xl overflow-hidden">
+            <h3 className="text-lg font-bold mb-6">Escenario de Ventas Proyectado</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               {['double', 'triple', 'quad', 'child'].map((type) => (
                 <div key={type} className="space-y-2">
                   <Label className="capitalize text-xs font-bold text-gray-400">Ventas {type}</Label>
@@ -343,14 +334,14 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
             </div>
             <div className="mt-8 flex flex-wrap items-center justify-between gap-6 pt-6 border-t border-white/10">
               <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-400 font-bold uppercase tracking-widest block">Capacidad:</span>
+                <span className="text-xs text-gray-400 font-bold uppercase tracking-widest">Ocupación:</span>
                 <span className={cn("text-4xl font-black", (projectedSales.double + projectedSales.triple + projectedSales.quad + projectedSales.child) > financialSummary.capacity ? "text-red-500" : "text-rosa-mexicano")}>
                   {projectedSales.double + projectedSales.triple + projectedSales.quad + projectedSales.child}
                 </span>
                 <span className="text-xl text-gray-500">/ {financialSummary.capacity} pax</span>
               </div>
               <div className="text-right">
-                <span className="text-xs text-gray-400 font-bold uppercase tracking-widest block mb-1">Resultado de la Operación</span>
+                <span className="text-xs text-gray-400 font-bold uppercase tracking-widest block mb-1">Utilidad del Escenario</span>
                 <span className={cn("text-5xl font-black tracking-tighter", financialSummary.projectedProfit >= 0 ? "text-green-400" : "text-red-500")}>
                   ${financialSummary.projectedProfit.toLocaleString()}
                 </span>
@@ -362,7 +353,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
 
       <form onSubmit={handleSubmit} className="space-y-8">
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-          {/* LOGÍSTICA Y PRECIOS */}
           <div className="space-y-8">
             <Card>
               <CardHeader><CardTitle className="text-lg flex items-center gap-2"><MapPin className="h-5 w-5 text-rosa-mexicano" /> Datos Principales</CardTitle></CardHeader>
@@ -385,8 +375,19 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Duración (Ej: 3 días, 2 noches)</Label>
-                    <Input id="duration" value={formData.duration} onChange={handleChange} placeholder="Ej: 4 Días" />
+                    <Label>Duración</Label>
+                    <Input id="duration" value={formData.duration} onChange={handleChange} placeholder="Ej: 3 días, 2 noches" />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
+                  <div className="space-y-2">
+                    <Label>Coordinadores (No pagan)</Label>
+                    <Input type="number" id="courtesies" value={formData.courtesies} onChange={handleChange} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Otros Ingresos ($)</Label>
+                    <Input type="number" id="other_income" value={formData.other_income} onChange={handleChange} />
                   </div>
                 </div>
 
@@ -429,22 +430,10 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
             <Card className="border-rosa-mexicano/30">
               <CardHeader><CardTitle className="text-lg">Precios de Venta</CardTitle></CardHeader>
               <CardContent className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label>Doble (p/p)</Label>
-                  <Input type="number" id="selling_price_double_occupancy" value={formData.selling_price_double_occupancy} onChange={handleChange} className="font-bold border-rosa-mexicano/30" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Triple (p/p)</Label>
-                  <Input type="number" id="selling_price_triple_occupancy" value={formData.selling_price_triple_occupancy} onChange={handleChange} className="font-bold border-rosa-mexicano/30" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Cuádruple (p/p)</Label>
-                  <Input type="number" id="selling_price_quad_occupancy" value={formData.selling_price_quad_occupancy} onChange={handleChange} className="font-bold border-rosa-mexicano/30" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Niño</Label>
-                  <Input type="number" id="selling_price_child" value={formData.selling_price_child} onChange={handleChange} className="font-bold border-rosa-mexicano/30" />
-                </div>
+                <div className="space-y-2"><Label>Doble (p/p)</Label><Input type="number" id="selling_price_double_occupancy" value={formData.selling_price_double_occupancy} onChange={handleChange} className="font-bold border-rosa-mexicano/30" /></div>
+                <div className="space-y-2"><Label>Triple (p/p)</Label><Input type="number" id="selling_price_triple_occupancy" value={formData.selling_price_triple_occupancy} onChange={handleChange} className="font-bold border-rosa-mexicano/30" /></div>
+                <div className="space-y-2"><Label>Cuádruple (p/p)</Label><Input type="number" id="selling_price_quad_occupancy" value={formData.selling_price_quad_occupancy} onChange={handleChange} className="font-bold border-rosa-mexicano/30" /></div>
+                <div className="space-y-2"><Label>Niño</Label><Input type="number" id="selling_price_child" value={formData.selling_price_child} onChange={handleChange} className="font-bold border-rosa-mexicano/30" /></div>
               </CardContent>
             </Card>
 
@@ -453,7 +442,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
               <CardContent className="space-y-3">
                 {formData.includes.map((item, idx) => (
                   <div key={idx} className="flex gap-2">
-                    <Input value={item} onChange={e => updateInclude(idx, e.target.value)} placeholder="Ej: Desayunos bufet" />
+                    <Input value={item} onChange={e => updateInclude(idx, e.target.value)} placeholder="Ej: Desayunos" />
                     <Button variant="ghost" size="icon" onClick={() => removeInclude(idx)}><MinusCircle className="h-4 w-4 text-red-400" /></Button>
                   </div>
                 ))}
@@ -462,7 +451,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
             </Card>
           </div>
 
-          {/* MULTIMEDIA Y TIEMPOS */}
           <div className="space-y-8">
             <Card>
               <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Clock className="h-5 w-5 text-rosa-mexicano" /> Tiempos y Foto</CardTitle></CardHeader>
@@ -470,11 +458,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
                 <div className="space-y-2">
                   <Label>Imagen Principal</Label>
                   <div className="relative border-2 border-dashed rounded-xl h-48 flex items-center justify-center overflow-hidden bg-gray-50 group">
-                    {imageUrlPreview ? (
-                      <img src={imageUrlPreview} className="w-full h-full object-cover" alt="Preview" />
-                    ) : (
-                      <div className="text-center text-gray-400"><ImageIcon className="mx-auto mb-2" /><span>Subir Foto</span></div>
-                    )}
+                    {imageUrlPreview ? <img src={imageUrlPreview} className="w-full h-full object-cover" alt="Preview" /> : <div className="text-center text-gray-400"><ImageIcon className="mx-auto mb-2" /><span>Subir Foto</span></div>}
                     <Input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleFileChange} />
                   </div>
                 </div>
@@ -483,9 +467,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
                   <div className="space-y-2">
                     <Label>Salida</Label>
                     <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start gap-2"><CalendarIcon className="h-4 w-4" />{departureDate ? format(departureDate, 'dd/MM/yy') : 'Fecha'}</Button>
-                      </PopoverTrigger>
+                      <PopoverTrigger asChild><Button variant="outline" className="w-full justify-start gap-2"><CalendarIcon className="h-4 w-4" />{departureDate ? format(departureDate, 'dd/MM/yy') : 'Fecha'}</Button></PopoverTrigger>
                       <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={departureDate} onSelect={d => handleDateSelect('departure_date', d)} locale={es} /></PopoverContent>
                     </Popover>
                     <Input id="departure_time" value={formData.departure_time || ''} onChange={handleChange} placeholder="08:00 AM" />
@@ -493,12 +475,10 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
                   <div className="space-y-2">
                     <Label>Regreso</Label>
                     <Popover>
-                      <PopoverTrigger asChild>
-                        <Button variant="outline" className="w-full justify-start gap-2"><CalendarIcon className="h-4 w-4" />{returnDate ? format(returnDate, 'dd/MM/yy') : 'Fecha'}</Button>
-                      </PopoverTrigger>
+                      <PopoverTrigger asChild><Button variant="outline" className="w-full justify-start gap-2"><CalendarIcon className="h-4 w-4" />{returnDate ? format(returnDate, 'dd/MM/yy') : 'Fecha'}</Button></PopoverTrigger>
                       <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={returnDate} onSelect={d => handleDateSelect('return_date', d)} locale={es} /></PopoverContent>
                     </Popover>
-                    <Input id="return_time" value={formData.return_time || ''} onChange={handleChange} placeholder="08:00 PM" />
+                    <Input id="return_time" value={formData.return_time || ''} onChange={handleChange} placeholder="06:00 PM" />
                   </div>
                 </div>
               </CardContent>
@@ -507,52 +487,68 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
             <Card>
               <CardHeader><CardTitle className="text-lg">Descripción de Venta (Corta)</CardTitle></CardHeader>
               <CardContent>
-                <RichTextEditor 
-                  value={formData.description} 
-                  onChange={val => setFormData({...formData, description: val})} 
-                  placeholder="Este texto aparece en las tarjetas de la página principal..."
-                  className="min-h-[150px]"
-                />
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader><CardTitle className="text-lg">Itinerario por Días</CardTitle></CardHeader>
-              <CardContent className="space-y-4">
-                {formData.itinerary.map((item, idx) => (
-                  <div key={idx} className="flex gap-2 items-start bg-gray-50 p-3 rounded-lg border">
-                    <div className="bg-rosa-mexicano text-white rounded-full h-6 w-6 flex-shrink-0 flex items-center justify-center text-xs font-bold mt-2">{item.day}</div>
-                    <Textarea 
-                      value={item.activity} 
-                      onChange={e => {
-                        const newI = [...formData.itinerary]; newI[idx].activity = e.target.value;
-                        setFormData({...formData, itinerary: newI});
-                      }} 
-                      className="bg-white" 
-                      placeholder="¿Qué haremos este día?"
-                    />
-                    <Button variant="ghost" size="icon" onClick={() => setFormData({...formData, itinerary: formData.itinerary.filter((_, i) => i !== idx)})}>
-                      <MinusCircle className="h-4 w-4 text-red-400" />
-                    </Button>
-                  </div>
-                ))}
-                <Button type="button" variant="outline" className="w-full" onClick={() => setFormData({...formData, itinerary: [...formData.itinerary, { day: formData.itinerary.length + 1, activity: '' }]})}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Añadir Día
-                </Button>
+                <RichTextEditor value={formData.description} onChange={val => setFormData({...formData, description: val})} placeholder="Breve texto comercial..." className="min-h-[150px]" />
               </CardContent>
             </Card>
           </div>
         </div>
 
+        {/* MAPA DE ASIENTOS Y BLOQUEO MANUAL */}
+        {formData.bus_id && (
+          <Card className="border-2 border-rosa-mexicano/20 shadow-lg">
+            <CardHeader className="bg-rosa-mexicano/5">
+              <CardTitle className="text-xl flex items-center gap-2">
+                <Armchair className="text-rosa-mexicano" /> Gestión de Asientos para este Tour
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6">
+              <div className="bg-blue-50 p-4 rounded-xl mb-6 flex gap-4 items-start border border-blue-100">
+                <Info className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-800">
+                  <p className="font-bold mb-1">Instrucciones para el Administrador:</p>
+                  <ul className="list-disc list-inside space-y-1 opacity-90">
+                    <li>Haz clic en un asiento disponible para <strong>bloquearlo</strong> (aparecerá en gris).</li>
+                    <li>Los asientos de <strong>Coordinador</strong> (morados) se asignan automáticamente según el número de cortesías.</li>
+                    <li>Los asientos <strong>Ocupados</strong> (rojos) son reservas ya confirmadas de clientes.</li>
+                  </ul>
+                </div>
+              </div>
+              
+              <div className="max-w-3xl mx-auto">
+                <TourSeatMap
+                  tourId={tourId || 'new-tour'}
+                  busCapacity={formData.bus_capacity}
+                  courtesies={formData.courtesies}
+                  seatLayoutJson={selectedBusLayout}
+                  adminMode={true}
+                  readOnly={false}
+                />
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
-          <CardHeader><CardTitle className="text-lg">Información Detallada (Todo lo demás)</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-lg">Itinerario Detallado</CardTitle></CardHeader>
+          <CardContent className="space-y-4">
+            {formData.itinerary.map((item, idx) => (
+              <div key={idx} className="flex gap-2 items-start bg-gray-50 p-3 rounded-lg border">
+                <div className="bg-rosa-mexicano text-white rounded-full h-6 w-6 flex-shrink-0 flex items-center justify-center text-xs font-bold mt-2">{item.day}</div>
+                <Textarea value={item.activity} onChange={e => {
+                  const newI = [...formData.itinerary]; newI[idx].activity = e.target.value;
+                  setFormData({...formData, itinerary: newI});
+                }} className="bg-white" />
+                <Button variant="ghost" size="icon" onClick={() => setFormData({...formData, itinerary: formData.itinerary.filter((_, i) => i !== idx)})}><MinusCircle className="h-4 w-4 text-red-400" /></Button>
+              </div>
+            ))}
+            <Button type="button" variant="outline" className="w-full" onClick={() => setFormData({...formData, itinerary: [...formData.itinerary, { day: formData.itinerary.length + 1, activity: '' }]})}><PlusCircle className="mr-2 h-4 w-4" /> Añadir Día</Button>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader><CardTitle className="text-lg">Información Adicional (Políticas, etc)</CardTitle></CardHeader>
           <CardContent>
-            <RichTextEditor 
-              value={formData.full_content} 
-              onChange={val => setFormData({...formData, full_content: val})} 
-              placeholder="Políticas, recomendaciones, puntos de reunión, etc..."
-              className="min-h-[300px]"
-            />
+            <RichTextEditor value={formData.full_content} onChange={val => setFormData({...formData, full_content: val})} placeholder="Detalles extra..." className="min-h-[300px]" />
           </CardContent>
         </Card>
 
