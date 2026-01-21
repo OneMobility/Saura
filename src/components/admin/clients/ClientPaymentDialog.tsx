@@ -5,12 +5,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, Di
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save } from 'lucide-react'; // Removed CalendarIcon
-import { format, parse, isValid, parseISO } from 'date-fns'; // Added parse and isValid
+import { Loader2, Save } from 'lucide-react';
+import { format, parse, isValid } from 'date-fns';
 import { es } from 'date-fns/locale';
-import { cn } from '@/lib/utils';
 
 interface Client {
   id: string;
@@ -25,34 +25,32 @@ interface ClientPaymentDialogProps {
   isOpen: boolean;
   onClose: () => void;
   client: Client | null;
-  onPaymentRegistered: () => void; // Callback to refresh client data
+  onPaymentRegistered: () => void;
 }
 
 const ClientPaymentDialog: React.FC<ClientPaymentDialogProps> = ({ isOpen, onClose, client, onPaymentRegistered }) => {
   const [amount, setAmount] = useState<number>(0);
-  const [paymentDateInput, setPaymentDateInput] = useState<string>(format(new Date(), 'dd/MM/yy', { locale: es })); // State for input string
-  const [paymentDate, setPaymentDate] = useState<Date | undefined>(new Date()); // Internal Date object
+  const [paymentMethod, setPaymentMethod] = useState<string>('manual');
+  const [paymentDateInput, setPaymentDateInput] = useState<string>(format(new Date(), 'dd/MM/yy', { locale: es }));
+  const [paymentDate, setPaymentDate] = useState<Date | undefined>(new Date());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (isOpen && client) {
-      setAmount(0); // Reset amount when dialog opens
+      setAmount(0);
+      setPaymentMethod('manual');
       const today = new Date();
-      setPaymentDate(today); // Default to today
-      setPaymentDateInput(format(today, 'dd/MM/yy', { locale: es })); // Set input string
+      setPaymentDate(today);
+      setPaymentDateInput(format(today, 'dd/MM/yy', { locale: es }));
     }
   }, [isOpen, client]);
 
   const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setPaymentDateInput(value);
-
     const parsedDate = parse(value, 'dd/MM/yy', new Date(), { locale: es });
-    if (isValid(parsedDate)) {
-      setPaymentDate(parsedDate);
-    } else {
-      setPaymentDate(undefined);
-    }
+    if (isValid(parsedDate)) setPaymentDate(parsedDate);
+    else setPaymentDate(undefined);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -72,47 +70,37 @@ const ClientPaymentDialog: React.FC<ClientPaymentDialogProps> = ({ isOpen, onClo
     }
 
     if (!paymentDate || !isValid(paymentDate)) {
-      toast.error('Por favor, introduce una fecha de abono válida (DD/MM/AA).');
+      toast.error('Fecha inválida.');
       setIsSubmitting(false);
       return;
     }
 
     try {
-      // 1. Insert the new payment record
       const { error: paymentError } = await supabase
         .from('client_payments')
         .insert({
           client_id: client.id,
           amount: amount,
+          payment_method: paymentMethod,
           payment_date: format(paymentDate, 'yyyy-MM-dd'),
         });
 
-      if (paymentError) {
-        console.error('Error inserting payment:', paymentError);
-        toast.error('Error al registrar el abono.');
-        setIsSubmitting(false);
-        return;
-      }
+      if (paymentError) throw paymentError;
 
-      // 2. Update the client's total_paid amount
       const newTotalPaid = client.total_paid + amount;
       const { error: clientUpdateError } = await supabase
         .from('clients')
         .update({ total_paid: newTotalPaid, updated_at: new Date().toISOString() })
         .eq('id', client.id);
 
-      if (clientUpdateError) {
-        console.error('Error updating client total_paid:', clientUpdateError);
-        toast.error('Error al actualizar el total pagado del cliente.');
-        // Consider rolling back payment insertion if this fails, or handle with a trigger
-      } else {
-        toast.success('Abono registrado y total pagado del cliente actualizado con éxito.');
-        onPaymentRegistered(); // Notify parent to refresh client list
-        onClose();
-      }
+      if (clientUpdateError) throw clientUpdateError;
+
+      toast.success('Abono registrado con éxito.');
+      onPaymentRegistered();
+      onClose();
     } catch (error) {
-      console.error('Unexpected error during payment registration:', error);
-      toast.error('Ocurrió un error inesperado.');
+      console.error(error);
+      toast.error('Error al registrar el abono.');
     } finally {
       setIsSubmitting(false);
     }
@@ -124,56 +112,44 @@ const ClientPaymentDialog: React.FC<ClientPaymentDialogProps> = ({ isOpen, onClo
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[425px]">
         <DialogHeader>
-          <DialogTitle>Registrar Abono</DialogTitle>
-          <DialogDescription>
-            Registra un nuevo abono para {client?.first_name} {client?.last_name}.
-          </DialogDescription>
+          <DialogTitle>Registrar Abono Manual</DialogTitle>
+          <DialogDescription>Registra un pago recibido fuera de línea para {client?.first_name}.</DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="amount" className="text-right">
-              Monto
-            </Label>
-            <Input
-              id="amount"
-              type="text" // Changed to text
-              pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
-              value={amount}
-              onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
-              className="col-span-3"
-              required
-            />
+            <Label htmlFor="amount" className="text-right">Monto</Label>
+            <Input id="amount" type="number" value={amount} onChange={(e) => setAmount(parseFloat(e.target.value) || 0)} className="col-span-3" required />
           </div>
+          
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="paymentDateInput" className="text-right">
-              Fecha del Abono
-            </Label>
-            <Input
-              id="paymentDateInput"
-              type="text"
-              value={paymentDateInput}
-              onChange={handleDateInputChange}
-              placeholder="DD/MM/AA"
-              className="col-span-3"
-              required
-            />
+            <Label className="text-right">Método</Label>
+            <Select value={paymentMethod} onValueChange={setPaymentMethod}>
+              <SelectTrigger className="col-span-3">
+                <SelectValue placeholder="Selecciona método" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="manual">Efectivo / Manual</SelectItem>
+                <SelectItem value="transferencia">Transferencia Bancaria</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="grid grid-cols-4 items-center gap-4">
+            <Label htmlFor="date" className="text-right">Fecha</Label>
+            <Input id="date" value={paymentDateInput} onChange={handleDateInputChange} placeholder="DD/MM/AA" className="col-span-3" required />
           </div>
 
           {client && (
-            <div className="col-span-4 mt-4 p-3 bg-gray-50 rounded-md text-sm">
-              <p><span className="font-semibold">Monto Total del Contrato:</span> ${client.total_amount.toFixed(2)}</p>
-              <p><span className="font-semibold">Total Pagado Actualmente:</span> ${client.total_paid.toFixed(2)}</p>
-              <p><span className="font-semibold">Deuda Actual:</span> ${client.remaining_payment.toFixed(2)}</p>
-              <p className="mt-2 font-bold">
-                <span className="font-semibold">Deuda Después del Abono:</span> ${remainingAfterPayment.toFixed(2)}
-              </p>
+            <div className="col-span-4 mt-4 p-3 bg-gray-50 rounded-md text-xs">
+              <p>Deuda Actual: <strong>${client.remaining_payment.toFixed(2)}</strong></p>
+              <p>Deuda Final: <strong>${remainingAfterPayment.toFixed(2)}</strong></p>
             </div>
           )}
 
           <DialogFooter>
-            <Button type="submit" disabled={isSubmitting}>
+            <Button type="submit" disabled={isSubmitting} className="bg-rosa-mexicano">
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              Registrar Abono
+              Registrar Pago
             </Button>
           </DialogFooter>
         </form>

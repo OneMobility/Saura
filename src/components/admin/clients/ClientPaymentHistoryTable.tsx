@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Printer, Trash2, CreditCard, Hand, ShieldCheck } from 'lucide-react';
+import { Loader2, Printer, Trash2, CreditCard, Hand, ShieldCheck, Landmark } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
@@ -23,7 +23,7 @@ const ClientPaymentHistoryTable = ({ clientId, onPaymentsUpdated }: { clientId: 
 
   useEffect(() => {
     if (clientId) fetchPayments();
-  }, [clientId, onPaymentsUpdated]); // Se añade trigger para refrescar tras abono
+  }, [clientId, onPaymentsUpdated]);
 
   const fetchPayments = async () => {
     setLoading(true);
@@ -48,6 +48,12 @@ const ClientPaymentHistoryTable = ({ clientId, onPaymentsUpdated }: { clientId: 
         return (
           <Badge variant="default" className="bg-indigo-600 hover:bg-indigo-700 gap-1">
             <ShieldCheck className="h-3 w-3" /> Stripe
+          </Badge>
+        );
+      case 'transferencia':
+        return (
+          <Badge variant="default" className="bg-emerald-600 hover:bg-emerald-700 gap-1">
+            <Landmark className="h-3 w-3" /> Transferencia
           </Badge>
         );
       default:
