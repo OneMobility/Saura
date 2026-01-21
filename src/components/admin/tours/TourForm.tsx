@@ -17,7 +17,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { Calendar } from '@/components/ui/calendar';
 import TourSeatMap from '@/components/TourSeatMap';
 import { useNavigate } from 'react-router-dom';
-import { TourProviderService, AvailableProvider } from '@/types/shared';
+import { TourProviderService, AvailableProvider, SeatLayout } from '@/types/shared';
 import RichTextEditor from '@/components/RichTextEditor';
 
 // Hotel interface now represents a "hotel quote" from the 'hotels' table
@@ -52,13 +52,6 @@ interface TourHotelDetail {
 }
 
 // Definición de tipos para el layout de asientos
-type SeatLayoutItem = {
-  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty' | 'entry';
-  number?: number; // Solo para asientos
-};
-type SeatLayoutRow = SeatLayoutItem[];
-type SeatLayout = SeatLayoutRow[];
-
 interface Bus {
   id: string;
   name: string;
@@ -255,8 +248,11 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       return;
     }
 
-    const hotelStayNights = numNightsTour - 1;
-    const hotelStayStartDate = addDays(departureDate, 1);
+    // UPDATED LOGIC: Match hotel duration exactly with tour nights
+    // If tour is Day 1 to Day 5, differenceInDays is 4 nights. 
+    // We look for a quote of 4 nights starting on the SAME Day 1.
+    const hotelStayNights = numNightsTour; 
+    const hotelStayStartDate = departureDate;
 
     if (hotelStayNights <= 0) {
       setFilteredHotelQuotes([]);
@@ -269,12 +265,12 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       const quoteStartDate = parseISO(quote.quoted_date);
       const numNightsQuote = quote.num_nights_quoted || 1;
 
-      // 1. Check if the number of nights matches the hotel stay duration
+      // 1. Check if the number of nights matches the tour duration
       if (numNightsQuote !== hotelStayNights) {
         return false;
       }
 
-      // 2. Check if the quote start date matches the hotel stay start date (day after tour departure)
+      // 2. Check if the quote start date matches the tour departure date
       const isDateMatch = isEqual(hotelStayStartDate, quoteStartDate);
       
       return isDateMatch;
@@ -1359,7 +1355,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
         <div className="space-y-2 col-span-full">
           <Label className="text-lg font-semibold">Cotizaciones de Hoteles Vinculadas</Label>
           {filteredHotelQuotes.length === 0 && (formData.departure_date && formData.return_date) && (
-            <p className="text-sm text-red-600">No se encontraron cotizaciones de hotel activas que coincidan con la duración y fechas del tour ({numNightsTour - 1} noches, inicio: {format(addDays(departureDate!, 1), 'dd/MM/yy', { locale: es })}).</p>
+            <p className="text-sm text-red-600">No se encontraron cotizaciones de hotel activas que coincidan con la duración y fechas del tour ({numNightsTour} noches, inicio: {format(departureDate!, 'dd/MM/yy', { locale: es })}).</p>
           )}
           {formData.hotel_details.map((tourHotelDetail, index) => {
             const selectedQuote = availableHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
