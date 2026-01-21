@@ -267,6 +267,12 @@ const TourDetailsPage = () => {
                       Asientos seleccionados: {selectedSeats.join(', ')}
                     </p>
                   )}
+                  {/* Debugging indicator */}
+                  {tour.bus_id && (
+                    <p className="text-xs text-gray-500 mt-2">
+                      Bus ID: {tour.bus_id} | Layout Cargado: {busLayout ? 'Sí' : 'No'}
+                    </p>
+                  )}
                 </div>
               )}
               <Dialog open={isBookingFormOpen} onOpenChange={setIsBookingFormOpen}>
