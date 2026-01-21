@@ -7,10 +7,12 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, DollarSign } from 'lucide-react'; // Removed CalendarIcon
+import { Loader2, Save, DollarSign, CalendarIcon } from 'lucide-react'; // Added CalendarIcon
 import { format, parse, isValid, parseISO, addDays } from 'date-fns'; // Added addDays
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'; // Import Popover components
+import { Calendar } from '@/components/ui/calendar'; // Import Calendar component
 
 interface Hotel {
   id?: string;
@@ -71,7 +73,8 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
   const [dateInput, setDateInput] = useState<string>(''); 
-  const loadedHotelIdRef = useRef<string | undefined>(undefined); // NEW: Ref to track if onHotelDataLoaded was called for this ID
+  const [quotedDate, setQuotedDate] = useState<Date | undefined>(undefined); // NEW: State for Date object
+  const loadedHotelIdRef = useRef<string | undefined>(undefined);
 
   const calculateQuoteCosts = useCallback(() => {
     const totalCostDoubleRooms = formData.num_double_rooms * formData.cost_per_night_double * formData.num_nights_quoted;
@@ -141,7 +144,16 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
             quote_end_date: data.quote_end_date || null, // Load new field
           };
           setFormData(loadedData);
-          setDateInput(data.quoted_date ? format(parseISO(data.quoted_date), 'dd/MM/yy') : '');
+          
+          // Set date states
+          if (data.quoted_date) {
+            const date = parseISO(data.quoted_date);
+            setQuotedDate(date);
+            setDateInput(format(date, 'dd/MM/yy'));
+          } else {
+            setQuotedDate(undefined);
+            setDateInput('');
+          }
           
           // NEW: Only call onHotelDataLoaded if it hasn't been called for this specific hotelId yet
           if (loadedHotelIdRef.current !== hotelId) {
@@ -174,25 +186,34 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
           remaining_payment: 0,
         });
         setDateInput('');
+        setQuotedDate(undefined);
         loadedHotelIdRef.current = undefined; // Reset for new form
       }
       setLoadingInitialData(false);
     };
 
     fetchHotelData();
-  }, [hotelId, onHotelDataLoaded]); // onHotelDataLoaded is still a dependency, but its invocation is guarded.
+  }, [hotelId, onHotelDataLoaded]);
 
   useEffect(() => {
     calculateQuoteCosts();
   }, [calculateQuoteCosts]);
 
+  // Recalculate quote_end_date whenever quotedDate or num_nights_quoted changes
   useEffect(() => {
-    if (formData.quoted_date) {
-      setDateInput(format(parseISO(formData.quoted_date), 'dd/MM/yy'));
+    const numNights = formData.num_nights_quoted || 1;
+    if (quotedDate && numNights > 0) {
+      const endDate = addDays(quotedDate, numNights);
+      const quote_end_date = format(endDate, 'yyyy-MM-dd');
+      setFormData(prev => ({
+        ...prev,
+        quote_end_date,
+        quoted_date: format(quotedDate, 'yyyy-MM-dd'), // Ensure quoted_date is also updated
+      }));
     } else {
-      setDateInput('');
+      setFormData(prev => ({ ...prev, quote_end_date: null, quoted_date: null }));
     }
-  }, [formData.quoted_date]);
+  }, [quotedDate, formData.num_nights_quoted]);
 
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -203,27 +224,19 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
       
       const updatedData = { ...prev, [id]: newValue };
 
-      // Recalculate quote_end_date if quoted_date or num_nights_quoted changes
-      if (id === 'quoted_date' || id === 'num_nights_quoted') {
-        const currentQuotedDate = id === 'quoted_date' ? newValue : prev.quoted_date;
-        const currentNumNights = id === 'num_nights_quoted' ? (isNumeric ? (newValue as number) : prev.num_nights_quoted) : prev.num_nights_quoted;
-
-        if (currentQuotedDate && currentNumNights > 0) {
-          const parsedDate = parseISO(currentQuotedDate as string);
-          if (isValid(parsedDate)) {
-            // End date is start date + num_nights_quoted
-            const endDate = addDays(parsedDate, currentNumNights);
-            updatedData.quote_end_date = format(endDate, 'yyyy-MM-dd');
-          } else {
-            updatedData.quote_end_date = null;
-          }
-        } else {
-          updatedData.quote_end_date = null;
-        }
+      // If num_nights_quoted changes, trigger date recalculation via useEffect dependency
+      if (id === 'num_nights_quoted') {
+        // No need to manually update quote_end_date here, useEffect handles it
       }
 
       return updatedData;
     });
+  };
+
+  const handleDateSelect = (date: Date | undefined) => {
+    setQuotedDate(date);
+    setDateInput(date ? format(date, 'dd/MM/yy') : '');
+    // The useEffect hook will handle updating formData.quoted_date and formData.quote_end_date
   };
 
   const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -233,20 +246,10 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
     const parsedDate = parse(value, 'dd/MM/yy', new Date());
     
     if (isValid(parsedDate)) {
-      const quoted_date = format(parsedDate, 'yyyy-MM-dd');
-      
-      // Calculate quote_end_date: quoted_date + num_nights_quoted
-      const numNights = formData.num_nights_quoted || 1;
-      const endDate = addDays(parsedDate, numNights);
-      const quote_end_date = format(endDate, 'yyyy-MM-dd');
-
-      setFormData((prev) => ({ 
-        ...prev, 
-        quoted_date,
-        quote_end_date,
-      }));
+      setQuotedDate(parsedDate);
+      // The useEffect hook will handle updating formData.quoted_date and formData.quote_end_date
     } else {
-      setFormData((prev) => ({ ...prev, quoted_date: null, quote_end_date: null }));
+      setQuotedDate(undefined);
     }
   };
 
@@ -290,7 +293,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
       return;
     }
 
-    // Final calculation of quote_end_date before saving
+    // Final calculation of quote_end_date before saving (redundant but safe check)
     let finalQuoteEndDate = formData.quote_end_date;
     if (formData.quoted_date && formData.num_nights_quoted > 0) {
       const parsedDate = parseISO(formData.quoted_date);
@@ -398,20 +401,38 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
             <Label htmlFor="quoted_date" className="text-right">
               Fecha Inicio Cotización
             </Label>
-            <div className="relative col-span-3">
-              <Input
-                id="quoted_date_input"
-                type="text"
-                value={dateInput}
-                onChange={handleDateInputChange}
-                placeholder="DD/MM/AA"
-                className={cn(
-                  "w-full justify-start text-left font-normal pr-10",
-                  !formData.quoted_date && "text-muted-foreground"
-                )}
-                required
-              />
-            </div>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  variant={"outline"}
+                  className={cn(
+                    "col-span-3 justify-start text-left font-normal",
+                    !quotedDate && "text-muted-foreground"
+                  )}
+                >
+                  <CalendarIcon className="mr-2 h-4 w-4" />
+                  {quotedDate ? format(quotedDate, "dd/MM/yy", { locale: es }) : <span>Selecciona una fecha</span>}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0">
+                <Calendar
+                  mode="single"
+                  selected={quotedDate}
+                  onSelect={handleDateSelect}
+                  initialFocus
+                  locale={es}
+                />
+              </PopoverContent>
+            </Popover>
+            {/* Input for manual entry (hidden, but kept for reference if needed) */}
+            <Input
+              id="quoted_date_input"
+              type="text"
+              value={dateInput}
+              onChange={handleDateInputChange}
+              placeholder="DD/MM/AA"
+              className="col-span-3 hidden"
+            />
           </div>
 
           <div className="grid grid-cols-4 items-center gap-4">
