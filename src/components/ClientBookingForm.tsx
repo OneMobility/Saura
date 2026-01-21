@@ -7,62 +7,19 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, CreditCard, MessageSquare, Copy, CheckCircle2 } from 'lucide-react';
+import { Loader2, CreditCard, MessageSquare, CheckCircle2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import { TourProviderService, SeatLayout } from '@/types/shared';
-
-interface Companion {
-  id: string;
-  name: string;
-  age: number | null;
-}
-
-interface RoomDetails {
-  double_rooms: number;
-  triple_rooms: number;
-  quad_rooms: number;
-}
-
-interface TourSellingPrices {
-  double: number;
-  triple: number;
-  quad: number;
-  child: number;
-}
-
-interface BusDetails {
-  bus_id: string | null;
-  bus_capacity: number;
-  courtesies: number;
-  seat_layout_json: SeatLayout | null;
-}
 
 interface ClientBookingFormProps {
   isOpen: boolean;
   onClose: () => void;
   tourId: string;
   tourTitle: string;
-  tourImage: string;
-  tourDescription: string;
-  tourSellingPrices: TourSellingPrices;
-  busDetails: BusDetails;
-  tourAvailableExtraServices: TourProviderService[];
   initialSelectedSeats?: number[];
 }
 
-const allocateRoomsForPeople = (totalPeople: number): RoomDetails => {
-  let double = 0, triple = 0, quad = 0, remaining = totalPeople;
-  if (remaining <= 0) return { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 };
-  quad = Math.floor(remaining / 4);
-  remaining %= 4;
-  if (remaining === 1) {
-    if (quad > 0) { quad--; triple++; double++; } else { double++; }
-  } else if (remaining === 2) { double++; } else if (remaining === 3) { triple++; }
-  return { double_rooms: double, triple_rooms: triple, quad_rooms: quad };
-};
-
 const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
-  isOpen, onClose, tourId, tourTitle, tourSellingPrices, initialSelectedSeats = [],
+  isOpen, onClose, tourId, tourTitle, initialSelectedSeats = [],
 }) => {
   const [formData, setFormData] = useState({
     first_name: '', last_name: '', email: '', phone: '', age: null as number | null
@@ -81,12 +38,12 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
   }, []);
 
   const handleWhatsAppRedirect = (contract: string, name: string) => {
-    const phone = '528444041469'; // Número configurado
+    const phone = '528444041469';
     const message = encodeURIComponent(`¡Hola Saura Tours! 👋\n\nAcabo de realizar una reserva.\n\n📝 *Detalles de mi Reserva:*\n• *Contrato:* ${contract}\n• *Cliente:* ${name}\n• *Tour:* ${tourTitle}\n\nQuedo a la espera de instrucciones para realizar mi pago manual. ¡Muchas gracias!`);
     window.open(`https://wa.me/${phone}?text=${message}`, '_blank');
   };
 
-  const handleSubmit = async (e: React.FormEvent, withPayment: boolean = false) => {
+  const handleSubmit = async (e: React.FormEvent, paymentMethod: 'mercadopago' | 'stripe' | 'manual') => {
     if (e) e.preventDefault();
     setIsSubmitting(true);
 
@@ -109,12 +66,18 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
 
       setGeneratedContract(contractNumber);
 
-      if (withPayment && advanceAmount > 0) {
+      if (paymentMethod === 'mercadopago' && advanceAmount > 0) {
         const { data: mpData, error: mpError } = await supabase.functions.invoke('mercadopago-checkout', {
           body: { clientId: newClient.id, amount: advanceAmount, description: `Anticipo Tour: ${tourTitle}` }
         });
         if (mpError) throw mpError;
         window.location.href = mpData.init_point;
+      } else if (paymentMethod === 'stripe' && advanceAmount > 0) {
+        const { data: sData, error: sError } = await supabase.functions.invoke('stripe-checkout', {
+          body: { clientId: newClient.id, amount: advanceAmount, description: `Anticipo Tour: ${tourTitle}` }
+        });
+        if (sError) throw sError;
+        window.location.href = sData.url;
       } else {
         setShowSuccess(true);
         handleWhatsAppRedirect(contractNumber, `${formData.first_name} ${formData.last_name}`);
@@ -137,13 +100,11 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
           <DialogHeader>
             <DialogTitle className="text-2xl font-bold">¡Reserva Registrada!</DialogTitle>
             <DialogDescription className="text-lg">
-              Tu número de contrato es:
-              <span className="block text-3xl font-black text-rosa-mexicano my-4 tracking-widest">{generatedContract}</span>
+              Contrato: <span className="block text-3xl font-black text-rosa-mexicano my-2">{generatedContract}</span>
             </DialogDescription>
           </DialogHeader>
-          <div className="bg-muted p-4 rounded-lg text-sm space-y-3">
-            <p>✅ <strong>Guarda este número:</strong> Lo necesitarás para consultar tu contrato y hoja de reserva.</p>
-            <p>📱 Se ha abierto una ventana de <strong>WhatsApp</strong> para que nos envíes tu comprobante o solicites datos de pago.</p>
+          <div className="bg-muted p-4 rounded-lg text-sm">
+            <p>Se ha abierto WhatsApp para dar seguimiento.</p>
           </div>
           <DialogFooter className="mt-6">
             <Button onClick={onClose} className="w-full bg-rosa-mexicano">Entendido</Button>
@@ -158,7 +119,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle>Finalizar Reserva</DialogTitle>
-          <DialogDescription>Introduce tus datos de contacto.</DialogDescription>
+          <DialogDescription>Elige tu método de pago preferido para el anticipo.</DialogDescription>
         </DialogHeader>
         <form className="space-y-4 py-4">
           <div className="grid grid-cols-2 gap-4">
@@ -175,18 +136,18 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
             <Label>Email</Label>
             <Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} />
           </div>
-          <div className="space-y-2">
-            <Label>WhatsApp / Teléfono</Label>
-            <Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-          </div>
 
           <div className="grid grid-cols-1 gap-3 mt-6">
-            <Button type="button" onClick={(e) => handleSubmit(e, true)} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 py-6 text-lg">
-              {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <CreditCard className="mr-2" />}
-              Pagar Anticipo en Línea
+            <Button type="button" onClick={() => handleSubmit(null as any, 'mercadopago')} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 py-6 text-base">
+              {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <CreditCard className="mr-2 h-4 w-4" />}
+              Pagar Anticipo (Mercado Pago)
             </Button>
-            <Button type="button" variant="outline" onClick={(e) => handleSubmit(e, false)} disabled={isSubmitting} className="py-6 border-rosa-mexicano text-rosa-mexicano">
-              <MessageSquare className="mr-2" />
+            <Button type="button" onClick={() => handleSubmit(null as any, 'stripe')} disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700 py-6 text-base">
+              {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <CreditCard className="mr-2 h-4 w-4" />}
+              Pagar Anticipo (Stripe)
+            </Button>
+            <Button type="button" variant="outline" onClick={() => handleSubmit(null as any, 'manual')} disabled={isSubmitting} className="py-6 border-rosa-mexicano text-rosa-mexicano">
+              <MessageSquare className="mr-2 h-4 w-4" />
               Reservar y Pagar por WhatsApp
             </Button>
           </div>

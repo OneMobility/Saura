@@ -6,10 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, MessageSquare, CreditCard, Download } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
-import { es } from 'date-fns/locale';
-import { stripHtmlTags } from '@/utils/html';
+import { Loader2, MessageSquare, CreditCard } from 'lucide-react';
 
 const TourInquirySection = () => {
   const [contractNumber, setContractNumber] = useState('');
@@ -33,14 +30,15 @@ const TourInquirySection = () => {
     }
   };
 
-  const handleOnlinePayment = async () => {
+  const handleOnlinePayment = async (method: 'mercadopago' | 'stripe') => {
     if (!contractDetails) return;
     const remaining = contractDetails.total_amount - contractDetails.total_paid;
     if (remaining <= 0) return toast.success('Este contrato ya está liquidado.');
 
     setIsPaying(true);
     try {
-      const { data, error } = await supabase.functions.invoke('mercadopago-checkout', {
+      const functionName = method === 'mercadopago' ? 'mercadopago-checkout' : 'stripe-checkout';
+      const { data, error } = await supabase.functions.invoke(functionName, {
         body: { 
           clientId: contractDetails.id, 
           amount: remaining, 
@@ -48,7 +46,7 @@ const TourInquirySection = () => {
         }
       });
       if (error) throw error;
-      window.location.href = data.init_point;
+      window.location.href = method === 'mercadopago' ? data.init_point : data.url;
     } catch (error) {
       toast.error('Error al iniciar el pago.');
     } finally {
@@ -85,24 +83,19 @@ const TourInquirySection = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 mb-6 text-sm">
-              <div className="bg-gray-50 p-3 rounded">
-                <p className="text-gray-400">Total del Tour</p>
-                <p className="font-bold">${contractDetails.total_amount.toFixed(2)}</p>
-              </div>
-              <div className="bg-gray-50 p-3 rounded">
-                <p className="text-gray-400">Total Pagado</p>
-                <p className="font-bold text-green-600">${contractDetails.total_paid.toFixed(2)}</p>
-              </div>
-            </div>
-
             <div className="flex flex-col gap-3">
-              <Button onClick={handleOnlinePayment} disabled={isPaying} className="bg-blue-600 hover:bg-blue-700 w-full py-6 text-lg">
-                {isPaying ? <Loader2 className="animate-spin mr-2" /> : <CreditCard className="mr-2" />}
-                Liquidar / Abonar en Línea
-              </Button>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <Button onClick={() => handleOnlinePayment('mercadopago')} disabled={isPaying} className="bg-blue-600 hover:bg-blue-700 w-full py-6 text-sm">
+                  {isPaying ? <Loader2 className="animate-spin h-4 w-4" /> : <CreditCard className="mr-2 h-4 w-4" />}
+                  Pagar con Mercado Pago
+                </Button>
+                <Button onClick={() => handleOnlinePayment('stripe')} disabled={isPaying} className="bg-indigo-600 hover:bg-indigo-700 w-full py-6 text-sm">
+                  {isPaying ? <Loader2 className="animate-spin h-4 w-4" /> : <CreditCard className="mr-2 h-4 w-4" />}
+                  Pagar con Stripe
+                </Button>
+              </div>
               <Button variant="outline" onClick={() => window.open(`https://wa.me/528444041469`, '_blank')} className="w-full border-rosa-mexicano text-rosa-mexicano">
-                <MessageSquare className="mr-2" /> Consultar por WhatsApp
+                <MessageSquare className="mr-2 h-4 w-4" /> Consultar por WhatsApp
               </Button>
             </div>
           </div>

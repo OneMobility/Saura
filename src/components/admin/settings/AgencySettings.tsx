@@ -5,7 +5,6 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Save, Loader2, CreditCard } from 'lucide-react';
@@ -23,6 +22,7 @@ interface AgencySetting {
   advance_payment_amount: number;
   mp_commission_percentage: number;
   mp_fixed_fee: number;
+  stripe_public_key: string | null;
 }
 
 const AgencySettings = () => {
@@ -38,6 +38,7 @@ const AgencySettings = () => {
     advance_payment_amount: 0,
     mp_commission_percentage: 3.99,
     mp_fixed_fee: 4.0,
+    stripe_public_key: '',
   });
   
   const [loading, setLoading] = useState(true);
@@ -97,7 +98,7 @@ const AgencySettings = () => {
     <Card className="p-6">
       <CardHeader>
         <CardTitle>Configuración de Pagos y Agencia</CardTitle>
-        <CardDescription>Gestiona los datos de contacto y la integración con Mercado Pago.</CardDescription>
+        <CardDescription>Gestiona los datos de contacto y las pasarelas de pago.</CardDescription>
       </CardHeader>
       <CardContent>
         <form onSubmit={handleSubmit} className="space-y-8">
@@ -124,7 +125,6 @@ const AgencySettings = () => {
               <div className="space-y-2">
                 <Label htmlFor="advance_payment_amount">Monto del Anticipo por Persona ($)</Label>
                 <Input id="advance_payment_amount" type="number" value={agencyInfo.advance_payment_amount} onChange={handleChange} />
-                <p className="text-xs text-muted-foreground">Monto que se cobrará al reservar.</p>
               </div>
               <div className="space-y-2">
                 <Label htmlFor="mp_commission_percentage">Comisión MP (%)</Label>
@@ -135,9 +135,19 @@ const AgencySettings = () => {
                 <Input id="mp_fixed_fee" type="number" step="0.01" value={agencyInfo.mp_fixed_fee} onChange={handleChange} />
               </div>
             </div>
-            <p className="mt-4 text-sm bg-yellow-50 p-3 rounded-md text-yellow-800 border border-yellow-100">
-              Nota: El total a pagar se calculará como: <strong>(Monto + Cargo Fijo) / (1 - Comisión)</strong> + IVA sobre comisión.
-            </p>
+          </div>
+
+          <div className="border-t pt-6">
+            <h3 className="text-lg font-bold flex items-center gap-2 mb-4 text-blue-600">
+              <CreditCard className="h-5 w-5" /> Integración Stripe
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="stripe_public_key">Stripe Public Key</Label>
+                <Input id="stripe_public_key" value={agencyInfo.stripe_public_key || ''} onChange={handleChange} placeholder="pk_live_..." />
+              </div>
+            </div>
+            <p className="mt-2 text-xs text-muted-foreground">La Secret Key de Stripe debe configurarse en los secretos de las Edge Functions.</p>
           </div>
 
           <Button type="submit" disabled={isSubmitting} className="bg-rosa-mexicano w-full md:w-auto">
