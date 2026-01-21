@@ -115,9 +115,12 @@ const TourDetailsPage = () => {
         // Set the bus layout from the fetched data
         if (tourData.bus_id) {
           const bus = busesMap.get(tourData.bus_id);
-          setBusLayout(bus?.seat_layout_json || null);
+          const layout = bus?.seat_layout_json || null;
+          setBusLayout(layout);
+          console.log(`[TourDetailsPage] Bus ID: ${tourData.bus_id}, Layout Loaded: ${layout ? 'Sí' : 'No'}, Layout Data:`, layout);
         } else {
           setBusLayout(null);
+          console.log(`[TourDetailsPage] No Bus ID assigned to tour.`);
         }
       } else {
         setError('Tour no encontrado.');
