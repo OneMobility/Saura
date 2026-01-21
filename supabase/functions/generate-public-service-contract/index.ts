@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-import { format } from 'https://esm.sh/date-fns@2.30.0';
+import { format, parseISO } from 'https://esm.sh/date-fns@2.30.0';
 import es from 'https://esm.sh/date-fns@2.30.0/locale/es';
 
 const corsHeaders = {
@@ -40,6 +40,7 @@ const generateServiceContractHtml = (data: any) => {
   let includesList = '<li>N/A</li>';
   let itineraryList = '<li>N/A</li>';
   let seatNumbers = 'N/A';
+  let departureDateDisplay = '[FECHA DEL VIAJE NO DISPONIBLE EN DB]';
 
   if (client.tour_id && tour.title) {
     tourOrRouteTitle = tour.title;
@@ -56,6 +57,16 @@ const generateServiceContractHtml = (data: any) => {
     if (tourSeats && tourSeats.length > 0) {
       seatNumbers = tourSeats.map((s: any) => s.seat_number).sort((a: number, b: number) => a - b).join(', ');
     }
+    
+    // NEW: Format departure and return dates
+    if (tour.departure_date && tour.return_date) {
+        const formattedDeparture = format(parseISO(tour.departure_date), 'dd/MM/yyyy', { locale: es });
+        const formattedReturn = format(parseISO(tour.return_date), 'dd/MM/yyyy', { locale: es });
+        departureDateDisplay = `del ${formattedDeparture} al ${formattedReturn}`;
+    } else if (tour.departure_date) {
+        departureDateDisplay = format(parseISO(tour.departure_date), 'dd/MM/yyyy', { locale: es });
+    }
+
   } else if (client.bus_route_id && busRoute.name) {
     tourOrRouteTitle = `Ruta de Autobús: ${busRoute.name}`;
     tourOrRouteDuration = data.busSchedule?.departure_time ? `Salida: ${data.busSchedule.departure_time}` : 'N/A';
@@ -63,6 +74,10 @@ const generateServiceContractHtml = (data: any) => {
     itineraryList = `<li>Viaje de ${data.destinationMap.get(busRoute.all_stops[0]) || 'N/A'} a ${data.destinationMap.get(busRoute.all_stops[busRoute.all_stops.length - 1]) || 'N/A'}</li>`;
     if (busPassengers.length > 0) {
       seatNumbers = busPassengers.map((p: any) => p.seat_number).sort((a: number, b: number) => a - b).join(', ');
+    }
+    // For bus tickets, use the schedule date if available
+    if (data.busSchedule?.effective_date_start) {
+        departureDateDisplay = format(parseISO(data.busSchedule.effective_date_start), 'dd/MM/yyyy', { locale: es });
     }
   }
 
@@ -306,7 +321,7 @@ const generateServiceContractHtml = (data: any) => {
 
             <div class="section">
                 <h2>1. OBJETO DEL CONTRATO</h2>
-                <p>LA AGENCIA se compromete a coordinar y poner a disposición de EL CLIENTE el ${client.tour_id ? 'tour' : 'viaje en autobús'} denominado <strong>${tourOrRouteTitle}</strong>, que se llevará a cabo el día <strong>[FECHA DEL VIAJE NO DISPONIBLE EN DB]</strong>, con las siguientes características:</p>
+                <p>LA AGENCIA se compromete a coordinar y poner a disposición de EL CLIENTE el ${client.tour_id ? 'tour' : 'viaje en autobús'} denominado <strong>${tourOrRouteTitle}</strong>, que se llevará a cabo ${departureDateDisplay}, con las siguientes características:</p>
                 <p><span class="label">Destino / Itinerario:</span></p>
                 <ol>
                     ${itineraryList}
@@ -491,7 +506,9 @@ serve(async (req) => {
           description,
           duration,
           includes,
-          itinerary
+          itinerary,
+          departure_date,
+          return_date
         ),
         bus_routes (
           name,
@@ -517,18 +534,19 @@ serve(async (req) => {
         .select('seat_number')
         .eq('client_id', client.id)
         .eq('tour_id', client.tour_id);
-      if (seatsError) console.error('[generate-public-service-contract] Error fetching tour seats:', seatsError.message);
+      if (seatsError) console.error('[generate-public-service-contract] Error fetching tour seats for contract:', seatsError.message);
       tourSeats = fetchedSeats || [];
     } else if (client.bus_route_id) {
       const { data: fetchedBusPassengers, error: busPassengersError } = await supabaseAdmin
         .from('bus_passengers')
-        .select('id, first_name, last_name, age, is_contractor, seat_number, schedule_id');
+        .select('id, first_name, last_name, age, is_contractor, seat_number, schedule_id')
+        .eq('client_id', client.id);
       if (busPassengersError) console.error('[generate-public-service-contract] Error fetching bus passengers:', busPassengersError.message);
       busPassengers = (fetchedBusPassengers || []).filter(p => p.client_id === client.id);
       if (busPassengers.length > 0) {
         const { data: fetchedSchedule, error: scheduleError } = await supabaseAdmin
           .from('bus_schedules')
-          .select('departure_time')
+          .select('departure_time, effective_date_start')
           .eq('id', busPassengers[0].schedule_id)
           .single();
         if (scheduleError) console.error('[generate-public-service-contract] Error fetching bus schedule:', scheduleError.message);

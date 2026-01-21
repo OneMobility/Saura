@@ -1,15 +1,19 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle } from 'lucide-react';
+import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { v4 as uuidv4 } from 'uuid';
-import { format } from 'date-fns'; // Import format for dates
+import { format, parse, isValid, parseISO } from 'date-fns'; // Import parse, isValid, parseISO
+import { es } from 'date-fns/locale'; // Import locale
+import { cn } from '@/lib/utils'; // Import cn
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'; // Import Popover
+import { Calendar } from '@/components/ui/calendar'; // Import Calendar
 import TourSeatMap from '@/components/TourSeatMap'; // Import the new TourSeatMap component
 import { useNavigate } from 'react-router-dom'; // Import useNavigate
 import { TourProviderService, AvailableProvider } from '@/types/shared'; // NEW: Import shared types
@@ -88,6 +92,8 @@ interface Tour {
   selling_price_child: number; // NEW: Price for children under 12
   other_income: number; // NEW: Other income for the tour
   user_id?: string;
+  departure_date: string | null; // NEW: Departure Date
+  return_date: string | null; // NEW: Return Date
 }
 
 interface TourFormProps {
@@ -138,7 +144,7 @@ const calculateIdealRoomAllocation = (numAdults: number): RoomDetails => {
       double++;
     }
   }
-  return { double_rooms: quad, triple_rooms: triple, quad_rooms: quad };
+  return { double_rooms: double, triple_rooms: triple, quad_rooms: quad };
 };
 
 
@@ -165,6 +171,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     selling_price_quad_occupancy: 0,
     selling_price_child: 0, // Initialize new field
     other_income: 0, // Initialize new field
+    departure_date: null, // NEW
+    return_date: null, // NEW
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrlPreview, setImageUrlPreview] = useState<string>('');
@@ -175,6 +183,12 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const [availableBuses, setAvailableBuses] = useState<Bus[]>([]); // NEW: State for available buses
   const [availableProviders, setAvailableProviders] = useState<AvailableProvider[]>([]); // NEW: State for available providers
   const [selectedBusLayout, setSelectedBusLayout] = useState<SeatLayout | null>(null); // NEW: State for selected bus layout
+
+  // NEW: Date states for Popover/Input control
+  const [departureDate, setDepartureDate] = useState<Date | undefined>(undefined);
+  const [returnDate, setReturnDate] = useState<Date | undefined>(undefined);
+  const [departureDateInput, setDepartureDateInput] = useState<string>('');
+  const [returnDateInput, setReturnDateInput] = useState<string>('');
 
   // NEW: Financial states
   const [totalSoldSeats, setTotalSoldSeats] = useState(0);
@@ -274,8 +288,22 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             selling_price_quad_occupancy: data.selling_price_quad_occupancy || 0,
             selling_price_child: data.selling_price_child || 0, // Set new field
             other_income: data.other_income || 0, // Set new field
+            departure_date: data.departure_date || null, // NEW
+            return_date: data.return_date || null, // NEW
           });
           setImageUrlPreview(data.image_url);
+
+          // Set date states
+          if (data.departure_date) {
+            const date = parseISO(data.departure_date);
+            setDepartureDate(date);
+            setDepartureDateInput(format(date, 'dd/MM/yy', { locale: es }));
+          }
+          if (data.return_date) {
+            const date = parseISO(data.return_date);
+            setReturnDate(date);
+            setReturnDateInput(format(date, 'dd/MM/yy', { locale: es }));
+          }
 
           // Set selected bus layout if bus_id is present
           if (data.bus_id) {
@@ -307,11 +335,17 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           selling_price_quad_occupancy: 0,
           selling_price_child: 0, // Reset new field
           other_income: 0, // Reset new field
+          departure_date: null, // NEW
+          return_date: null, // NEW
         });
         setImageFile(null);
         setImageUrlPreview('');
         setSelectedBusLayout(null); // Clear layout for new tour
         setExpectedClientsForBreakeven(0);
+        setDepartureDate(undefined);
+        setReturnDate(undefined);
+        setDepartureDateInput('');
+        setReturnDateInput('');
       }
       setLoadingInitialData(false);
     };
@@ -380,7 +414,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       const costTriple = (hotelQuote.num_triple_rooms || 0) * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
       const costQuad = (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
       
-      const totalContractedRoomsCost = costDouble + costTriple + costQuad;
+      const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
 
       // Subtract the value of courtesy rooms from the total contracted cost
       // Courtesy rooms are always valued at the quad occupancy rate
@@ -469,6 +503,37 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       ...prev,
       [id]: parseFloat(value) || 0,
     }));
+  };
+
+  const handleDateSelect = (field: 'departure_date' | 'return_date', date: Date | undefined) => {
+    const formattedDate = date ? format(date, 'yyyy-MM-dd') : null;
+    const inputFormat = date ? format(date, 'dd/MM/yy', { locale: es }) : '';
+
+    if (field === 'departure_date') {
+      setDepartureDate(date);
+      setDepartureDateInput(inputFormat);
+      setFormData((prev) => ({ ...prev, departure_date: formattedDate }));
+    } else {
+      setReturnDate(date);
+      setReturnDateInput(inputFormat);
+      setFormData((prev) => ({ ...prev, return_date: formattedDate }));
+    }
+  };
+
+  const handleDateInputChange = (field: 'departure_date' | 'return_date', e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = e.target.value;
+    const parsedDate = parse(value, 'dd/MM/yy', new Date());
+    const formattedDate = isValid(parsedDate) ? format(parsedDate, 'yyyy-MM-dd') : null;
+
+    if (field === 'departure_date') {
+      setDepartureDateInput(value);
+      setDepartureDate(isValid(parsedDate) ? parsedDate : undefined);
+      setFormData((prev) => ({ ...prev, departure_date: formattedDate }));
+    } else {
+      setReturnDateInput(value);
+      setReturnDate(isValid(parsedDate) ? parsedDate : undefined);
+      setFormData((prev) => ({ ...prev, return_date: formattedDate }));
+    }
   };
 
   const generateSlug = (title: string) => {
@@ -866,6 +931,18 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       return;
     }
 
+    if (!formData.departure_date || !formData.return_date) {
+      toast.error('Por favor, selecciona la fecha de salida y regreso.');
+      setIsSubmitting(false);
+      return;
+    }
+
+    if (new Date(formData.departure_date) >= new Date(formData.return_date)) {
+      toast.error('La fecha de regreso debe ser posterior a la fecha de salida.');
+      setIsSubmitting(false);
+      return;
+    }
+
 
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) {
@@ -890,6 +967,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       cost_per_paying_person: formData.cost_per_paying_person,
       selling_price_per_person: calculatedSellingPricePerPerson, // Add this line
       other_income: formData.other_income, // NEW: Save other_income
+      departure_date: formData.departure_date, // NEW: Save departure date
+      return_date: formData.return_date, // NEW: Save return date
     };
 
     if (tourId) {
@@ -968,7 +1047,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             <RichTextEditor
               value={formData.full_content}
               onChange={(content) => handleRichTextChange('full_content', content)}
-              placeholder="Descripción detallada del tour. Puedes usar HTML básico."
+              placeholder="Escribe el contenido completo del tour aquí."
               className="min-h-[150px]"
             />
           </div>
@@ -990,6 +1069,77 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
         <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
           <Label htmlFor="duration" className="md:text-right">Duración</Label>
           <Input id="duration" value={formData.duration} onChange={handleChange} className="md:col-span-3" placeholder="Ej: 7 días / 6 noches" required />
+        </div>
+
+        {/* NEW: Date Fields */}
+        <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
+          <Label htmlFor="departure_date" className="md:text-right">Fecha de Salida</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                className={cn(
+                  "md:col-span-3 justify-start text-left font-normal",
+                  !departureDate && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {departureDate ? format(departureDate, "PPP", { locale: es }) : <span>Selecciona una fecha</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar
+                mode="single"
+                selected={departureDate}
+                onSelect={(date) => handleDateSelect('departure_date', date)}
+                initialFocus
+                locale={es}
+              />
+            </PopoverContent>
+          </Popover>
+          <Input
+            id="departure_date_input"
+            type="text"
+            value={departureDateInput}
+            onChange={(e) => handleDateInputChange('departure_date', e)}
+            placeholder="DD/MM/AA"
+            className="md:col-span-3 hidden"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 items-center gap-4">
+          <Label htmlFor="return_date" className="md:text-right">Fecha de Regreso</Label>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button
+                variant={"outline"}
+                className={cn(
+                  "md:col-span-3 justify-start text-left font-normal",
+                  !returnDate && "text-muted-foreground"
+                )}
+              >
+                <CalendarIcon className="mr-2 h-4 w-4" />
+                {returnDate ? format(returnDate, "PPP", { locale: es }) : <span>Selecciona una fecha</span>}
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-auto p-0">
+              <Calendar
+                mode="single"
+                selected={returnDate}
+                onSelect={(date) => handleDateSelect('return_date', date)}
+                initialFocus
+                locale={es}
+              />
+            </PopoverContent>
+          </Popover>
+          <Input
+            id="return_date_input"
+            type="text"
+            value={returnDateInput}
+            onChange={(e) => handleDateInputChange('return_date', e)}
+            placeholder="DD/MM/AA"
+            className="md:col-span-3 hidden"
+          />
         </div>
 
         {/* Includes */}

@@ -1,5 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
+import { format, parseISO } from 'https://esm.sh/date-fns@2.30.0'; // Import date-fns for formatting
+import es from 'https://esm.sh/date-fns@2.30.0/locale/es'; // Import locale
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -26,6 +28,7 @@ const generateBookingSheetHtml = (data: any) => {
   const agency = data.agency;
   const busRoute = data.busRoute || {}; // NEW: Bus route data
   const busPassengers = data.busPassengers || []; // NEW: Bus passengers data
+  const payments = data.payments || []; // NEW: Payments history
 
   const safeCompanions = Array.isArray(client.companions) ? client.companions : [];
   const safeExtraServices = Array.isArray(client.extra_services) ? client.extra_services : [];
@@ -77,6 +80,15 @@ const generateBookingSheetHtml = (data: any) => {
   const clientTotalAmount = typeof client.total_amount === 'number' ? client.total_amount : 0;
   const clientTotalPaid = typeof client.total_paid === 'number' ? client.total_paid : 0;
   const remainingPayment = (clientTotalAmount - clientTotalPaid).toFixed(2);
+
+  const paymentsListHtml = payments.length > 0
+    ? payments.map((p: any) => `
+        <tr>
+          <td>${format(parseISO(p.payment_date), 'dd/MM/yyyy', { locale: es })}</td>
+          <td>$${(typeof p.amount === 'number' ? p.amount : 0).toFixed(2)}</td>
+        </tr>
+      `).join('')
+    : '<tr><td colspan="2">No hay abonos registrados.</td></tr>';
 
   return `
     <!DOCTYPE html>
@@ -225,6 +237,20 @@ const generateBookingSheetHtml = (data: any) => {
                 font-size: 0.8em;
                 color: #888;
             }
+            .payments-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 10px;
+            }
+            .payments-table th, .payments-table td {
+                border: 1px solid #ddd;
+                padding: 8px;
+                text-align: left;
+            }
+            .payments-table th {
+                background-color: #f2f2f2;
+                font-weight: 600;
+            }
 
             @media print {
                 @page {
@@ -329,6 +355,21 @@ const generateBookingSheetHtml = (data: any) => {
                 <p class="total-amount"><span class="label">Adeudo:</span> $${remainingPayment}</p>
             </div>
 
+            <div class="section">
+                <h2>Historial de Abonos</h2>
+                <table class="payments-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Monto</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${paymentsListHtml}
+                    </tbody>
+                </table>
+            </div>
+
             <div class="footer-info">
                 <p>&copy; ${new Date().getFullYear()} ${agency?.agency_name || 'Tu Agencia de Viajes'}. Todos los derechos reservados.</p>
             </div>
@@ -387,7 +428,9 @@ serve(async (req) => {
           description,
           duration,
           includes,
-          itinerary
+          itinerary,
+          departure_date,
+          return_date
         ),
         bus_routes (
           name,
@@ -402,6 +445,15 @@ serve(async (req) => {
       return jsonResponse({ error: 'Client not found or error fetching client data.' }, 404);
     }
     console.log('[generate-public-booking-sheet] Client data fetched successfully.');
+
+    // Fetch payments history
+    const { data: payments, error: paymentsError } = await supabaseAdmin
+      .from('client_payments')
+      .select('*')
+      .eq('client_id', client.id)
+      .order('payment_date', { ascending: false });
+    if (paymentsError) console.error('[generate-public-booking-sheet] Error fetching payments:', paymentsError.message);
+
 
     let tourSeats: any[] = [];
     let busPassengers: any[] = [];
@@ -418,9 +470,10 @@ serve(async (req) => {
     } else if (client.bus_route_id) {
       const { data: fetchedBusPassengers, error: busPassengersError } = await supabaseAdmin
         .from('bus_passengers')
-        .select('id, first_name, last_name, age, is_contractor, seat_number, schedule_id');
+        .select('id, first_name, last_name, age, is_contractor, seat_number, schedule_id')
+        .eq('client_id', client.id);
       if (busPassengersError) console.error('[generate-public-booking-sheet] Error fetching bus passengers:', busPassengersError.message);
-      busPassengers = (fetchedBusPassengers || []).filter(p => p.client_id === client.id);
+      busPassengers = fetchedBusPassengers || [];
       if (busPassengers.length > 0) {
         const { data: fetchedSchedule, error: scheduleError } = await supabaseAdmin
           .from('bus_schedules')
@@ -456,6 +509,7 @@ serve(async (req) => {
       busSchedule: busSchedule,
       agency: agency,
       destinationMap: destinationMap,
+      payments: payments, // Pass payments history
     });
     console.log('[generate-public-booking-sheet] HTML content generated successfully.');
 
