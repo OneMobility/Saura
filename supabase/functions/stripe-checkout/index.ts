@@ -13,6 +13,14 @@ serve(async (req) => {
   try {
     const { clientId, amount, description } = await req.json();
 
+    const supabaseAdmin = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+
+    // Obtener configuración de comisiones de la base de datos
+    const { data: settings } = await supabaseAdmin.from('agency_settings').select('*').single();
+
     const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY');
     if (!STRIPE_SECRET_KEY) throw new Error("Stripe Secret Key no configurada");
 
@@ -21,14 +29,14 @@ serve(async (req) => {
       httpClient: Stripe.createFetchHttpClient(),
     });
 
-    // Stripe cobra comisiones pero el cálculo es diferente. 
-    // Para simplificar y unificar con MP, aplicaremos una lógica similar si lo deseas, 
-    // o simplemente pasar el monto neto. En Stripe, las comisiones suelen restarse del total.
-    // Aquí calcularemos un total que cubra la comisión aproximada (3.6% + $3 MXN)
-    const commissionRate = 0.036;
-    const fixedFee = 3.0;
-    const totalToPay = (amount + fixedFee) / (1 - commissionRate);
-    const roundedTotal = Math.ceil(totalToPay * 100); // Stripe usa centavos
+    // Cálculo dinámico de comisión para Stripe
+    const percentage = (settings?.stripe_commission_percentage || 4.0) / 100;
+    const fixed = settings?.stripe_fixed_fee || 5.0;
+    const taxFactor = 1.16; // IVA en México
+    
+    // Total = (Neto + Fijo) / (1 - %Comisión * 1.16)
+    const totalToPay = (amount + fixed) / (1 - (percentage * taxFactor));
+    const roundedTotalCentavos = Math.ceil(totalToPay * 100);
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -39,7 +47,7 @@ serve(async (req) => {
             product_data: {
               name: description || "Anticipo de Reserva",
             },
-            unit_amount: roundedTotal,
+            unit_amount: roundedTotalCentavos,
           },
           quantity: 1,
         },

@@ -16,6 +16,8 @@ interface PaymentSetting {
   mp_commission_percentage: number;
   mp_fixed_fee: number;
   stripe_public_key: string | null;
+  stripe_commission_percentage: number;
+  stripe_fixed_fee: number;
 }
 
 const PaymentSettings = () => {
@@ -25,6 +27,8 @@ const PaymentSettings = () => {
     mp_commission_percentage: 3.99,
     mp_fixed_fee: 4.0,
     stripe_public_key: '',
+    stripe_commission_percentage: 4.0,
+    stripe_fixed_fee: 5.0,
   });
   
   const [loading, setLoading] = useState(true);
@@ -38,13 +42,17 @@ const PaymentSettings = () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('agency_settings')
-      .select('id, mp_public_key, advance_payment_amount, mp_commission_percentage, mp_fixed_fee, stripe_public_key')
+      .select('*')
       .single();
 
     if (error && error.code !== 'PGRST116') {
       console.error('Error fetching settings:', error);
     } else if (data) {
-      setPaymentInfo(data);
+      setPaymentInfo({
+        ...data,
+        stripe_commission_percentage: data.stripe_commission_percentage || 4.0,
+        stripe_fixed_fee: data.stripe_fixed_fee || 5.0,
+      });
     }
     setLoading(false);
   };
@@ -53,7 +61,7 @@ const PaymentSettings = () => {
     const { id, value } = e.target;
     setPaymentInfo((prev) => ({ 
       ...prev, 
-      [id]: ['advance_payment_amount', 'mp_commission_percentage', 'mp_fixed_fee'].includes(id) 
+      [id]: ['advance_payment_amount', 'mp_commission_percentage', 'mp_fixed_fee', 'stripe_commission_percentage', 'stripe_fixed_fee'].includes(id) 
         ? parseFloat(value) || 0 
         : value 
     }));
@@ -71,6 +79,8 @@ const PaymentSettings = () => {
         mp_commission_percentage: paymentInfo.mp_commission_percentage,
         mp_fixed_fee: paymentInfo.mp_fixed_fee,
         stripe_public_key: paymentInfo.stripe_public_key,
+        stripe_commission_percentage: paymentInfo.stripe_commission_percentage,
+        stripe_fixed_fee: paymentInfo.stripe_fixed_fee,
         updated_at: new Date().toISOString(),
       })
       .eq('id', paymentInfo.id);
@@ -128,8 +138,18 @@ const PaymentSettings = () => {
                 <Label htmlFor="stripe_public_key">Public Key (pk_...)</Label>
                 <Input id="stripe_public_key" value={paymentInfo.stripe_public_key || ''} onChange={handleChange} placeholder="pk_live_..." />
               </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="stripe_commission_percentage">Comisión (%)</Label>
+                  <Input id="stripe_commission_percentage" type="number" step="0.01" value={paymentInfo.stripe_commission_percentage} onChange={handleChange} />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="stripe_fixed_fee">Cargo Fijo ($)</Label>
+                  <Input id="stripe_fixed_fee" type="number" step="0.01" value={paymentInfo.stripe_fixed_fee} onChange={handleChange} />
+                </div>
+              </div>
             </div>
-            <p className="mt-2 text-xs text-muted-foreground italic">Nota: La "Secret Key" debe configurarse directamente en los secretos de Supabase para mayor seguridad.</p>
+            <p className="mt-2 text-xs text-muted-foreground italic">Nota: La "Secret Key" debe configurarse directamente en los secretos de Supabase.</p>
           </div>
 
           <Button type="submit" disabled={isSubmitting} className="bg-rosa-mexicano w-full">
