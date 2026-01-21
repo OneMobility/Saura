@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-import { format } from 'https://esm.sh/date-fns@2.30.0';
+import { format, parseISO } from 'https://esm.sh/date-fns@2.30.0';
 import es from 'https://esm.sh/date-fns@2.30.0/locale/es';
 
 const corsHeaders = {
@@ -40,6 +40,10 @@ const generateServiceContractHtml = (data: any) => {
   let includesList = '<li>N/A</li>';
   let itineraryList = '<li>N/A</li>';
   let seatNumbers = 'N/A';
+  
+  // --- NEW/CORRECTED DATE LOGIC FOR CONTRACT ---
+  let mainDepartureDate = '[FECHA SALIDA Y HORA]'; 
+  let returnDateSection = ''; 
 
   if (client.tour_id && tour.title) {
     tourOrRouteTitle = tour.title;
@@ -56,6 +60,21 @@ const generateServiceContractHtml = (data: any) => {
     if (tourSeats && tourSeats.length > 0) {
       seatNumbers = tourSeats.map((s: any) => s.seat_number).sort((a: number, b: number) => a - b).join(', ');
     }
+    
+    // Format departure and return dates/times
+    const departureTime = tour.departure_time || '';
+    const returnTime = tour.return_time || '';
+
+    if (tour.departure_date) {
+        const formattedDeparture = format(parseISO(tour.departure_date), 'dd/MM/yyyy', { locale: es });
+        mainDepartureDate = `${formattedDeparture} ${departureTime}`;
+    }
+
+    if (tour.return_date) {
+        const formattedReturn = format(parseISO(tour.return_date), 'dd/MM/yyyy', { locale: es });
+        returnDateSection = `<p><strong>REGRESO ${formattedReturn} ${returnTime}</strong></p>`;
+    }
+
   } else if (client.bus_route_id && busRoute.name) {
     tourOrRouteTitle = `Ruta de Autobús: ${busRoute.name}`;
     tourOrRouteDuration = data.busSchedule?.departure_time ? `Salida: ${data.busSchedule.departure_time}` : 'N/A';
@@ -64,7 +83,13 @@ const generateServiceContractHtml = (data: any) => {
     if (busPassengers.length > 0) {
       seatNumbers = busPassengers.map((p: any) => p.seat_number).sort((a: number, b: number) => a - b).join(', ');
     }
+    // For bus tickets, use the schedule date if available
+    if (data.busSchedule?.effective_date_start) {
+        const formattedDate = format(parseISO(data.busSchedule.effective_date_start), 'dd/MM/yyyy', { locale: es });
+        mainDepartureDate = `${formattedDate} ${data.busSchedule.departure_time || ''}`;
+    }
   }
+  // --- END NEW/CORRECTED DATE LOGIC FOR CONTRACT ---
 
   const companionsListHtml = safeCompanions.length > 0
     ? safeCompanions.map((c: any) => `<li>${c.name || 'Acompañante sin nombre'} ${c.age !== null && typeof c.age === 'number' ? `(${c.age} años)` : ''}</li>`).join('')
@@ -307,12 +332,13 @@ const generateServiceContractHtml = (data: any) => {
 
             <div class="section">
                 <h2>1. OBJETO DEL CONTRATO</h2>
-                <p>LA AGENCIA se compromete a coordinar y poner a disposición de EL CLIENTE el ${client.tour_id ? 'tour' : 'viaje en autobús'} denominado <strong>${tourOrRouteTitle}</strong>, que se llevará a cabo el día <strong>[FECHA DEL VIAJE NO DISPONIBLE EN DB]</strong>, con las siguientes características:</p>
+                <p>LA AGENCIA se compromete a coordinar y poner a disposición de EL CLIENTE el ${client.tour_id ? 'tour' : 'viaje en autobús'} denominado <strong>${tourOrRouteTitle}</strong>, que se llevará a cabo el día <strong>${mainDepartureDate}</strong> con las siguientes características:</p>
                 <p><span class="label">Destino / Itinerario:</span></p>
                 <ol>
                     ${itineraryList}
                 </ol>
                 <p><span class="label">Duración/Salida:</span> ${tourOrRouteDuration}</p>
+                ${client.tour_id && tour.return_date ? `<p><strong>REGRESO ${format(parseISO(tour.return_date), 'dd/MM/yyyy', { locale: es })} ${tour.return_time || ''}</strong></p>` : ''}
                 <p><span class="label">Incluye:</span></p>
                 <ul>
                     ${includesList}
@@ -444,14 +470,10 @@ const generateServiceContractHtml = (data: any) => {
 };
 
 serve(async (req) => {
-  console.log('Edge Function: generate-service-contract invoked (start of serve).');
+  console.log('[generate-service-contract] Edge Function invoked.');
 
   if (req.method === 'OPTIONS') {
-    console.log('Edge Function: OPTIONS request received for generate-service-contract. Responding with 200 OK and full CORS headers.');
-    return new Response(null, {
-      status: 200,
-      headers: corsHeaders,
-    });
+    return new Response(null, { headers: corsHeaders });
   }
 
   const jsonResponse = (body: any, status: number) => new Response(JSON.stringify(body), {
@@ -466,7 +488,7 @@ serve(async (req) => {
 
   const authHeader = req.headers.get('Authorization');
   if (!authHeader) {
-    console.error('Edge Function: Unauthorized: Missing Authorization header.');
+    console.error('[generate-service-contract] Unauthorized: Missing Authorization header.');
     return jsonResponse({ error: 'Unauthorized: Missing Authorization header' }, 401);
   }
 
@@ -485,7 +507,7 @@ serve(async (req) => {
   const { data: { user: authUser }, error: authError } = await supabaseAdmin.auth.getUser(token);
 
   if (authError || !authUser) {
-    console.error('Edge Function: Auth error:', authError?.message || 'User not found.');
+    console.error('[generate-service-contract] Auth error:', authError?.message || 'User not found.');
     return jsonResponse({ error: 'Unauthorized: Invalid token or user not found' }, 401);
   }
 
@@ -496,25 +518,26 @@ serve(async (req) => {
     .single();
 
   if (profileError || profile?.role !== 'admin') {
-    console.error('Edge Function: Profile error or not admin. Profile error:', profileError?.message, 'User role:', profile?.role);
+    console.error('[generate-service-contract] Profile error or not admin. User role:', profile?.role);
     return jsonResponse({ error: 'Forbidden: Only administrators can perform this action' }, 403);
   }
 
-  let clientId: string;
+  let contractNumber: string;
   try {
     const requestBody = await req.json();
-    clientId = requestBody.clientId;
+    contractNumber = requestBody.contractNumber; // Expecting contractNumber
+    console.log('[generate-service-contract] Parsed contractNumber:', contractNumber);
   } catch (parseError: any) {
-    console.error('Edge Function: Error parsing JSON body:', parseError.message);
+    console.error('[generate-service-contract] Error parsing JSON body:', parseError.message);
     return jsonResponse({ error: `Invalid JSON in request body: ${parseError.message}` }, 400);
   }
 
   try {
-    if (!clientId) {
-      return jsonResponse({ error: 'Client ID is required.' }, 400);
+    if (!contractNumber) {
+      return jsonResponse({ error: 'Contract number is required.' }, 400);
     }
 
-    console.log('Edge Function: Fetching client data for contract...');
+    console.log('[generate-service-contract] Fetching client data by contract number...');
     const { data: client, error: clientError } = await supabaseAdmin
       .from('clients')
       .select(`
@@ -524,21 +547,25 @@ serve(async (req) => {
           description,
           duration,
           includes,
-          itinerary
+          itinerary,
+          departure_date,
+          return_date,
+          departure_time,
+          return_time
         ),
         bus_routes (
           name,
           all_stops
         )
       `)
-      .eq('id', clientId)
+      .ilike('contract_number', contractNumber.trim())
       .single();
 
     if (clientError || !client) {
-      console.error('Edge Function: Error fetching client for contract:', clientError?.message || 'Client not found.');
+      console.error('[generate-service-contract] Error fetching client:', clientError?.message || 'Client not found.');
       return jsonResponse({ error: 'Client not found or error fetching client data.' }, 404);
     }
-    console.log('Edge Function: Client data fetched successfully for contract.');
+    console.log('[generate-service-contract] Client data fetched successfully for contract.');
 
     let tourSeats: any[] = [];
     let busPassengers: any[] = [];
@@ -548,54 +575,43 @@ serve(async (req) => {
       const { data: fetchedSeats, error: seatsError } = await supabaseAdmin
         .from('tour_seat_assignments')
         .select('seat_number')
-        .eq('client_id', clientId)
+        .eq('client_id', client.id)
         .eq('tour_id', client.tour_id);
-
-      if (seatsError) {
-        console.error('Edge Function: Error fetching tour seats for contract:', seatsError.message);
-      } else {
-        tourSeats = fetchedSeats || [];
-      }
+      if (seatsError) console.error('[generate-service-contract] Error fetching tour seats for contract:', seatsError.message);
+      tourSeats = fetchedSeats || [];
     } else if (client.bus_route_id) {
       const { data: fetchedBusPassengers, error: busPassengersError } = await supabaseAdmin
         .from('bus_passengers')
-        .select('*')
-        .eq('client_id', clientId);
-
-      if (busPassengersError) {
-        console.error('Edge Function: Error fetching bus passengers for contract:', busPassengersError.message);
-      } else {
-        busPassengers = fetchedBusPassengers || [];
-        if (busPassengers.length > 0) {
-          const { data: fetchedSchedule, error: scheduleError } = await supabaseAdmin
-            .from('bus_schedules')
-            .select('departure_time')
-            .eq('id', busPassengers[0].schedule_id)
-            .single();
-          if (scheduleError) console.error('Error fetching bus schedule:', scheduleError.message);
-          busSchedule = fetchedSchedule;
-        }
+        .select('id, first_name, last_name, age, is_contractor, seat_number, schedule_id')
+        .eq('client_id', client.id);
+      if (busPassengersError) console.error('[generate-service-contract] Error fetching bus passengers:', busPassengersError.message);
+      busPassengers = (fetchedBusPassengers || []).filter(p => p.client_id === client.id);
+      if (busPassengers.length > 0) {
+        const { data: fetchedSchedule, error: scheduleError } = await supabaseAdmin
+          .from('bus_schedules')
+          .select('departure_time, effective_date_start')
+          .eq('id', busPassengers[0].schedule_id)
+          .single();
+        if (scheduleError) console.error('[generate-service-contract] Error fetching bus schedule:', scheduleError.message);
+        busSchedule = fetchedSchedule;
       }
     }
 
-    console.log('Edge Function: Fetching agency settings for contract...');
+    console.log('[generate-service-contract] Fetching agency settings for contract...');
     const { data: agency, error: agencyError } = await supabaseAdmin
       .from('agency_settings')
       .select('*')
       .single();
+    if (agencyError && agencyError.code !== 'PGRST116') console.error('[generate-service-contract] Error fetching agency settings for contract:', agencyError.message);
 
-    if (agencyError && agencyError.code !== 'PGRST116') {
-      console.error('Edge Function: Error fetching agency settings for contract:', agencyError.message);
-    }
-
-    // NEW: Fetch destinations for bus routes
+    console.log('[generate-service-contract] Fetching destinations...');
     const { data: destinationsData, error: destinationsError } = await supabaseAdmin
       .from('bus_destinations')
       .select('id, name');
     if (destinationsError) throw destinationsError;
     const destinationMap = new Map(destinationsData.map(d => [d.id, d.name]));
 
-    console.log('Edge Function: Generating HTML content for contract...');
+    console.log('[generate-service-contract] Generating HTML content for contract...');
     const htmlContent = generateServiceContractHtml({
       client,
       tour: client.tours,
@@ -606,12 +622,12 @@ serve(async (req) => {
       agency: agency,
       destinationMap: destinationMap,
     });
-    console.log('Edge Function: HTML content generated successfully for contract.');
+    console.log('[generate-service-contract] HTML content generated successfully for contract.');
 
     return htmlResponse(htmlContent, 200);
 
   } catch (error: any) {
-    console.error('Edge Function: UNEXPECTED ERROR IN CATCH BLOCK for contract:', error.message);
+    console.error('[generate-service-contract] UNEXPECTED ERROR IN CATCH BLOCK for contract:', error.message);
     return jsonResponse({ error: error.message }, 500);
   }
 });

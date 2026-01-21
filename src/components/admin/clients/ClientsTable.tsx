@@ -62,8 +62,8 @@ interface ClientsTableProps {
 const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayment, onEditClient }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
-  const [exportingClientId, setExportingClientId] = useState<string | null>(null);
-  const [generatingContractId, setGeneratingContractId] = useState<string | null>(null);
+  const [exportingContractNumber, setExportingContractNumber] = useState<string | null>(null);
+  const [generatingContractNumber, setGeneratingContractNumber] = useState<string | null>(null);
   const navigate = useNavigate();
   const { session } = useSession();
 
@@ -148,13 +148,13 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
     return parts.join(', ') || 'N/A';
   };
 
-  const handleDownloadBookingSheet = async (clientId: string, clientName: string) => {
-    setExportingClientId(clientId);
+  const handleDownloadBookingSheet = async (contractNumber: string, clientName: string) => {
+    setExportingContractNumber(contractNumber);
     toast.info(`Generando hoja de reserva para ${clientName}...`);
 
     if (!session?.access_token) {
       toast.error('No estás autenticado. Por favor, inicia sesión de nuevo.');
-      setExportingClientId(null);
+      setExportingContractNumber(null);
       return;
     }
 
@@ -169,7 +169,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ clientId }),
+        body: JSON.stringify({ contractNumber }), // Pass contractNumber
       });
 
       if (!response.ok) {
@@ -194,17 +194,17 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
       console.error('Unexpected error during booking sheet generation:', err);
       toast.error(`Error inesperado: ${err.message}`);
     } finally {
-      setExportingClientId(null);
+      setExportingContractNumber(null);
     }
   };
 
-  const handleDownloadServiceContract = async (clientId: string, clientName: string) => {
-    setGeneratingContractId(clientId);
+  const handleDownloadServiceContract = async (contractNumber: string, clientName: string) => {
+    setGeneratingContractNumber(contractNumber);
     toast.info(`Generando contrato de servicio para ${clientName}...`);
 
     if (!session?.access_token) {
       toast.error('No estás autenticado. Por favor, inicia sesión de nuevo.');
-      setGeneratingContractId(null);
+      setGeneratingContractNumber(null);
       return;
     }
 
@@ -219,7 +219,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${session.access_token}`,
         },
-        body: JSON.stringify({ clientId }),
+        body: JSON.stringify({ contractNumber }), // Pass contractNumber
       });
 
       if (!response.ok) {
@@ -244,7 +244,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
       console.error('Unexpected error during contract generation:', err);
       toast.error(`Error inesperado: ${err.message}`);
     } finally {
-      setGeneratingContractId(null);
+      setGeneratingContractNumber(null);
     }
   };
 
@@ -325,11 +325,11 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => handleDownloadBookingSheet(client.id, `${client.first_name} ${client.last_name}`)}
-                      disabled={exportingClientId === client.id}
+                      onClick={() => handleDownloadBookingSheet(client.contract_number, `${client.first_name} ${client.last_name}`)}
+                      disabled={exportingContractNumber === client.contract_number}
                       className="text-purple-600 hover:bg-purple-50"
                     >
-                      {exportingClientId === client.id ? (
+                      {exportingContractNumber === client.contract_number ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <FileText className="h-4 w-4" />
@@ -339,11 +339,11 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                     <Button
                       variant="outline"
                       size="icon"
-                      onClick={() => handleDownloadServiceContract(client.id, `${client.first_name} ${client.last_name}`)}
-                      disabled={generatingContractId === client.id}
+                      onClick={() => handleDownloadServiceContract(client.contract_number, `${client.first_name} ${client.last_name}`)}
+                      disabled={generatingContractNumber === client.contract_number}
                       className="text-orange-600 hover:bg-orange-50"
                     >
-                      {generatingContractId === client.id ? (
+                      {generatingContractNumber === client.contract_number ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
                       ) : (
                         <FileSignature className="h-4 w-4" />
