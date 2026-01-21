@@ -82,6 +82,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     selling_price_child: 0, other_income: 0, departure_date: null, return_date: null, departure_time: '08:00', return_time: '18:00',
   });
   
+  // Estados de simulación financiera
   const [desiredProfitFixed, setDesiredProfitFixed] = useState(45000);
   const [projectedSales, setProjectedSales] = useState({ double: 0, triple: 0, quad: 0, child: 0 });
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -95,6 +96,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
   const [departureDate, setDepartureDate] = useState<Date | undefined>(undefined);
   const [returnDate, setReturnDate] = useState<Date | undefined>(undefined);
 
+  // Carga de dependencias
   useEffect(() => {
     const fetchData = async () => {
       const [hotelsRes, busesRes, providersRes] = await Promise.all([
@@ -154,6 +156,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     fetchTourData();
   }, [tourId]);
 
+  // Lógica financiera avanzada (Puntos de equilibrio y escenarios)
   const financialSummary = useMemo(() => {
     const bus = availableBuses.find(b => b.id === formData.bus_id);
     const busCost = bus?.rental_cost || 0;
@@ -166,6 +169,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     const totalCost = busCost + providerCost + hotelCost;
     const capacity = (formData.bus_capacity || bus?.total_capacity || 0) - formData.courtesies;
     
+    // Ingresos según simulador manual
     const currentRevenue = (projectedSales.double * formData.selling_price_double_occupancy) +
                            (projectedSales.triple * formData.selling_price_triple_occupancy) +
                            (projectedSales.quad * formData.selling_price_quad_occupancy) +
@@ -174,11 +178,17 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     
     const projectedProfit = currentRevenue - totalCost;
 
+    // Cálculo de puntos de equilibrio (asientos necesarios según tipo dominante)
+    const beQuad = formData.selling_price_quad_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_quad_occupancy) : 0;
+    const beTriple = formData.selling_price_triple_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_triple_occupancy) : 0;
+    const beDouble = formData.selling_price_double_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_double_occupancy) : 0;
+
     const targetRevenue = totalCost + desiredProfitFixed;
     const avgRequiredPerPerson = capacity > 0 ? targetRevenue / capacity : 0;
 
     return {
       busCost, hotelCost, providerCost, totalCost, capacity, projectedProfit,
+      beQuad, beTriple, beDouble,
       recPrice: {
         quad: avgRequiredPerPerson,
         triple: avgRequiredPerPerson * 1.12,
@@ -255,50 +265,104 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
 
   return (
     <div className="space-y-8 pb-20">
-      {/* Simulador Financiero */}
+      {/* SECCIÓN FINANCIERA COMPLETA */}
       <Card className="border-t-4 border-rosa-mexicano shadow-xl overflow-hidden">
         <CardHeader className="bg-gray-50/50">
           <CardTitle className="text-2xl font-bold flex items-center gap-2">
-            <TrendingUp className="text-rosa-mexicano" /> Simulador de Rentabilidad
+            <TrendingUp className="text-rosa-mexicano" /> Simulador Financiero de Rentabilidad
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-6 pt-6">
+        <CardContent className="space-y-8 pt-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            <div className="p-4 bg-muted/40 rounded-xl border border-dashed border-gray-300">
-              <h3 className="text-xs font-black uppercase text-gray-500 mb-2">Gastos Totales</h3>
-              <div className="text-2xl font-black text-rosa-mexicano">${financialSummary.totalCost.toLocaleString()}</div>
+            {/* Gastos Totales */}
+            <div className="p-5 bg-muted/40 rounded-2xl border border-dashed border-gray-300">
+              <h3 className="text-xs font-black uppercase text-gray-500 mb-4 tracking-widest">Egresos del Tour</h3>
+              <div className="space-y-3">
+                <div className="flex justify-between text-sm"><span>🚌 Bus:</span> <span className="font-bold">${financialSummary.busCost.toLocaleString()}</span></div>
+                <div className="flex justify-between text-sm"><span>🏨 Hotel:</span> <span className="font-bold">${financialSummary.hotelCost.toLocaleString()}</span></div>
+                <div className="flex justify-between text-sm"><span>🎟️ Servicios:</span> <span className="font-bold">${financialSummary.providerCost.toLocaleString()}</span></div>
+                <div className="pt-3 mt-2 border-t-2 border-rosa-mexicano/20 flex justify-between text-xl font-black text-rosa-mexicano">
+                  <span>TOTAL:</span>
+                  <span>${financialSummary.totalCost.toLocaleString()}</span>
+                </div>
+              </div>
             </div>
-            <div className="p-4 bg-blue-50/60 rounded-xl border border-blue-100">
-              <h3 className="text-xs font-black uppercase text-blue-600 mb-2">Asientos Vendibles</h3>
-              <div className="text-2xl font-black text-blue-800">{financialSummary.capacity} pax</div>
+
+            {/* Equilibrio */}
+            <div className="p-5 bg-blue-50/60 rounded-2xl border border-blue-100">
+              <h3 className="text-xs font-black uppercase text-blue-600 mb-4 flex items-center gap-1 tracking-widest">
+                <AlertCircle className="h-4 w-4" /> Punto de Equilibrio
+              </h3>
+              <div className="space-y-3">
+                <p className="text-[10px] leading-tight text-blue-800 font-medium">Pax necesarios para cubrir gastos:</p>
+                <div className="flex justify-between text-sm"><span>En Cuádruple:</span> <span className="font-bold">{financialSummary.beQuad} pax</span></div>
+                <div className="flex justify-between text-sm"><span>En Triple:</span> <span className="font-bold">{financialSummary.beTriple} pax</span></div>
+                <div className="flex justify-between text-sm"><span>En Doble:</span> <span className="font-bold">{financialSummary.beDouble} pax</span></div>
+                <p className="text-[10px] text-gray-500 italic mt-2">* Basado en {financialSummary.capacity} asientos libres.</p>
+              </div>
             </div>
-            <div className="p-4 bg-green-50/60 rounded-xl border border-green-100">
-              <h3 className="text-xs font-black uppercase text-green-600 mb-2">Utilidad Proyectada</h3>
-              <div className={cn("text-2xl font-black", financialSummary.projectedProfit >= 0 ? "text-green-700" : "text-red-600")}>
-                ${financialSummary.projectedProfit.toLocaleString()}
+
+            {/* Utilidad Deseada */}
+            <div className="p-5 bg-green-50/60 rounded-2xl border border-green-100">
+              <h3 className="text-xs font-black uppercase text-green-600 mb-4 flex items-center gap-1 tracking-widest">
+                <Calculator className="h-4 w-4" /> Recomendador de Precios
+              </h3>
+              <div className="space-y-4">
+                <div>
+                  <Label className="text-[10px] font-bold">Ganancia meta ($):</Label>
+                  <Input type="number" value={desiredProfitFixed} onChange={e => setDesiredProfitFixed(parseFloat(e.target.value) || 0)} className="h-8 bg-white font-bold" />
+                </div>
+                <div className="p-3 bg-white/80 rounded-xl border border-green-100">
+                  <p className="text-[10px] font-black text-gray-400 mb-2">P-VENTA RECOMENDADOS:</p>
+                  <div className="grid grid-cols-2 gap-2 text-xs font-black">
+                    <div className="text-green-700">QUAD: ${financialSummary.recPrice.quad.toFixed(0)}</div>
+                    <div className="text-green-700">TRIP: ${financialSummary.recPrice.triple.toFixed(0)}</div>
+                    <div className="text-green-700">DBL: ${financialSummary.recPrice.double.toFixed(0)}</div>
+                    <div className="text-green-700">NIÑO: ${financialSummary.recPrice.child.toFixed(0)}</div>
+                  </div>
+                </div>
               </div>
             </div>
           </div>
-          
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-900 rounded-2xl text-white">
-            {['double', 'triple', 'quad', 'child'].map((type) => (
-              <div key={type} className="space-y-1">
-                <Label className="capitalize text-[10px] font-bold text-gray-400">Simular Ventas {type}</Label>
-                <Input 
-                  type="number" 
-                  value={projectedSales[type as keyof typeof projectedSales]}
-                  onChange={e => setProjectedSales({...projectedSales, [type]: parseInt(e.target.value) || 0})}
-                  className="bg-white/10 border-white/20 h-8 text-white font-bold"
-                />
+
+          {/* Mezcla de Ventas Realista */}
+          <div className="p-6 bg-gray-900 rounded-3xl text-white shadow-2xl overflow-hidden relative">
+            <h3 className="text-lg font-bold mb-6 flex items-center gap-2">Mezcla de Ventas y Utilidad Proyectada</h3>
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 relative z-10">
+              {['double', 'triple', 'quad', 'child'].map((type) => (
+                <div key={type} className="space-y-2">
+                  <Label className="capitalize text-xs font-bold text-gray-400">Ventas {type}</Label>
+                  <Input 
+                    type="number" 
+                    value={projectedSales[type as keyof typeof projectedSales]}
+                    onChange={e => setProjectedSales({...projectedSales, [type]: parseInt(e.target.value) || 0})}
+                    className="bg-white/10 border-white/20 text-white font-bold h-12 text-xl"
+                  />
+                </div>
+              ))}
+            </div>
+            <div className="mt-8 flex flex-wrap items-center justify-between gap-6 pt-6 border-t border-white/10">
+              <div className="flex items-center gap-3">
+                <span className="text-xs text-gray-400 font-bold uppercase tracking-widest block">Capacidad:</span>
+                <span className={cn("text-4xl font-black", (projectedSales.double + projectedSales.triple + projectedSales.quad + projectedSales.child) > financialSummary.capacity ? "text-red-500" : "text-rosa-mexicano")}>
+                  {projectedSales.double + projectedSales.triple + projectedSales.quad + projectedSales.child}
+                </span>
+                <span className="text-xl text-gray-500">/ {financialSummary.capacity} pax</span>
               </div>
-            ))}
+              <div className="text-right">
+                <span className="text-xs text-gray-400 font-bold uppercase tracking-widest block mb-1">Resultado de la Operación</span>
+                <span className={cn("text-5xl font-black tracking-tighter", financialSummary.projectedProfit >= 0 ? "text-green-400" : "text-red-500")}>
+                  ${financialSummary.projectedProfit.toLocaleString()}
+                </span>
+              </div>
+            </div>
           </div>
         </CardContent>
       </Card>
 
       <form onSubmit={handleSubmit} className="space-y-8">
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
-          {/* Columna Izquierda: Logística y Precios */}
+          {/* LOGÍSTICA Y PRECIOS */}
           <div className="space-y-8">
             <Card>
               <CardHeader><CardTitle className="text-lg flex items-center gap-2"><MapPin className="h-5 w-5 text-rosa-mexicano" /> Datos Principales</CardTitle></CardHeader>
@@ -398,7 +462,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
             </Card>
           </div>
 
-          {/* Columna Derecha: Multimedia, Fechas e Itinerario */}
+          {/* MULTIMEDIA Y TIEMPOS */}
           <div className="space-y-8">
             <Card>
               <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Clock className="h-5 w-5 text-rosa-mexicano" /> Tiempos y Foto</CardTitle></CardHeader>
