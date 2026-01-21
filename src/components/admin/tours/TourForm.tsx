@@ -7,10 +7,10 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, Info, Image as ImageIcon, MapPin, Clock, Hotel } from 'lucide-react';
+import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, Info, Image as ImageIcon, MapPin, Clock, Hotel, Timer, ListChecks } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectGroup, SelectLabel } from '@/components/ui/select';
 import { v4 as uuidv4 } from 'uuid';
-import { format, parseISO, differenceInDays } from 'date-fns';
+import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -30,17 +30,6 @@ interface HotelQuote {
   cost_per_night_double: number;
   cost_per_night_triple: number;
   cost_per_night_quad: number;
-  capacity_double: number;
-  capacity_triple: number;
-  capacity_quad: number;
-  num_double_rooms: number;
-  num_triple_rooms: number;
-  num_quad_rooms: number;
-  num_courtesy_rooms: number;
-  is_active: boolean;
-  advance_payment: number;
-  total_paid: number;
-  quote_end_date: string | null;
   estimated_total_cost: number;
 }
 
@@ -73,9 +62,6 @@ interface Tour {
   courtesies: number;
   hotel_details: TourHotelDetail[];
   provider_details: TourProviderService[];
-  total_base_cost?: number;
-  paying_clients_count?: number;
-  cost_per_paying_person?: number;
   selling_price_double_occupancy: number;
   selling_price_triple_occupancy: number;
   selling_price_quad_occupancy: number;
@@ -96,7 +82,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     selling_price_child: 0, other_income: 0, departure_date: null, return_date: null, departure_time: '08:00', return_time: '18:00',
   });
   
-  // Estados de simulación
   const [desiredProfitFixed, setDesiredProfitFixed] = useState(45000);
   const [projectedSales, setProjectedSales] = useState({ double: 0, triple: 0, quad: 0, child: 0 });
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -110,7 +95,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
   const [departureDate, setDepartureDate] = useState<Date | undefined>(undefined);
   const [returnDate, setReturnDate] = useState<Date | undefined>(undefined);
 
-  // Carga de dependencias
   useEffect(() => {
     const fetchData = async () => {
       const [hotelsRes, busesRes, providersRes] = await Promise.all([
@@ -136,7 +120,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     fetchData();
   }, []);
 
-  // Organizar hoteles agrupados para el selector
   const groupedAndSortedQuotes = useMemo(() => {
     const groups: Record<string, HotelQuote[]> = {};
     availableHotelQuotes.forEach(quote => {
@@ -150,7 +133,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     });
   }, [availableHotelQuotes]);
 
-  // Carga de datos del tour si es edición
   useEffect(() => {
     const fetchTourData = async () => {
       if (tourId) {
@@ -172,7 +154,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     fetchTourData();
   }, [tourId]);
 
-  // Lógica financiera avanzada
   const financialSummary = useMemo(() => {
     const bus = availableBuses.find(b => b.id === formData.bus_id);
     const busCost = bus?.rental_cost || 0;
@@ -193,20 +174,11 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     
     const projectedProfit = currentRevenue - totalCost;
 
-    const beQuad = formData.selling_price_quad_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_quad_occupancy) : 0;
-    const beTriple = formData.selling_price_triple_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_triple_occupancy) : 0;
-    const beDouble = formData.selling_price_double_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_double_occupancy) : 0;
-
     const targetRevenue = totalCost + desiredProfitFixed;
     const avgRequiredPerPerson = capacity > 0 ? targetRevenue / capacity : 0;
 
     return {
-      busCost, hotelCost, providerCost,
-      totalCost,
-      capacity,
-      currentRevenue,
-      projectedProfit,
-      beQuad, beTriple, beDouble,
+      busCost, hotelCost, providerCost, totalCost, capacity, projectedProfit,
       recPrice: {
         quad: avgRequiredPerPerson,
         triple: avgRequiredPerPerson * 1.12,
@@ -232,13 +204,11 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     else { setReturnDate(date); setFormData(p => ({ ...p, return_date: formatted })); }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      setImageUrlPreview(URL.createObjectURL(file));
-    }
-  };
+  const addInclude = () => setFormData(p => ({ ...p, includes: [...p.includes, ''] }));
+  const removeInclude = (idx: number) => setFormData(p => ({ ...p, includes: p.includes.filter((_, i) => i !== idx) }));
+  const updateInclude = (idx: number, val: string) => setFormData(p => {
+    const newI = [...p.includes]; newI[idx] = val; return { ...p, includes: newI };
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -277,128 +247,58 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
 
   return (
     <div className="space-y-8 pb-20">
-      {/* 1. Análisis Financiero (Simulador) */}
-      <Card className="border-t-4 border-rosa-mexicano shadow-xl">
+      {/* Simulador Financiero */}
+      <Card className="border-t-4 border-rosa-mexicano shadow-xl overflow-hidden">
         <CardHeader className="bg-gray-50/50">
           <CardTitle className="text-2xl font-bold flex items-center gap-2">
-            <TrendingUp className="text-rosa-mexicano" /> Calculadora de Rentabilidad Avanzada
+            <TrendingUp className="text-rosa-mexicano" /> Simulador de Rentabilidad
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-8 pt-6">
+        <CardContent className="space-y-6 pt-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Gastos Reales */}
-            <div className="p-5 bg-muted/40 rounded-2xl border border-dashed border-gray-300">
-              <h3 className="text-xs font-black uppercase text-gray-500 mb-4 tracking-widest">Gastos del Tour</h3>
-              <div className="space-y-3">
-                <div className="flex justify-between text-sm"><span>🚌 Transporte:</span> <span className="font-bold">${financialSummary.busCost.toLocaleString()}</span></div>
-                <div className="flex justify-between text-sm"><span>🏨 Hospedaje:</span> <span className="font-bold">${financialSummary.hotelCost.toLocaleString()}</span></div>
-                <div className="flex justify-between text-sm"><span>🎟️ Proveedores:</span> <span className="font-bold">${financialSummary.providerCost.toLocaleString()}</span></div>
-                <div className="pt-3 mt-2 border-t-2 border-rosa-mexicano/20 flex justify-between text-xl font-black text-rosa-mexicano">
-                  <span>EGRESO TOTAL:</span>
-                  <span>${financialSummary.totalCost.toLocaleString()}</span>
-                </div>
-              </div>
+            <div className="p-4 bg-muted/40 rounded-xl border border-dashed border-gray-300">
+              <h3 className="text-xs font-black uppercase text-gray-500 mb-2">Gastos Totales</h3>
+              <div className="text-2xl font-black text-rosa-mexicano">${financialSummary.totalCost.toLocaleString()}</div>
             </div>
-
-            {/* Punto de Equilibrio */}
-            <div className="p-5 bg-blue-50/60 rounded-2xl border border-blue-100">
-              <h3 className="text-xs font-black uppercase text-blue-600 mb-4 flex items-center gap-1 tracking-widest">
-                <AlertCircle className="h-4 w-4" /> Punto de Equilibrio
-              </h3>
-              <div className="space-y-3">
-                <p className="text-[10px] leading-tight text-blue-800 font-medium">Asientos necesarios para cubrir costos según tipo de venta dominante:</p>
-                <div className="flex justify-between text-sm"><span>Solo Cuádruple:</span> <span className="font-bold bg-blue-100 px-2 rounded">{financialSummary.beQuad} pax</span></div>
-                <div className="flex justify-between text-sm"><span>Solo Triple:</span> <span className="font-bold bg-blue-100 px-2 rounded">{financialSummary.beTriple} pax</span></div>
-                <div className="flex justify-between text-sm"><span>Solo Doble:</span> <span className="font-bold bg-blue-100 px-2 rounded">{financialSummary.beDouble} pax</span></div>
-                <p className="text-[10px] text-gray-500 italic mt-2">* Basado en {financialSummary.capacity} asientos vendibles.</p>
-              </div>
+            <div className="p-4 bg-blue-50/60 rounded-xl border border-blue-100">
+              <h3 className="text-xs font-black uppercase text-blue-600 mb-2">Asientos Vendibles</h3>
+              <div className="text-2xl font-black text-blue-800">{financialSummary.capacity} pax</div>
             </div>
-
-            {/* Utilidad Meta y Recomendación */}
-            <div className="p-5 bg-green-50/60 rounded-2xl border border-green-100">
-              <h3 className="text-xs font-black uppercase text-green-600 mb-4 flex items-center gap-1 tracking-widest">
-                <Calculator className="h-4 w-4" /> Utilidad Deseada
-              </h3>
-              <div className="space-y-4">
-                <div>
-                  <Label className="text-[10px] font-bold">Meta de ganancia neta ($):</Label>
-                  <Input 
-                    type="number" 
-                    value={desiredProfitFixed} 
-                    onChange={e => setDesiredProfitFixed(parseFloat(e.target.value) || 0)}
-                    className="h-9 bg-white font-bold border-green-200"
-                  />
-                </div>
-                <div className="p-3 bg-white/80 rounded-xl border border-green-100">
-                  <p className="text-[10px] font-black text-gray-400 mb-2">PRECIOS RECOMENDADOS:</p>
-                  <div className="grid grid-cols-2 gap-2 text-xs font-black">
-                    <div className="text-green-700">QUAD: ${financialSummary.recPrice.quad.toFixed(0)}</div>
-                    <div className="text-green-700">TRIP: ${financialSummary.recPrice.triple.toFixed(0)}</div>
-                    <div className="text-green-700">DBL: ${financialSummary.recPrice.double.toFixed(0)}</div>
-                    <div className="text-green-700">NIÑO: ${financialSummary.recPrice.child.toFixed(0)}</div>
-                  </div>
-                </div>
+            <div className="p-4 bg-green-50/60 rounded-xl border border-green-100">
+              <h3 className="text-xs font-black uppercase text-green-600 mb-2">Utilidad Proyectada</h3>
+              <div className={cn("text-2xl font-black", financialSummary.projectedProfit >= 0 ? "text-green-700" : "text-red-600")}>
+                ${financialSummary.projectedProfit.toLocaleString()}
               </div>
             </div>
           </div>
-
-          {/* Simulador de Mezcla de Ventas */}
-          <div className="p-6 bg-gray-900 rounded-3xl text-white shadow-2xl overflow-hidden relative">
-            <div className="absolute top-0 right-0 p-8 opacity-10"><TrendingUp className="h-40 w-40" /></div>
-            <h3 className="text-lg font-bold mb-6 flex items-center gap-2">Simulador de Escenario Mixto</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 relative z-10">
-              {['double', 'triple', 'quad', 'child'].map((type) => (
-                <div key={type} className="space-y-2">
-                  <Label className="capitalize text-xs font-bold text-gray-400">Ventas {type}</Label>
-                  <Input 
-                    type="number" 
-                    value={projectedSales[type as keyof typeof projectedSales]}
-                    onChange={e => setProjectedSales({...projectedSales, [type]: parseInt(e.target.value) || 0})}
-                    className="bg-white/10 border-white/20 text-white font-bold h-12 text-xl focus:bg-white/20"
-                  />
-                </div>
-              ))}
-            </div>
-            <div className="mt-8 flex flex-wrap items-center justify-between gap-6 pt-6 border-t border-white/10 relative z-10">
-              <div>
-                <span className="text-xs text-gray-400 font-bold uppercase tracking-widest block mb-1">Capacidad Bus</span>
-                <div className="flex items-center gap-3">
-                  <span className={cn(
-                    "text-4xl font-black",
-                    (projectedSales.double + projectedSales.triple + projectedSales.quad + projectedSales.child) > financialSummary.capacity ? "text-red-500" : "text-rosa-mexicano"
-                  )}>
-                    {projectedSales.double + projectedSales.triple + projectedSales.quad + projectedSales.child}
-                  </span>
-                  <span className="text-xl text-gray-500">/ {financialSummary.capacity} pax</span>
-                </div>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 p-4 bg-gray-900 rounded-2xl text-white">
+            {['double', 'triple', 'quad', 'child'].map((type) => (
+              <div key={type} className="space-y-1">
+                <Label className="capitalize text-[10px] font-bold text-gray-400">Simular Ventas {type}</Label>
+                <Input 
+                  type="number" 
+                  value={projectedSales[type as keyof typeof projectedSales]}
+                  onChange={e => setProjectedSales({...projectedSales, [type]: parseInt(e.target.value) || 0})}
+                  className="bg-white/10 border-white/20 h-8 text-white font-bold"
+                />
               </div>
-              <div className="text-right">
-                <span className="text-xs text-gray-400 font-bold uppercase tracking-widest block mb-1">Utilidad Estimada</span>
-                <span className={cn(
-                  "text-5xl font-black tracking-tighter",
-                  financialSummary.projectedProfit >= 0 ? "text-green-400" : "text-red-500"
-                )}>
-                  ${financialSummary.projectedProfit.toLocaleString()}
-                </span>
-              </div>
-            </div>
+            ))}
           </div>
         </CardContent>
       </Card>
 
-      {/* 2. Formulario de Datos y Logística */}
       <form onSubmit={handleSubmit} className="space-y-8">
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-8">
           {/* Columna Izquierda: Logística y Precios */}
           <div className="space-y-8">
             <Card>
-              <CardHeader><CardTitle className="text-lg">Logística del Viaje</CardTitle></CardHeader>
-              <CardContent className="space-y-6">
+              <CardHeader><CardTitle className="text-lg flex items-center gap-2"><MapPin className="h-5 w-5 text-rosa-mexicano" /> Datos Principales</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
                 <div className="space-y-2">
                   <Label>Nombre del Tour</Label>
-                  <Input id="title" value={formData.title} onChange={handleChange} placeholder="Ej: Semana Santa en Huasteca" required />
+                  <Input id="title" value={formData.title} onChange={handleChange} required />
                 </div>
-                
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Autobús</Label>
@@ -408,18 +308,18 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
                     }}>
                       <SelectTrigger><SelectValue placeholder="Elegir Bus" /></SelectTrigger>
                       <SelectContent>
-                        {availableBuses.map(b => <SelectItem key={b.id} value={b.id}>{b.name} (${b.rental_cost})</SelectItem>)}
+                        {availableBuses.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Coordinadores (Lugares ocupados)</Label>
-                    <Input type="number" id="courtesies" value={formData.courtesies} onChange={handleChange} />
+                    <Label>Duración (Ej: 3 días, 2 noches)</Label>
+                    <Input id="duration" value={formData.duration} onChange={handleChange} placeholder="Ej: 4 Días" />
                   </div>
                 </div>
 
-                <div className="space-y-3">
-                  <Label className="flex items-center gap-2"><Hotel className="h-4 w-4" /> Hoteles Vinculados</Label>
+                <div className="space-y-3 pt-4 border-t">
+                  <Label className="flex items-center gap-2"><Hotel className="h-4 w-4" /> Hoteles Asociados</Label>
                   {formData.hotel_details.map((detail, index) => (
                     <div key={detail.id} className="flex gap-2">
                       <Select value={detail.hotel_quote_id} onValueChange={val => {
@@ -427,7 +327,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
                         setFormData({...formData, hotel_details: newH});
                       }}>
                         <SelectTrigger className="flex-grow">
-                          <SelectValue placeholder="Seleccionar Cotización" />
+                          <SelectValue placeholder="Elegir Cotización" />
                         </SelectTrigger>
                         <SelectContent>
                           {groupedAndSortedQuotes.map(([name, quotes]) => (
@@ -435,7 +335,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
                               <SelectLabel className="bg-muted py-1 px-2 text-rosa-mexicano font-bold">{name}</SelectLabel>
                               {quotes.map(q => (
                                 <SelectItem key={q.id} value={q.id}>
-                                  ${q.estimated_total_cost.toFixed(0)} - {q.num_nights_quoted} Noches ({format(parseISO(q.quoted_date!), 'dd/MM')})
+                                  ${q.estimated_total_cost.toFixed(0)} ({format(parseISO(q.quoted_date!), 'dd/MM')})
                                 </SelectItem>
                               ))}
                             </SelectGroup>
@@ -448,128 +348,145 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
                     </div>
                   ))}
                   <Button type="button" variant="outline" className="w-full border-dashed" onClick={() => setFormData({...formData, hotel_details: [...formData.hotel_details, { id: uuidv4(), hotel_quote_id: '' }]})}>
-                    <PlusCircle className="mr-2 h-4 w-4" /> Vincular otro Hotel
+                    <PlusCircle className="mr-2 h-4 w-4" /> Añadir Hotel
                   </Button>
                 </div>
               </CardContent>
             </Card>
 
             <Card className="border-rosa-mexicano/30">
-              <CardHeader><CardTitle className="text-lg">Precios de Venta Oficiales</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-lg">Precios de Venta</CardTitle></CardHeader>
               <CardContent className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label>Doble (p/p)</Label>
-                  <Input type="number" id="selling_price_double_occupancy" value={formData.selling_price_double_occupancy} onChange={handleChange} className="border-rosa-mexicano/50 font-bold" />
+                  <Input type="number" id="selling_price_double_occupancy" value={formData.selling_price_double_occupancy} onChange={handleChange} className="font-bold border-rosa-mexicano/30" />
                 </div>
                 <div className="space-y-2">
                   <Label>Triple (p/p)</Label>
-                  <Input type="number" id="selling_price_triple_occupancy" value={formData.selling_price_triple_occupancy} onChange={handleChange} className="border-rosa-mexicano/50 font-bold" />
+                  <Input type="number" id="selling_price_triple_occupancy" value={formData.selling_price_triple_occupancy} onChange={handleChange} className="font-bold border-rosa-mexicano/30" />
                 </div>
                 <div className="space-y-2">
                   <Label>Cuádruple (p/p)</Label>
-                  <Input type="number" id="selling_price_quad_occupancy" value={formData.selling_price_quad_occupancy} onChange={handleChange} className="border-rosa-mexicano/50 font-bold" />
+                  <Input type="number" id="selling_price_quad_occupancy" value={formData.selling_price_quad_occupancy} onChange={handleChange} className="font-bold border-rosa-mexicano/30" />
                 </div>
                 <div className="space-y-2">
-                  <Label>Niño (-12 años)</Label>
-                  <Input type="number" id="selling_price_child" value={formData.selling_price_child} onChange={handleChange} className="border-rosa-mexicano/50 font-bold" />
+                  <Label>Niño</Label>
+                  <Input type="number" id="selling_price_child" value={formData.selling_price_child} onChange={handleChange} className="font-bold border-rosa-mexicano/30" />
                 </div>
-                <div className="space-y-2 col-span-2 pt-2 border-t">
-                  <Label>Otros Ingresos (Ej: Patrocinios)</Label>
-                  <Input type="number" id="other_income" value={formData.other_income} onChange={handleChange} />
-                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle className="text-lg flex items-center gap-2"><ListChecks className="h-5 w-5 text-rosa-mexicano" /> ¿Qué Incluye?</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                {formData.includes.map((item, idx) => (
+                  <div key={idx} className="flex gap-2">
+                    <Input value={item} onChange={e => updateInclude(idx, e.target.value)} placeholder="Ej: Desayunos bufet" />
+                    <Button variant="ghost" size="icon" onClick={() => removeInclude(idx)}><MinusCircle className="h-4 w-4 text-red-400" /></Button>
+                  </div>
+                ))}
+                <Button type="button" variant="outline" className="w-full" onClick={addInclude}><PlusCircle className="mr-2 h-4 w-4" /> Añadir Inclusión</Button>
               </CardContent>
             </Card>
           </div>
 
-          {/* Columna Derecha: Multimedia y Fechas */}
+          {/* Columna Derecha: Multimedia, Fechas e Itinerario */}
           <div className="space-y-8">
             <Card>
-              <CardHeader><CardTitle className="text-lg">Fechas y Foto</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Clock className="h-5 w-5 text-rosa-mexicano" /> Tiempos y Foto</CardTitle></CardHeader>
               <CardContent className="space-y-6">
-                <div className="grid grid-cols-1 gap-4">
-                  <div className="space-y-2">
-                    <Label>Foto de Portada</Label>
-                    <div className="relative group cursor-pointer border-2 border-dashed rounded-xl h-48 flex items-center justify-center overflow-hidden">
-                      {imageUrlPreview ? (
-                        <img src={imageUrlPreview} className="w-full h-full object-cover" alt="Preview" />
-                      ) : (
-                        <div className="text-center text-gray-400"><ImageIcon className="mx-auto mb-2" /><span>Subir Imagen</span></div>
-                      )}
-                      <Input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleFileChange} />
-                    </div>
-                  </div>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Fecha Salida</Label>
-                      <Popover>
-                        <PopoverTrigger asChild>
-                          <Button variant="outline" className="w-full justify-start">{departureDate ? format(departureDate, 'dd/MM/yy') : 'Fecha'}</Button>
-                        </PopoverTrigger>
-                        <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={departureDate} onSelect={d => handleDateSelect('departure_date', d)} locale={es} /></PopoverContent>
-                      </Popover>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>Hora</Label>
-                      <Input id="departure_time" value={formData.departure_time || ''} onChange={handleChange} placeholder="08:00" />
-                    </div>
+                <div className="space-y-2">
+                  <Label>Imagen Principal</Label>
+                  <div className="relative border-2 border-dashed rounded-xl h-48 flex items-center justify-center overflow-hidden bg-gray-50 group">
+                    {imageUrlPreview ? (
+                      <img src={imageUrlPreview} className="w-full h-full object-cover" alt="Preview" />
+                    ) : (
+                      <div className="text-center text-gray-400"><ImageIcon className="mx-auto mb-2" /><span>Subir Foto</span></div>
+                    )}
+                    <Input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={handleFileChange} />
                   </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Descripción Corta (Venta)</Label>
-                  <Textarea id="description" value={formData.description} onChange={handleChange} placeholder="Engancha a tus clientes..." className="h-24" />
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Salida</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start gap-2"><CalendarIcon className="h-4 w-4" />{departureDate ? format(departureDate, 'dd/MM/yy') : 'Fecha'}</Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={departureDate} onSelect={d => handleDateSelect('departure_date', d)} locale={es} /></PopoverContent>
+                    </Popover>
+                    <Input id="departure_time" value={formData.departure_time || ''} onChange={handleChange} placeholder="08:00 AM" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Regreso</Label>
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button variant="outline" className="w-full justify-start gap-2"><CalendarIcon className="h-4 w-4" />{returnDate ? format(returnDate, 'dd/MM/yy') : 'Fecha'}</Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={returnDate} onSelect={d => handleDateSelect('return_date', d)} locale={es} /></PopoverContent>
+                    </Popover>
+                    <Input id="return_time" value={formData.return_time || ''} onChange={handleChange} placeholder="08:00 PM" />
+                  </div>
                 </div>
               </CardContent>
             </Card>
 
             <Card>
-              <CardHeader><CardTitle className="text-lg">Itinerario y Detalles</CardTitle></CardHeader>
-              <CardContent className="space-y-6">
-                <div className="space-y-4">
-                  <Label>Días del Viaje</Label>
-                  {formData.itinerary.map((item, index) => (
-                    <div key={index} className="flex gap-2 items-start bg-gray-50 p-3 rounded-lg">
-                      <div className="bg-rosa-mexicano text-white rounded-full h-6 w-6 flex-shrink-0 flex items-center justify-center text-xs font-bold mt-2">{item.day}</div>
-                      <Textarea 
-                        value={item.activity} 
-                        onChange={e => {
-                          const newI = [...formData.itinerary]; newI[index].activity = e.target.value;
-                          setFormData({...formData, itinerary: newI});
-                        }} 
-                        className="bg-white" 
-                        placeholder="Actividades del día..."
-                      />
-                      <Button variant="ghost" size="icon" onClick={() => setFormData({...formData, itinerary: formData.itinerary.filter((_, i) => i !== index)})}>
-                        <MinusCircle className="h-4 w-4 text-red-400" />
-                      </Button>
-                    </div>
-                  ))}
-                  <Button type="button" variant="outline" className="w-full" onClick={() => setFormData({...formData, itinerary: [...formData.itinerary, { day: formData.itinerary.length + 1, activity: '' }]})}>
-                    <PlusCircle className="mr-2 h-4 w-4" /> Añadir Día
-                  </Button>
-                </div>
+              <CardHeader><CardTitle className="text-lg">Descripción de Venta (Corta)</CardTitle></CardHeader>
+              <CardContent>
+                <RichTextEditor 
+                  value={formData.description} 
+                  onChange={val => setFormData({...formData, description: val})} 
+                  placeholder="Este texto aparece en las tarjetas de la página principal..."
+                  className="min-h-[150px]"
+                />
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle className="text-lg">Itinerario por Días</CardTitle></CardHeader>
+              <CardContent className="space-y-4">
+                {formData.itinerary.map((item, idx) => (
+                  <div key={idx} className="flex gap-2 items-start bg-gray-50 p-3 rounded-lg border">
+                    <div className="bg-rosa-mexicano text-white rounded-full h-6 w-6 flex-shrink-0 flex items-center justify-center text-xs font-bold mt-2">{item.day}</div>
+                    <Textarea 
+                      value={item.activity} 
+                      onChange={e => {
+                        const newI = [...formData.itinerary]; newI[idx].activity = e.target.value;
+                        setFormData({...formData, itinerary: newI});
+                      }} 
+                      className="bg-white" 
+                      placeholder="¿Qué haremos este día?"
+                    />
+                    <Button variant="ghost" size="icon" onClick={() => setFormData({...formData, itinerary: formData.itinerary.filter((_, i) => i !== idx)})}>
+                      <MinusCircle className="h-4 w-4 text-red-400" />
+                    </Button>
+                  </div>
+                ))}
+                <Button type="button" variant="outline" className="w-full" onClick={() => setFormData({...formData, itinerary: [...formData.itinerary, { day: formData.itinerary.length + 1, activity: '' }]})}>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Añadir Día
+                </Button>
               </CardContent>
             </Card>
           </div>
         </div>
 
-        {/* Sección de Texto Largo (Debajo de las columnas) */}
         <Card>
-          <CardHeader><CardTitle className="text-lg">Información Detallada (Página del Tour)</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-lg">Información Detallada (Todo lo demás)</CardTitle></CardHeader>
           <CardContent>
             <RichTextEditor 
               value={formData.full_content} 
               onChange={val => setFormData({...formData, full_content: val})} 
-              placeholder="Detalles sobre puntos de reunión, recomendaciones, equipo necesario..."
+              placeholder="Políticas, recomendaciones, puntos de reunión, etc..."
               className="min-h-[300px]"
             />
           </CardContent>
         </Card>
 
         <div className="fixed bottom-6 right-6 flex gap-4 z-50">
-          <Button type="button" variant="outline" onClick={() => navigate('/admin/tours')} className="bg-white shadow-lg">Cancelar</Button>
-          <Button type="submit" disabled={isSubmitting} className="bg-rosa-mexicano text-white shadow-lg px-8 py-6 h-auto text-lg font-bold rounded-2xl">
+          <Button type="button" variant="outline" onClick={() => navigate('/admin/tours')} className="bg-white shadow-lg px-6 h-12">Cancelar</Button>
+          <Button type="submit" disabled={isSubmitting} className="bg-rosa-mexicano text-white shadow-lg px-10 h-12 text-lg font-bold rounded-xl">
             {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
             {tourId ? 'Actualizar Tour' : 'Publicar Tour'}
           </Button>
