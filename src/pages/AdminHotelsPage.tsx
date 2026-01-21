@@ -11,9 +11,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { format, parseISO } from 'date-fns';
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils'; // NEW: Import cn utility
+import { cn } from '@/lib/utils';
 
 interface Hotel {
   id: string;
@@ -123,6 +122,27 @@ const AdminHotelsPage = () => {
     setLoading(false);
   };
 
+  const handleDeleteAllQuotes = async (hotelName: string, quoteIds: string[]) => {
+    if (!window.confirm(`¿Estás seguro de que quieres eliminar las ${quoteIds.length} cotizaciones de "${hotelName}"? Esta acción no se puede deshacer.`)) {
+      return;
+    }
+    
+    setLoading(true);
+    const { error } = await supabase
+      .from('hotels')
+      .delete()
+      .in('id', quoteIds);
+
+    if (error) {
+      console.error('Error deleting all hotel quotes:', error);
+      toast.error('Error al eliminar las cotizaciones del hotel.');
+    } else {
+      toast.success(`Se han eliminado ${quoteIds.length} cotizaciones de "${hotelName}".`);
+      setRefreshKey(prev => prev + 1);
+    }
+    setLoading(false);
+  };
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
     try {
@@ -183,17 +203,27 @@ const AdminHotelsPage = () => {
                         <p className="text-sm text-gray-500">{quotes[0].location}</p>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-4">
-                      <Badge variant="secondary" className="bg-rosa-mexicano/10 text-rosa-mexicano border-rosa-mexicano/20">
+                    <div className="flex items-center space-x-2">
+                      <Badge variant="secondary" className="bg-rosa-mexicano/10 text-rosa-mexicano border-rosa-mexicano/20 mr-2">
                         {quotes.length} {quotes.length === 1 ? 'cotización' : 'cotizaciones'}
                       </Badge>
+                      
                       <Button 
                         variant="ghost" 
                         size="sm" 
-                        className="text-blue-600"
+                        className="text-blue-600 hover:bg-blue-50"
                         onClick={(e) => { e.stopPropagation(); handleCloneHotel(quotes[0]); }}
                       >
                         <Copy className="h-4 w-4 mr-1" /> Clonar Base
+                      </Button>
+
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-red-600 hover:bg-red-50"
+                        onClick={(e) => { e.stopPropagation(); handleDeleteAllQuotes(name, quotes.map(q => q.id)); }}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" /> Eliminar Todas
                       </Button>
                     </div>
                   </div>
