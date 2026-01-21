@@ -1,15 +1,16 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react'; // Import useRef
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Search, Hotel as HotelIcon } from 'lucide-react'; // Added Search and HotelIcon
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { v4 as uuidv4 } from 'uuid';
-import { format, parse, isValid, parseISO, differenceInDays } from 'date-fns'; // Import differenceInDays
+import { format, parse, isValid, parseISO, addDays, differenceInDays, isEqual } from 'date-fns'; // Import differenceInDays, isEqual
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -33,12 +34,15 @@ interface HotelQuote {
   capacity_triple: number;
   capacity_quad: number;
   num_double_rooms: number; // NEW
-  num_triple_rooms: number; // NEW
-  num_quad_rooms: number; // NEW
+  num_triple_rooms: number;
+  num_quad_rooms: number;
   num_courtesy_rooms: number; // NEW: Added courtesy rooms
   is_active: boolean;
   advance_payment: number;
   total_paid: number;
+  quote_end_date: string | null;
+  // Calculated fields for filtering/sorting
+  estimated_total_cost: number;
 }
 
 // TourHotelDetail now references a hotel quote ID
@@ -205,10 +209,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const [expectedClientsForBreakeven, setExpectedClientsForBreakeven] = useState(0);
   const [breakevenResult, setBreakevenResult] = useState<BreakevenResult | null>(null);
 
-  // NEW: Cheapest Hotel Quote state
-  const [cheapestHotelQuote, setCheapestHotelQuote] = useState<{ name: string; estimated_total_cost: number; id: string; quoted_date: string | null } | null>(null);
-  const [loadingCheapestHotel, setLoadingCheapestHotel] = useState(false);
-
+  // NEW: Filtered and Sorted Hotel Quotes
+  const [filteredHotelQuotes, setFilteredHotelQuotes] = useState<HotelQuote[]>([]);
 
   // Fetch available hotel quotes
   useEffect(() => {
@@ -223,11 +225,65 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
         console.error('Error al cargar cotizaciones de hoteles disponibles:', error);
         toast.error('Error al cargar la lista de cotizaciones de hoteles disponibles.');
       } else {
-        setAvailableHotelQuotes(data || []);
+        // Calculate estimated total cost for each quote upon fetching
+        const quotesWithCost = (data || []).map(quote => {
+          const numNights = quote.num_nights_quoted || 1;
+          const costDouble = (quote.num_double_rooms || 0) * quote.cost_per_night_double * numNights;
+          const costTriple = (quote.num_triple_rooms || 0) * quote.cost_per_night_triple * numNights;
+          const costQuad = (quote.num_quad_rooms || 0) * quote.cost_per_night_quad * numNights;
+          const costCourtesy = (quote.num_courtesy_rooms || 0) * quote.cost_per_night_quad * numNights;
+          const estimated_total_cost = (costDouble + costTriple + costQuad) - costCourtesy;
+
+          return {
+            ...quote,
+            estimated_total_cost,
+          } as HotelQuote;
+        });
+        setAvailableHotelQuotes(quotesWithCost);
       }
     };
     fetchAvailableHotelQuotes();
   }, []);
+
+  // NEW: Logic to filter and sort hotel quotes based on tour dates
+  useEffect(() => {
+    if (!departureDate || !returnDate || availableHotelQuotes.length === 0) {
+      setFilteredHotelQuotes([]);
+      return;
+    }
+
+    const numNightsTour = differenceInDays(returnDate, departureDate);
+    const hotelStayNights = numNightsTour - 1;
+    const hotelStayStartDate = addDays(departureDate, 1);
+
+    if (hotelStayNights <= 0) {
+      setFilteredHotelQuotes([]);
+      return;
+    }
+
+    const relevantQuotes = availableHotelQuotes.filter(quote => {
+      if (!quote.quoted_date) return false;
+
+      const quoteStartDate = parseISO(quote.quoted_date);
+      const numNightsQuote = quote.num_nights_quoted || 1;
+
+      // 1. Check if the number of nights matches the hotel stay duration
+      if (numNightsQuote !== hotelStayNights) {
+        return false;
+      }
+
+      // 2. Check if the quote start date matches the hotel stay start date (day after tour departure)
+      const isDateMatch = isEqual(hotelStayStartDate, quoteStartDate);
+      
+      return isDateMatch;
+    });
+
+    // Sort by estimated total cost (lowest to highest)
+    relevantQuotes.sort((a, b) => a.estimated_total_cost - b.estimated_total_cost);
+
+    setFilteredHotelQuotes(relevantQuotes);
+  }, [departureDate, returnDate, availableHotelQuotes]);
+
 
   // NEW: Fetch available buses
   useEffect(() => {
@@ -414,7 +470,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       return sum + (providerService.cost_per_unit_snapshot * providerService.quantity);
     }, 0);
     
-    let totalHotelCost = 0; // Total cost for all rooms across all linked hotel quotes
+    let totalHotelCost = 0; // Total cost for all contracted rooms in this quote
     let currentTotalRemainingPayments = 0; // NEW: for total remaining payments
 
     formData.hotel_details.forEach(tourHotelDetail => {
@@ -434,7 +490,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       totalHotelCost += totalContractedRoomsCost - costOfCourtesyRooms;
 
       // NEW: Add hotel remaining payment (adjusted for courtesies)
-      currentTotalRemainingPayments += (totalContractedRoomsCost - costOfCourtesyRooms) - (hotelQuote.total_paid || 0);
+      const hotelQuoteTotalCost = totalContractedRoomsCost - costOfCourtesyRooms;
+      currentTotalRemainingPayments += hotelQuoteTotalCost - (hotelQuote.total_paid || 0);
     });
 
     const selectedBus = availableBuses.find(b => b.id === formData.bus_id);
@@ -895,54 +952,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     availableHotelQuotes,
   ]);
 
-  // NEW: Handler to find the cheapest hotel quote
-  const handleFindCheapestHotel = async () => {
-    if (!formData.departure_date || !formData.return_date) {
-      toast.error('Por favor, selecciona la fecha de salida y regreso del tour.');
-      return;
-    }
-
-    setLoadingCheapestHotel(true);
-    setCheapestHotelQuote(null);
-
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      if (!sessionData.session?.access_token) {
-        toast.error('Sesión expirada. Por favor, inicia sesión de nuevo.');
-        setLoadingCheapestHotel(false);
-        return;
-      }
-
-      const { data, error } = await supabase.functions.invoke('find-cheapest-hotel-quote', {
-        body: {
-          departureDate: formData.departure_date,
-          returnDate: formData.return_date,
-        },
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${sessionData.session.access_token}`,
-        },
-      });
-
-      if (error) {
-        console.error('Error invoking find-cheapest-hotel-quote:', error);
-        toast.error(`Error al buscar cotización: ${data?.error || error.message || 'Error desconocido.'}`);
-      } else if (data.cheapestQuote) {
-        setCheapestHotelQuote(data.cheapestQuote);
-        toast.success(`Cotización más barata encontrada: ${data.cheapestQuote.name}`);
-      } else if (data.error) {
-        toast.error(data.error);
-      } else {
-        toast.info('No se encontraron cotizaciones de hotel activas para esas fechas.');
-      }
-    } catch (error: any) {
-      console.error('Unexpected error finding cheapest hotel:', error);
-      toast.error(`Ocurrió un error inesperado: ${error.message}`);
-    } finally {
-      setLoadingCheapestHotel(false);
-    }
-  };
-
+  // REMOVED: handleFindCheapestHotel and cheapestHotelQuote states
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -1315,10 +1325,13 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
         {/* Hotel Details (now linking to quotes) */}
         <div className="space-y-2 col-span-full">
           <Label className="text-lg font-semibold">Cotizaciones de Hoteles Vinculadas</Label>
+          {filteredHotelQuotes.length === 0 && (formData.departure_date && formData.return_date) && (
+            <p className="text-sm text-red-600">No se encontraron cotizaciones de hotel activas que coincidan con la duración y fechas del tour ({numNightsTour - 1} noches, inicio: {format(addDays(departureDate!, 1), 'dd/MM/yy', { locale: es })}).</p>
+          )}
           {formData.hotel_details.map((tourHotelDetail, index) => {
             const selectedQuote = availableHotelQuotes.find(hq => hq.id === tourHotelDetail.hotel_quote_id);
             const quoteDisplay = selectedQuote
-              ? `${selectedQuote.name} (${selectedQuote.location}) - ${selectedQuote.num_nights_quoted} Noches - ${selectedQuote.quoted_date ? format(new Date(selectedQuote.quoted_date), 'PPP') : 'Fecha N/A'}`
+              ? `${selectedQuote.name} (${selectedQuote.location}) - ${selectedQuote.num_nights_quoted} Noches - ${selectedQuote.quoted_date ? format(parseISO(selectedQuote.quoted_date), 'PPP') : 'Fecha N/A'}`
               : 'Seleccionar Cotización';
             const totalQuoteCost = selectedQuote
               ? (((selectedQuote.num_double_rooms || 0) * selectedQuote.cost_per_night_double * selectedQuote.num_nights_quoted) +
@@ -1337,11 +1350,17 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
                     <SelectValue placeholder={quoteDisplay} />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableHotelQuotes.map((quote) => (
+                    {filteredHotelQuotes.map((quote) => (
                       <SelectItem key={quote.id} value={quote.id}>
-                        {`${quote.name} (${quote.location}) - ${quote.num_nights_quoted} Noches - ${quote.quoted_date ? format(new Date(quote.quoted_date), 'PPP') : 'Fecha N/A'} (Coordinadores: ${quote.num_courtesy_rooms})`}
+                        {`${quote.name} ($${quote.estimated_total_cost.toFixed(2)}) - ${quote.num_nights_quoted} Noches - ${quote.quoted_date ? format(parseISO(quote.quoted_date), 'dd/MM/yy') : 'N/A'}`}
                       </SelectItem>
                     ))}
+                    {/* Include currently selected quote if it's not in the filtered list (e.g., if dates changed) */}
+                    {selectedQuote && !filteredHotelQuotes.some(q => q.id === selectedQuote.id) && (
+                      <SelectItem key={selectedQuote.id} value={selectedQuote.id}>
+                        {`${selectedQuote.name} (ACTUAL) - $${totalQuoteCost.toFixed(2)}`}
+                      </SelectItem>
+                    )}
                   </SelectContent>
                 </Select>
                 {selectedQuote && (
@@ -1360,48 +1379,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           </Button>
         </div>
 
-        {/* NEW: Cheapest Hotel Finder */}
-        <div className="col-span-full mt-4 p-4 bg-blue-50 rounded-md">
-          <h3 className="text-xl font-semibold mb-4 text-blue-800 flex items-center">
-            <HotelIcon className="mr-2 h-5 w-5" /> Búsqueda de Hotel Más Barato
-          </h3>
-          <p className="text-sm text-gray-700 mb-4">
-            Busca la cotización de hotel activa más barata para la duración de este tour (basado en el costo total de la cotización ajustado por noche).
-          </p>
-          <div className="flex justify-end">
-            <Button 
-              type="button" 
-              onClick={handleFindCheapestHotel} 
-              disabled={loadingCheapestHotel || !formData.departure_date || !formData.return_date}
-              className="bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              {loadingCheapestHotel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
-              Buscar Hotel Más Barato
-            </Button>
-          </div>
-          {cheapestHotelQuote && (
-            <div className="mt-4 p-3 bg-blue-100 border border-blue-300 rounded-md">
-              <h4 className="font-semibold text-blue-900">Resultado:</h4>
-              <p className="text-blue-800">
-                <span className="font-bold">{cheapestHotelQuote.name}</span> ({cheapestHotelQuote.location})
-              </p>
-              <p className="text-blue-800 text-sm">
-                Costo Estimado para {cheapestHotelQuote.num_nights_tour} noches: <span className="font-bold">${cheapestHotelQuote.estimated_total_cost.toFixed(2)}</span>
-              </p>
-              <p className="text-blue-800 text-sm">
-                Fecha de Cotización: <span className="font-bold">{cheapestHotelQuote.quoted_date ? format(parseISO(cheapestHotelQuote.quoted_date), 'dd/MM/yyyy', { locale: es }) : 'N/A'}</span>
-              </p>
-              <Button 
-                type="button" 
-                variant="link" 
-                className="p-0 h-auto text-blue-600"
-                onClick={() => navigate(`/admin/hotels/edit/${cheapestHotelQuote.id}`)}
-              >
-                Ver Cotización
-              </Button>
-            </div>
-          )}
-        </div>
+        {/* REMOVED: Cheapest Hotel Finder */}
 
         {/* NEW: Provider Services */}
         <div className="space-y-2 col-span-full">
