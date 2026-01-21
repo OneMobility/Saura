@@ -198,6 +198,9 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const [departureDateInput, setDepartureDateInput] = useState<string>('');
   const [returnDateInput, setReturnDateInput] = useState<string>('');
 
+  // Calculate tour duration for display and logic
+  const numNightsTour = (departureDate && returnDate) ? differenceInDays(returnDate, departureDate) : 0;
+
   // NEW: Financial states
   const [totalSoldSeats, setTotalSoldSeats] = useState(0);
   const [totalRemainingPayments, setTotalRemainingPayments] = useState(0);
@@ -252,7 +255,6 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       return;
     }
 
-    const numNightsTour = differenceInDays(returnDate, departureDate);
     const hotelStayNights = numNightsTour - 1;
     const hotelStayStartDate = addDays(departureDate, 1);
 
@@ -282,7 +284,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     relevantQuotes.sort((a, b) => a.estimated_total_cost - b.estimated_total_cost);
 
     setFilteredHotelQuotes(relevantQuotes);
-  }, [departureDate, returnDate, availableHotelQuotes]);
+  }, [departureDate, returnDate, availableHotelQuotes, numNightsTour]);
 
 
   // NEW: Fetch available buses
@@ -1355,7 +1357,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
                         {`${quote.name} ($${quote.estimated_total_cost.toFixed(2)}) - ${quote.num_nights_quoted} Noches - ${quote.quoted_date ? format(parseISO(quote.quoted_date), 'dd/MM/yy') : 'N/A'}`}
                       </SelectItem>
                     ))}
-                    {/* Include currently selected quote if it's not in the filtered list (e.g., if dates changed) */}
+                    {/* Include currently selected quote if it's not in the filtered list (e.e., if dates changed) */}
                     {selectedQuote && !filteredHotelQuotes.some(q => q.id === selectedQuote.id) && (
                       <SelectItem key={selectedQuote.id} value={selectedQuote.id}>
                         {`${selectedQuote.name} (ACTUAL) - $${totalQuoteCost.toFixed(2)}`}
