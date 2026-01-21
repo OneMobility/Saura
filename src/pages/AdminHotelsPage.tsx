@@ -5,12 +5,14 @@ import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, PlusCircle, Edit, Trash2 } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, ChevronDown, ChevronRight, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { format, parseISO } from 'date-fns'; // Import parseISO
+import { format, parseISO } from 'date-fns';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Badge } from '@/components/ui/badge';
 
 interface Hotel {
   id: string;
@@ -24,18 +26,17 @@ interface Hotel {
   capacity_double: number;
   capacity_triple: number;
   capacity_quad: number;
-  num_double_rooms: number; // NEW
-  num_triple_rooms: number; // NEW
-  num_quad_rooms: number; // NEW
-  num_courtesy_rooms: number; // NEW: Added courtesy rooms
+  num_double_rooms: number;
+  num_triple_rooms: number;
+  num_quad_rooms: number;
+  num_courtesy_rooms: number;
   is_active: boolean;
   advance_payment: number;
   total_paid: number;
-  quote_end_date: string | null; // NEW: Quote End Date
+  quote_end_date: string | null;
   created_at: string;
-  // Calculated fields for display
-  total_quote_cost: number; // Total cost for all contracted rooms in this quote
-  remaining_payment: number; // Remaining payment for all contracted rooms
+  total_quote_cost: number;
+  remaining_payment: number;
 }
 
 const AdminHotelsPage = () => {
@@ -43,7 +44,8 @@ const AdminHotelsPage = () => {
   const navigate = useNavigate();
   const [hotels, setHotels] = useState<Hotel[]>([]);
   const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0); // Key to force re-fetch of hotels
+  const [refreshKey, setRefreshKey] = useState(0);
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     if (!sessionLoading && (!user || !isAdmin)) {
@@ -51,14 +53,14 @@ const AdminHotelsPage = () => {
     } else if (!sessionLoading && user && isAdmin) {
       fetchHotels();
     }
-  }, [user, isAdmin, sessionLoading, navigate, refreshKey]); // Add refreshKey to dependencies
+  }, [user, isAdmin, sessionLoading, navigate, refreshKey]);
 
   const fetchHotels = async () => {
     setLoading(true);
     const { data, error } = await supabase
       .from('hotels')
       .select('*')
-      .order('quoted_date', { ascending: false }); // Order by quoted date
+      .order('quoted_date', { ascending: false });
 
     if (error) {
       console.error('Error fetching hotels:', error);
@@ -69,10 +71,7 @@ const AdminHotelsPage = () => {
         const totalCostTripleRooms = (hotel.num_triple_rooms || 0) * hotel.cost_per_night_triple * hotel.num_nights_quoted;
         const totalCostQuadRooms = (hotel.num_quad_rooms || 0) * hotel.cost_per_night_quad * hotel.num_nights_quoted;
         const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
-
-        // Calculate cost of courtesy rooms (always using quad occupancy rate)
         const costOfCourtesyRooms = (hotel.num_courtesy_rooms || 0) * hotel.cost_per_night_quad * hotel.num_nights_quoted;
-
         const totalQuoteCost = totalContractedRoomsCost - costOfCourtesyRooms;
 
         return {
@@ -80,8 +79,7 @@ const AdminHotelsPage = () => {
           num_double_rooms: hotel.num_double_rooms || 0,
           num_triple_rooms: hotel.num_triple_rooms || 0,
           num_quad_rooms: hotel.num_quad_rooms || 0,
-          num_courtesy_rooms: hotel.num_courtesy_rooms || 0, // Set new field
-          quote_end_date: hotel.quote_end_date || null, // Include new field
+          num_courtesy_rooms: hotel.num_courtesy_rooms || 0,
           total_quote_cost: totalQuoteCost,
           remaining_payment: totalQuoteCost - (hotel.total_paid || 0),
         };
@@ -92,15 +90,23 @@ const AdminHotelsPage = () => {
   };
 
   const handleAddHotel = () => {
-    navigate('/admin/hotels/new'); // Navigate to the new form page for creation
+    navigate('/admin/hotels/new');
   };
 
   const handleEditHotel = (hotel: Hotel) => {
-    navigate(`/admin/hotels/edit/${hotel.id}`); // Navigate to the new form page for editing
+    navigate(`/admin/hotels/edit/${hotel.id}`);
+  };
+
+  const handleCloneHotel = (hotel: Hotel) => {
+    // Almacenamos los datos para clonar en el estado local o vía URL (aquí simulamos navegación)
+    // Para simplificar, pasamos los datos básicos por navegación si el componente form los aceptara, 
+    // pero lo ideal es ir a /new y que el form sepa que es un clon.
+    toast.info(`Clonando configuración de ${hotel.name}...`);
+    navigate(`/admin/hotels/new?cloneFrom=${hotel.id}`);
   };
 
   const handleDeleteHotel = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar esta cotización de hotel?')) {
+    if (!window.confirm('¿Estás seguro de que quieres eliminar esta cotización?')) {
       return;
     }
     setLoading(true);
@@ -111,10 +117,10 @@ const AdminHotelsPage = () => {
 
     if (error) {
       console.error('Error deleting hotel quote:', error);
-      toast.error('Error al eliminar la cotización del hotel.');
+      toast.error('Error al eliminar la cotización.');
     } else {
-      toast.success('Cotización de hotel eliminada con éxito.');
-      setRefreshKey(prev => prev + 1); // Trigger re-fetch
+      toast.success('Cotización eliminada con éxito.');
+      setRefreshKey(prev => prev + 1);
     }
     setLoading(false);
   };
@@ -124,16 +130,29 @@ const AdminHotelsPage = () => {
     try {
       return format(parseISO(dateString), 'dd/MM/yy');
     } catch (e) {
-      console.error("Error formatting date:", dateString, e);
       return 'Inválida';
     }
   };
 
+  const toggleGroup = (name: string) => {
+    setOpenGroups(prev => ({ ...prev, [name]: !prev[name] }));
+  };
+
+  // Agrupar hoteles por nombre
+  const groupedHotels = hotels.reduce((acc, hotel) => {
+    if (!acc[hotel.name]) acc[hotel.name] = [];
+    acc[hotel.name].push(hotel);
+    return acc;
+  }, {} as Record<string, Hotel[]>);
+
   if (sessionLoading || (user && isAdmin && loading)) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-100">
-        <Loader2 className="h-12 w-12 animate-spin text-rosa-mexicano" />
-        <p className="ml-4 text-gray-700">Cargando cotizaciones de hoteles...</p>
+      <div className="flex min-h-screen bg-gray-100">
+        <AdminSidebar />
+        <div className="flex flex-col flex-grow items-center justify-center">
+          <Loader2 className="h-12 w-12 animate-spin text-rosa-mexicano" />
+          <p className="mt-4 text-gray-700">Cargando hoteles...</p>
+        </div>
       </div>
     );
   }
@@ -148,75 +167,109 @@ const AdminHotelsPage = () => {
           </Button>
         </AdminHeader>
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
-          <div className="bg-white rounded-lg shadow-lg p-6">
-            <h2 className="text-xl font-semibold mb-4">Cotizaciones de Hoteles Registradas</h2>
-            {hotels.length === 0 ? (
-              <p className="text-gray-600">No hay cotizaciones de hoteles registradas.</p>
-            ) : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Hotel</TableHead>
-                      <TableHead>Ubicación</TableHead>
-                      <TableHead>Inicio Cotización</TableHead>
-                      <TableHead>Fin Cotización</TableHead> {/* NEW COLUMN */}
-                      <TableHead>Noches</TableHead>
-                      <TableHead>Hab. Dobles</TableHead>
-                      <TableHead>Hab. Triples</TableHead>
-                      <TableHead>Hab. Cuádruples</TableHead>
-                      <TableHead>Hab. Coordinadores</TableHead>
-                      <TableHead>Costo Total Cotización</TableHead>
-                      <TableHead>Anticipo</TableHead>
-                      <TableHead>Total Pagado</TableHead>
-                      <TableHead>Pago Restante</TableHead>
-                      <TableHead>Activo</TableHead>
-                      <TableHead>Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {hotels.map((hotel) => (
-                      <TableRow key={hotel.id}>
-                        <TableCell className="font-medium">{hotel.name}</TableCell>
-                        <TableCell>{hotel.location}</TableCell>
-                        <TableCell>{formatDate(hotel.quoted_date)}</TableCell>
-                        <TableCell>{formatDate(hotel.quote_end_date)}</TableCell> {/* Display new field */}
-                        <TableCell>{hotel.num_nights_quoted}</TableCell>
-                        <TableCell>{hotel.num_double_rooms}</TableCell>
-                        <TableCell>{hotel.num_triple_rooms}</TableCell>
-                        <TableCell>{hotel.num_quad_rooms}</TableCell>
-                        <TableCell>{hotel.num_courtesy_rooms}</TableCell>
-                        <TableCell>${hotel.total_quote_cost.toFixed(2)}</TableCell>
-                        <TableCell>${hotel.advance_payment.toFixed(2)}</TableCell>
-                        <TableCell>${hotel.total_paid.toFixed(2)}</TableCell>
-                        <TableCell>${hotel.remaining_payment.toFixed(2)}</TableCell>
-                        <TableCell>{hotel.is_active ? 'Sí' : 'No'}</TableCell>
-                        <TableCell className="flex space-x-2">
-                          <Button
-                            variant="outline"
-                            size="icon"
-                            onClick={() => handleEditHotel(hotel)}
-                            className="text-blue-600 hover:bg-blue-50"
-                          >
-                            <Edit className="h-4 w-4" />
-                            <span className="sr-only">Editar</span>
-                          </Button>
-                          <Button
-                            variant="destructive"
-                            size="icon"
-                            onClick={() => handleDeleteHotel(hotel.id)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                            <span className="sr-only">Eliminar</span>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </div>
+          {Object.keys(groupedHotels).length === 0 ? (
+            <div className="bg-white rounded-lg shadow-lg p-12 text-center text-gray-600">
+              No hay cotizaciones de hoteles registradas.
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {Object.entries(groupedHotels).map(([name, quotes]) => (
+                <div key={name} className="bg-white rounded-lg shadow-md overflow-hidden border border-gray-200">
+                  <div 
+                    className="bg-gray-50 p-4 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors"
+                    onClick={() => toggleGroup(name)}
+                  >
+                    <div className="flex items-center space-x-3">
+                      {openGroups[name] ? <ChevronDown className="h-5 w-5 text-gray-500" /> : <ChevronRight className="h-5 w-5 text-gray-500" />}
+                      <div>
+                        <h3 className="text-xl font-bold text-gray-800">{name}</h3>
+                        <p className="text-sm text-gray-500">{quotes[0].location}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center space-x-4">
+                      <Badge variant="secondary" className="bg-rosa-mexicano/10 text-rosa-mexicano border-rosa-mexicano/20">
+                        {quotes.length} {quotes.length === 1 ? 'cotización' : 'cotizaciones'}
+                      </Badge>
+                      <Button 
+                        variant="ghost" 
+                        size="sm" 
+                        className="text-blue-600"
+                        onClick={(e) => { e.stopPropagation(); handleCloneHotel(quotes[0]); }}
+                      >
+                        <Copy className="h-4 w-4 mr-1" /> Clonar Base
+                      </Button>
+                    </div>
+                  </div>
+                  
+                  {openGroups[name] && (
+                    <div className="p-0 border-t border-gray-100 overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Inicio</TableHead>
+                            <TableHead>Fin</TableHead>
+                            <TableHead>Noches</TableHead>
+                            <TableHead>Costo Total</TableHead>
+                            <TableHead>Habitaciones</TableHead>
+                            <TableHead>Estado Pago</TableHead>
+                            <TableHead>Acciones</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {quotes.map((quote) => (
+                            <TableRow key={quote.id}>
+                              <TableCell className="font-medium">{formatDate(quote.quoted_date)}</TableCell>
+                              <TableCell>{formatDate(quote.quote_end_date)}</TableCell>
+                              <TableCell>{quote.num_nights_quoted}</TableCell>
+                              <TableCell className="font-bold text-gray-900">${quote.total_quote_cost.toFixed(2)}</TableCell>
+                              <TableCell className="text-xs">
+                                D:{quote.num_double_rooms} T:{quote.num_triple_rooms} C:{quote.num_quad_rooms}
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-col">
+                                  <span className="text-[10px] text-gray-500">Pendiente:</span>
+                                  <span className={cn("text-xs font-bold", quote.remaining_payment > 0 ? "text-red-600" : "text-green-600")}>
+                                    ${quote.remaining_payment.toFixed(2)}
+                                  </span>
+                                </div>
+                              </TableCell>
+                              <TableCell className="flex space-x-2">
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => handleEditHotel(quote)}
+                                  className="h-8 w-8 text-blue-600"
+                                >
+                                  <Edit className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="icon"
+                                  onClick={() => handleCloneHotel(quote)}
+                                  className="h-8 w-8 text-green-600"
+                                  title="Clonar esta fecha"
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="destructive"
+                                  size="icon"
+                                  onClick={() => handleDeleteHotel(quote.id)}
+                                  className="h-8 w-8"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
         </main>
         <footer className="bg-gray-800 text-white py-4 text-center text-sm">
           <p>&copy; {new Date().getFullYear()} Saura Tours Admin. Todos los derechos reservados.</p>

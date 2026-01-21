@@ -7,12 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, DollarSign, CalendarIcon } from 'lucide-react'; // Added CalendarIcon
-import { format, parse, isValid, parseISO, addDays } from 'date-fns'; // Added addDays
+import { Loader2, Save, DollarSign, CalendarIcon } from 'lucide-react'; 
+import { format, parse, isValid, parseISO, addDays } from 'date-fns'; 
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'; // Import Popover components
-import { Calendar } from '@/components/ui/calendar'; // Import Calendar component
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'; 
+import { Calendar } from '@/components/ui/calendar'; 
+import { useSearchParams } from 'react-router-dom'; // NEW
 
 interface Hotel {
   id?: string;
@@ -33,9 +34,7 @@ interface Hotel {
   is_active: boolean;
   advance_payment: number;
   total_paid: number;
-  // NEW: quote_end_date
   quote_end_date: string | null;
-  // calculated fields
   total_quote_cost: number;
   remaining_payment: number;
 }
@@ -48,6 +47,9 @@ interface HotelFormProps {
 }
 
 const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoaded, onRegisterPayment }) => {
+  const [searchParams] = useSearchParams();
+  const cloneFromId = searchParams.get('cloneFrom');
+
   const [formData, setFormData] = useState<Hotel>({
     name: '',
     location: '',
@@ -66,25 +68,22 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
     is_active: true,
     advance_payment: 0,
     total_paid: 0,
-    quote_end_date: null, // Initialize new field
+    quote_end_date: null,
     total_quote_cost: 0,
     remaining_payment: 0,
   });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
   const [dateInput, setDateInput] = useState<string>(''); 
-  const [quotedDate, setQuotedDate] = useState<Date | undefined>(undefined); // NEW: State for Date object
+  const [quotedDate, setQuotedDate] = useState<Date | undefined>(undefined);
   const loadedHotelIdRef = useRef<string | undefined>(undefined);
 
   const calculateQuoteCosts = useCallback(() => {
     const totalCostDoubleRooms = formData.num_double_rooms * formData.cost_per_night_double * formData.num_nights_quoted;
     const totalCostTripleRooms = formData.num_triple_rooms * formData.cost_per_night_triple * formData.num_nights_quoted;
     const totalCostQuadRooms = formData.num_quad_rooms * formData.cost_per_night_quad * formData.num_nights_quoted;
-    
     const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
-
     const costOfCourtesyRooms = formData.num_courtesy_rooms * formData.cost_per_night_quad * formData.num_nights_quoted;
-
     const totalQuoteCost = totalContractedRoomsCost - costOfCourtesyRooms;
     const remaining = totalQuoteCost - formData.total_paid;
 
@@ -107,99 +106,65 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
 
   useEffect(() => {
     const fetchHotelData = async () => {
-      if (hotelId) {
+      const targetId = hotelId || cloneFromId;
+      
+      if (targetId) {
         setLoadingInitialData(true);
         const { data, error } = await supabase
           .from('hotels')
           .select('*')
-          .eq('id', hotelId)
+          .eq('id', targetId)
           .single();
 
         if (error) {
-          console.error('Error fetching hotel for editing:', error);
-          toast.error('Error al cargar los datos de la cotización del hotel para editar.');
+          console.error('Error fetching hotel data:', error);
+          toast.error('Error al cargar los datos.');
           setLoadingInitialData(false);
-          loadedHotelIdRef.current = undefined; // Reset ref on error
           return;
         }
 
         if (data) {
-          const totalCostDoubleRooms = (data.num_double_rooms || 0) * data.cost_per_night_double * data.num_nights_quoted;
-          const totalCostTripleRooms = (data.num_triple_rooms || 0) * data.cost_per_night_triple * data.num_nights_quoted;
-          const totalCostQuadRooms = (data.num_quad_rooms || 0) * data.cost_per_night_quad * data.num_nights_quoted;
-          const totalContractedRoomsCost = totalCostDoubleRooms + totalCostTripleRooms + totalCostQuadRooms;
-
-          const costOfCourtesyRooms = (data.num_courtesy_rooms || 0) * data.cost_per_night_quad * data.num_nights_quoted;
-
-          const totalQuoteCost = totalContractedRoomsCost - costOfCourtesyRooms;
-
+          // Si estamos clonando, reseteamos campos específicos de la instancia
+          const isCloning = !hotelId && !!cloneFromId;
+          
           const loadedData = {
             ...data,
-            num_double_rooms: data.num_double_rooms || 0,
-            num_triple_rooms: data.num_triple_rooms || 0,
-            num_quad_rooms: data.num_quad_rooms || 0,
-            num_courtesy_rooms: data.num_courtesy_rooms || 0, // Set new field
-            total_quote_cost: totalQuoteCost,
-            remaining_payment: totalQuoteCost - (data.total_paid || 0),
-            quote_end_date: data.quote_end_date || null, // Load new field
+            id: isCloning ? undefined : data.id, // IMPORTANTE: Quitar ID si es clon
+            advance_payment: isCloning ? 0 : (data.advance_payment || 0),
+            total_paid: isCloning ? 0 : (data.total_paid || 0),
+            // Si clonamos, limpiamos las fechas para que el usuario las ponga
+            quoted_date: isCloning ? null : data.quoted_date,
+            quote_end_date: isCloning ? null : data.quote_end_date,
           };
+          
           setFormData(loadedData);
           
-          // Set date states
-          if (data.quoted_date) {
+          if (!isCloning && data.quoted_date) {
             const date = parseISO(data.quoted_date);
             setQuotedDate(date);
             setDateInput(format(date, 'dd/MM/yy'));
-          } else {
-            setQuotedDate(undefined);
-            setDateInput('');
+          }
+
+          if (!isCloning && loadedHotelIdRef.current !== targetId) {
+            onHotelDataLoaded?.(loadedData);
+            loadedHotelIdRef.current = targetId;
           }
           
-          // NEW: Only call onHotelDataLoaded if it hasn't been called for this specific hotelId yet
-          if (loadedHotelIdRef.current !== hotelId) {
-            onHotelDataLoaded?.(loadedData);
-            loadedHotelIdRef.current = hotelId;
+          if (isCloning) {
+            toast.success('Datos base cargados para nueva cotización.');
           }
         }
-      } else {
-        // Reset form for new hotel
-        setFormData({
-          name: '',
-          location: '',
-          quoted_date: null,
-          num_nights_quoted: 1,
-          cost_per_night_double: 0,
-          cost_per_night_triple: 0,
-          cost_per_night_quad: 0,
-          capacity_double: 2,
-          capacity_triple: 3,
-          capacity_quad: 4,
-          num_double_rooms: 0,
-          num_triple_rooms: 0,
-          num_quad_rooms: 0,
-          num_courtesy_rooms: 0,
-          is_active: true,
-          advance_payment: 0,
-          total_paid: 0,
-          quote_end_date: null, // Reset new field
-          total_quote_cost: 0,
-          remaining_payment: 0,
-        });
-        setDateInput('');
-        setQuotedDate(undefined);
-        loadedHotelIdRef.current = undefined; // Reset for new form
       }
       setLoadingInitialData(false);
     };
 
     fetchHotelData();
-  }, [hotelId, onHotelDataLoaded]);
+  }, [hotelId, cloneFromId, onHotelDataLoaded]);
 
   useEffect(() => {
     calculateQuoteCosts();
   }, [calculateQuoteCosts]);
 
-  // Recalculate quote_end_date whenever quotedDate or num_nights_quoted changes
   useEffect(() => {
     const numNights = formData.num_nights_quoted || 1;
     if (quotedDate && numNights > 0) {
@@ -208,7 +173,7 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
       setFormData(prev => ({
         ...prev,
         quote_end_date,
-        quoted_date: format(quotedDate, 'yyyy-MM-dd'), // Ensure quoted_date is also updated
+        quoted_date: format(quotedDate, 'yyyy-MM-dd'),
       }));
     } else {
       setFormData(prev => ({ ...prev, quote_end_date: null, quoted_date: null }));
@@ -221,33 +186,21 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
     setFormData((prev) => {
       const isNumeric = ['num_nights_quoted', 'cost_per_night_double', 'cost_per_night_triple', 'cost_per_night_quad', 'num_double_rooms', 'num_triple_rooms', 'num_quad_rooms', 'num_courtesy_rooms', 'advance_payment', 'total_paid'].includes(id);
       const newValue = isNumeric ? parseFloat(value) || 0 : value;
-      
-      const updatedData = { ...prev, [id]: newValue };
-
-      // If num_nights_quoted changes, trigger date recalculation via useEffect dependency
-      if (id === 'num_nights_quoted') {
-        // No need to manually update quote_end_date here, useEffect handles it
-      }
-
-      return updatedData;
+      return { ...prev, [id]: newValue };
     });
   };
 
   const handleDateSelect = (date: Date | undefined) => {
     setQuotedDate(date);
     setDateInput(date ? format(date, 'dd/MM/yy') : '');
-    // The useEffect hook will handle updating formData.quoted_date and formData.quote_end_date
   };
 
   const handleDateInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
     setDateInput(value);
-
     const parsedDate = parse(value, 'dd/MM/yy', new Date());
-    
     if (isValid(parsedDate)) {
       setQuotedDate(parsedDate);
-      // The useEffect hook will handle updating formData.quoted_date and formData.quote_end_date
     } else {
       setQuotedDate(undefined);
     }
@@ -262,47 +215,10 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
     setIsSubmitting(true);
 
     if (!formData.name || !formData.location || !formData.quoted_date) {
-      toast.error('Por favor, rellena el nombre, la ubicación y la fecha cotizada del hotel.');
+      toast.error('Por favor, rellena los campos obligatorios.');
       setIsSubmitting(false);
       return;
     }
-
-    if (formData.cost_per_night_double < 0 || formData.cost_per_night_triple < 0 || formData.cost_per_night_quad < 0) {
-      toast.error('Los costos por noche no pueden ser negativos.');
-      setIsSubmitting(false);
-      return;
-    }
-    if (formData.num_nights_quoted <= 0) {
-      toast.error('El número de noches debe ser mayor que 0.');
-      setIsSubmitting(false);
-      return;
-    }
-    if (formData.total_paid < formData.advance_payment) {
-      toast.error('El total pagado no puede ser menor que el anticipo.');
-      setIsSubmitting(false);
-      return;
-    }
-    if (formData.num_double_rooms < 0 || formData.num_triple_rooms < 0 || formData.num_quad_rooms < 0 || formData.num_courtesy_rooms < 0) {
-      toast.error('El número de habitaciones no puede ser negativo.');
-      setIsSubmitting(false);
-      return;
-    }
-    if (formData.num_double_rooms === 0 && formData.num_triple_rooms === 0 && formData.num_quad_rooms === 0 && formData.num_courtesy_rooms === 0) {
-      toast.error('Debes especificar al menos una habitación contratada o de coordinador.');
-      setIsSubmitting(false);
-      return;
-    }
-
-    // Final calculation of quote_end_date before saving (redundant but safe check)
-    let finalQuoteEndDate = formData.quote_end_date;
-    if (formData.quoted_date && formData.num_nights_quoted > 0) {
-      const parsedDate = parseISO(formData.quoted_date);
-      if (isValid(parsedDate)) {
-        // Calculate end date as start date + num_nights_quoted
-        finalQuoteEndDate = format(addDays(parsedDate, formData.num_nights_quoted), 'yyyy-MM-dd');
-      }
-    }
-
 
     const dataToSave = {
       name: formData.name,
@@ -322,35 +238,27 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
       is_active: formData.is_active,
       advance_payment: formData.advance_payment,
       total_paid: formData.total_paid,
-      quote_end_date: finalQuoteEndDate, // Save the calculated end date
+      quote_end_date: formData.quote_end_date,
     };
 
     if (hotelId) {
       const { error } = await supabase
         .from('hotels')
-        .update({
-          ...dataToSave,
-          updated_at: new Date().toISOString(),
-        })
+        .update({ ...dataToSave, updated_at: new Date().toISOString() })
         .eq('id', hotelId);
 
       if (error) {
-        console.error('Error al actualizar la cotización del hotel:', error);
-        toast.error('Error al actualizar la cotización del hotel.');
+        toast.error('Error al actualizar.');
       } else {
-        toast.success('Cotización de hotel actualizada con éxito.');
+        toast.success('Cotización actualizada.');
         onSave();
       }
     } else {
-      const { error } = await supabase
-        .from('hotels')
-        .insert(dataToSave);
-
+      const { error } = await supabase.from('hotels').insert(dataToSave);
       if (error) {
-        console.error('Error al crear la cotización del hotel:', error);
-        toast.error('Error al crear la cotización del hotel.');
+        toast.error('Error al crear.');
       } else {
-        toast.success('Cotización de hotel creada con éxito.');
+        toast.success('Nueva cotización creada.');
         onSave();
       }
     }
@@ -361,280 +269,102 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
     return (
       <div className="flex items-center justify-center p-8 bg-white rounded-lg shadow-lg">
         <Loader2 className="h-12 w-12 animate-spin text-rosa-mexicano" />
-        <p className="ml-4 text-gray-700">Cargando formulario del hotel...</p>
+        <p className="ml-4 text-gray-700">Cargando...</p>
       </div>
     );
   }
 
-  const quoteEndDateDisplay = formData.quote_end_date ? format(parseISO(formData.quote_end_date), 'dd/MM/yy') : 'N/A';
-
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
-      <h2 className="text-2xl font-bold text-gray-800 mb-6">{hotelId ? 'Editar Cotización de Hotel' : 'Añadir Nueva Cotización de Hotel'}</h2>
+      <h2 className="text-2xl font-bold text-gray-800 mb-6">{hotelId ? 'Editar Cotización' : 'Nueva Cotización'}</h2>
       <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="name" className="text-right">
-              Nombre del Hotel
-            </Label>
-            <Input
-              id="name"
-              value={formData.name}
-              onChange={handleChange}
-              className="col-span-3"
-              required
-            />
+            <Label htmlFor="name" className="text-right">Nombre del Hotel</Label>
+            <Input id="name" value={formData.name} onChange={handleChange} className="col-span-3" required />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="location" className="text-right">
-              Ubicación
-            </Label>
-            <Input
-              id="location"
-              value={formData.location}
-              onChange={handleChange}
-              className="col-span-3"
-              required
-            />
+            <Label htmlFor="location" className="text-right">Ubicación</Label>
+            <Input id="location" value={formData.location} onChange={handleChange} className="col-span-3" required />
           </div>
 
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="quoted_date" className="text-right">
-              Fecha Inicio Cotización
-            </Label>
+            <Label htmlFor="quoted_date" className="text-right">Fecha Inicio</Label>
             <Popover>
               <PopoverTrigger asChild>
-                <Button
-                  variant={"outline"}
-                  className={cn(
-                    "col-span-3 justify-start text-left font-normal",
-                    !quotedDate && "text-muted-foreground"
-                  )}
-                >
+                <Button variant={"outline"} className={cn("col-span-3 justify-start text-left font-normal", !quotedDate && "text-muted-foreground")}>
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {quotedDate ? format(quotedDate, "dd/MM/yy", { locale: es }) : <span>Selecciona una fecha</span>}
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-auto p-0">
-                <Calendar
-                  mode="single"
-                  selected={quotedDate}
-                  onSelect={handleDateSelect}
-                  initialFocus
-                  locale={es}
-                />
+                <Calendar mode="single" selected={quotedDate} onSelect={handleDateSelect} initialFocus locale={es} />
               </PopoverContent>
             </Popover>
-            {/* Input for manual entry (hidden, but kept for reference if needed) */}
-            <Input
-              id="quoted_date_input"
-              type="text"
-              value={dateInput}
-              onChange={handleDateInputChange}
-              placeholder="DD/MM/AA"
-              className="col-span-3 hidden"
-            />
           </div>
 
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="num_nights_quoted" className="text-right">
-              Noches Cotizadas
-            </Label>
-            <Input
-              id="num_nights_quoted"
-              type="text" // Changed to text
-              pattern="[0-9]*" // Pattern for integers
-              value={formData.num_nights_quoted}
-              onChange={handleChange}
-              className="col-span-3"
-              required
-            />
+            <Label htmlFor="num_nights_quoted" className="text-right">Noches</Label>
+            <Input id="num_nights_quoted" type="text" pattern="[0-9]*" value={formData.num_nights_quoted} onChange={handleChange} className="col-span-3" required />
           </div>
           
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label className="text-right font-semibold">
-              Fecha Fin Cotización
-            </Label>
-            <Input
-              value={quoteEndDateDisplay}
-              readOnly
-              className="col-span-3 bg-gray-100 cursor-not-allowed"
-            />
+            <Label className="text-right font-semibold">Fecha Fin</Label>
+            <Input value={formData.quote_end_date ? format(parseISO(formData.quote_end_date), 'dd/MM/yy') : 'N/A'} readOnly className="col-span-3 bg-gray-100" />
           </div>
 
-          <h3 className="col-span-4 text-lg font-semibold mt-4">Costos por Noche (Cotizados)</h3>
+          <h3 className="col-span-4 text-lg font-semibold mt-4">Costos por Noche</h3>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="cost_per_night_double" className="text-right">
-              Costo Doble (x{formData.capacity_double})
-            </Label>
-            <Input
-              id="cost_per_night_double"
-              type="text" // Changed to text
-              pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
-              value={formData.cost_per_night_double}
-              onChange={handleChange}
-              className="col-span-3"
-              required
-            />
+            <Label htmlFor="cost_per_night_double" className="text-right">Costo Doble</Label>
+            <Input id="cost_per_night_double" type="text" pattern="[0-9]*\.?[0-9]*" value={formData.cost_per_night_double} onChange={handleChange} className="col-span-3" required />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="cost_per_night_triple" className="text-right">
-              Costo Triple (x{formData.capacity_triple})
-            </Label>
-            <Input
-              id="cost_per_night_triple"
-              type="text" // Changed to text
-              pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
-              value={formData.cost_per_night_triple}
-              onChange={handleChange}
-              className="col-span-3"
-              required
-            />
+            <Label htmlFor="cost_per_night_triple" className="text-right">Costo Triple</Label>
+            <Input id="cost_per_night_triple" type="text" pattern="[0-9]*\.?[0-9]*" value={formData.cost_per_night_triple} onChange={handleChange} className="col-span-3" required />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="cost_per_night_quad" className="text-right">
-              Costo Cuádruple (x{formData.capacity_quad})
-            </Label>
-            <Input
-              id="cost_per_night_quad"
-              type="text" // Changed to text
-              pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
-              value={formData.cost_per_night_quad}
-              onChange={handleChange}
-              className="col-span-3"
-              required
-            />
+            <Label htmlFor="cost_per_night_quad" className="text-right">Costo Cuádruple</Label>
+            <Input id="cost_per_night_quad" type="text" pattern="[0-9]*\.?[0-9]*" value={formData.cost_per_night_quad} onChange={handleChange} className="col-span-3" required />
           </div>
 
-          <h3 className="col-span-4 text-lg font-semibold mt-4">Habitaciones Contratadas para esta Cotización</h3>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="num_double_rooms" className="text-right">
-              Hab. Dobles
-            </Label>
-            <Input
-              id="num_double_rooms"
-              type="text" // Changed to text
-              pattern="[0-9]*" // Pattern for integers
-              value={formData.num_double_rooms}
-              onChange={handleChange}
-              className="col-span-3"
-              required
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="num_triple_rooms" className="text-right">
-              Hab. Triples
-            </Label>
-            <Input
-              id="num_triple_rooms"
-              type="text" // Changed to text
-              pattern="[0-9]*" // Pattern for integers
-              value={formData.num_triple_rooms}
-              onChange={handleChange}
-              className="col-span-3"
-              required
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="num_quad_rooms" className="text-right">
-              Hab. Cuádruples
-            </Label>
-            <Input
-              id="num_quad_rooms"
-              type="text" // Changed to text
-              pattern="[0-9]*" // Pattern for integers
-              value={formData.num_quad_rooms}
-              onChange={handleChange}
-              className="col-span-3"
-              required
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="num_courtesy_rooms" className="text-right">
-              Hab. Coordinadores
-            </Label>
-            <Input
-              id="num_courtesy_rooms"
-              type="text" // Changed to text
-              pattern="[0-9]*" // Pattern for integers
-              value={formData.num_courtesy_rooms}
-              onChange={handleChange}
-              className="col-span-3"
-              required
-            />
+          <h3 className="col-span-4 text-lg font-semibold mt-4">Habitaciones Contratadas</h3>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 col-span-4">
+            <div className="space-y-2">
+              <Label htmlFor="num_double_rooms">Dobles</Label>
+              <Input id="num_double_rooms" type="text" pattern="[0-9]*" value={formData.num_double_rooms} onChange={handleChange} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="num_triple_rooms">Triples</Label>
+              <Input id="num_triple_rooms" type="text" pattern="[0-9]*" value={formData.num_triple_rooms} onChange={handleChange} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="num_quad_rooms">Cuádruples</Label>
+              <Input id="num_quad_rooms" type="text" pattern="[0-9]*" value={formData.num_quad_rooms} onChange={handleChange} required />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="num_courtesy_rooms">Coordinadores</Label>
+              <Input id="num_courtesy_rooms" type="text" pattern="[0-9]*" value={formData.num_courtesy_rooms} onChange={handleChange} required />
+            </div>
           </div>
 
           <div className="grid grid-cols-4 items-center gap-4 mt-4">
-            <Label htmlFor="is_active" className="text-right">
-              Activo para Tours
-            </Label>
+            <Label htmlFor="is_active" className="text-right">Activo</Label>
             <div className="col-span-3 flex items-center">
-              <Switch
-                id="is_active"
-                checked={formData.is_active}
-                onCheckedChange={handleSwitchChange}
-              />
-              <span className="ml-2 text-sm text-gray-600">
-                {formData.is_active ? 'Sí' : 'No'}
-              </span>
+              <Switch id="is_active" checked={formData.is_active} onCheckedChange={handleSwitchChange} />
+              <span className="ml-2 text-sm text-gray-600">{formData.is_active ? 'Sí' : 'No'}</span>
             </div>
           </div>
 
-          <h3 className="col-span-4 text-lg font-semibold mt-4">Gestión de Pagos</h3>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="advance_payment" className="text-right">
-              Anticipo Dado
-            </Label>
-            <Input
-              id="advance_payment"
-              type="text" // Changed to text
-              pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
-              value={formData.advance_payment}
-              onChange={handleChange}
-              className="col-span-3"
-            />
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="total_paid" className="text-right">
-              Total Pagado
-            </Label>
-            <Input
-              id="total_paid"
-              type="text" // Changed to text
-              pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
-              value={formData.total_paid}
-              onChange={handleChange}
-              className="col-span-3"
-            />
-          </div>
-
-          <div className="col-span-4 grid grid-cols-2 gap-4 mt-4 bg-gray-50 p-4 rounded-md">
+          <div className="col-span-4 bg-gray-50 p-4 rounded-md flex justify-between items-center">
             <div>
-              <Label className="font-semibold">Costo Total de esta Cotización:</Label>
-              <p>${formData.total_quote_cost.toFixed(2)}</p>
+              <Label className="font-semibold">Costo Total Cotización:</Label>
+              <p className="text-xl font-bold">${formData.total_quote_cost.toFixed(2)}</p>
             </div>
-            <div>
-              <Label className="font-semibold">Pago Restante:</Label>
-              <p>${formData.remaining_payment.toFixed(2)}</p>
-            </div>
-          </div>
-
-          <div className="flex justify-end mt-6 space-x-2">
-            {hotelId && onRegisterPayment && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => onRegisterPayment(formData as Hotel)}
-                className="text-green-600 hover:bg-green-50"
-              >
-                <DollarSign className="mr-2 h-4 w-4" /> Registrar Abono
-              </Button>
-            )}
             <Button type="submit" disabled={isSubmitting}>
               {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              {hotelId ? 'Guardar Cambios' : 'Añadir Cotización'}
+              {hotelId ? 'Guardar Cambios' : 'Crear Cotización'}
             </Button>
           </div>
-        </form>
+      </form>
     </div>
   );
 };
