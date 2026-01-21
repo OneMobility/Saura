@@ -94,7 +94,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     selling_price_child: 0, other_income: 0, departure_date: null, return_date: null, departure_time: '08:00', return_time: '18:00',
   });
   
-  // Estados para simulación y rentabilidad
   const [desiredProfitFixed, setDesiredProfitFixed] = useState(45000);
   const [projectedSales, setProjectedSales] = useState({ double: 0, triple: 0, quad: 0, child: 0 });
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -108,7 +107,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
   const [departureDate, setDepartureDate] = useState<Date | undefined>(undefined);
   const [returnDate, setReturnDate] = useState<Date | undefined>(undefined);
 
-  // Fetch inicial
   useEffect(() => {
     const fetchData = async () => {
       const [hotelsRes, busesRes, providersRes] = await Promise.all([
@@ -155,7 +153,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     fetchTourData();
   }, [tourId]);
 
-  // Cálculos Avanzados
   const financialSummary = useMemo(() => {
     const bus = availableBuses.find(b => b.id === formData.bus_id);
     const busCost = bus?.rental_cost || 0;
@@ -168,7 +165,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     const totalCost = busCost + providerCost + hotelCost;
     const capacity = formData.bus_capacity - formData.courtesies;
     
-    // Proyección actual
     const currentRevenue = (projectedSales.double * formData.selling_price_double_occupancy) +
                            (projectedSales.triple * formData.selling_price_triple_occupancy) +
                            (projectedSales.quad * formData.selling_price_quad_occupancy) +
@@ -177,12 +173,10 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     
     const projectedProfit = currentRevenue - totalCost;
 
-    // Punto de equilibrio (cuántas personas en cada tipo)
     const beQuad = formData.selling_price_quad_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_quad_occupancy) : 0;
     const beTriple = formData.selling_price_triple_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_triple_occupancy) : 0;
     const beDouble = formData.selling_price_double_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_double_occupancy) : 0;
 
-    // Recomendación de precios basada en utilidad deseada
     const targetRevenue = totalCost + desiredProfitFixed;
     const avgRequiredPerPerson = capacity > 0 ? targetRevenue / capacity : 0;
 
@@ -196,9 +190,9 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
       beDouble,
       recPrice: {
         quad: avgRequiredPerPerson,
-        triple: avgRequiredPerPerson * 1.1, // Factor de ocupación menor
-        double: avgRequiredPerPerson * 1.25, // Factor de ocupación mínimo
-        child: avgRequiredPerPerson * 0.7 // Descuento para niños
+        triple: avgRequiredPerPerson * 1.1,
+        double: avgRequiredPerPerson * 1.25,
+        child: avgRequiredPerPerson * 0.7
       }
     };
   }, [formData, projectedSales, desiredProfitFixed, availableBuses, availableHotelQuotes]);
@@ -222,7 +216,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-    // ... lógica de subida de imagen existente ...
+    
     const { data: { user } } = await supabase.auth.getUser();
     const dataToSave = { 
       ...formData, 
@@ -251,13 +245,11 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-            {/* Gastos y Costos */}
             <div className="p-4 bg-muted/50 rounded-xl border border-dashed">
               <h3 className="text-sm font-bold uppercase text-gray-500 mb-4">Estructura de Gastos</h3>
               <div className="space-y-2">
                 <div className="flex justify-between text-sm"><span>Transporte:</span> <span className="font-bold">${(availableBuses.find(b => b.id === formData.bus_id)?.rental_cost || 0).toLocaleString()}</span></div>
-                <div className="flex justify-between text-sm"><span>Hospedaje:</span> <span className="font-bold">${financialSummary.totalCost - (availableBuses.find(b => b.id === formData.bus_id)?.rental_cost || 0) - formData.provider_details.reduce((s, p) => s + (p.cost_per_unit_snapshot * p.quantity), 0)}</span></div>
-                <div className="flex justify-between text-sm"><span>Proveedores:</span> <span className="font-bold">${formData.provider_details.reduce((s, p) => s + (p.cost_per_unit_snapshot * p.quantity), 0)}</span></div>
+                <div className="flex justify-between text-sm"><span>Proveedores:</span> <span className="font-bold">${formData.provider_details.reduce((s, p) => s + (p.cost_per_unit_snapshot * p.quantity), 0).toLocaleString()}</span></div>
                 <div className="pt-2 mt-2 border-t flex justify-between text-lg font-black text-rosa-mexicano">
                   <span>COSTO TOTAL:</span>
                   <span>${financialSummary.totalCost.toLocaleString()}</span>
@@ -265,30 +257,25 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
               </div>
             </div>
 
-            {/* Punto de Equilibrio */}
             <div className="p-4 bg-blue-50/50 rounded-xl border border-blue-100">
               <h3 className="text-sm font-bold uppercase text-blue-600 mb-4 flex items-center gap-1">
                 <AlertCircle className="h-4 w-4" /> Punto de Equilibrio
               </h3>
               <div className="space-y-2">
-                <p className="text-xs text-blue-800">Personas necesarias para cubrir costos según el tipo de venta:</p>
-                <div className="flex justify-between text-sm"><span>Venta Cuádruple:</span> <span className="font-bold">{financialSummary.beQuad} pax</span></div>
-                <div className="flex justify-between text-sm"><span>Venta Triple:</span> <span className="font-bold">{financialSummary.beTriple} pax</span></div>
-                <div className="flex justify-between text-sm"><span>Venta Doble:</span> <span className="font-bold">{financialSummary.beDouble} pax</span></div>
-                <div className="mt-2 p-2 bg-white rounded border border-blue-200 text-xs italic">
-                  * Basado en {financialSummary.capacity} asientos disponibles.
-                </div>
+                <p className="text-xs text-blue-800">Mínimo para cubrir costos:</p>
+                <div className="flex justify-between text-sm"><span>Solo Cuádruple:</span> <span className="font-bold">{financialSummary.beQuad} pax</span></div>
+                <div className="flex justify-between text-sm"><span>Solo Triple:</span> <span className="font-bold">{financialSummary.beTriple} pax</span></div>
+                <div className="flex justify-between text-sm"><span>Solo Doble:</span> <span className="font-bold">{financialSummary.beDouble} pax</span></div>
               </div>
             </div>
 
-            {/* Utilidad Deseada */}
             <div className="p-4 bg-green-50/50 rounded-xl border border-green-100">
               <h3 className="text-sm font-bold uppercase text-green-600 mb-4 flex items-center gap-1">
                 <Calculator className="h-4 w-4" /> Utilidad Meta
               </h3>
               <div className="space-y-4">
                 <div>
-                  <Label className="text-xs">¿Cuánto quieres ganar libre?</Label>
+                  <Label className="text-xs">Meta de ganancia fija:</Label>
                   <Input 
                     type="number" 
                     value={desiredProfitFixed} 
@@ -297,8 +284,8 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
                   />
                 </div>
                 <div className="space-y-1">
-                  <p className="text-xs font-bold text-gray-500">PRECIOS RECOMENDADOS:</p>
-                  <div className="grid grid-cols-2 gap-x-4 text-[10px] font-bold">
+                  <p className="text-[10px] font-bold text-gray-500">PRECIOS RECOMENDADOS:</p>
+                  <div className="grid grid-cols-2 gap-x-2 text-[10px] font-bold">
                     <div className="text-green-700">QUAD: ${financialSummary.recPrice.quad.toFixed(0)}</div>
                     <div className="text-green-700">TRIP: ${financialSummary.recPrice.triple.toFixed(0)}</div>
                     <div className="text-green-700">DBL: ${financialSummary.recPrice.double.toFixed(0)}</div>
@@ -309,10 +296,9 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
             </div>
           </div>
 
-          {/* Simulador de Mezcla de Ventas */}
           <div className="p-6 bg-gray-50 rounded-2xl border">
             <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
-              <TRENDINGUP className="h-5 w-5 text-rosa-mexicano" /> Simulador de Escenario de Ventas
+              <TrendingUp className="h-5 w-5 text-rosa-mexicano" /> Simulador de Escenario de Ventas
             </h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               {['double', 'triple', 'quad', 'child'].map((type) => (
@@ -329,7 +315,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
             </div>
             <div className="flex flex-wrap items-center justify-between gap-4 p-4 bg-white rounded-xl border shadow-sm">
               <div>
-                <span className="text-sm text-gray-500 block">Total Pasajeros Simulados</span>
+                <span className="text-sm text-gray-500 block">Asientos Ocupados</span>
                 <span className={cn(
                   "text-2xl font-black",
                   (projectedSales.double + projectedSales.triple + projectedSales.quad + projectedSales.child) > financialSummary.capacity ? "text-red-500" : "text-gray-900"
