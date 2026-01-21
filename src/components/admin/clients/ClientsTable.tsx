@@ -306,14 +306,6 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                       <span className="sr-only">Editar</span>
                     </Button>
                     <Button
-                      variant="destructive"
-                      size="icon"
-                      onClick={() => handleDeleteClient(client.id)}
-                    >
-                      <Trash2 className="h-4 w-4" />
-                      <span className="sr-only">Eliminar</span>
-                    </Button>
-                    <Button
                       variant="outline"
                       size="icon"
                       onClick={() => onRegisterPayment(client)}
@@ -349,6 +341,14 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                         <FileSignature className="h-4 w-4" />
                       )}
                       <span className="sr-only">Descargar Contrato</span>
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      size="icon"
+                      onClick={() => handleDeleteClient(client.id)}
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span className="sr-only">Eliminar</span>
                     </Button>
                   </TableCell>
                 </TableRow>
