@@ -6,18 +6,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon } from 'lucide-react';
+import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Search, Hotel as HotelIcon } from 'lucide-react'; // Added Search and HotelIcon
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { v4 as uuidv4 } from 'uuid';
-import { format, parse, isValid, parseISO } from 'date-fns'; // Import parse, isValid, parseISO
-import { es } from 'date-fns/locale'; // Import locale
-import { cn } from '@/lib/utils'; // Import cn
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'; // Import Popover
-import { Calendar } from '@/components/ui/calendar'; // Import Calendar
-import TourSeatMap from '@/components/TourSeatMap'; // Import the new TourSeatMap component
-import { useNavigate } from 'react-router-dom'; // Import useNavigate
-import { TourProviderService, AvailableProvider } from '@/types/shared'; // NEW: Import shared types
-import RichTextEditor from '@/components/RichTextEditor'; // Import the new RichTextEditor
+import { format, parse, isValid, parseISO, differenceInDays } from 'date-fns'; // Import differenceInDays
+import { es } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
+import TourSeatMap from '@/components/TourSeatMap';
+import { useNavigate } from 'react-router-dom';
+import { TourProviderService, AvailableProvider } from '@/types/shared';
+import RichTextEditor from '@/components/RichTextEditor';
 
 // Hotel interface now represents a "hotel quote" from the 'hotels' table
 interface HotelQuote {
@@ -95,7 +95,7 @@ interface Tour {
   departure_date: string | null; // NEW: Departure Date
   return_date: string | null; // NEW: Return Date
   departure_time: string | null; // NEW: Departure Time
-  return_time: string | null; // NEW: Return Time
+  return_time: string | null; // NEW
 }
 
 interface TourFormProps {
@@ -151,7 +151,7 @@ const calculateIdealRoomAllocation = (numAdults: number): RoomDetails => {
 
 
 const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
-  const navigate = useNavigate(); // Initialize useNavigate
+  const navigate = useNavigate();
   const [formData, setFormData] = useState<Tour>({
     title: '',
     slug: '',
@@ -161,22 +161,22 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     duration: '',
     includes: [],
     itinerary: [],
-    bus_id: null, // Initialize bus_id
+    bus_id: null,
     bus_capacity: 0,
     bus_cost: 0,
-    courtesies: 0, // Renamed to Coordinadores
+    courtesies: 0,
     hotel_details: [],
     provider_details: [],
-    selling_price_per_person: 0, // Initialize this field
+    selling_price_per_person: 0,
     selling_price_double_occupancy: 0,
     selling_price_triple_occupancy: 0,
     selling_price_quad_occupancy: 0,
-    selling_price_child: 0, // Initialize new field
-    other_income: 0, // Initialize new field
-    departure_date: null, // NEW
-    return_date: null, // NEW
-    departure_time: '08:00', // Default time
-    return_time: '18:00', // Default time
+    selling_price_child: 0,
+    other_income: 0,
+    departure_date: null,
+    return_date: null,
+    departure_time: '08:00',
+    return_time: '18:00',
   });
   const [imageFile, setImageFile] = useState<File | null>(null);
   const [imageUrlPreview, setImageUrlPreview] = useState<string>('');
@@ -184,9 +184,9 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const [isUploadingImage, setIsUploadingImage] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
   const [availableHotelQuotes, setAvailableHotelQuotes] = useState<HotelQuote[]>([]);
-  const [availableBuses, setAvailableBuses] = useState<Bus[]>([]); // NEW: State for available buses
-  const [availableProviders, setAvailableProviders] = useState<AvailableProvider[]>([]); // NEW: State for available providers
-  const [selectedBusLayout, setSelectedBusLayout] = useState<SeatLayout | null>(null); // NEW: State for selected bus layout
+  const [availableBuses, setAvailableBuses] = useState<Bus[]>([]);
+  const [availableProviders, setAvailableProviders] = useState<AvailableProvider[]>([]);
+  const [selectedBusLayout, setSelectedBusLayout] = useState<SeatLayout | null>(null);
 
   // NEW: Date states for Popover/Input control
   const [departureDate, setDepartureDate] = useState<Date | undefined>(undefined);
@@ -197,13 +197,18 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   // NEW: Financial states
   const [totalSoldSeats, setTotalSoldSeats] = useState(0);
   const [totalRemainingPayments, setTotalRemainingPayments] = useState(0);
-  const [desiredProfitPercentage, setDesiredProfitPercentage] = useState(20); // Default 20%
-  const [suggestedSellingPrice, setSuggestedSellingPrice] = useState(0); // This will be an average
-  const [totalClientsRevenue, setTotalClientsRevenue] = useState(0); // NEW: Sum of total_amount from active clients
+  const [desiredProfitPercentage, setDesiredProfitPercentage] = useState(20);
+  const [suggestedSellingPrice, setSuggestedSellingPrice] = useState(0);
+  const [totalClientsRevenue, setTotalClientsRevenue] = useState(0);
 
   // NEW: Break-even analysis states
   const [expectedClientsForBreakeven, setExpectedClientsForBreakeven] = useState(0);
   const [breakevenResult, setBreakevenResult] = useState<BreakevenResult | null>(null);
+
+  // NEW: Cheapest Hotel Quote state
+  const [cheapestHotelQuote, setCheapestHotelQuote] = useState<{ name: string; estimated_total_cost: number; id: string } | null>(null);
+  const [loadingCheapestHotel, setLoadingCheapestHotel] = useState(false);
+
 
   // Fetch available hotel quotes
   useEffect(() => {
@@ -284,18 +289,18 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             includes: data.includes || [],
             itinerary: data.itinerary || [],
             hotel_details: data.hotel_details || [],
-            provider_details: data.provider_details || [], // Ensure provider_details is set
-            bus_id: data.bus_id || null, // Ensure bus_id is set
-            selling_price_per_person: data.selling_price_per_person || 0, // Set this field
+            provider_details: data.provider_details || [],
+            bus_id: data.bus_id || null,
+            selling_price_per_person: data.selling_price_per_person || 0,
             selling_price_double_occupancy: data.selling_price_double_occupancy || 0,
             selling_price_triple_occupancy: data.selling_price_triple_occupancy || 0,
             selling_price_quad_occupancy: data.selling_price_quad_occupancy || 0,
-            selling_price_child: data.selling_price_child || 0, // Set new field
-            other_income: data.other_income || 0, // Set new field
-            departure_date: data.departure_date || null, // NEW
-            return_date: data.return_date || null, // NEW
-            departure_time: data.departure_time || '08:00', // NEW
-            return_time: data.return_time || '18:00', // NEW
+            selling_price_child: data.selling_price_child || 0,
+            other_income: data.other_income || 0,
+            departure_date: data.departure_date || null,
+            return_date: data.return_date || null,
+            departure_time: data.departure_time || '08:00',
+            return_time: data.return_time || '18:00',
           });
           setImageUrlPreview(data.image_url);
 
@@ -316,7 +321,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             const bus = availableBuses.find(b => b.id === data.bus_id);
             setSelectedBusLayout(bus?.seat_layout_json || null);
           }
-          setExpectedClientsForBreakeven(data.paying_clients_count || 0); // Initialize with full paying capacity
+          setExpectedClientsForBreakeven(data.paying_clients_count || 0);
         }
       } else {
         // Reset form for new tour
@@ -332,23 +337,23 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           bus_id: null,
           bus_capacity: 0,
           bus_cost: 0,
-          courtesies: 0, // Renamed to Coordinadores
+          courtesies: 0,
           hotel_details: [],
           provider_details: [],
-          selling_price_per_person: 0, // Reset this field
+          selling_price_per_person: 0,
           selling_price_double_occupancy: 0,
           selling_price_triple_occupancy: 0,
           selling_price_quad_occupancy: 0,
-          selling_price_child: 0, // Reset new field
-          other_income: 0, // Reset new field
-          departure_date: null, // NEW
-          return_date: null, // NEW
-          departure_time: '08:00', // Default time
-          return_time: '18:00', // Default time
+          selling_price_child: 0,
+          other_income: 0,
+          departure_date: null,
+          return_date: null,
+          departure_time: '08:00',
+          return_time: '18:00',
         });
         setImageFile(null);
         setImageUrlPreview('');
-        setSelectedBusLayout(null); // Clear layout for new tour
+        setSelectedBusLayout(null);
         setExpectedClientsForBreakeven(0);
         setDepartureDate(undefined);
         setReturnDate(undefined);
@@ -359,7 +364,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     };
 
     fetchTourData();
-  }, [tourId, availableBuses]); // Add availableBuses to dependencies to ensure layout is set on load
+  }, [tourId, availableBuses]);
 
   // NEW: Fetch total sold seats and clients revenue
   useEffect(() => {
@@ -417,7 +422,6 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       if (!hotelQuote) return;
 
       // Calculate cost based on the *contracted rooms in the hotel quote*
-      // and the *cost per night for each room type* from the quote.
       const costDouble = (hotelQuote.num_double_rooms || 0) * hotelQuote.cost_per_night_double * hotelQuote.num_nights_quoted;
       const costTriple = (hotelQuote.num_triple_rooms || 0) * hotelQuote.cost_per_night_triple * hotelQuote.num_nights_quoted;
       const costQuad = (hotelQuote.num_quad_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
@@ -425,7 +429,6 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       const totalContractedRoomsCost = costDouble + costTriple + costQuad;
 
       // Subtract the value of courtesy rooms from the total contracted cost
-      // Courtesy rooms are always valued at the quad occupancy rate
       const costOfCourtesyRooms = (hotelQuote.num_courtesy_rooms || 0) * hotelQuote.cost_per_night_quad * hotelQuote.num_nights_quoted;
       
       totalHotelCost += totalContractedRoomsCost - costOfCourtesyRooms;
@@ -436,19 +439,17 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
 
     const selectedBus = availableBuses.find(b => b.id === formData.bus_id);
     const busRentalCost = selectedBus?.rental_cost || 0;
-    const busAdvancePayment = selectedBus?.advance_payment || 0;
     const busTotalPaid = selectedBus?.total_paid || 0;
 
     const totalBaseCost = busRentalCost + totalProviderCost + totalHotelCost;
 
-    const payingClientsCount = formData.bus_capacity - formData.courtesies; // Use 'courtesies' here
+    const payingClientsCount = formData.bus_capacity - formData.courtesies;
     const costPerPayingPerson = payingClientsCount > 0 ? totalBaseCost / payingClientsCount : 0;
 
     // NEW: Add bus remaining payment
     currentTotalRemainingPayments += busRentalCost - busTotalPaid;
 
     // Calculate average selling price for potential revenue calculations
-    // This average is for adults only, as child pricing is separate
     const averageAdultSellingPrice = (formData.selling_price_double_occupancy + formData.selling_price_triple_occupancy + formData.selling_price_quad_occupancy) / 3;
 
     setFormData((prev) => ({
@@ -456,7 +457,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       total_base_cost: totalBaseCost,
       paying_clients_count: payingClientsCount,
       cost_per_paying_person: costPerPayingPerson,
-      selling_price_per_person: averageAdultSellingPrice, // Set the average here
+      selling_price_per_person: averageAdultSellingPrice,
     }));
     setTotalRemainingPayments(currentTotalRemainingPayments);
 
@@ -471,7 +472,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   }, [
     formData.bus_capacity,
     formData.bus_id,
-    formData.courtesies, // Use 'courtesies' here
+    formData.courtesies,
     formData.provider_details,
     formData.hotel_details,
     formData.selling_price_double_occupancy,
@@ -573,10 +574,10 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     setIsUploadingImage(true);
     const fileExt = file.name.split('.').pop();
     const fileName = `${uuidv4()}.${fileExt}`;
-    const filePath = `${fileName}`; // Store directly in the bucket root
+    const filePath = `${fileName}`;
 
     const { data, error } = await supabase.storage
-      .from('tour-images') // *** Changed to the new 'tour-images' bucket ***
+      .from('tour-images')
       .upload(filePath, file, {
         cacheControl: '3600',
         upsert: false,
@@ -591,7 +592,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     }
 
     const { data: publicUrlData } = supabase.storage
-      .from('tour-images') // *** Changed to the new 'tour-images' bucket ***
+      .from('tour-images')
       .getPublicUrl(filePath);
 
     return publicUrlData.publicUrl;
@@ -659,7 +660,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     setFormData((prev) => ({
       ...prev,
       hotel_details: [...prev.hotel_details, {
-        id: uuidv4(), // Unique ID for this entry
+        id: uuidv4(),
         hotel_quote_id: '',
       }],
     }));
@@ -734,7 +735,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       bus_capacity: selectedBus?.total_capacity || 0,
       bus_cost: selectedBus?.rental_cost || 0,
     }));
-    setSelectedBusLayout(selectedBus?.seat_layout_json || null); // Set the layout
+    setSelectedBusLayout(selectedBus?.seat_layout_json || null);
   };
 
   // NEW: Break-even analysis function
@@ -894,6 +895,54 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     availableHotelQuotes,
   ]);
 
+  // NEW: Handler to find the cheapest hotel quote
+  const handleFindCheapestHotel = async () => {
+    if (!formData.departure_date || !formData.return_date) {
+      toast.error('Por favor, selecciona la fecha de salida y regreso del tour.');
+      return;
+    }
+
+    setLoadingCheapestHotel(true);
+    setCheapestHotelQuote(null);
+
+    try {
+      const { data: sessionData } = await supabase.auth.getSession();
+      if (!sessionData.session?.access_token) {
+        toast.error('Sesión expirada. Por favor, inicia sesión de nuevo.');
+        setLoadingCheapestHotel(false);
+        return;
+      }
+
+      const { data, error } = await supabase.functions.invoke('find-cheapest-hotel-quote', {
+        body: {
+          departureDate: formData.departure_date,
+          returnDate: formData.return_date,
+        },
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${sessionData.session.access_token}`,
+        },
+      });
+
+      if (error) {
+        console.error('Error invoking find-cheapest-hotel-quote:', error);
+        toast.error(`Error al buscar cotización: ${data?.error || error.message || 'Error desconocido.'}`);
+      } else if (data.cheapestQuote) {
+        setCheapestHotelQuote(data.cheapestQuote);
+        toast.success(`Cotización más barata encontrada: ${data.cheapestQuote.name}`);
+      } else if (data.error) {
+        toast.error(data.error);
+      } else {
+        toast.info('No se encontraron cotizaciones de hotel activas para esas fechas.');
+      }
+    } catch (error: any) {
+      console.error('Unexpected error finding cheapest hotel:', error);
+      toast.error(`Ocurrió un error inesperado: ${error.message}`);
+    } finally {
+      setLoadingCheapestHotel(false);
+    }
+  };
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -908,7 +957,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
         return;
       }
       finalImageUrl = uploadedUrl;
-    } else if (!formData.image_url && !tourId) { // Only require image for new tours if not already present
+    } else if (!formData.image_url && !tourId) {
       toast.error('Por favor, sube una imagen de portada.');
       setIsSubmitting(false);
       return;
@@ -926,7 +975,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       return;
     }
 
-    if (formData.courtesies >= formData.bus_capacity) { // Use 'courtesies' here
+    if (formData.courtesies >= formData.bus_capacity) {
       toast.error('El número de coordinadores no puede ser igual o mayor que la capacidad del autobús.');
       setIsSubmitting(false);
       return;
@@ -984,12 +1033,12 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       total_base_cost: formData.total_base_cost,
       paying_clients_count: formData.paying_clients_count,
       cost_per_paying_person: formData.cost_per_paying_person,
-      selling_price_per_person: calculatedSellingPricePerPerson, // Add this line
-      other_income: formData.other_income, // NEW: Save other_income
-      departure_date: formData.departure_date, // NEW: Save departure date
-      return_date: formData.return_date, // NEW: Save return date
-      departure_time: formData.departure_time, // NEW: Save departure time
-      return_time: formData.return_time, // NEW: Save return time
+      selling_price_per_person: calculatedSellingPricePerPerson,
+      other_income: formData.other_income,
+      departure_date: formData.departure_date,
+      return_date: formData.return_date,
+      departure_time: formData.departure_time,
+      return_time: formData.return_time,
     };
 
     if (tourId) {
@@ -1004,7 +1053,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
         toast.error('Error al actualizar el tour.');
       } else {
         toast.success('Tour actualizado con éxito.');
-        onSave(); // Call onSave to redirect
+        onSave();
       }
     } else {
       // Insert new tour
@@ -1017,7 +1066,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
         toast.error('Error al crear el tour.');
       } else {
         toast.success('Tour creado con éxito.');
-        onSave(); // Call onSave to redirect
+        onSave();
       }
     }
     setIsSubmitting(false);
@@ -1035,8 +1084,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   // Calculate average selling price for display in financial summary
   const averageSellingPrice = (formData.selling_price_double_occupancy + formData.selling_price_triple_occupancy + formData.selling_price_quad_occupancy) / 3;
   const totalPotentialRevenue = (formData.paying_clients_count || 0) * averageSellingPrice;
-  const totalSoldRevenue = totalClientsRevenue + formData.other_income; // NEW: Use totalClientsRevenue + other_income
-  const totalToSell = totalPotentialRevenue - totalClientsRevenue; // NEW: Only subtract client revenue
+  const totalSoldRevenue = totalClientsRevenue + formData.other_income;
+  const totalToSell = totalPotentialRevenue - totalClientsRevenue;
 
   return (
     <div className="bg-white rounded-lg shadow-lg p-6">
@@ -1244,12 +1293,12 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           <div className="col-span-full mt-6">
             <h3 className="text-xl font-semibold mb-4">Visualización de Asientos</h3>
             <TourSeatMap
-              tourId={tourId || 'new-tour'} // Pass a dummy ID for new tours, actual ID for existing
+              tourId={tourId || 'new-tour'}
               busCapacity={formData.bus_capacity}
               courtesies={formData.courtesies}
-              seatLayoutJson={selectedBusLayout} // Pass the selected bus layout
-              readOnly={true} // Set to readOnly
-              adminMode={false} // Disable admin mode here
+              seatLayoutJson={selectedBusLayout}
+              readOnly={true}
+              adminMode={false}
             />
             <div className="flex justify-end mt-4">
               <Button
@@ -1275,7 +1324,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
               ? (((selectedQuote.num_double_rooms || 0) * selectedQuote.cost_per_night_double * selectedQuote.num_nights_quoted) +
                 ((selectedQuote.num_triple_rooms || 0) * selectedQuote.cost_per_night_triple * selectedQuote.num_nights_quoted) +
                 ((selectedQuote.num_quad_rooms || 0) * selectedQuote.cost_per_night_quad * selectedQuote.num_nights_quoted)) -
-                ((selectedQuote.num_courtesy_rooms || 0) * selectedQuote.cost_per_night_quad * selectedQuote.num_nights_quoted) // Subtract courtesy cost using quad rate
+                ((selectedQuote.num_courtesy_rooms || 0) * selectedQuote.cost_per_night_quad * selectedQuote.num_nights_quoted)
               : 0;
 
             return (
@@ -1311,6 +1360,46 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           </Button>
         </div>
 
+        {/* NEW: Cheapest Hotel Finder */}
+        <div className="col-span-full mt-4 p-4 bg-blue-50 rounded-md">
+          <h3 className="text-xl font-semibold mb-4 text-blue-800 flex items-center">
+            <HotelIcon className="mr-2 h-5 w-5" /> Búsqueda de Hotel Más Barato
+          </h3>
+          <p className="text-sm text-gray-700 mb-4">
+            Busca la cotización de hotel activa más barata para la duración de este tour (basado en costo por noche doble).
+          </p>
+          <div className="flex justify-end">
+            <Button 
+              type="button" 
+              onClick={handleFindCheapestHotel} 
+              disabled={loadingCheapestHotel || !formData.departure_date || !formData.return_date}
+              className="bg-blue-600 hover:bg-blue-700 text-white"
+            >
+              {loadingCheapestHotel ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Search className="mr-2 h-4 w-4" />}
+              Buscar Hotel Más Barato
+            </Button>
+          </div>
+          {cheapestHotelQuote && (
+            <div className="mt-4 p-3 bg-blue-100 border border-blue-300 rounded-md">
+              <h4 className="font-semibold text-blue-900">Resultado:</h4>
+              <p className="text-blue-800">
+                <span className="font-bold">{cheapestHotelQuote.name}</span> ({cheapestHotelQuote.location})
+              </p>
+              <p className="text-blue-800 text-sm">
+                Costo Estimado para {cheapestHotelQuote.num_nights_tour} noches (Doble): <span className="font-bold">${cheapestHotelQuote.estimated_total_cost.toFixed(2)}</span>
+              </p>
+              <Button 
+                type="button" 
+                variant="link" 
+                className="p-0 h-auto text-blue-600"
+                onClick={() => navigate(`/admin/hotels/edit/${cheapestHotelQuote.id}`)}
+              >
+                Ver Cotización
+              </Button>
+            </div>
+          )}
+        </div>
+
         {/* NEW: Provider Services */}
         <div className="space-y-2 col-span-full">
           <Label className="text-lg font-semibold">Servicios de Proveedores Vinculados</Label>
@@ -1339,8 +1428,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
                   </SelectContent>
                 </Select>
                 <Input
-                  type="text" // Changed to text
-                  pattern="[0-9]*" // Pattern for integers
+                  type="text"
+                  pattern="[0-9]*"
                   value={tourProviderService.quantity}
                   onChange={(e) => handleProviderServiceChange(tourProviderService.id, 'quantity', parseFloat(e.target.value) || 0)}
                   placeholder="Cantidad"
@@ -1387,8 +1476,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             <Label htmlFor="other_income" className="font-semibold">Otros Ingresos:</Label>
             <Input
               id="other_income"
-              type="text" // Changed to text
-              pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
+              type="text"
+              pattern="[0-9]*\.?[0-9]*"
               value={formData.other_income}
               onChange={handleChange}
               className="w-full"
@@ -1416,8 +1505,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             <Label htmlFor="desired_profit_percentage" className="md:text-right">Ganancia Deseada (%)</Label>
             <Input
               id="desired_profit_percentage"
-              type="text" // Changed to text
-              pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
+              type="text"
+              pattern="[0-9]*\.?[0-9]*"
               value={desiredProfitPercentage}
               onChange={(e) => setDesiredProfitPercentage(parseFloat(e.target.value) || 0)}
               className="md:col-span-3"
@@ -1455,8 +1544,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             <Label htmlFor="expected_clients_for_breakeven" className="md:text-right">Clientes Esperados (para análisis)</Label>
             <Input
               id="expected_clients_for_breakeven"
-              type="text" // Changed to text
-              pattern="[0-9]*" // Pattern for integers
+              type="text"
+              pattern="[0-9]*"
               value={expectedClientsForBreakeven}
               onChange={(e) => setExpectedClientsForBreakeven(parseFloat(e.target.value) || 0)}
               className="md:col-span-3"
