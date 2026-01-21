@@ -94,7 +94,7 @@ const TourInquirySection = () => {
           contract_number,
           identification_number,
           number_of_people,
-          companions, -- Keep for tour clients
+          companions,
           total_amount,
           advance_payment,
           total_paid,
