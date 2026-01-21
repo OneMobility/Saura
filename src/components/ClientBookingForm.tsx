@@ -50,6 +50,7 @@ interface ClientBookingFormProps {
   tourSellingPrices: TourSellingPrices;
   busDetails: BusDetails;
   tourAvailableExtraServices: TourProviderService[];
+  initialSelectedSeats?: number[]; // NEW: Prop para asientos preseleccionados
 }
 
 const allocateRoomsForPeople = (totalPeople: number): RoomDetails => {
@@ -90,6 +91,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
   tourSellingPrices,
   busDetails,
   tourAvailableExtraServices,
+  initialSelectedSeats = [], // Default value
 }) => {
   const [formData, setFormData] = useState({
     first_name: '',
@@ -102,7 +104,8 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     companions: [] as Companion[],
     extra_services: [] as TourProviderService[],
   });
-  const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
+  // Initialize selectedSeats with the prop value
+  const [selectedSeats, setSelectedSeats] = useState<number[]>(initialSelectedSeats);
   const [totalAmount, setTotalAmount] = useState(0);
   const [roomDetails, setRoomDetails] = useState<RoomDetails>({ double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -110,6 +113,11 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
   const [numAdults, setNumAdults] = useState(0);
   const [numChildren, setNumChildren] = useState(0);
   const [extraServicesTotal, setExtraServicesTotal] = useState(0);
+
+  // Sync selectedSeats if the prop changes while the form is open (unlikely in this flow, but good practice)
+  useEffect(() => {
+    setSelectedSeats(initialSelectedSeats);
+  }, [initialSelectedSeats]);
 
   useEffect(() => {
     let currentNumAdults = 0;
@@ -215,7 +223,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
             };
           }
         } else if (field === 'quantity') {
-          newExtraServices[index] = { ...newExtraServices[index], quantity: value as number };
+          newExtraServices[index] = { ...newExtraServices[index], quantity: parseFloat(value as string) || 0 };
         }
       }
       return { ...prev, extra_services: newExtraServices };
@@ -245,6 +253,9 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     }));
   };
 
+  // This function is now only used if the user changes the selection *inside* the form,
+  // but since we are passing initialSelectedSeats, we might not need to allow changes here.
+  // However, keeping it allows flexibility if we decide to allow re-selection later.
   const handleSeatsSelected = useCallback((seats: number[]) => {
     setSelectedSeats(seats);
   }, []);
@@ -275,8 +286,9 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
       }
     }
 
+    // Validation check against the current state of selectedSeats
     if (selectedSeats.length !== totalPeople) {
-      toast.error(`Debes seleccionar ${totalPeople} asientos para este contrato.`);
+      toast.error(`Debes seleccionar ${totalPeople} asientos para este contrato. Por favor, revisa tu selección.`);
       setIsSubmitting(false);
       return;
     }
@@ -357,7 +369,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
         <DialogHeader>
           <DialogTitle>Reservar Tour: {tourTitle}</DialogTitle>
           <DialogDescription>
-            Rellena tus datos y selecciona tus asientos para completar la reserva.
+            Rellena tus datos para completar la reserva.
           </DialogDescription>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-6 py-4">
@@ -399,7 +411,14 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <Label htmlFor="contractor_age">Edad del Contratante</Label>
-              <Input id="contractor_age" type="number" value={formData.contractor_age || ''} onChange={(e) => handleNumberChange('contractor_age', e.target.value)} min={0} max={120} />
+              <Input 
+                id="contractor_age" 
+                type="text" // Changed to text
+                pattern="[0-9]*" // Pattern for integers
+                value={formData.contractor_age || ''} 
+                onChange={(e) => handleNumberChange('contractor_age', e.target.value)} 
+                required 
+              />
             </div>
             <div>
               <Label htmlFor="identification_number">Número de Identificación</Label>
@@ -431,12 +450,12 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
                   className="w-full md:w-2/3"
                 />
                 <Input
-                  type="number"
+                  type="text" // Changed to text
+                  pattern="[0-9]*" // Pattern for integers
                   value={companion.age || ''}
                   onChange={(e) => handleCompanionChange(companion.id, 'age', e.target.value)}
                   placeholder="Edad"
                   className="w-full md:w-1/3"
-                  min={0} max={120}
                 />
                 <Button type="button" variant="destructive" size="icon" onClick={() => removeCompanion(companion.id)}>
                   <MinusCircle className="h-4 w-4" />
@@ -480,12 +499,13 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
                         </SelectContent>
                       </Select>
                       <Input
-                        type="number"
+                        type="text" // Changed to text
+                        pattern="[0-9]*" // Pattern for integers
                         value={clientService.quantity}
-                        onChange={(e) => handleClientExtraServiceChange(clientService.id, 'quantity', parseFloat(e.target.value) || 0)}
+                        onChange={(e) => handleClientExtraServiceChange(clientService.id, 'quantity', e.target.value)}
                         placeholder="Cantidad"
                         className="w-full md:w-1/6"
-                        min={1}
+                        required
                       />
                       <span className="text-sm text-gray-600 md:w-1/4 text-center md:text-left">
                         Precio Venta Total: ${totalSellingPrice.toFixed(2)}
@@ -503,24 +523,23 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
             )}
           </div>
 
-          {/* Seat Selection */}
+          {/* Seat Selection (Read-only in form, controlled by parent page) */}
           {busDetails.bus_capacity > 0 && (
             <div className="col-span-full mt-6">
-              <h3 className="text-lg font-semibold mb-4">Selección de Asientos</h3>
+              <h3 className="text-lg font-semibold mb-4">Asientos Seleccionados</h3>
+              <p className="text-sm text-gray-600 mb-2">
+                Asientos seleccionados en la página anterior: <span className="font-bold">{selectedSeats.join(', ')}</span>
+              </p>
               <TourSeatMap
                 tourId={tourId}
                 busCapacity={busDetails.bus_capacity}
                 courtesies={busDetails.courtesies}
                 seatLayoutJson={busDetails.seat_layout_json}
                 onSeatsSelected={handleSeatsSelected}
-                readOnly={false}
+                readOnly={true} // Set to readOnly inside the form
                 adminMode={false}
+                initialSelectedSeats={selectedSeats} // Pass selected seats
               />
-              {selectedSeats.length > 0 && (
-                <p className="text-sm text-gray-600 mt-2">
-                  Asientos seleccionados: {selectedSeats.join(', ')}
-                </p>
-              )}
             </div>
           )}
 

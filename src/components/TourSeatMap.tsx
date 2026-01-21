@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Loader2, Check, X, Ban, CarFront, Toilet } from 'lucide-react'; // Added CarFront and Toilet icons
+import { Loader2, Check, X, Ban, CarFront, Toilet, LogIn } from 'lucide-react'; // Added LogIn icon
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useSession } from '@/components/SessionContextProvider';
@@ -25,7 +25,7 @@ interface TourSeatMapProps {
   readOnly?: boolean; // If true, no interaction allowed (e.g., for public viewing without booking)
   adminMode?: boolean; // If true, admin can block/unblock seats
   currentClientId?: string | null; // NEW: Client ID for booking/editing
-  initialSelectedSeats?: number[]; // NEW: For pre-selecting seats when editing a client
+  initialSelectedSeats?: number[]; // NEW: For pre-selecting seats when editing a client or public selection
 }
 
 const TourSeatMap: React.FC<TourSeatMapProps> = ({
@@ -95,7 +95,6 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
       let courtesySeatsAssigned = 0;
       const updatedSeats = allSeats.map(seat => {
         // Only apply courtesy if it's currently 'available' and we still need to assign courtesies
-        // And if it's not already explicitly marked as courtesy in DB (though it shouldn't be if it's 'available')
         if (seat.status === 'available' && courtesySeatsAssigned < courtesies) { // Use 'courtesies' here
           courtesySeatsAssigned++;
           return { ...seat, status: 'courtesy' };
@@ -112,7 +111,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
     fetchSeats();
   }, [fetchSeats]);
 
-  // Update selectedSeats when initialSelectedSeats prop changes (e.g., when editing a client)
+  // Update selectedSeats when initialSelectedSeats prop changes (e.g., when editing a client or public selection changes)
   useEffect(() => {
     setSelectedSeats(initialSelectedSeats);
   }, [initialSelectedSeats]);
@@ -183,7 +182,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
       } else if (currentStatus === 'blocked') {
         toast.info('Este asiento está bloqueado por el administrador.');
       } else if (currentStatus === 'courtesy') {
-        toast.info('Este asiento es de coordinador.'); // Changed text
+        toast.info('Este asiento es de coordinador.');
       }
       return;
     }
@@ -224,7 +223,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
 
     if (seat.status === 'booked') {
       if (currentClientId && seat.client_id === currentClientId) {
-        return cn(baseClasses, "bg-bus-primary text-bus-primary-foreground hover:bg-bus-primary/90 cursor-pointer"); // Booked by this client, allow unselect
+        return cn(baseClasses, "bg-rosa-mexicano text-white hover:bg-rosa-mexicano/90 cursor-pointer"); // Booked by this client, allow unselect
       }
       return cn(baseClasses, "bg-destructive text-destructive-foreground cursor-not-allowed"); // Booked by another
     }
@@ -235,7 +234,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
       return cn(baseClasses, "bg-purple-500 text-white cursor-not-allowed", adminMode && "hover:bg-purple-600 cursor-pointer");
     }
     if (isCurrentlySelected) {
-      return cn(baseClasses, "bg-bus-primary text-bus-primary-foreground hover:bg-bus-primary/90 cursor-pointer");
+      return cn(baseClasses, "bg-rosa-mexicano text-white hover:bg-rosa-mexicano/90 cursor-pointer");
     }
     // Default for 'available' seats
     return cn(baseClasses, "bg-secondary text-secondary-foreground hover:bg-secondary/80 cursor-pointer");
@@ -244,7 +243,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
   if (loading || sessionLoading) {
     return (
       <div className="flex items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-bus-primary" />
+        <Loader2 className="h-8 w-8 animate-spin text-rosa-mexicano" />
         <p className="ml-4 text-muted-foreground">Cargando mapa de asientos...</p>
       </div>
     );
@@ -266,7 +265,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
 
   return (
     <div className="p-4 border rounded-lg bg-muted">
-      <h3 className="text-xl font-semibold mb-4 text-bus-foreground">
+      <h3 className="text-xl font-semibold mb-4 text-foreground">
         Mapa de Asientos ({busCapacity} asientos)
       </h3>
       {adminMode && isAdmin && (
@@ -306,7 +305,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
                     </div>
                   ) : item.type === 'entry' ? ( // Render 'entry' type
                     <div className={getSeatClasses(null, item.type)} title="Ascenso">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-log-in"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" x2="3" y1="12" y2="12"/></svg>
+                      <LogIn className="h-5 w-5" />
                     </div>
                   ) : ( // empty type
                     <div className={getSeatClasses(null, item.type)}></div>
@@ -324,7 +323,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
             <span className="w-5 h-5 bg-secondary rounded-sm mr-2"></span> Disponible
           </div>
           <div className="flex items-center">
-            <span className="w-5 h-5 bg-bus-primary rounded-sm mr-2"></span> Seleccionado (o tuyo)
+            <span className="w-5 h-5 bg-rosa-mexicano rounded-sm mr-2"></span> Seleccionado (o tuyo)
           </div>
           <div className="flex items-center">
             <span className="w-5 h-5 bg-destructive rounded-sm mr-2"></span> Ocupado (otro cliente)

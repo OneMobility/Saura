@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft, Loader2 } from 'lucide-react';
@@ -47,6 +47,11 @@ const TourDetailsPage = () => {
   const [error, setError] = useState<string | null>(null);
   const [busLayout, setBusLayout] = useState<SeatLayout | null>(null);
   const [isBookingFormOpen, setIsBookingFormOpen] = useState(false); // State to control booking form dialog
+  const [selectedSeats, setSelectedSeats] = useState<number[]>([]); // NEW: State for selected seats
+
+  const handleSeatsSelected = useCallback((seats: number[]) => {
+    setSelectedSeats(seats);
+  }, []);
 
   useEffect(() => {
     const fetchTourDetails = async () => {
@@ -243,7 +248,7 @@ const TourDetailsPage = () => {
             <div className="lg:col-span-1 bg-gray-50 p-6 rounded-lg shadow-inner">
               <h3 className="text-2xl font-bold text-gray-800 mb-4">¡Reserva Ahora!</h3>
               <p className="text-gray-700 mb-6">
-                ¿Listo para tu próxima aventura? Contáctanos para personalizar tu viaje o reservar este tour.
+                ¿Listo para tu próxima aventura? Selecciona tus asientos y reserva.
               </p>
               {tour.bus_capacity > 0 && (
                 <div className="mb-6">
@@ -252,17 +257,25 @@ const TourDetailsPage = () => {
                     busCapacity={tour.bus_capacity}
                     courtesies={tour.courtesies}
                     seatLayoutJson={busLayout}
-                    readOnly={false} // Allow public users to select seats
+                    onSeatsSelected={handleSeatsSelected} // Pass callback to capture selection
+                    readOnly={false}
                     adminMode={false}
+                    initialSelectedSeats={selectedSeats} // Pass current selection
                   />
+                  {selectedSeats.length > 0 && (
+                    <p className="text-sm text-gray-600 mt-2">
+                      Asientos seleccionados: {selectedSeats.join(', ')}
+                    </p>
+                  )}
                 </div>
               )}
               <Dialog open={isBookingFormOpen} onOpenChange={setIsBookingFormOpen}>
                 <DialogTrigger asChild>
                   <Button
                     className="w-full bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white font-semibold py-3 text-lg"
+                    disabled={selectedSeats.length === 0} // Disable if no seats selected
                   >
-                    Reservar Tour
+                    Reservar Tour ({selectedSeats.length} personas)
                   </Button>
                 </DialogTrigger>
                 {tour && (
@@ -285,7 +298,8 @@ const TourDetailsPage = () => {
                       courtesies: tour.courtesies,
                       seat_layout_json: busLayout,
                     }}
-                    tourAvailableExtraServices={tour.provider_details} // NEW: Pass provider details
+                    tourAvailableExtraServices={tour.provider_details}
+                    initialSelectedSeats={selectedSeats} // Pass selected seats to the form
                   />
                 )}
               </Dialog>
