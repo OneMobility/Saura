@@ -33,7 +33,7 @@ const generateServiceContractHtml = (data: any) => {
   const contractDate = format(new Date(client.created_at), 'dd/MM/yyyy', { locale: es });
 
   const safeCompanions = Array.isArray(client.companions) ? client.companions : [];
-  const safeExtraServices = Array.isArray(client.extra_services) ? client.extra_services : [];
+  const safeExtraServices = Array.isArray(client.extra_services) ? safeExtraServices : [];
 
   let tourOrRouteTitle = 'N/A';
   let tourOrRouteDuration = 'N/A';
@@ -41,6 +41,7 @@ const generateServiceContractHtml = (data: any) => {
   let itineraryList = '<li>N/A</li>';
   let seatNumbers = 'N/A';
   let departureDateDisplay = '[FECHA DEL VIAJE NO DISPONIBLE EN DB]';
+  let mainDepartureDate = '[FECHA SALIDA]'; // For Clause 1
 
   if (client.tour_id && tour.title) {
     tourOrRouteTitle = tour.title;
@@ -58,13 +59,15 @@ const generateServiceContractHtml = (data: any) => {
       seatNumbers = tourSeats.map((s: any) => s.seat_number).sort((a: number, b: number) => a - b).join(', ');
     }
     
-    // NEW: Format departure and return dates
+    // Format departure and return dates
     if (tour.departure_date && tour.return_date) {
         const formattedDeparture = format(parseISO(tour.departure_date), 'dd/MM/yyyy', { locale: es });
         const formattedReturn = format(parseISO(tour.return_date), 'dd/MM/yyyy', { locale: es });
         departureDateDisplay = `del ${formattedDeparture} al ${formattedReturn}`;
+        mainDepartureDate = formattedDeparture; // Use only departure date for Clause 1
     } else if (tour.departure_date) {
         departureDateDisplay = format(parseISO(tour.departure_date), 'dd/MM/yyyy', { locale: es });
+        mainDepartureDate = departureDateDisplay;
     }
 
   } else if (client.bus_route_id && busRoute.name) {
@@ -78,6 +81,7 @@ const generateServiceContractHtml = (data: any) => {
     // For bus tickets, use the schedule date if available
     if (data.busSchedule?.effective_date_start) {
         departureDateDisplay = format(parseISO(data.busSchedule.effective_date_start), 'dd/MM/yyyy', { locale: es });
+        mainDepartureDate = departureDateDisplay;
     }
   }
 
@@ -321,7 +325,7 @@ const generateServiceContractHtml = (data: any) => {
 
             <div class="section">
                 <h2>1. OBJETO DEL CONTRATO</h2>
-                <p>LA AGENCIA se compromete a coordinar y poner a disposición de EL CLIENTE el ${client.tour_id ? 'tour' : 'viaje en autobús'} denominado <strong>${tourOrRouteTitle}</strong>, que se llevará a cabo ${departureDateDisplay}, con las siguientes características:</p>
+                <p>LA AGENCIA se compromete a coordinar y poner a disposición de EL CLIENTE el ${client.tour_id ? 'tour' : 'viaje en autobús'} denominado <strong>${tourOrRouteTitle}</strong>, que se llevará a cabo el día <strong>${mainDepartureDate}</strong> con las siguientes características:</p>
                 <p><span class="label">Destino / Itinerario:</span></p>
                 <ol>
                     ${itineraryList}
