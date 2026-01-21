@@ -117,10 +117,10 @@ const TourDetailsPage = () => {
           const bus = busesMap.get(tourData.bus_id);
           const layout = bus?.seat_layout_json || null;
           setBusLayout(layout);
-          console.log(`[TourDetailsPage] Bus ID: ${tourData.bus_id}, Layout Loaded: ${layout ? 'Sí' : 'No'}, Layout Data:`, layout);
+          // console.log(`[TourDetailsPage] Bus ID: ${tourData.bus_id} | Layout Loaded: ${layout ? 'Sí' : 'No'}`); // REMOVED DEBUG LOG
         } else {
           setBusLayout(null);
-          console.log(`[TourDetailsPage] No Bus ID assigned to tour.`);
+          // console.log(`[TourDetailsPage] No Bus ID assigned to tour.`); // REMOVED DEBUG LOG
         }
       } else {
         setError('Tour no encontrado.');
@@ -270,12 +270,7 @@ const TourDetailsPage = () => {
                       Asientos seleccionados: {selectedSeats.join(', ')}
                     </p>
                   )}
-                  {/* Debugging indicator */}
-                  {tour.bus_id && (
-                    <p className="text-xs text-gray-500 mt-2">
-                      Bus ID: {tour.bus_id} | Layout Cargado: {busLayout ? 'Sí' : 'No'}
-                    </p>
-                  )}
+                  {/* REMOVED DEBUGGING INDICATOR */}
                 </div>
               )}
               <Dialog open={isBookingFormOpen} onOpenChange={setIsBookingFormOpen}>
