@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, CreditCard, MessageSquare, CheckCircle2, Landmark, Info } from 'lucide-react';
+import { Loader2, CreditCard, MessageSquare, CheckCircle2, Landmark, Info, PlusCircle, MinusCircle } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Textarea } from '@/components/ui/textarea';
 import TourSeatMap from '@/components/TourSeatMap';
