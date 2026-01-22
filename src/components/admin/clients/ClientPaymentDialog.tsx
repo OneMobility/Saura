@@ -87,15 +87,21 @@ const ClientPaymentDialog: React.FC<ClientPaymentDialogProps> = ({ isOpen, onClo
 
       if (paymentError) throw paymentError;
 
-      const newTotalPaid = client.total_paid + amount;
+      const newTotalPaid = (client.total_paid || 0) + amount;
+      const newStatus = newTotalPaid > 0 ? 'confirmed' : 'pending';
+
       const { error: clientUpdateError } = await supabase
         .from('clients')
-        .update({ total_paid: newTotalPaid, updated_at: new Date().toISOString() })
+        .update({ 
+          total_paid: newTotalPaid, 
+          status: newStatus,
+          updated_at: new Date().toISOString() 
+        })
         .eq('id', client.id);
 
       if (clientUpdateError) throw clientUpdateError;
 
-      toast.success('Abono registrado con éxito.');
+      toast.success('Abono registrado y contrato confirmado.');
       onPaymentRegistered();
       onClose();
     } catch (error) {

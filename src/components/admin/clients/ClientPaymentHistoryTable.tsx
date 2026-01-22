@@ -56,17 +56,21 @@ const ClientPaymentHistoryTable: React.FC<ClientPaymentHistoryTableProps> = ({ c
   };
 
   const syncClientTotalPaid = async () => {
-    // Obtenemos todos los pagos actuales para recalcular el total exacto
     const { data: allPayments } = await supabase
       .from('client_payments')
       .select('amount')
       .eq('client_id', clientId);
     
     const newTotal = (allPayments || []).reduce((sum, p) => sum + p.amount, 0);
+    const newStatus = newTotal > 0 ? 'confirmed' : 'pending';
     
     await supabase
       .from('clients')
-      .update({ total_paid: newTotal, updated_at: new Date().toISOString() })
+      .update({ 
+        total_paid: newTotal, 
+        status: newStatus,
+        updated_at: new Date().toISOString() 
+      })
       .eq('id', clientId);
     
     onPaymentsUpdated();

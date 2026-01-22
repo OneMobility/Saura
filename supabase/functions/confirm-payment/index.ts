@@ -27,11 +27,9 @@ serve(async (req) => {
     if (clientError || !client) throw new Error('Contrato no encontrado');
 
     // 2. Determinar el monto exacto a abonar
-    // Priorizamos el monto enviado desde la URL de éxito
     let amountToCredit = parseFloat(amount);
 
     if (isNaN(amountToCredit) || amountToCredit <= 0) {
-      // Fallback: Si no hay monto en la URL (flujo antiguo), usamos lógica de respaldo segura
       amountToCredit = client.total_paid === 0 ? (client.advance_payment || 0) : 0;
     }
 
@@ -53,9 +51,9 @@ serve(async (req) => {
 
     if (paymentError) throw paymentError;
 
-    // 4. Actualizar el total pagado
+    // 4. Actualizar el total pagado y cambiar estado a 'confirmed'
     const newTotalPaid = (client.total_paid || 0) + amountToCredit;
-    const newStatus = newTotalPaid >= client.total_amount ? 'confirmed' : 'pending';
+    const newStatus = newTotalPaid > 0 ? 'confirmed' : 'pending';
 
     const { error: updateError } = await supabaseAdmin
       .from('clients')
