@@ -70,7 +70,7 @@ const ClientPaymentDialog: React.FC<ClientPaymentDialogProps> = ({ isOpen, onClo
     }
 
     if (!paymentDate || !isValid(paymentDate)) {
-      toast.error('Fecha inválida.');
+      toast.error('Por favor, introduce una fecha válida (DD/MM/AA).');
       setIsSubmitting(false);
       return;
     }
@@ -81,7 +81,7 @@ const ClientPaymentDialog: React.FC<ClientPaymentDialogProps> = ({ isOpen, onClo
         .insert({
           client_id: client.id,
           amount: amount,
-          payment_method: paymentMethod, // Now the column exists in DB
+          payment_method: paymentMethod,
           payment_date: format(paymentDate, 'yyyy-MM-dd'),
         });
 
@@ -133,7 +133,7 @@ const ClientPaymentDialog: React.FC<ClientPaymentDialogProps> = ({ isOpen, onClo
             <Label className="text-right">Método</Label>
             <Select value={paymentMethod} onValueChange={setPaymentMethod}>
               <SelectTrigger className="col-span-3">
-                <SelectValue placeholder="Selecciona método" />
+                <SelectValue placeholder="Selecciona el método" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="manual">Efectivo / Manual</SelectItem>
@@ -149,8 +149,8 @@ const ClientPaymentDialog: React.FC<ClientPaymentDialogProps> = ({ isOpen, onClo
 
           {client && (
             <div className="col-span-4 mt-4 p-3 bg-gray-50 rounded-md text-xs">
-              <p>Deuda Actual: <strong>${client.remaining_payment.toFixed(2)}</strong></p>
-              <p>Deuda Final: <strong>${remainingAfterPayment.toFixed(2)}</strong></p>
+              <p>Saldo Pendiente Actual: <strong>${client.remaining_payment.toFixed(2)}</strong></p>
+              <p>Saldo tras este abono: <strong>${remainingAfterPayment.toFixed(2)}</strong></p>
             </div>
           )}
 
