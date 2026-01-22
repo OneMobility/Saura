@@ -20,7 +20,12 @@ const generateServiceContractHtml = (data: any) => {
   const duration = isTour ? (tour?.duration || 'N/A') : 'Viaje sencillo';
   const includes = isTour ? (tour?.includes?.join(', ') || 'N/A') : 'Transporte y seguro de viajero.';
   const notIncludes = isTour ? 'Gastos personales, comidas no especificadas, propinas.' : 'Gastos personales, comidas, hospedaje.';
+  
+  // Obtener fechas y horas específicas
   const departureDate = isTour ? (client.tours?.departure_date ? format(parseISO(client.tours.departure_date), 'dd/MM/yyyy', { locale: es }) : 'N/A') : 'N/A';
+  const returnDate = isTour ? (client.tours?.return_date ? format(parseISO(client.tours.return_date), 'dd/MM/yyyy', { locale: es }) : 'N/A') : 'N/A';
+  const departureTime = isTour ? (client.tours?.departure_time || 'N/A') : 'N/A';
+  const returnTime = isTour ? (client.tours?.return_time || 'N/A') : 'N/A';
 
   let seatNumbers = "";
   if (isTour) {
@@ -174,6 +179,8 @@ const generateServiceContractHtml = (data: any) => {
                 <table class="details-table">
                     <tr><td class="label">Destino o Servicio:</td><td><span class="bold">${title}</span></td></tr>
                     <tr><td class="label">Fecha de Contrato:</td><td>${contractDate}</td></tr>
+                    <tr><td class="label">Salida:</td><td><span class="bold">${departureDate}</span> a las <span class="bold">${departureTime}</span></td></tr>
+                    <tr><td class="label">Regreso:</td><td><span class="bold">${returnDate}</span> a las <span class="bold">${returnTime}</span></td></tr>
                     <tr><td class="label">Asientos Asignados:</td><td class="bold" style="font-size: 14px; color: #91045A;">${seatNumbers}</td></tr>
                     <tr><td class="label">Número de Pasajeros:</td><td>${client.number_of_people} Persona(s)</td></tr>
                     <tr><td class="label">Monto Total del Contrato:</td><td class="bold">$${client.total_amount.toLocaleString()} MXN</td></tr>
