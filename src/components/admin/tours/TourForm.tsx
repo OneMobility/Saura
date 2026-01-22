@@ -9,7 +9,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, ImageIcon, MapPin, Clock, Hotel, ListChecks, Armchair, Info, Upload, Crown, Star, DollarSign } from 'lucide-react';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { v4 as uuidv4 } from 'uuid';
-import { format, parseISO } from 'date-fns';
+import { format, parseISO, addDays } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
@@ -20,6 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import RichTextEditor from '@/components/RichTextEditor';
 import TourSeatMap from '@/components/TourSeatMap';
+import { stripHtmlTags } from '@/utils/html'; // Import stripHtmlTags
 
 interface HotelQuote {
   id: string;
