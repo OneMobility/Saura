@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, MessageSquare, CreditCard, FileText, FileSignature, Calendar, User, MapPin, Armchair, Info, CheckCircle2 } from 'lucide-react';
+import { Loader2, MessageSquare, CreditCard, FileText, FileSignature, Calendar, User, MapPin, Armchair, Info, CheckCircle2, DollarSign } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
@@ -26,6 +26,7 @@ const TourInquirySection = () => {
   const [isPaying, setIsPaying] = useState(false);
   const [isDownloading, setIsDownloading] = useState<string | null>(null);
   const [agencySettings, setAgencySettings] = useState<AgencySettings | null>(null);
+  const [paymentAmount, setPaymentAmount] = useState<string>('');
   const sectionRef = useRef<HTMLDivElement>(null);
 
   const handleInquiry = useCallback(async (customNumber?: string) => {
@@ -39,6 +40,11 @@ const TourInquirySection = () => {
       });
       if (error) throw error;
       setContractDetails(data.contractDetails);
+      
+      // Establecer el monto por defecto al adeudo restante
+      const remaining = data.contractDetails.total_amount - data.contractDetails.total_paid;
+      setPaymentAmount(remaining.toString());
+      
     } catch (err) {
       toast.error('Folio no encontrado. Verifica tu número de contrato.');
       setContractDetails(null);
@@ -47,14 +53,11 @@ const TourInquirySection = () => {
     }
   }, [contractNumber]);
 
-  // Efecto para detectar contrato en la URL y auto-consultar
   useEffect(() => {
     const contractFromUrl = searchParams.get('contract');
     if (contractFromUrl) {
       const folio = contractFromUrl.toUpperCase();
       setContractNumber(folio);
-      
-      // Ejecutar consulta y scroll
       setTimeout(() => {
         handleInquiry(folio);
         sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -98,8 +101,16 @@ const TourInquirySection = () => {
 
   const handleOnlinePayment = async (method: 'mercadopago' | 'stripe') => {
     if (!contractDetails) return;
+    
+    const amountToPay = parseFloat(paymentAmount);
     const remaining = contractDetails.total_amount - contractDetails.total_paid;
-    if (remaining <= 0) return toast.success('Este contrato ya está liquidado.');
+
+    if (isNaN(amountToPay) || amountToPay <= 0) {
+      return toast.error('Ingresa un monto válido para abonar.');
+    }
+    if (amountToPay > remaining) {
+      return toast.error(`El monto no puede exceder el adeudo actual ($${remaining}).`);
+    }
 
     setIsPaying(true);
     try {
@@ -107,7 +118,7 @@ const TourInquirySection = () => {
       const { data, error } = await supabase.functions.invoke(functionName, {
         body: { 
           clientId: contractDetails.id, 
-          amount: remaining, 
+          amount: amountToPay, 
           description: `Abono Contrato: ${contractDetails.contract_number}`,
           contractNumber: contractDetails.contract_number
         }
@@ -230,21 +241,40 @@ const TourInquirySection = () => {
                   </div>
                 </div>
 
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {remainingPayment > 0 ? (
                     <>
-                      {hasMercadoPago && (
-                        <Button onClick={() => handleOnlinePayment('mercadopago')} disabled={isPaying} className="bg-blue-600 hover:bg-blue-700 w-full h-14 text-lg font-bold">
-                          {isPaying ? <Loader2 className="animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
-                          Pagar con Mercado Pago
-                        </Button>
-                      )}
-                      {hasStripe && (
-                        <Button onClick={() => handleOnlinePayment('stripe')} disabled={isPaying} className="bg-indigo-600 hover:bg-indigo-700 w-full h-14 text-lg font-bold">
-                          {isPaying ? <Loader2 className="animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
-                          Pagar con Stripe
-                        </Button>
-                      )}
+                      <div className="space-y-2">
+                        <Label htmlFor="payment-amount" className="text-xs font-black uppercase text-gray-400">Monto a Abonar</Label>
+                        <div className="relative">
+                          <DollarSign className="absolute left-3 top-1/2 -translate-y-1/2 h-5 w-5 text-gray-400" />
+                          <Input 
+                            id="payment-amount"
+                            type="number"
+                            className="pl-10 h-12 text-lg font-bold border-gray-200"
+                            placeholder="Ej: 500"
+                            value={paymentAmount}
+                            onChange={e => setPaymentAmount(e.target.value)}
+                            max={remainingPayment}
+                          />
+                        </div>
+                        <p className="text-[10px] text-gray-400 italic">Puedes realizar pagos parciales o liquidar el total.</p>
+                      </div>
+
+                      <div className="grid grid-cols-1 gap-3">
+                        {hasMercadoPago && (
+                          <Button onClick={() => handleOnlinePayment('mercadopago')} disabled={isPaying} className="bg-blue-600 hover:bg-blue-700 w-full h-14 text-lg font-bold">
+                            {isPaying ? <Loader2 className="animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
+                            Pagar con Mercado Pago
+                          </Button>
+                        )}
+                        {hasStripe && (
+                          <Button onClick={() => handleOnlinePayment('stripe')} disabled={isPaying} className="bg-indigo-600 hover:bg-indigo-700 w-full h-14 text-lg font-bold">
+                            {isPaying ? <Loader2 className="animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
+                            Pagar con Stripe
+                          </Button>
+                        )}
+                      </div>
                     </>
                   ) : (
                     <div className="text-center p-4 bg-green-100 rounded-xl text-green-800 font-bold flex items-center justify-center gap-2">
