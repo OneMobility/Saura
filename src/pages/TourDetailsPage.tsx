@@ -23,10 +23,9 @@ interface Bus {
   seat_layout_json: SeatLayout | null;
 }
 
-// Interface for the structure stored in the tour's hotel_details JSONB field
 interface TourHotelDetail {
   id: string;
-  hotel_quote_id: string; // This is the ID of the hotel quote in the 'hotels' table
+  hotel_quote_id: string;
 }
 
 interface Tour {
@@ -46,19 +45,27 @@ interface Tour {
   bus_capacity: number;
   courtesies: number;
   provider_details: TourProviderService[];
-  hotel_details: TourHotelDetail[]; // Use the simplified structure
+  hotel_details: TourHotelDetail[];
   departure_date: string | null;
   return_date: string | null;
   departure_time: string | null;
   return_time: string | null;
 }
 
+interface BankAccount {
+  id: string;
+  bank_name: string;
+  bank_clabe: string;
+  bank_holder: string;
+}
+
 interface AgencySettings {
+  payment_mode: 'test' | 'production';
   mp_public_key: string | null;
+  mp_test_public_key: string | null;
   stripe_public_key: string | null;
-  bank_name: string | null;
-  bank_clabe: string | null;
-  bank_holder: string | null;
+  stripe_test_public_key: string | null;
+  bank_accounts: BankAccount[];
   advance_payment_amount: number;
 }
 
@@ -83,69 +90,40 @@ const TourDetailsPage = () => {
       setLoading(true);
       setError(null);
 
-      // 1. Fetch Agency Settings
+      // 1. Fetch ALL Agency Settings needed for the form
       const { data: settingsData, error: settingsError } = await supabase
         .from('agency_settings')
-        .select('mp_public_key, stripe_public_key, bank_name, bank_clabe, bank_holder, advance_payment_amount')
+        .select('payment_mode, mp_public_key, mp_test_public_key, stripe_public_key, stripe_test_public_key, bank_accounts, advance_payment_amount')
         .single();
       
       if (settingsError && settingsError.code !== 'PGRST116') {
         console.error('Error fetching agency settings:', settingsError);
       }
       
-      // Ensure advance_payment_amount is treated as a number, defaulting to 500 if null/undefined
       const advanceAmount = settingsData?.advance_payment_amount ? parseFloat(String(settingsData.advance_payment_amount)) : 500;
       
       const settings = {
         ...settingsData,
         advance_payment_amount: advanceAmount,
+        bank_accounts: Array.isArray(settingsData?.bank_accounts) ? settingsData.bank_accounts : [],
+        payment_mode: settingsData?.payment_mode || 'test'
       } as AgencySettings;
       setAgencySettings(settings);
 
-      // 2. Fetch all buses to get their layouts
-      const { data: busesData, error: busesError } = await supabase
-        .from('buses')
-        .select('id, seat_layout_json');
-
-      if (busesError) {
-        console.error('Error fetching buses:', busesError);
-      }
-      const busesMap = new Map<string, Bus>();
-      busesData?.forEach(bus => busesMap.set(bus.id, bus as Bus));
+      // 2. Fetch all buses for layouts
+      const { data: busesData } = await supabase.from('buses').select('id, seat_layout_json');
+      const busesMap = new Map<string, any>();
+      busesData?.forEach(bus => busesMap.set(bus.id, bus));
 
       // 3. Fetch tour details
       const { data: tourData, error: tourError } = await supabase
         .from('tours')
-        .select(`
-          id,
-          image_url,
-          title,
-          description,
-          full_content,
-          duration,
-          includes,
-          itinerary,
-          selling_price_double_occupancy,
-          selling_price_triple_occupancy,
-          selling_price_quad_occupancy,
-          selling_price_child,
-          bus_id,
-          bus_capacity,
-          courtesies,
-          provider_details,
-          hotel_details,
-          departure_date,
-          return_date,
-          departure_time,
-          return_time
-        `)
+        .select('*')
         .eq('slug', id)
         .single();
 
       if (tourError) {
-        console.error('Error fetching tour details:', tourError);
-        setError('No se pudo cargar los detalles del tour. Asegúrate de que el slug sea correcto.');
-        setTour(null);
+        setError('No se pudo cargar los detalles del tour.');
         setLoading(false);
         return;
       } 
@@ -161,212 +139,83 @@ const TourDetailsPage = () => {
           selling_price_child: tourData.selling_price_child || 0,
           provider_details: tourData.provider_details || [],
           hotel_details: tourData.hotel_details || [],
-          departure_date: tourData.departure_date || null,
-          return_date: tourData.return_date || null,
-          departure_time: tourData.departure_time || null,
-          return_time: tourData.return_time || null,
         } as Tour;
 
-        // 4. Calculate Advance Payment Per Person
-        const minPricePerPerson = Math.min(
-          tourDetails.selling_price_double_occupancy,
-          tourDetails.selling_price_triple_occupancy,
-          tourDetails.selling_price_quad_occupancy,
-          tourDetails.selling_price_child
+        // 4. Calculate Advance
+        const minPrice = Math.min(
+          tourDetails.selling_price_double_occupancy || 99999,
+          tourDetails.selling_price_triple_occupancy || 99999,
+          tourDetails.selling_price_quad_occupancy || 99999,
+          tourDetails.selling_price_child || 99999
         );
-        
-        const fixedAdvance = settings.advance_payment_amount; // Use the numeric value from settings
-        const percentageAdvance = minPricePerPerson * 0.10;
-        
-        setAdvancePaymentPerPerson(Math.max(fixedAdvance, percentageAdvance));
+        setAdvancePaymentPerPerson(Math.max(advanceAmount, minPrice * 0.10));
 
-        // 5. Fetch hotel names
-        const hotelQuoteIds = tourDetails.hotel_details.map(d => d.hotel_quote_id).filter(Boolean);
-        
-        if (hotelQuoteIds.length > 0) {
-          const { data: hotelsData } = await supabase
-            .from('hotels')
-            .select('id, name')
-            .in('id', hotelQuoteIds);
-          const names = (hotelsData || []).map(h => h.name).join(', ');
-          setHotelNames(names);
-        } else {
-          setHotelNames('N/A');
+        // 5. Hotel names
+        const hotelIds = tourDetails.hotel_details.map(d => d.hotel_quote_id).filter(Boolean);
+        if (hotelIds.length > 0) {
+          const { data: hotelsData } = await supabase.from('hotels').select('name').in('id', hotelIds);
+          setHotelNames((hotelsData || []).map(h => h.name).join(', '));
         }
 
-        // 6. Set bus layout
+        // 6. Bus layout
         if (tourDetails.bus_id) {
-          const bus = busesMap.get(tourDetails.bus_id);
-          const layout = bus?.seat_layout_json || null;
-          setBusLayout(layout);
-        } else {
-          setBusLayout(null);
+          setBusLayout(busesMap.get(tourDetails.bus_id)?.seat_layout_json || null);
         }
         
         setTour(tourDetails);
-      } else {
-        setError('Tour no encontrado.');
-        setTour(null);
       }
       setLoading(false);
     };
 
-    if (id) {
-      fetchTourDetails();
-    }
+    if (id) fetchTourDetails();
   }, [id]);
 
   const handleWhatsAppContact = () => {
     if (!tour) return;
-    const phoneNumber = '528444041469';
-    const message = encodeURIComponent(`¡Hola! Me interesa el tour: ${tour.title}. ¿Podrían darme más información?`);
-    const whatsappUrl = `https://wa.me/${phoneNumber}?text=${message}`;
-    window.open(whatsappUrl, '_blank');
+    window.open(`https://wa.me/528444041469?text=${encodeURIComponent(`¡Hola! Me interesa el tour: ${tour.title}.`)}`, '_blank');
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 text-gray-800">
-        <Loader2 className="h-12 w-12 animate-spin text-rosa-mexicano" />
-        <p className="mt-4 text-xl">Cargando detalles del tour...</p>
-      </div>
-    );
-  }
-
-  if (error || !tour) {
-    return (
-      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-100 text-gray-800">
-        <h1 className="text-4xl font-bold mb-4">Tour no encontrado</h1>
-        <p className="text-xl mb-6">{error || 'Lo sentimos, el tour que buscas no existe.'}</p>
-        <Button asChild className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white">
-          <Link to="/tours">
-            <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Tours
-          </Link>
-        </Button>
-      </div>
-    );
-  }
-
-  const cleanDescription = stripHtmlTags(tour.description);
-  const departureDateDisplay = tour.departure_date ? format(parseISO(tour.departure_date), 'EEEE, dd MMMM yyyy', { locale: es }) : 'N/A';
-  const returnDateDisplay = tour.return_date ? format(parseISO(tour.return_date), 'EEEE, dd MMMM yyyy', { locale: es }) : 'N/A';
+  if (loading) return <div className="min-h-screen flex flex-col items-center justify-center"><Loader2 className="animate-spin text-rosa-mexicano h-12 w-12" /></div>;
+  if (error || !tour) return <div className="min-h-screen flex flex-col items-center justify-center p-4"><h1>Error</h1><p>{error}</p><Button asChild className="mt-4"><Link to="/tours">Volver</Link></Button></div>;
 
   return (
     <div className="min-h-screen flex flex-col">
       <Navbar />
       <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
-        <div className="mb-8">
-          <Button asChild variant="outline" className="bg-white text-rosa-mexicano hover:bg-gray-100 border-rosa-mexicano hover:border-rosa-mexicano/90">
-            <Link to="/tours">
-              <ArrowLeft className="mr-2 h-4 w-4" /> Volver a Tours
-            </Link>
-          </Button>
-        </div>
+        <div className="mb-8"><Button asChild variant="outline"><Link to="/tours"><ArrowLeft className="mr-2 h-4 w-4" /> Volver a Tours</Link></Button></div>
 
         <div className="bg-white rounded-lg shadow-xl overflow-hidden">
           <div className="relative h-64 md:h-96 w-full">
-            <img
-              src={tour.image_url}
-              alt={tour.title}
-              className="absolute inset-0 w-full h-full object-cover"
-            />
-            <div className="absolute inset-0 bg-black bg-opacity-40 flex items-end p-6">
-              <h1 className="text-4xl md:text-5xl font-bold text-white leading-tight">
-                {tour.title}
-              </h1>
-            </div>
+            <img src={tour.image_url} alt={tour.title} className="absolute inset-0 w-full h-full object-cover" />
+            <div className="absolute inset-0 bg-black/40 flex items-end p-6"><h1 className="text-4xl md:text-5xl font-bold text-white">{tour.title}</h1></div>
           </div>
 
           <div className="p-6 md:p-8 lg:p-10 grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2">
-              <h2 className="text-2xl md:text-3xl font-bold text-gray-800 mb-4">Descripción del Tour</h2>
-              <p className="text-gray-700 text-lg leading-relaxed mb-6">
-                {cleanDescription}
-              </p>
-
-              {tour.full_content && (
-                <div className="prose prose-lg max-w-none mb-6" dangerouslySetInnerHTML={{ __html: tour.full_content }} />
-              )}
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-800 mb-3">Detalles Clave</h3>
-                  <ul className="space-y-2 text-gray-700">
-                    {hotelNames && hotelNames !== 'N/A' && (
-                      <li>
-                        <Hotel className="inline h-4 w-4 mr-2 text-gray-500" />
-                        <span className="font-medium">Hospedaje en:</span> {hotelNames}
-                      </li>
-                    )}
-                    <li>
-                      <CalendarDays className="inline h-4 w-4 mr-2 text-gray-500" />
-                      <span className="font-medium">Salida:</span> {departureDateDisplay} {tour.departure_time}
-                    </li>
-                    <li>
-                      <CalendarDays className="inline h-4 w-4 mr-2 text-gray-500" />
-                      <span className="font-medium">Regreso:</span> {returnDateDisplay} {tour.return_time}
-                    </li>
-                    <li><span className="font-medium">Duración:</span> {tour.duration}</li>
-                    <li><span className="font-medium">Coordinadores:</span> {tour.courtesies}</li>
-                  </ul>
+              <h2 className="text-2xl font-bold mb-4">Descripción</h2>
+              <div className="prose prose-lg max-w-none" dangerouslySetInnerHTML={{ __html: tour.full_content || tour.description }} />
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-8">
+                <div className="space-y-3">
+                  <h3 className="font-bold border-b pb-2">Información</h3>
+                  <p><Hotel className="inline h-4 w-4 mr-2" /> <strong>Hotel:</strong> {hotelNames}</p>
+                  <p><CalendarDays className="inline h-4 w-4 mr-2" /> <strong>Salida:</strong> {tour.departure_date ? format(parseISO(tour.departure_date), 'dd/MM/yy', { locale: es }) : 'N/A'}</p>
+                  <p><Clock className="inline h-4 w-4 mr-2" /> <strong>Horario:</strong> {tour.departure_time}</p>
                 </div>
-                {tour.includes && tour.includes.length > 0 && (
-                  <div>
-                    <h3 className="text-xl font-semibold text-gray-800 mb-3">Incluye</h3>
-                    <ul className="list-disc list-inside space-y-2 text-gray-700">
-                      {tour.includes.map((item, index) => (
-                        <li key={index}>{item}</li>
-                      ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                <div>
-                  <h3 className="text-xl font-semibold text-gray-800 mb-3">Precios por Persona</h3>
-                  <ul className="space-y-2 text-gray-700">
-                    <li><span className="font-medium">Doble:</span> ${tour.selling_price_double_occupancy.toFixed(2)}</li>
-                    <li><span className="font-medium">Triple:</span> ${tour.selling_price_triple_occupancy.toFixed(2)}</li>
-                    <li><span className="font-medium">Cuádruple:</span> ${tour.selling_price_quad_occupancy.toFixed(2)}</li>
-                    <li><span className="font-medium">Menor (-12 años):</span> ${tour.selling_price_child.toFixed(2)}</li>
-                  </ul>
+                <div className="space-y-3">
+                  <h3 className="font-bold border-b pb-2">Precios</h3>
+                  <p>Doble: <strong>${tour.selling_price_double_occupancy}</strong></p>
+                  <p>Triple: <strong>${tour.selling_price_triple_occupancy}</strong></p>
+                  <p>Quad: <strong>${tour.selling_price_quad_occupancy}</strong></p>
+                  <p>Niño: <strong>${tour.selling_price_child}</strong></p>
                 </div>
               </div>
-
-              {tour.itinerary && tour.itinerary.length > 0 && (
-                <>
-                  <h3 className="text-xl font-semibold text-gray-800 mb-3">Itinerario</h3>
-                  <ol className="list-decimal list-inside space-y-3 text-gray-700">
-                    {tour.itinerary.map((item) => (
-                      <li key={item.day}>
-                        <span className="font-medium">Día {item.day}:</span> {item.activity}
-                      </li>
-                    ))}
-                  </ol>
-                </>
-              )}
-
-              {tour.provider_details && tour.provider_details.length > 0 && (
-                <div className="mt-8">
-                  <h3 className="text-xl font-semibold text-gray-800 mb-3">Servicios Adicionales Disponibles</h3>
-                  <ul className="list-disc list-inside space-y-2 text-gray-700">
-                    {tour.provider_details.map((service) => (
-                      <li key={service.id}>
-                        <span className="font-medium">{service.name_snapshot} ({service.service_type_snapshot}):</span>{' '}
-                        ${service.selling_price_per_unit_snapshot.toFixed(2)} por {service.unit_type_snapshot}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )}
             </div>
 
-            <div className="lg:col-span-1 bg-gray-50 p-6 rounded-lg shadow-inner">
-              <h3 className="text-2xl font-bold text-gray-800 mb-4">¡Reserva Ahora!</h3>
-              <p className="text-gray-700 mb-6">
-                Anticipo requerido por persona: <span className="font-bold text-rosa-mexicano">${advancePaymentPerPerson.toFixed(2)} MXN</span>
-              </p>
+            <div className="lg:col-span-1 bg-gray-50 p-6 rounded-2xl shadow-inner">
+              <h3 className="text-2xl font-bold mb-4">¡Reserva Ahora!</h3>
+              <p className="text-sm text-gray-500 mb-6">Anticipo por persona: <span className="font-bold text-rosa-mexicano">${advancePaymentPerPerson.toFixed(2)}</span></p>
+              
               {tour.bus_capacity > 0 && (
                 <div className="mb-6">
                   <TourSeatMap
@@ -375,24 +224,15 @@ const TourDetailsPage = () => {
                     courtesies={tour.courtesies}
                     seatLayoutJson={busLayout}
                     onSeatsSelected={handleSeatsSelected}
-                    readOnly={false}
-                    adminMode={false}
                     initialSelectedSeats={selectedSeats}
                   />
-                  {selectedSeats.length > 0 && (
-                    <p className="text-sm text-gray-600 mt-2">
-                      Asientos seleccionados: {selectedSeats.join(', ')}
-                    </p>
-                  )}
                 </div>
               )}
+
               <Dialog open={isBookingFormOpen} onOpenChange={setIsBookingFormOpen}>
                 <DialogTrigger asChild>
-                  <Button
-                    className="w-full bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white font-semibold py-3 text-lg"
-                    disabled={selectedSeats.length === 0}
-                  >
-                    Reservar Tour ({selectedSeats.length} personas)
+                  <Button className="w-full bg-rosa-mexicano h-14 text-lg font-bold" disabled={selectedSeats.length === 0}>
+                    Reservar para {selectedSeats.length} {selectedSeats.length === 1 ? 'persona' : 'personas'}
                   </Button>
                 </DialogTrigger>
                 {tour && agencySettings && (
@@ -418,14 +258,12 @@ const TourDetailsPage = () => {
                     tourAvailableExtraServices={tour.provider_details}
                     advancePaymentPerPerson={advancePaymentPerPerson}
                     agencySettings={agencySettings}
+                    initialSelectedSeats={selectedSeats}
                   />
                 )}
               </Dialog>
-              <Button 
-                variant="outline" 
-                className="w-full mt-4 bg-white text-rosa-mexicano hover:bg-gray-100 border-rosa-mexicano hover:border-rosa-mexicano/90"
-                onClick={handleWhatsAppContact}
-              >
+
+              <Button variant="outline" className="w-full mt-4 h-12 border-rosa-mexicano text-rosa-mexicano" onClick={handleWhatsAppContact}>
                 <MessageSquare className="mr-2 h-4 w-4" /> Contactar Asesor
               </Button>
             </div>
