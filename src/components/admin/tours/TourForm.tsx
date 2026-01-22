@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, ImageIcon, MapPin, Clock, Hotel, ListChecks, Armchair, Info, Upload } from 'lucide-react';
+import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, ImageIcon, MapPin, Clock, Hotel, ListChecks, Armchair, Info, Upload, Crown } from 'lucide-react';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { v4 as uuidv4 } from 'uuid';
 import { format, parseISO } from 'date-fns';
@@ -125,6 +125,26 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     fetchData();
   }, []);
 
+  // Lógica de recomendación y resaltado mensual para el selector de hoteles
+  const hotelStats = useMemo(() => {
+    const monthlyMins: Record<string, number> = {};
+    let absMin = Infinity;
+    let absId = '';
+
+    availableHotelQuotes.forEach(q => {
+      if (!q.quoted_date) return;
+      const monthKey = format(parseISO(q.quoted_date), 'yyyy-MM');
+      if (!monthlyMins[monthKey] || q.estimated_total_cost < monthlyMins[monthKey]) {
+        monthlyMins[monthKey] = q.estimated_total_cost;
+      }
+      if (q.estimated_total_cost < absMin) {
+        absMin = q.estimated_total_cost;
+        absId = q.id;
+      }
+    });
+    return { monthlyMins, absoluteCheapestId: absId };
+  }, [availableHotelQuotes]);
+
   const groupedAndSortedQuotes = useMemo(() => {
     const groups: Record<string, HotelQuote[]> = {};
     availableHotelQuotes.forEach(quote => {
@@ -179,17 +199,14 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     
     const projectedProfit = currentRevenue - totalCost;
 
-    // Punto de equilibrio - Evitar división por cero
-    const beQuad = formData.selling_price_quad_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_quad_occupancy) : 0;
-    const beTriple = formData.selling_price_triple_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_triple_occupancy) : 0;
-    const beDouble = formData.selling_price_double_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_double_occupancy) : 0;
-
     const targetRevenue = totalCost + desiredProfitFixed;
     const avgRequiredPerPerson = capacity > 0 ? targetRevenue / capacity : 0;
 
     return {
       busCost, hotelCost, providerCost, totalCost, capacity, projectedProfit,
-      beQuad, beTriple, beDouble,
+      beQuad: formData.selling_price_quad_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_quad_occupancy) : 0,
+      beTriple: formData.selling_price_triple_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_triple_occupancy) : 0,
+      beDouble: formData.selling_price_double_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_double_occupancy) : 0,
       recPrice: {
         quad: avgRequiredPerPerson,
         triple: avgRequiredPerPerson * 1.12,
@@ -417,7 +434,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
 
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                   <div className="space-y-2">
-                    <Label>Coordinadores (Cortesías)</Label>
+                    <Label>Coordinadores (No pagan)</Label>
                     <Input type="number" id="courtesies" value={formData.courtesies} onChange={handleChange} />
                   </div>
                   <div className="space-y-2">
@@ -441,11 +458,31 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
                           {groupedAndSortedQuotes.map(([name, quotes]) => (
                             <SelectGroup key={name}>
                               <SelectLabel className="bg-muted py-1 px-2 text-rosa-mexicano font-bold">{name}</SelectLabel>
-                              {quotes.map(q => (
-                                <SelectItem key={q.id} value={q.id}>
-                                  ${q.estimated_total_cost.toFixed(0)} ({format(parseISO(q.quoted_date!), 'dd/MM')})
-                                </SelectItem>
-                              ))}
+                              {quotes.map(q => {
+                                const monthKey = q.quoted_date ? format(parseISO(q.quoted_date), 'yyyy-MM') : '';
+                                const isMonthlyCheapest = hotelStats.monthlyMins[monthKey] === q.estimated_total_cost;
+                                const isRecommended = q.id === hotelStats.absoluteCheapestId;
+
+                                return (
+                                  <SelectItem key={q.id} value={q.id} className="cursor-pointer">
+                                    <div className="flex flex-col">
+                                      <div className="flex items-center gap-2">
+                                        <span className={cn(isMonthlyCheapest ? "text-green-600 font-bold" : "text-foreground")}>
+                                          ${q.estimated_total_cost.toLocaleString()}
+                                        </span>
+                                        {isRecommended && (
+                                          <span className="bg-yellow-400 text-yellow-900 text-[10px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                            <Crown className="h-3 w-3 fill-yellow-900" /> RECOMENDADO
+                                          </span>
+                                        )}
+                                      </div>
+                                      <span className="text-[10px] text-muted-foreground">
+                                        {q.num_nights_quoted} noches • {q.quoted_date ? format(parseISO(q.quoted_date), 'dd/MM/yy') : 'Sin fecha'}
+                                      </span>
+                                    </div>
+                                  </SelectItem>
+                                );
+                              })}
                             </SelectGroup>
                           ))}
                         </SelectContent>
