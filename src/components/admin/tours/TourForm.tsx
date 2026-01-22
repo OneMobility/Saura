@@ -125,7 +125,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     fetchData();
   }, []);
 
-  // Lógica de recomendación y resaltado mensual para el selector de hoteles
   const hotelStats = useMemo(() => {
     const monthlyMins: Record<string, number> = {};
     let absMin = Infinity;
@@ -245,16 +244,10 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     try {
       const fileName = `${uuidv4()}-${file.name.replace(/\s/g, '_')}`;
       const { error: uploadError } = await supabase.storage.from('tour-images').upload(fileName, file);
-      
-      if (uploadError) {
-        toast.error(`Error de subida: ${uploadError.message}`);
-        return null;
-      }
-
+      if (uploadError) return null;
       const { data: { publicUrl } } = supabase.storage.from('tour-images').getPublicUrl(fileName);
       return publicUrl;
     } catch (err) {
-      toast.error("Error inesperado al subir la imagen.");
       return null;
     } finally {
       setIsUploadingImage(false);
@@ -266,25 +259,13 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     setIsSubmitting(true);
 
     let finalImageUrl = formData.image_url;
-
-    if (!tourId && !imageFile) {
-      toast.error("Debes seleccionar una imagen para publicar el tour.");
-      setIsSubmitting(false);
-      return;
-    }
-
     if (imageFile) {
       const uploadedUrl = await uploadImage(imageFile);
-      if (!uploadedUrl) {
-        setIsSubmitting(false);
-        return;
-      }
+      if (!uploadedUrl) { setIsSubmitting(false); return; }
       finalImageUrl = uploadedUrl;
     }
 
     const { data: { user } } = await supabase.auth.getUser();
-    
-    // Preparar datos, incluyendo la columna obligatoria legacy 'selling_price_per_person'
     const dataToSave = { 
       ...formData, 
       image_url: finalImageUrl,
@@ -292,7 +273,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
       total_base_cost: financialSummary.totalCost,
       paying_clients_count: financialSummary.capacity,
       cost_per_paying_person: financialSummary.capacity > 0 ? financialSummary.totalCost / financialSummary.capacity : 0,
-      // Corregir restricción NOT NULL de la DB enviando el precio base (doble)
       selling_price_per_person: formData.selling_price_double_occupancy 
     };
     
@@ -300,13 +280,8 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
       ? await supabase.from('tours').update(dataToSave).eq('id', tourId)
       : await supabase.from('tours').insert(dataToSave);
       
-    if (error) {
-      console.error(error);
-      toast.error(`Error al guardar el tour: ${error.message}`);
-    } else {
-      toast.success('Tour publicado con éxito.');
-      onSave();
-    }
+    if (error) toast.error(`Error: ${error.message}`);
+    else { toast.success('Tour guardado.'); onSave(); }
     setIsSubmitting(false);
   };
 
@@ -320,7 +295,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
 
   return (
     <div className="space-y-8 pb-20">
-      {/* SIMULADOR FINANCIERO */}
       <Card className="border-t-4 border-rosa-mexicano shadow-xl">
         <CardHeader className="bg-gray-50/50">
           <CardTitle className="text-2xl font-bold flex items-center gap-2">
@@ -438,7 +412,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
 
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                   <div className="space-y-2">
-                    <Label>Coordinadores (No pagan)</Label>
+                    <Label>Coordinadores</Label>
                     <Input type="number" id="courtesies" value={formData.courtesies} onChange={handleChange} />
                   </div>
                   <div className="space-y-2">
@@ -466,7 +440,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
                                 const monthKey = q.quoted_date ? format(parseISO(q.quoted_date), 'yyyy-MM') : '';
                                 const isMonthlyCheapest = hotelStats.monthlyMins[monthKey] === q.estimated_total_cost;
                                 const isRecommended = q.id === hotelStats.absoluteCheapestId;
-
                                 return (
                                   <SelectItem key={q.id} value={q.id} className="cursor-pointer">
                                     <div className="flex flex-col">
@@ -474,15 +447,9 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
                                         <span className={cn(isMonthlyCheapest ? "text-green-600 font-bold" : "text-foreground")}>
                                           ${q.estimated_total_cost.toLocaleString()}
                                         </span>
-                                        {isRecommended && (
-                                          <span className="bg-yellow-400 text-yellow-900 text-[10px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                                            <Crown className="h-3 w-3 fill-yellow-900" /> RECOMENDADO
-                                          </span>
-                                        )}
+                                        {isRecommended && <span className="bg-yellow-400 text-yellow-900 text-[10px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5"><Crown className="h-3 w-3 fill-yellow-900" /> RECOMENDADO</span>}
                                       </div>
-                                      <span className="text-[10px] text-muted-foreground">
-                                        {q.num_nights_quoted} noches • {q.quoted_date ? format(parseISO(q.quoted_date), 'dd/MM/yy') : 'Sin fecha'}
-                                      </span>
+                                      <span className="text-[10px] text-muted-foreground">{q.num_nights_quoted} noches • {q.quoted_date ? format(parseISO(q.quoted_date), 'dd/MM/yy') : 'Sin fecha'}</span>
                                     </div>
                                   </SelectItem>
                                 );
@@ -535,30 +502,13 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
                   <Label>Imagen Principal (Obligatoria)</Label>
                   <div className="relative border-2 border-dashed rounded-xl h-48 flex items-center justify-center overflow-hidden bg-gray-50 hover:bg-gray-100 transition-colors group">
                     {isUploadingImage ? (
-                      <div className="text-center">
-                        <Loader2 className="animate-spin mx-auto mb-2 text-rosa-mexicano" />
-                        <span className="text-xs font-bold text-rosa-mexicano">Subiendo...</span>
-                      </div>
+                      <div className="text-center"><Loader2 className="animate-spin mx-auto mb-2 text-rosa-mexicano" /><span className="text-xs font-bold text-rosa-mexicano">Subiendo...</span></div>
                     ) : imageUrlPreview ? (
-                      <div className="relative w-full h-full">
-                        <img src={imageUrlPreview} className="w-full h-full object-cover" alt="Preview" />
-                        <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
-                          <p className="text-white text-xs font-bold flex items-center gap-1"><Upload className="h-3 w-3" /> Cambiar Imagen</p>
-                        </div>
-                      </div>
+                      <div className="relative w-full h-full"><img src={imageUrlPreview} className="w-full h-full object-cover" alt="Preview" /><div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><p className="text-white text-xs font-bold flex items-center gap-1"><Upload className="h-3 w-3" /> Cambiar Imagen</p></div></div>
                     ) : (
-                      <div className="text-center text-gray-400">
-                        <ImageIcon className="mx-auto mb-2" />
-                        <span className="text-xs">Haz clic para seleccionar foto</span>
-                      </div>
+                      <div className="text-center text-gray-400"><ImageIcon className="mx-auto mb-2" /><span className="text-xs">Haz clic para seleccionar foto</span></div>
                     )}
-                    <input 
-                      type="file" 
-                      className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" 
-                      onChange={handleFileChange} 
-                      accept="image/*"
-                      disabled={isUploadingImage}
-                    />
+                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={handleFileChange} accept="image/*" disabled={isUploadingImage} />
                   </div>
                 </div>
 
@@ -592,13 +542,10 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
           </div>
         </div>
 
-        {/* GESTIÓN DE ASIENTOS */}
         {formData.bus_id && (
           <Card className="border-2 border-rosa-mexicano/20 shadow-lg">
             <CardHeader className="bg-rosa-mexicano/5">
-              <CardTitle className="text-xl flex items-center gap-2">
-                <Armchair className="text-rosa-mexicano" /> Gestión de Asientos para este Tour
-              </CardTitle>
+              <CardTitle className="text-xl flex items-center gap-2"><Armchair className="text-rosa-mexicano" /> Gestión de Asientos para este Tour</CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
               <div className="bg-blue-50 p-4 rounded-xl mb-6 flex gap-4 items-start border border-blue-100">
@@ -606,22 +553,14 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
                 <div className="text-sm text-blue-800">
                   <p className="font-bold mb-1">Instrucciones para el Administrador:</p>
                   <ul className="list-disc list-inside space-y-1 opacity-90">
-                    <li>Haz clic en un asiento disponible para <strong>bloquearlo</strong> (aparecerá en gris).</li>
-                    <li>Los asientos de <strong>Coordinador</strong> (morados) se asignan automáticamente según el número de cortesías.</li>
-                    <li>Los asientos <strong>Ocupados</strong> (rojos) son reservas ya confirmadas de clientes.</li>
+                    <li>Haz clic en un asiento disponible para <strong>bloquearlo</strong>.</li>
+                    <li>Los asientos de <strong>Coordinador</strong> (morados) se asignan automáticamente.</li>
+                    <li>Los asientos <strong>Ocupados</strong> (rojos) son reservas de clientes.</li>
                   </ul>
                 </div>
               </div>
-              
               <div className="max-w-3xl mx-auto">
-                <TourSeatMap
-                  tourId={tourId || 'new-tour'}
-                  busCapacity={formData.bus_capacity}
-                  courtesies={formData.courtesies}
-                  seatLayoutJson={selectedBusLayout}
-                  adminMode={true}
-                  readOnly={false}
-                />
+                <TourSeatMap tourId={tourId || 'new-tour'} busCapacity={formData.bus_capacity} courtesies={formData.courtesies} seatLayoutJson={selectedBusLayout} adminMode={true} readOnly={false} />
               </div>
             </CardContent>
           </Card>
@@ -649,12 +588,13 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
           <CardContent>
             <RichTextEditor value={formData.full_content} onChange={val => setFormData({...formData, full_content: val})} placeholder="Detalles extra..." className="min-h-[300px]" />
           </CardContent>
+        </Card>
 
         <div className="fixed bottom-6 right-6 flex gap-4 z-50">
           <Button type="button" variant="outline" onClick={() => navigate('/admin/tours')} className="bg-white shadow-lg px-6 h-12">Cancelar</Button>
           <Button type="submit" disabled={isSubmitting || isUploadingImage} className="bg-rosa-mexicano text-white shadow-lg px-10 h-12 text-lg font-bold rounded-xl">
             {isSubmitting || isUploadingImage ? (
-              <><Loader2 className="animate-spin mr-2" /> {isUploadingImage ? 'Subiendo imagen...' : 'Guardando...'}</>
+              <><Loader2 className="animate-spin mr-2" /> {isUploadingImage ? 'Subiendo...' : 'Guardando...'}</>
             ) : (
               <><Save className="mr-2" /> {tourId ? 'Actualizar Tour' : 'Publicar Tour'}</>
             )}
