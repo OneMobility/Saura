@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, Info, Users, Handshake, Armchair, MapPin, DollarSign, CalendarDays } from 'lucide-react';
+import { Loader2, Save, PlusCircle, MinusCircle, Info, Users, Handshake, Armchair, MapPin, DollarSign, CalendarDays, Wallet } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
@@ -102,20 +102,20 @@ const AdminClientFormPage = () => {
   const [loadingInitialData, setLoadingInitialData] = useState(true);
   const [availableTours, setAvailableTours] = useState<Tour[]>([]);
   const [availableBuses, setAvailableBuses] = useState<Bus[]>([]);
-  const [availableProviders, setAvailableProviders] = useState<AvailableProvider[]>([]);
   const [clientSelectedSeats, setClientSelectedSeats] = useState<number[]>([]);
+  const [advancePerPerson, setAdvancePerPerson] = useState(0);
 
   useEffect(() => {
     const fetchDependencies = async () => {
-      const [toursRes, providersRes, busesRes] = await Promise.all([
+      const [toursRes, busesRes, settingsRes] = await Promise.all([
         supabase.from('tours').select('*').order('title', { ascending: true }),
-        supabase.from('providers').select('*').eq('is_active', true).order('name', { ascending: true }),
-        supabase.from('buses').select('*').order('name', { ascending: true })
+        supabase.from('buses').select('*').order('name', { ascending: true }),
+        supabase.from('agency_settings').select('advance_payment_amount').single()
       ]);
 
       if (toursRes.data) setAvailableTours(toursRes.data);
-      if (providersRes.data) setAvailableProviders(providersRes.data);
       if (busesRes.data) setAvailableBuses(busesRes.data);
+      if (settingsRes.data) setAdvancePerPerson(settingsRes.data.advance_payment_amount || 0);
     };
     fetchDependencies();
   }, []);
@@ -148,6 +148,10 @@ const AdminClientFormPage = () => {
   const currentBus = useMemo(() => {
     return selectedTour?.bus_id ? availableBuses.find(b => b.id === selectedTour.bus_id) : null;
   }, [selectedTour, availableBuses]);
+
+  const requiredAdvance = useMemo(() => {
+    return clientSelectedSeats.length * advancePerPerson;
+  }, [clientSelectedSeats.length, advancePerPerson]);
 
   // Sincronizar número de acompañantes con asientos seleccionados
   useEffect(() => {
@@ -195,6 +199,7 @@ const AdminClientFormPage = () => {
     
     const clientData = {
       ...formData,
+      advance_payment: requiredAdvance, // Guardar el anticipo calculado
       user_id: authUser?.id,
       updated_at: new Date().toISOString(),
     };
@@ -205,6 +210,16 @@ const AdminClientFormPage = () => {
     } else {
       const { data } = await supabase.from('clients').insert(clientData).select('id').single();
       savedId = data?.id;
+      
+      // Si se registró un pago inicial al crear, guardarlo en el historial
+      if (formData.total_paid > 0 && savedId) {
+        await supabase.from('client_payments').insert({
+          client_id: savedId,
+          amount: formData.total_paid,
+          payment_date: new Date().toISOString(),
+          payment_method: 'manual'
+        });
+      }
     }
 
     if (savedId) {
@@ -214,7 +229,7 @@ const AdminClientFormPage = () => {
       })));
     }
 
-    toast.success('Cliente registrado correctamente.');
+    toast.success('Reserva administrativa guardada.');
     navigate('/admin/clients');
     setIsSubmitting(false);
   };
@@ -225,11 +240,10 @@ const AdminClientFormPage = () => {
     <div className="flex min-h-screen bg-gray-100">
       <AdminSidebar />
       <div className="flex flex-col flex-grow">
-        <AdminHeader pageTitle={clientIdFromParams ? 'Editar Cliente' : 'Nueva Reserva Directa'} />
+        <AdminHeader pageTitle={clientIdFromParams ? 'Gestionar Reserva' : 'Nueva Reserva Directa'} />
         <main className="flex-grow container mx-auto px-4 py-8 max-w-6xl">
           <form onSubmit={handleSubmit} className="space-y-8">
             
-            {/* SECCIÓN 1: SELECCIÓN DEL VIAJE */}
             <Card className="border-t-4 border-rosa-mexicano shadow-lg">
               <CardHeader className="bg-gray-50/50">
                 <CardTitle className="text-xl flex items-center gap-2">
@@ -251,9 +265,9 @@ const AdminClientFormPage = () => {
                     </Select>
                   </div>
                   {selectedTour && (
-                    <div className="p-4 bg-muted rounded-xl grid grid-cols-2 gap-4 text-sm font-medium">
-                      <div><p className="opacity-60 text-[10px] uppercase">Capacidad</p><p className="text-lg">{selectedTour.bus_capacity} pax</p></div>
-                      <div><p className="opacity-60 text-[10px] uppercase">Coordinadores</p><p className="text-lg">{selectedTour.courtesies}</p></div>
+                    <div className="p-4 bg-muted rounded-xl flex items-center justify-between font-medium">
+                      <div><p className="opacity-60 text-[10px] uppercase">Anticipo p/p</p><p className="text-xl font-bold text-rosa-mexicano">${advancePerPerson.toLocaleString()}</p></div>
+                      <div className="text-right"><p className="opacity-60 text-[10px] uppercase">Capacidad</p><p className="text-lg">{selectedTour.bus_capacity} pax</p></div>
                     </div>
                   )}
                 </div>
@@ -272,18 +286,11 @@ const AdminClientFormPage = () => {
                         currentClientId={clientIdFromParams} 
                       />
                     </div>
-                    {clientSelectedSeats.length > 0 && (
-                      <div className="mt-4 flex flex-wrap gap-2 items-center">
-                        <span className="text-sm font-bold">Asientos elegidos ({clientSelectedSeats.length}):</span>
-                        {clientSelectedSeats.sort((a,b)=>a-b).map(s => <Badge key={s} className="bg-rosa-mexicano">{s}</Badge>)}
-                      </div>
-                    )}
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {/* SECCIÓN 2: DATOS DEL CLIENTE Y PAGOS */}
             {clientSelectedSeats.length > 0 && (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-in slide-in-from-bottom-4 duration-500">
                 <div className="lg:col-span-2 space-y-8">
@@ -295,18 +302,18 @@ const AdminClientFormPage = () => {
                       <div className="space-y-1"><Label>Email</Label><Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required /></div>
                       <div className="space-y-1"><Label>WhatsApp</Label><Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
                       <div className="space-y-1"><Label>Edad</Label><Input type="number" value={formData.contractor_age || ''} onChange={e => setFormData({...formData, contractor_age: parseInt(e.target.value) || null})} /></div>
-                      <div className="space-y-1"><Label>Identificación (Opcional)</Label><Input value={formData.identification_number || ''} onChange={e => setFormData({...formData, identification_number: e.target.value})} /></div>
-                      <div className="md:col-span-2 space-y-1"><Label>Domicilio</Label><Textarea value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} /></div>
+                      <div className="space-y-1"><Label>ID (INE / Pasaporte)</Label><Input value={formData.identification_number || ''} onChange={e => setFormData({...formData, identification_number: e.target.value})} /></div>
+                      <div className="md:col-span-2 space-y-1"><Label>Domicilio Completo</Label><Textarea value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} /></div>
                     </CardContent>
                   </Card>
 
                   {formData.companions.length > 0 && (
                     <Card className="shadow-lg">
-                      <CardHeader><CardTitle className="text-lg">Acompañantes</CardTitle></CardHeader>
+                      <CardHeader><CardTitle className="text-lg">Acompañantes ({formData.companions.length})</CardTitle></CardHeader>
                       <CardContent className="space-y-4">
                         {formData.companions.map((c, idx) => (
                           <div key={c.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-xl items-end">
-                            <div className="md:col-span-2 space-y-1"><Label className="text-[10px] uppercase font-bold text-gray-400">Pasajero {idx + 2}</Label><Input value={c.name} onChange={e => setFormData({...formData, companions: formData.companions.map(x => x.id === c.id ? {...x, name: e.target.value} : x)})} /></div>
+                            <div className="md:col-span-2 space-y-1"><Label className="text-[10px] uppercase font-bold text-gray-400">Nombre Pasajero {idx + 2}</Label><Input value={c.name} onChange={e => setFormData({...formData, companions: formData.companions.map(x => x.id === c.id ? {...x, name: e.target.value} : x)})} /></div>
                             <div className="space-y-1"><Label className="text-[10px] uppercase font-bold text-gray-400">Edad</Label><Input type="number" value={c.age || ''} onChange={e => setFormData({...formData, companions: formData.companions.map(x => x.id === c.id ? {...x, age: parseInt(e.target.value) || null} : x)})} /></div>
                           </div>
                         ))}
@@ -316,24 +323,42 @@ const AdminClientFormPage = () => {
                 </div>
 
                 <div className="space-y-8">
-                  <Card className="bg-gray-900 text-white shadow-xl">
-                    <CardHeader><CardTitle className="text-white text-lg flex items-center gap-2"><DollarSign className="h-5 w-5 text-rosa-mexicano" /> Resumen Financiero</CardTitle></CardHeader>
-                    <CardContent className="space-y-6">
-                      <div className="space-y-2">
-                        <div className="flex justify-between text-sm opacity-60"><span>Monto Total:</span><span className="font-bold">${formData.total_amount.toLocaleString()}</span></div>
-                        <div className="flex justify-between text-sm text-green-400"><span>Abonado:</span><span className="font-bold">${formData.total_paid.toLocaleString()}</span></div>
-                        <div className="pt-4 border-t border-white/10 flex justify-between items-center">
-                          <span className="font-bold">PENDIENTE:</span>
+                  <Card className="bg-gray-900 text-white shadow-xl overflow-hidden">
+                    <CardHeader className="bg-rosa-mexicano/10"><CardTitle className="text-white text-lg flex items-center gap-2"><DollarSign className="h-5 w-5 text-rosa-mexicano" /> Gestión de Pagos</CardTitle></CardHeader>
+                    <CardContent className="space-y-6 pt-6">
+                      <div className="space-y-4">
+                        <div className="p-3 bg-white/5 rounded-xl border border-white/10">
+                          <Label className="text-xs uppercase text-gray-400 font-bold">Anticipo Requerido</Label>
+                          <p className="text-2xl font-black text-yellow-400">${requiredAdvance.toLocaleString()}</p>
+                          <p className="text-[10px] opacity-60">* {clientSelectedSeats.length} lugares x ${advancePerPerson}</p>
+                        </div>
+                        
+                        <div className="space-y-2">
+                          <Label className="text-white/80 font-bold flex items-center gap-2"><Wallet className="h-4 w-4" /> Registrar Abono ($)</Label>
+                          <Input 
+                            type="number" 
+                            value={formData.total_paid} 
+                            onChange={e => setFormData({...formData, total_paid: parseFloat(e.target.value) || 0})}
+                            className="bg-white/10 border-white/20 h-12 text-xl font-bold"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="pt-4 border-t border-white/10 space-y-2">
+                        <div className="flex justify-between text-xs opacity-60 uppercase font-bold"><span>Costo Total:</span><span>${formData.total_amount.toLocaleString()}</span></div>
+                        <div className="flex justify-between items-center">
+                          <span className="font-bold text-sm">PENDIENTE:</span>
                           <span className="text-3xl font-black text-red-500">${(formData.total_amount - formData.total_paid).toLocaleString()}</span>
                         </div>
                       </div>
-                      <div className="space-y-2 pt-4">
-                        <Label className="text-white opacity-60 text-xs">Estado del Contrato</Label>
+
+                      <div className="space-y-2 pt-2">
+                        <Label className="text-white/60 text-[10px] uppercase font-bold tracking-tighter">Estado de Reserva</Label>
                         <Select value={formData.status} onValueChange={v => setFormData({...formData, status: v})}>
                           <SelectTrigger className="bg-white/10 border-white/20"><SelectValue /></SelectTrigger>
                           <SelectContent>
                             <SelectItem value="pending">Pendiente</SelectItem>
-                            <SelectItem value="confirmed">Confirmada / Pagado</SelectItem>
+                            <SelectItem value="confirmed">Liquidado / Confirmado</SelectItem>
                             <SelectItem value="cancelled">Cancelada</SelectItem>
                           </SelectContent>
                         </Select>
@@ -344,7 +369,7 @@ const AdminClientFormPage = () => {
                   <div className="flex flex-col gap-3">
                     <Button type="submit" disabled={isSubmitting} className="bg-rosa-mexicano h-14 text-lg font-black shadow-xl">
                       {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
-                      {clientIdFromParams ? 'Actualizar Reserva' : 'Confirmar Reserva'}
+                      {clientIdFromParams ? 'Guardar Cambios' : 'Confirmar Reserva'}
                     </Button>
                     <Button type="button" variant="outline" onClick={() => navigate('/admin/clients')} className="h-12 bg-white">Cancelar</Button>
                   </div>
