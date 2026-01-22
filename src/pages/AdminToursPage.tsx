@@ -4,7 +4,7 @@ import React, { useState } from 'react';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { Button } from '@/components/ui/button';
-import { PlusCircle } from 'lucide-react';
+import { PlusCircle, DollarSign } from 'lucide-react';
 import ToursTable from '@/components/admin/tours/ToursTable';
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate } from 'react-router-dom';
@@ -21,6 +21,10 @@ const AdminToursPage = () => {
 
   const handleAddTour = () => {
     navigate('/admin/tours/new'); // Navigate to the new form page for creation
+  };
+
+  const handleCostOptimizationMode = () => {
+    navigate('/admin/tours/new?mode=cost-optimization'); // Navigate to the new form page in cost optimization mode
   };
 
   const handleEditTour = (tour: any) => { // Use 'any' for now, will define Tour interface later
@@ -46,9 +50,14 @@ const AdminToursPage = () => {
       <AdminSidebar />
       <div className="flex flex-col flex-grow">
         <AdminHeader pageTitle="Gestión de Tours">
-          <Button onClick={handleAddTour} className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white">
-            <PlusCircle className="mr-2 h-4 w-4" /> Crear Nuevo Tour
-          </Button>
+          <div className="flex space-x-2">
+            <Button onClick={handleCostOptimizationMode} className="bg-green-600 hover:bg-green-700 text-white">
+              <DollarSign className="mr-2 h-4 w-4" /> Optimizar Costo
+            </Button>
+            <Button onClick={handleAddTour} className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white">
+              <PlusCircle className="mr-2 h-4 w-4" /> Crear Nuevo Tour
+            </Button>
+          </div>
         </AdminHeader>
         <main className="flex-grow container mx-auto px-4 py-8 md:py-12">
           <ToursTable key={refreshKey} onEditTour={handleEditTour} onTourDeleted={handleTourSave} />

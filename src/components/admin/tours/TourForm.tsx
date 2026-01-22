@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, ImageIcon, MapPin, Clock, Hotel, ListChecks, Armchair, Info, Upload, Crown, Star } from 'lucide-react';
+import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, ImageIcon, MapPin, Clock, Hotel, ListChecks, Armchair, Info, Upload, Crown, Star, DollarSign } from 'lucide-react';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { v4 as uuidv4 } from 'uuid';
 import { format, parseISO } from 'date-fns';
@@ -73,10 +73,16 @@ interface Tour {
   return_time: string | null;
 }
 
-const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, onSave }) => {
+interface TourFormProps {
+  tourId?: string;
+  onSave: () => void;
+  costOptimizationMode?: boolean; // NEW PROP
+}
+
+const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMode = false }) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState<Tour>({
-    title: '', slug: '', description: '', image_url: '', full_content: '', duration: '', includes: [], itinerary: [],
+    title: '', slug: '', description: '', full_content: '', duration: '', includes: [], itinerary: [],
     bus_id: null, bus_capacity: 0, bus_cost: 0, courtesies: 0, hotel_details: [], provider_details: [],
     selling_price_double_occupancy: 0, selling_price_triple_occupancy: 0, selling_price_quad_occupancy: 0,
     selling_price_child: 0, other_income: 0, departure_date: null, return_date: null, departure_time: '08:00', return_time: '18:00',
@@ -114,7 +120,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
           const estimated_total_cost = (((quote.num_double_rooms || 0) * quote.cost_per_night_double +
                                        (quote.num_triple_rooms || 0) * quote.cost_per_night_triple +
                                        (quote.num_quad_rooms || 0) * quote.cost_per_night_quad) -
-                                       (quote.num_courtesy_rooms || 0) * quote.cost_per_night_quad) * numNights;
+                                       ((quote.num_courtesy_rooms || 0) * (quote.cost_per_night_quad || 0))) * numNights;
           return { ...quote, estimated_total_cost };
         });
         setAvailableHotelQuotes(quotesWithCost);
@@ -154,6 +160,17 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
       return minA - minB;
     });
   }, [availableHotelQuotes]);
+
+  // NEW: Logic to find the cheapest provider for each service type
+  const cheapestProviders = useMemo(() => {
+    const cheapestMap: Record<string, AvailableProvider> = {}; // Key: service_type
+    availableProviders.forEach(p => {
+      if (!cheapestMap[p.service_type] || p.cost_per_unit < cheapestMap[p.service_type].cost_per_unit) {
+        cheapestMap[p.service_type] = p;
+      }
+    });
+    return cheapestMap;
+  }, [availableProviders]);
 
   useEffect(() => {
     const fetchTourData = async () => {
@@ -289,10 +306,68 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     const newI = [...p.includes]; newI[idx] = val; return { ...p, includes: newI };
   });
 
+  const addProviderDetail = () => setFormData(p => ({
+    ...p,
+    provider_details: [...p.provider_details, {
+      id: uuidv4(),
+      provider_id: '',
+      quantity: 1,
+      cost_per_unit_snapshot: 0,
+      selling_price_per_unit_snapshot: 0,
+      name_snapshot: '',
+      service_type_snapshot: '',
+      unit_type_snapshot: 'person',
+    }],
+  }));
+
+  const removeProviderDetail = (id: string) => setFormData(p => ({
+    ...p,
+    provider_details: p.provider_details.filter(d => d.id !== id),
+  }));
+
+  const updateProviderDetail = (id: string, field: keyof TourProviderService, value: string | number) => {
+    setFormData(prev => ({
+      ...prev,
+      provider_details: prev.provider_details.map(d => {
+        if (d.id === id) {
+          if (field === 'provider_id') {
+            const provider = availableProviders.find(p => p.id === value);
+            if (provider) {
+              return {
+                ...d,
+                provider_id: value as string,
+                cost_per_unit_snapshot: provider.cost_per_unit,
+                selling_price_per_unit_snapshot: provider.selling_price_per_unit,
+                name_snapshot: provider.name,
+                service_type_snapshot: provider.service_type,
+                unit_type_snapshot: provider.unit_type,
+              };
+            }
+          }
+          return { ...d, [field]: value };
+        }
+        return d;
+      }),
+    }));
+  };
+
   if (loadingInitialData) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-12 w-12 text-rosa-mexicano" /></div>;
 
   return (
     <div className="space-y-8 pb-20">
+      {costOptimizationMode && (
+        <Card className="border-t-4 border-green-500 shadow-xl bg-green-50">
+          <CardHeader>
+            <CardTitle className="text-2xl font-bold flex items-center gap-2 text-green-700">
+              <DollarSign className="text-green-700" /> Modo: Optimización de Costos
+            </CardTitle>
+            <p className="text-sm text-green-600">
+              Esta guía te ayudará a seleccionar las opciones más económicas para cada componente del tour.
+            </p>
+          </CardHeader>
+        </Card>
+      )}
+
       <Card className="border-t-4 border-rosa-mexicano shadow-xl">
         <CardHeader className="bg-gray-50/50">
           <CardTitle className="text-2xl font-bold flex items-center gap-2">
@@ -398,7 +473,11 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
                     }}>
                       <SelectTrigger><SelectValue placeholder="Elegir Bus" /></SelectTrigger>
                       <SelectContent>
-                        {availableBuses.map(b => <SelectItem key={b.id} value={b.id}>{b.name}</SelectItem>)}
+                        {availableBuses.map(b => (
+                          <SelectItem key={b.id} value={b.id}>
+                            {b.name} (Costo: ${b.rental_cost.toLocaleString()})
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
@@ -463,7 +542,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
                         </SelectContent>
                       </Select>
                       <Button variant="ghost" size="icon" onClick={() => setFormData({...formData, hotel_details: formData.hotel_details.filter(d => d.id !== detail.id)})}>
-                        <MinusCircle className="h-4 w-4 text-red-500" />
+                        <MinusCircle className="h-4 w-4 text-red-400" />
                       </Button>
                     </div>
                   ))}
@@ -471,6 +550,65 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
                     <PlusCircle className="mr-2 h-4 w-4" /> Añadir Hotel
                   </Button>
                 </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader><CardTitle className="text-lg flex items-center gap-2"><DollarSign className="h-5 w-5 text-rosa-mexicano" /> Servicios de Proveedores</CardTitle></CardHeader>
+              <CardContent className="space-y-3">
+                {formData.provider_details.map((detail) => {
+                  const provider = availableProviders.find(p => p.id === detail.provider_id);
+                  const isCheapest = provider && cheapestProviders[provider.service_type]?.id === provider.id;
+                  
+                  return (
+                    <div key={detail.id} className="border p-3 rounded-lg bg-gray-50 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-bold uppercase text-gray-500">Servicio</Label>
+                        <Button variant="ghost" size="icon" onClick={() => removeProviderDetail(detail.id)}><MinusCircle className="h-4 w-4 text-red-400" /></Button>
+                      </div>
+                      <Select value={detail.provider_id} onValueChange={val => updateProviderDetail(detail.id, 'provider_id', val)}>
+                        <SelectTrigger className={cn("w-full", isCheapest && costOptimizationMode && "border-2 border-green-500 ring-2 ring-green-200")}>
+                          <SelectValue placeholder="Elegir Proveedor" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {availableProviders.map(p => {
+                            const isCheapestOption = cheapestProviders[p.service_type]?.id === p.id;
+                            return (
+                              <SelectItem key={p.id} value={p.id} className="cursor-pointer">
+                                <div className="flex flex-col">
+                                  <div className="flex items-center gap-2">
+                                    <span className={cn(isCheapestOption ? "text-green-600 font-bold" : "text-foreground")}>
+                                      {p.name}
+                                    </span>
+                                    {isCheapestOption && costOptimizationMode && (
+                                      <span className="bg-green-400 text-green-900 text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5">
+                                        <Star className="h-2.5 w-2.5 fill-green-900" /> MENOR COSTO
+                                      </span>
+                                    )}
+                                  </div>
+                                  <span className="text-[10px] text-muted-foreground">{p.service_type} (${p.cost_per_unit.toFixed(2)}/{p.unit_type})</span>
+                                </div>
+                              </SelectItem>
+                            );
+                          })}
+                        </SelectContent>
+                      </Select>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div className="space-y-1">
+                          <Label className="text-xs">Cantidad</Label>
+                          <Input type="number" value={detail.quantity} onChange={e => updateProviderDetail(detail.id, 'quantity', parseFloat(e.target.value) || 0)} />
+                        </div>
+                        <div className="space-y-1">
+                          <Label className="text-xs">Costo Total</Label>
+                          <Input value={(detail.cost_per_unit_snapshot * detail.quantity).toFixed(2)} readOnly className="bg-white/50 font-bold" />
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+                <Button type="button" variant="outline" className="w-full border-dashed" onClick={addProviderDetail}>
+                  <PlusCircle className="mr-2 h-4 w-4" /> Añadir Proveedor
+                </Button>
               </CardContent>
             </Card>
 
