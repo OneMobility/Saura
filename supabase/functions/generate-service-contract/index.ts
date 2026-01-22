@@ -37,14 +37,15 @@ const generateServiceContractHtml = (data: any) => {
     <head>
         <meta charset="UTF-8">
         <title>Contrato de Venta de Tour - ${client.contract_number}</title>
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;900&display=swap" rel="stylesheet">
         <style>
             body { 
-                font-family: 'Times New Roman', serif; 
-                line-height: 1.5; 
-                color: #000; 
+                font-family: 'Poppins', sans-serif; 
+                line-height: 1.6; 
+                color: #333; 
                 margin: 0; 
                 padding: 0; 
-                font-size: 11pt; 
+                font-size: 10pt; 
             }
             .page {
                 width: 215.9mm; /* Letter width */
@@ -55,7 +56,7 @@ const generateServiceContractHtml = (data: any) => {
             }
             .header { 
                 text-align: center; 
-                border-bottom: 2px solid #91045A; 
+                border-bottom: 3px solid #91045A; 
                 padding-bottom: 10px; 
                 margin-bottom: 20px; 
             }
@@ -67,28 +68,30 @@ const generateServiceContractHtml = (data: any) => {
                 margin-right: auto;
             }
             .contract-title { 
-                font-size: 18pt; 
-                font-weight: bold; 
+                font-size: 16pt; 
+                font-weight: 900; 
                 color: #91045A; 
                 margin: 0; 
                 text-transform: uppercase; 
             }
             .contract-number { 
-                font-size: 14pt; 
-                font-weight: bold; 
+                font-size: 12pt; 
+                font-weight: 700; 
                 margin-top: 5px; 
+                color: #333;
             }
             .section { 
                 margin-bottom: 15px; 
             }
             .section-title { 
-                font-weight: bold; 
-                text-decoration: underline; 
+                font-weight: 700; 
                 margin-bottom: 8px; 
                 text-transform: uppercase; 
-                font-size: 12pt; 
+                font-size: 11pt; 
                 color: #91045A; 
                 margin-top: 15px;
+                border-bottom: 1px solid #91045A;
+                padding-bottom: 3px;
             }
             .details-table { 
                 width: 100%; 
@@ -98,19 +101,19 @@ const generateServiceContractHtml = (data: any) => {
             }
             .details-table td { 
                 padding: 6px 10px; 
-                border: 1px solid #ccc; 
-                font-size: 11pt; 
+                border: 1px solid #eee; 
+                font-size: 10pt; 
             }
             .details-table .label { 
-                font-weight: bold; 
+                font-weight: 600; 
                 background-color: #f9f9f9; 
                 width: 30%; 
-                color: #333;
+                color: #666;
             }
             .clause { 
                 text-align: justify; 
                 margin-bottom: 10px; 
-                font-size: 11pt; 
+                font-size: 10pt; 
                 text-indent: -15px;
                 padding-left: 15px;
             }
@@ -124,17 +127,17 @@ const generateServiceContractHtml = (data: any) => {
                 width: 40%; 
                 text-align: center; 
                 padding-top: 5px; 
-                font-weight: bold; 
-                font-size: 11pt;
+                font-weight: 600; 
+                font-size: 10pt;
             }
             .bold { 
-                font-weight: bold; 
+                font-weight: 700; 
             }
             .footer-info { 
                 margin-top: 40px; 
                 text-align: center; 
-                font-size: 9pt; 
-                color: #666; 
+                font-size: 8pt; 
+                color: #888; 
                 border-top: 1px solid #eee; 
                 padding-top: 10px; 
             }

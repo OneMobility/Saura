@@ -10,7 +10,7 @@ const corsHeaders = {
 };
 
 const generateBookingSheetHtml = (data: any) => {
-  const { client, tour, agency, busRoute, busPassengers, tourSeats } = data;
+  const { client, tour, agency, busRoute, busPassengers, tourSeats, payments } = data;
   const isTour = !!client.tour_id;
   const title = isTour ? tour?.title : busRoute?.name;
   const clientFullName = `${client.first_name || ''} ${client.last_name || ''}`.trim();
@@ -29,15 +29,24 @@ const generateBookingSheetHtml = (data: any) => {
   const roomDetails = client.room_details || {};
   const roomDetailsDisplay = `${roomDetails.quad_rooms || 0} Cuádruple(s), ${roomDetails.triple_rooms || 0} Triple(s), ${roomDetails.double_rooms || 0} Doble(s)`;
 
+  const paymentsHtml = payments.map((p: any) => `
+    <tr>
+      <td>${format(parseISO(p.payment_date), 'dd/MM/yyyy', { locale: es })}</td>
+      <td style="font-weight: bold; color: #2e7d32;">$${p.amount.toLocaleString()} MXN</td>
+      <td style="text-transform: capitalize;">${p.payment_method}</td>
+    </tr>
+  `).join('');
+
   return `
     <!DOCTYPE html>
     <html lang="es">
     <head>
         <meta charset="UTF-8">
         <title>Hoja de Control de Reserva - ${client.contract_number}</title>
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;900&display=swap" rel="stylesheet">
         <style>
             body { 
-                font-family: 'Helvetica', 'Arial', sans-serif; 
+                font-family: 'Poppins', sans-serif; 
                 padding: 30px; 
                 border: 8px double #91045A; 
                 min-height: 90vh; 
@@ -84,7 +93,7 @@ const generateBookingSheetHtml = (data: any) => {
                 padding-bottom: 5px;
             }
             .label { 
-                font-weight: bold; 
+                font-weight: 600; 
                 color: #666; 
                 display: block; 
                 margin-bottom: 2px; 
@@ -113,7 +122,7 @@ const generateBookingSheetHtml = (data: any) => {
             }
             .seats-value { 
                 font-size: 60px; 
-                font-weight: bold; 
+                font-weight: 900; 
                 color: #91045A; 
                 display: block; 
             }
@@ -127,7 +136,7 @@ const generateBookingSheetHtml = (data: any) => {
             .total-value-red { 
                 color: #d32f2f; 
                 font-size: 30px; 
-                font-weight: bold; 
+                font-weight: 900; 
             }
             .footer { 
                 text-align: center; 
@@ -145,6 +154,22 @@ const generateBookingSheetHtml = (data: any) => {
                 border-radius: 20px; 
                 font-size: 12px; 
                 margin-top: 10px; 
+            }
+            .payments-table {
+                width: 100%;
+                border-collapse: collapse;
+                margin-top: 10px;
+                font-size: 9pt;
+            }
+            .payments-table th, .payments-table td {
+                border: 1px solid #eee;
+                padding: 8px;
+                text-align: left;
+            }
+            .payments-table th {
+                background-color: #f0f0f0;
+                color: #333;
+                font-weight: 700;
             }
             @media print { 
                 body { 
@@ -226,6 +251,24 @@ const generateBookingSheetHtml = (data: any) => {
             </div>
         </div>
 
+        <div class="section">
+            <h2>Historial de Abonos</h2>
+            ${payments.length > 0 ? `
+                <table class="payments-table">
+                    <thead>
+                        <tr>
+                            <th>Fecha</th>
+                            <th>Monto</th>
+                            <th>Método</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${paymentsHtml}
+                    </tbody>
+                </table>
+            ` : '<p style="color: #888;">No hay abonos registrados.</p>'}
+        </div>
+
         <div class="footer">
             <p><strong>IMPORTANTE:</strong> Esta hoja es para control interno y debe ser presentada al abordar.</p>
             <p>Agencia: ${agency?.agency_name || 'Saura Tours'} | Tel: ${agency?.agency_phone || 'N/A'}</p>
@@ -240,9 +283,14 @@ serve(async (req) => {
   try {
     const { contractNumber } = await req.json();
     const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
+    
     const { data: client, error: clientError } = await supabaseAdmin.from('clients').select(`*, tours (*), bus_routes (*)`).ilike('contract_number', contractNumber.trim()).single();
     if (clientError || !client) throw new Error("Reserva no encontrada.");
+    
     const { data: agency } = await supabaseAdmin.from('agency_settings').select('*').single();
+    
+    const { data: payments } = await supabaseAdmin.from('client_payments').select('*').eq('client_id', client.id).order('payment_date', { ascending: true });
+
     let tourSeats = [], busPassengers = [];
     if (client.tour_id) {
       const { data } = await supabaseAdmin.from('tour_seat_assignments').select('seat_number').eq('client_id', client.id);
@@ -251,7 +299,8 @@ serve(async (req) => {
       const { data } = await supabaseAdmin.from('bus_passengers').select('seat_number').eq('client_id', client.id);
       busPassengers = data || [];
     }
-    const html = generateBookingSheetHtml({ client, tour: client.tours, busRoute: client.bus_routes, agency, tourSeats, busPassengers });
+    
+    const html = generateBookingSheetHtml({ client, tour: client.tours, busRoute: client.bus_routes, agency, tourSeats, busPassengers, payments: payments || [] });
     return new Response(html, { headers: { ...corsHeaders, 'Content-Type': 'text/html' } });
   } catch (error: any) {
     return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: corsHeaders });
