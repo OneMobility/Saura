@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Loader2, CarFront, Toilet, LogIn } from 'lucide-react';
+import { Loader2, CarFront, Toilet, LogIn, Crown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useSession } from '@/components/SessionContextProvider';
@@ -24,12 +24,13 @@ interface TourSeatMapProps {
   readOnly?: boolean;
   adminMode?: boolean;
   currentClientId?: string | null;
-  initialSelectedSeats?: number[]; // La fuente de verdad viene de aquí
+  initialSelectedSeats?: number[];
 }
 
 const TourSeatMap: React.FC<TourSeatMapProps> = ({
   tourId,
   busCapacity,
+  courtesies,
   seatLayoutJson,
   onSeatsSelected,
   readOnly = false,
@@ -49,14 +50,19 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
   const fetchSeats = useCallback(async () => {
     setLoading(true);
     
-    // Si es un tour nuevo que aún no se guarda, generamos asientos vacíos basados en el layout
     if (!isValidUUID(tourId)) {
       const allSeats: Seat[] = [];
       const currentLayout = seatLayoutJson || [];
       currentLayout.forEach(row => {
         row.forEach(item => {
           if (item.type === 'seat' && item.number !== undefined) {
-            allSeats.push({ seat_number: item.number, status: 'available', client_id: null });
+            // Asignar cortesía automáticamente a los primeros X asientos si es tour nuevo
+            const isCourtesy = item.number <= courtesies;
+            allSeats.push({ 
+              seat_number: item.number, 
+              status: isCourtesy ? 'courtesy' : 'available', 
+              client_id: null 
+            });
           }
         });
       });
@@ -82,9 +88,12 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
           row.forEach(item => {
             if (item.type === 'seat' && item.number !== undefined) {
               const existing = fetchedAssignments.find(s => s.seat_number === item.number);
+              // Lógica: Si no hay en DB pero es de los primeros X, es cortesía
+              const isDefaultCourtesy = !existing && item.number <= courtesies;
+              
               allSeats.push({
                 seat_number: item.number,
-                status: (existing?.status || 'available') as Seat['status'],
+                status: isDefaultCourtesy ? 'courtesy' : ((existing?.status || 'available') as Seat['status']),
                 client_id: existing?.client_id || null,
               });
             }
@@ -94,7 +103,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
       setSeats(allSeats.sort((a, b) => a.seat_number - b.seat_number));
     }
     setLoading(false);
-  }, [tourId, seatLayoutJson]);
+  }, [tourId, seatLayoutJson, courtesies]);
 
   useEffect(() => {
     fetchSeats();
@@ -103,36 +112,42 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
   const handleSeatClick = async (seatNumber: number, currentStatus: Seat['status'], assignedClientId: string | null) => {
     if (readOnly || !onSeatsSelected) return;
 
-    // LÓGICA MODO ADMIN (Bloqueo persistente en BD)
     if (adminMode && isAdmin) {
       if (!isValidUUID(tourId)) {
         toast.error('Guarda el tour primero para bloquear asientos.');
         return;
       }
-      setIsUpdatingSeats(true);
-      const newStatus = (currentStatus === 'available') ? 'blocked' : 'available';
       if (currentStatus === 'booked') {
         toast.info('Asiento reservado por cliente.');
-        setIsUpdatingSeats(false);
         return;
       }
+      if (seatNumber <= courtesies) {
+        toast.info('Asiento reservado para Coordinadores.');
+        return;
+      }
+
+      setIsUpdatingSeats(true);
+      const newStatus = (currentStatus === 'available') ? 'blocked' : 'available';
+      
       await supabase.from('tour_seat_assignments').upsert({
         tour_id: tourId, seat_number: seatNumber, status: newStatus, client_id: null
       }, { onConflict: 'tour_id,seat_number' });
+      
       fetchSeats();
       setIsUpdatingSeats(false);
       return;
     }
 
-    // LÓGICA DE SELECCIÓN (Formulario de reserva)
-    
-    // Si está ocupado por otro, no dejar tocar
+    // Lógica de Selección de Cliente
     if (currentStatus === 'booked' && assignedClientId !== currentClientId) {
-      toast.info('Asiento ocupado.');
+      toast.info('Asiento ya reservado.');
+      return;
+    }
+    if (currentStatus === 'blocked' || currentStatus === 'courtesy') {
+      toast.info('Este asiento no está disponible para venta.');
       return;
     }
 
-    // Toggle de selección comunicando directamente al padre
     const isSelected = initialSelectedSeats.includes(seatNumber);
     const newSelection = isSelected 
       ? initialSelectedSeats.filter(s => s !== seatNumber)
@@ -142,7 +157,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
   };
 
   const getSeatClasses = (seat: Seat | null, itemType: SeatLayoutItem['type']) => {
-    const base = "w-10 h-10 flex items-center justify-center rounded-md text-sm font-bold transition-all duration-200";
+    const base = "w-10 h-10 flex items-center justify-center rounded-md text-sm font-bold transition-all duration-200 relative";
     if (['aisle', 'empty', 'entry'].includes(itemType)) return "w-10 h-10";
     if (itemType === 'bathroom') return cn(base, "bg-gray-200 text-gray-400 cursor-default");
     if (itemType === 'driver') return cn(base, "bg-gray-800 text-white cursor-default");
@@ -153,8 +168,8 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
 
     if (isSelected) return cn(base, "bg-rosa-mexicano text-white scale-110 shadow-lg z-10");
     if (seat.status === 'booked') return cn(base, "bg-red-100 text-red-400 cursor-not-allowed opacity-50");
-    if (seat.status === 'blocked') return cn(base, "bg-gray-400 text-white cursor-pointer");
-    if (seat.status === 'courtesy') return cn(base, "bg-purple-500 text-white cursor-pointer");
+    if (seat.status === 'blocked') return cn(base, "bg-gray-400 text-white cursor-pointer hover:bg-gray-500");
+    if (seat.status === 'courtesy') return cn(base, "bg-yellow-100 text-yellow-700 cursor-not-allowed border-2 border-yellow-400");
     
     return cn(base, "bg-gray-100 text-gray-700 hover:bg-gray-200 cursor-pointer border border-gray-200");
   };
@@ -171,6 +186,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
           <React.Fragment key={rIdx}>
             {row.map((item, cIdx) => {
               const seat = item.type === 'seat' ? seats.find(s => s.seat_number === item.number) : null;
+              const isCourtesy = seat?.status === 'courtesy';
               return (
                 <div key={`${rIdx}-${cIdx}`} className="flex justify-center">
                   {item.type === 'seat' ? (
@@ -180,7 +196,9 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
                       onClick={() => handleSeatClick(item.number!, seat?.status || 'available', seat?.client_id || null)}
                       disabled={isUpdatingSeats}
                       variant="ghost"
+                      title={isCourtesy ? "Espacio de Coordinador" : ""}
                     >
+                      {isCourtesy ? <Crown className="h-4 w-4 absolute -top-1 -right-1 text-yellow-600" /> : null}
                       {item.number}
                     </Button>
                   ) : (
@@ -196,11 +214,12 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
           </React.Fragment>
         ))}
       </div>
-      <div className="flex flex-wrap gap-4 text-[10px] uppercase font-bold text-gray-400 justify-center border-t pt-4">
+      <div className="flex flex-wrap gap-4 text-[10px] uppercase font-black text-gray-400 justify-center border-t pt-4 tracking-tighter">
         <div className="flex items-center gap-1"><div className="w-3 h-3 bg-gray-100 border rounded" /> Libre</div>
         <div className="flex items-center gap-1"><div className="w-3 h-3 bg-rosa-mexicano rounded" /> Seleccionado</div>
-        <div className="flex items-center gap-1"><div className="w-3 h-3 bg-red-100 rounded" /> Ocupado</div>
+        <div className="flex items-center gap-1"><div className="w-3 h-3 bg-red-100 rounded" /> Vendido</div>
         <div className="flex items-center gap-1"><div className="w-3 h-3 bg-gray-400 rounded" /> Bloqueado</div>
+        <div className="flex items-center gap-1"><div className="w-3 h-3 bg-yellow-100 border-yellow-400 border rounded" /> Coordinador</div>
       </div>
     </div>
   );

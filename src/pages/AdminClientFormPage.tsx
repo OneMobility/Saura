@@ -70,6 +70,7 @@ const AdminClientFormPage = () => {
     [selectedTour, availableBuses]
   );
 
+  // Lógica de Cálculo de Liquidación
   useEffect(() => {
     if (!selectedTour) return;
     
@@ -87,14 +88,17 @@ const AdminClientFormPage = () => {
       } else {
         newRooms = Math.ceil(totalPax / 4);
 
-        let adults = (formData.contractor_age === null || formData.contractor_age > 12) ? 1 : 0;
-        let children = (formData.contractor_age !== null && formData.contractor_age <= 12) ? 1 : 0;
+        // Conteo preciso de Adultos y Niños
+        let adultsCount = (formData.contractor_age === null || formData.contractor_age > 12) ? 1 : 0;
+        let childrenCount = (formData.contractor_age !== null && formData.contractor_age <= 12) ? 1 : 0;
+        
         formData.companions.forEach((c: any) => { 
-          (c.age === null || c.age > 12) ? adults++ : children++; 
+          if (c.age !== null && c.age <= 12) childrenCount++;
+          else adultsCount++;
         });
 
-        let tempAdults = adults;
-        let tempChildren = children;
+        let tempAdults = adultsCount;
+        let tempChildren = childrenCount;
 
         for (let i = 0; i < newRooms; i++) {
           const paxInRoom = Math.min(4, tempAdults + tempChildren);
@@ -104,7 +108,7 @@ const AdminClientFormPage = () => {
           if ((paxInRoom === 1 && adultsInRoom === 1) || (paxInRoom === 2 && adultsInRoom === 1 && childrenInRoom === 1)) {
             const price = selectedTour.selling_price_double_occupancy;
             newTotal += (2 * price);
-            newDetails.push(`Hab. ${i+1}: Cargo base Doble (2 Adultos x $${price})`);
+            newDetails.push(`Hab. ${i+1}: Cargo Doble (Sencillo/Pareja paga x 2) ($${price} c/u)`);
           } else {
             let occPrice = selectedTour.selling_price_quad_occupancy;
             let label = "Cuádruple";
@@ -132,6 +136,7 @@ const AdminClientFormPage = () => {
     setBreakdownDetails(newDetails);
     setFormData((prev: any) => ({ ...prev, total_amount: newTotal }));
 
+    // Ajustar campos de acompañantes
     const neededComps = totalPax - 1;
     if (neededComps !== formData.companions.length && neededComps >= 0) {
       setFormData((p: any) => {
@@ -145,7 +150,7 @@ const AdminClientFormPage = () => {
         return { ...p, companions: newComps };
       });
     }
-  }, [clientSelectedSeats.length, formData.contractor_age, formData.is_transport_only, selectedTour]);
+  }, [clientSelectedSeats.length, formData.contractor_age, formData.companions, formData.is_transport_only, selectedTour]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -254,7 +259,7 @@ const AdminClientFormPage = () => {
                       </div>
 
                       <div className="pt-4 border-t">
-                        <Label className="mb-4 block font-bold">Mapa de Asientos ({clientSelectedSeats.length} pax)</Label>
+                        <Label className="mb-4 block font-bold">Selección de Asientos ({clientSelectedSeats.length} pax)</Label>
                         <TourSeatMap 
                           tourId={selectedTour.id} 
                           busCapacity={selectedTour.bus_capacity} 
