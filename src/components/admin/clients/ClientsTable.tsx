@@ -46,7 +46,7 @@ const ClientsTable: React.FC<{ refreshKey: number; onRegisterPayment: (client: C
 
   const fetchClients = async () => {
     setLoading(true);
-    const { data } = await supabase.from('clients').select('*, tours(title), bus_routes(name)').order('created_at', { ascending: false });
+    const { data } = await supabase.from('clients').select('*, tours(id, title), bus_routes(id, name)').order('created_at', { ascending: false });
     if (data) {
       const processed = data.map((c: any) => ({
         ...c,
@@ -87,6 +87,25 @@ const ClientsTable: React.FC<{ refreshKey: number; onRegisterPayment: (client: C
     setLoading(false);
   };
 
+  const handleDeleteGroup = async (groupName: string, tourId: string | null, busRouteId: string | null) => {
+    if (!window.confirm(`¿Estás seguro de que quieres eliminar a TODOS los clientes del grupo "${groupName}"? Esta acción borrará también sus abonos y liberará sus asientos.`)) return;
+    
+    setLoading(true);
+    let query = supabase.from('clients').delete();
+    
+    if (tourId) query = query.eq('tour_id', tourId);
+    else if (busRouteId) query = query.eq('bus_route_id', busRouteId);
+    else query = query.is('tour_id', null).is('bus_route_id', null);
+
+    const { error } = await query;
+    if (error) toast.error("Error al eliminar el grupo.");
+    else {
+      toast.success(`Grupo "${groupName}" eliminado.`);
+      fetchClients();
+    }
+    setLoading(false);
+  };
+
   const handleStatusChange = async (client: Client, newStatus: string) => {
     if (newStatus === 'cancelled') {
       setCancelDialog({ isOpen: true, clientId: client.id, reason: '' });
@@ -109,23 +128,32 @@ const ClientsTable: React.FC<{ refreshKey: number; onRegisterPayment: (client: C
   const groupedClients = useMemo(() => {
     return clients.reduce((acc, client) => {
       const key = client.tour_title || 'Sin Viaje';
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(client);
+      if (!acc[key]) acc[key] = { clients: [], tour_id: client.tour_id, bus_route_id: client.bus_route_id };
+      acc[key].clients.push(client);
       return acc;
-    }, {} as Record<string, Client[]>);
+    }, {} as Record<string, { clients: Client[], tour_id: string | null, bus_route_id: string | null }>);
   }, [clients]);
 
   if (loading) return <div className="flex justify-center p-12"><Loader2 className="animate-spin text-rosa-mexicano" /></div>;
 
   return (
     <div className="space-y-6">
-      {Object.entries(groupedClients).map(([tourTitle, group]) => (
+      {Object.entries(groupedClients).map(([tourTitle, groupData]) => (
         <div key={tourTitle} className="bg-white rounded-xl shadow-md border overflow-hidden">
-          <div className="bg-gray-900 text-white p-4 flex items-center justify-between cursor-pointer" onClick={() => setOpenGroups(p => ({ ...p, [tourTitle]: !p[tourTitle] }))}>
-            <div className="flex items-center gap-3">
+          <div className="bg-gray-900 text-white p-4 flex items-center justify-between">
+            <div className="flex items-center gap-3 cursor-pointer flex-grow" onClick={() => setOpenGroups(p => ({ ...p, [tourTitle]: !p[tourTitle] }))}>
               {openGroups[tourTitle] ? <ChevronDown className="text-rosa-mexicano" /> : <ChevronRight className="text-rosa-mexicano" />}
-              <h3 className="text-lg font-bold flex items-center gap-2"><Package className="h-5 w-5 text-rosa-mexicano" /> {tourTitle} ({group.length})</h3>
+              <h3 className="text-lg font-bold flex items-center gap-2"><Package className="h-5 w-5 text-rosa-mexicano" /> {tourTitle} ({groupData.clients.length})</h3>
             </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="text-red-400 hover:text-red-600 hover:bg-red-500/10" 
+              onClick={() => handleDeleteGroup(tourTitle, groupData.tour_id, groupData.bus_route_id)}
+              title="Borrar todo el grupo"
+            >
+              <Trash2 className="h-5 w-5" />
+            </Button>
           </div>
 
           {openGroups[tourTitle] && (
@@ -141,7 +169,7 @@ const ClientsTable: React.FC<{ refreshKey: number; onRegisterPayment: (client: C
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {group.map((client) => (
+                  {groupData.clients.map((client) => (
                     <TableRow key={client.id} className={cn(client.status === 'cancelled' && "opacity-60 bg-gray-50")}>
                       <TableCell className="font-mono text-xs font-bold text-rosa-mexicano">{client.contract_number}</TableCell>
                       <TableCell>

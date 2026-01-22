@@ -107,7 +107,7 @@ const TourInquirySection = () => {
     );
     
     window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
-    navigate(`/tour-confirmation/${contractDetails.contract_number}`);
+    navigate(`/pago-validacion/${contractDetails.contract_number}`);
   };
 
   const isProduction = agencySettings?.payment_mode === 'production';

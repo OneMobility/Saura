@@ -16,7 +16,8 @@ import ContactPage from "./pages/ContactPage";
 import BusTicketsPage from "./pages/BusTicketsPage";
 import PaymentSuccessPage from "./pages/PaymentSuccessPage";
 import PaymentFailurePage from "./pages/PaymentFailurePage";
-import TourConfirmationPage from "./pages/TourConfirmationPage"; // NEW
+import TourConfirmationPage from "./pages/TourConfirmationPage";
+import PaymentValidationPage from "./pages/PaymentValidationPage"; // NEW
 
 // Admin Pages
 import AdminDashboard from "./pages/AdminDashboard";
@@ -113,6 +114,7 @@ const App = () => {
               <Route path="/payment-success" element={<PaymentSuccessPage />} />
               <Route path="/payment-failure" element={<PaymentFailurePage />} />
               <Route path="/tour-confirmation/:contractNumber" element={<TourConfirmationPage />} />
+              <Route path="/pago-validacion/:contractNumber" element={<PaymentValidationPage />} />
 
               <Route path="/bus-tickets" element={<BusTicketsPage />} />
               <Route path="/bus-tickets/destinations" element={<DestinationsPage />} />
