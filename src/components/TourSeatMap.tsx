@@ -107,17 +107,19 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
   const handleSeatClick = async (seatNumber: number, currentStatus: Seat['status'], assignedClientId: string | null, clientName?: string) => {
     if (readOnly || !onSeatsSelected) return;
 
-    // Si el asiento está vendido, mostrar el nombre del cliente
+    // Lógica para asientos ya reservados
     if (currentStatus === 'booked') {
-      if (clientName) {
+      // SOLO MOSTRAR NOMBRE SI ES ADMIN
+      if (isAdmin && clientName) {
         toast.info(`Asiento ${seatNumber}: ${clientName}`, {
           icon: <User className="h-4 w-4 text-blue-500" />,
         });
-      } else if (assignedClientId === currentClientId) {
-        // Permitir deselección si es el mismo cliente en modo reserva
+      } else if (assignedClientId === currentClientId && assignedClientId !== null) {
+        // Permitir deselección al mismo cliente durante su proceso de reserva
         const newSelection = initialSelectedSeats.filter(s => s !== seatNumber);
         onSeatsSelected(newSelection);
       } else {
+        // Mensaje genérico para el público
         toast.info(`Asiento ${seatNumber} ya reservado.`);
       }
       return;
