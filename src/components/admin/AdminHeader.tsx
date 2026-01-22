@@ -6,9 +6,10 @@ import { Button } from '@/components/ui/button';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { getGreeting } from '@/utils/greetings';
-import { Sun, CloudSun, Moon, Bell, Mail, UserPlus, ArrowRight, Circle, Check, Package, MessageSquareText } from 'lucide-react';
+import { Sun, CloudSun, Moon, Bell, Mail, UserPlus, Circle, Check, Package, MessageSquareText } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
@@ -28,10 +29,8 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ pageTitle, children }) => {
   const navigate = useNavigate();
   const [unreadMessages, setUnreadMessages] = useState<any[]>([]);
   const [unreadClients, setUnreadClients] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
 
   const fetchNotifications = async () => {
-    // Fetch Unread Messages (Formularios)
     const { data: messages } = await supabase
       .from('contact_messages')
       .select('id, name, created_at, status')
@@ -39,7 +38,6 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ pageTitle, children }) => {
       .order('created_at', { ascending: false });
     setUnreadMessages(messages || []);
 
-    // Fetch Unread Clients (Reservas)
     const { data: clients } = await supabase
       .from('clients')
       .select('id, first_name, last_name, contract_number, created_at, is_read')
@@ -50,15 +48,11 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ pageTitle, children }) => {
 
   useEffect(() => {
     fetchNotifications();
-    
     const channel = supabase.channel('admin-notifs-realtime')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'contact_messages' }, () => fetchNotifications())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => fetchNotifications())
       .subscribe();
-
-    return () => { 
-      supabase.removeChannel(channel); 
-    };
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const handleLogout = async () => { 
@@ -67,22 +61,20 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ pageTitle, children }) => {
   };
 
   const markMessageAsRead = async (e: React.MouseEvent, id: string) => {
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
     const { error } = await supabase.from('contact_messages').update({ status: 'read' }).eq('id', id);
     if (!error) {
       setUnreadMessages(prev => prev.filter(m => m.id !== id));
-      toast.success("Mensaje marcado como leído");
+      toast.success("Mensaje listo");
     }
   };
 
   const markClientAsRead = async (e: React.MouseEvent, id: string) => {
-    e.preventDefault();
-    e.stopPropagation();
+    e.preventDefault(); e.stopPropagation();
     const { error } = await supabase.from('clients').update({ is_read: true }).eq('id', id);
     if (!error) {
       setUnreadClients(prev => prev.filter(c => c.id !== id));
-      toast.success("Reserva marcada como vista");
+      toast.success("Reserva lista");
     }
   };
 
@@ -113,73 +105,77 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ pageTitle, children }) => {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80 p-0 rounded-2xl shadow-2xl border-none overflow-hidden" align="end">
-              <div className="bg-gray-900 p-4 text-white flex justify-between items-center">
-                <h3 className="font-bold flex items-center gap-2 text-sm">
-                  <Bell className="h-4 w-4 text-rosa-mexicano" /> Centro de Avisos
+              <div className="bg-gray-900 p-4 text-white">
+                <h3 className="font-bold flex items-center gap-2 text-sm mb-1">
+                  <Bell className="h-4 w-4 text-rosa-mexicano" /> Bandeja de Entrada
                 </h3>
-                <Badge className="bg-rosa-mexicano text-[10px] font-black">{totalNotifs} Pendientes</Badge>
+                <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">Tienes {totalNotifs} avisos sin gestionar</p>
               </div>
               
-              <div className="max-h-[450px] overflow-auto bg-gray-50">
-                {/* SECCIÓN RESERVAS */}
-                <div className="p-2 bg-gray-100/50 text-[10px] font-black uppercase tracking-widest text-gray-500 border-b flex items-center gap-1.5">
-                  <Package className="h-3 w-3" /> Reservas ({unreadClients.length})
-                </div>
-                {unreadClients.length > 0 ? unreadClients.map(c => (
-                  <div key={c.id} className="group relative flex items-center gap-3 p-4 bg-white hover:bg-rosa-mexicano/5 border-b transition-colors">
-                    <div className="bg-blue-50 p-2 rounded-full text-blue-600 shrink-0">
-                      <UserPlus className="h-4 w-4" />
-                    </div>
-                    <Link to={`/admin/clients/edit/${c.id}`} className="flex-grow min-w-0">
-                      <p className="text-xs font-black truncate">Reserva: {c.contract_number}</p>
-                      <p className="text-[10px] text-gray-500 truncate">{c.first_name} {c.last_name}</p>
-                    </Link>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={(e) => markClientAsRead(e, c.id)}
-                      className="h-8 w-8 text-gray-300 hover:text-green-600 hover:bg-green-50 rounded-full shrink-0"
-                    >
-                      <Check className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )) : (
-                  <div className="p-4 text-center text-[10px] text-gray-400 italic">Sin reservas nuevas</div>
-                )}
+              <Tabs defaultValue="reservas" className="w-full">
+                <TabsList className="grid w-full grid-cols-2 rounded-none bg-gray-100/50 border-b h-12">
+                  <TabsTrigger value="reservas" className="text-[10px] uppercase font-black gap-2 data-[state=active]:bg-white data-[state=active]:text-rosa-mexicano">
+                    <Package className="h-3 w-3" /> Reservas
+                    {unreadClients.length > 0 && <Badge className="h-4 min-w-4 p-1 bg-rosa-mexicano text-[8px]">{unreadClients.length}</Badge>}
+                  </TabsTrigger>
+                  <TabsTrigger value="mensajes" className="text-[10px] uppercase font-black gap-2 data-[state=active]:bg-white data-[state=active]:text-rosa-mexicano">
+                    <MessageSquareText className="h-3 w-3" /> Mensajes
+                    {unreadMessages.length > 0 && <Badge className="h-4 min-w-4 p-1 bg-rosa-mexicano text-[8px]">{unreadMessages.length}</Badge>}
+                  </TabsTrigger>
+                </TabsList>
 
-                {/* SECCIÓN FORMULARIOS */}
-                <div className="p-2 bg-gray-100/50 text-[10px] font-black uppercase tracking-widest text-gray-500 border-b border-t flex items-center gap-1.5">
-                  <MessageSquareText className="h-3 w-3" /> Formularios ({unreadMessages.length})
+                <div className="max-h-[350px] overflow-auto bg-white">
+                  <TabsContent value="reservas" className="m-0">
+                    {unreadClients.length > 0 ? unreadClients.map(c => (
+                      <div key={c.id} className="group flex items-center gap-3 p-4 hover:bg-gray-50 border-b transition-colors">
+                        <div className="bg-blue-50 p-2 rounded-full text-blue-600 shrink-0">
+                          <UserPlus className="h-4 w-4" />
+                        </div>
+                        <Link to={`/admin/clients/edit/${c.id}`} className="flex-grow min-w-0">
+                          <p className="text-xs font-black truncate">Contrato: {c.contract_number}</p>
+                          <p className="text-[10px] text-gray-500 truncate">{c.first_name} {c.last_name}</p>
+                        </Link>
+                        <Button variant="ghost" size="icon" onClick={(e) => markClientAsRead(e, c.id)} className="h-8 w-8 text-gray-300 hover:text-green-600 hover:bg-green-50 rounded-full">
+                          <Check className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )) : (
+                      <div className="p-10 text-center text-gray-400">
+                        <Package className="h-8 w-8 mx-auto mb-2 opacity-10" />
+                        <p className="text-[10px] font-bold uppercase tracking-tighter">Sin reservas nuevas</p>
+                      </div>
+                    )}
+                  </TabsContent>
+
+                  <TabsContent value="mensajes" className="m-0">
+                    {unreadMessages.length > 0 ? unreadMessages.map(m => (
+                      <div key={m.id} className="group flex items-center gap-3 p-4 hover:bg-gray-50 border-b transition-colors">
+                        <div className="bg-rosa-mexicano/10 p-2 rounded-full text-rosa-mexicano shrink-0">
+                          <Mail className="h-4 w-4" />
+                        </div>
+                        <Link to={`/admin/contacto`} className="flex-grow min-w-0">
+                          <p className="text-xs font-black truncate">{m.name}</p>
+                          <p className="text-[10px] text-gray-500">Nuevo formulario de contacto</p>
+                        </Link>
+                        <Button variant="ghost" size="icon" onClick={(e) => markMessageAsRead(e, m.id)} className="h-8 w-8 text-gray-300 hover:text-green-600 hover:bg-green-50 rounded-full">
+                          <Check className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )) : (
+                      <div className="p-10 text-center text-gray-400">
+                        <MessageSquareText className="h-8 w-8 mx-auto mb-2 opacity-10" />
+                        <p className="text-[10px] font-bold uppercase tracking-tighter">Bandeja vacía</p>
+                      </div>
+                    )}
+                  </TabsContent>
                 </div>
-                {unreadMessages.length > 0 ? unreadMessages.map(m => (
-                  <div key={m.id} className="group relative flex items-center gap-3 p-4 bg-white hover:bg-rosa-mexicano/5 border-b transition-colors">
-                    <div className="bg-rosa-mexicano/10 p-2 rounded-full text-rosa-mexicano shrink-0">
-                      <Mail className="h-4 w-4" />
-                    </div>
-                    <Link to={`/admin/contacto`} className="flex-grow min-w-0">
-                      <p className="text-xs font-black truncate">{m.name}</p>
-                      <p className="text-[10px] text-gray-500">Nuevo mensaje de contacto</p>
-                    </Link>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      onClick={(e) => markMessageAsRead(e, m.id)}
-                      className="h-8 w-8 text-gray-300 hover:text-green-600 hover:bg-green-50 rounded-full shrink-0"
-                    >
-                      <Check className="h-4 w-4" />
-                    </Button>
-                  </div>
-                )) : (
-                  <div className="p-4 text-center text-[10px] text-gray-400 italic">Sin mensajes nuevos</div>
-                )}
-                
-                {totalNotifs === 0 && (
-                  <div className="p-10 text-center text-gray-400">
-                    <Circle className="h-10 w-10 mx-auto mb-2 opacity-10" />
-                    <p className="text-xs font-bold uppercase tracking-tighter">Todo al día</p>
-                  </div>
-                )}
-              </div>
+              </Tabs>
+              
+              {totalNotifs > 0 && (
+                <div className="p-2 bg-gray-50 border-t text-center">
+                  <p className="text-[8px] text-gray-400 font-bold uppercase">Usa el check para limpiar tu bandeja</p>
+                </div>
+              )}
             </PopoverContent>
           </Popover>
 
