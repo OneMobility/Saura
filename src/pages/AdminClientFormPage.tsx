@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, Users, Armchair, MapPin, DollarSign, Hotel, List } from 'lucide-react';
+import { Loader2, Save, MapPin, Hotel } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
@@ -75,11 +75,11 @@ const AdminClientFormPage = () => {
       const childrenInRoom = paxInRoom - adultsInRoom;
 
       if (paxInRoom === 1 && adultsInRoom === 1) {
-        calculatedTotal += selectedTour.selling_price_double_occupancy;
-        details.push(`Hab. ${i+1}: 1 Ad. Solo (Tarifa Doble)`);
+        calculatedTotal += (2 * selectedTour.selling_price_double_occupancy);
+        details.push(`Hab. ${i+1}: 1 Adulto Solo (Paga 2 pax en Doble)`);
       } else if (paxInRoom === 2 && adultsInRoom === 1 && childrenInRoom === 1) {
         calculatedTotal += (2 * selectedTour.selling_price_double_occupancy);
-        details.push(`Hab. ${i+1}: 1 Ad + 1 Niñ (como 2 Ad Doble)`);
+        details.push(`Hab. ${i+1}: 1 Adulto + 1 Niño (Paga 2 pax en Doble)`);
       } else {
         let occPrice = selectedTour.selling_price_quad_occupancy;
         let label = "Cua.";
@@ -100,7 +100,7 @@ const AdminClientFormPage = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.tour_id || clientSelectedSeats.length === 0) return toast.error("Datos incompletos.");
+    if (!formData.tour_id || clientSelectedSeats.length === 0) return toast.error("Reserva incompleta.");
     setIsSubmitting(true);
     
     const { data } = await supabase.from('clients').insert({ 
@@ -114,7 +114,7 @@ const AdminClientFormPage = () => {
         tour_id: formData.tour_id, seat_number: s, status: 'booked', client_id: data.id 
       })));
     }
-    toast.success("Reserva guardada.");
+    toast.success("Contrato generado correctamente.");
     navigate('/admin/clients');
   };
 
@@ -122,14 +122,14 @@ const AdminClientFormPage = () => {
     <div className="flex min-h-screen bg-gray-100">
       <AdminSidebar />
       <div className="flex flex-col flex-grow">
-        <AdminHeader pageTitle="Consola de Reserva" />
+        <AdminHeader pageTitle="Registro de Contrato" />
         <main className="flex-grow container mx-auto px-4 py-8 max-w-6xl">
           <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <Card className="lg:col-span-2 shadow-lg border-t-4 border-rosa-mexicano">
-              <CardHeader><CardTitle className="text-lg flex items-center gap-2"><MapPin className="h-5 w-5" /> Viaje y Asientos</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-lg flex items-center gap-2"><MapPin className="h-5 w-5" /> Viaje y Selección de Asientos</CardTitle></CardHeader>
               <CardContent className="space-y-6">
                 <Select value={formData.tour_id} onValueChange={v => setFormData({...formData, tour_id: v})}>
-                  <SelectTrigger className="h-12 font-bold"><SelectValue placeholder="Elegir Tour" /></SelectTrigger>
+                  <SelectTrigger className="h-12 font-bold"><SelectValue placeholder="Seleccionar Destino" /></SelectTrigger>
                   <SelectContent>{availableTours.map(t => <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>)}</SelectContent>
                 </Select>
 
@@ -143,22 +143,22 @@ const AdminClientFormPage = () => {
 
             <div className="space-y-6">
               <Card className="bg-gray-900 text-white shadow-xl">
-                <CardHeader><CardTitle className="text-white flex items-center gap-2"><Hotel className="h-5 w-5 text-rosa-mexicano" /> Alojamiento</CardTitle></CardHeader>
+                <CardHeader><CardTitle className="text-white flex items-center gap-2"><Hotel className="h-5 w-5 text-rosa-mexicano" /> Liquidación</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center bg-white/5 p-4 rounded-xl border border-white/10">
-                    <span className="text-xs uppercase font-bold text-gray-400">Habitaciones</span>
+                    <span className="text-xs uppercase font-bold text-gray-400">Total Habitaciones</span>
                     <span className="text-2xl font-black text-rosa-mexicano">{roomsCount}</span>
                   </div>
                   <div className="space-y-1 pt-2">
                     {breakdownDetails.map((d, i) => <p key={i} className="text-[10px] opacity-60 italic">- {d}</p>)}
                   </div>
                   <div className="pt-4 border-t border-white/10 flex justify-between font-black text-xl">
-                    <span>Total:</span>
+                    <span>Monto Total:</span>
                     <span className="text-yellow-400">${formData.total_amount.toLocaleString()}</span>
                   </div>
                 </CardContent>
               </Card>
-              <Button type="submit" disabled={isSubmitting} className="w-full bg-rosa-mexicano h-14 text-lg font-black shadow-xl">Confirmar Reserva</Button>
+              <Button type="submit" disabled={isSubmitting} className="w-full bg-rosa-mexicano h-14 text-lg font-black shadow-xl">Generar Contrato</Button>
             </div>
           </form>
         </main>
@@ -168,96 +168,3 @@ const AdminClientFormPage = () => {
 };
 
 export default AdminClientFormPage;
-</dyad-file>
-
-<dyad-write path="supabase/functions/generate-service-contract/index.ts" description="Ajustando el contrato de servicio para que un solo pasajero adulto figure con tarifa doble y detallando la asignación de 1 habitación cada 4 pax.">
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-const generateHtml = (data: any) => {
-  const { client, tour } = data;
-  const totalPax = client.number_of_people;
-  const roomsCount = Math.ceil(totalPax / 4);
-
-  let adults = (client.contractor_age === null || client.contractor_age > 12) ? 1 : 0;
-  let children = (client.contractor_age !== null && client.contractor_age <= 12) ? 1 : 0;
-  (client.companions || []).forEach((c: any) => { (c.age === null || c.age > 12) ? adults++ : children++; });
-
-  let tempAdults = adults;
-  let tempChildren = children;
-  let breakdownRows = "";
-
-  for (let i = 0; i < roomsCount; i++) {
-    const paxInRoom = Math.min(4, tempAdults + tempChildren);
-    const adultsInRoom = Math.min(paxInRoom, tempAdults);
-    const childrenInRoom = paxInRoom - adultsInRoom;
-
-    if (paxInRoom === 1 && adultsInRoom === 1) {
-      breakdownRows += `<tr><td>Habitación ${i+1}: 1 Adulto Solo (Tarifa Doble)</td><td>1 pax</td><td>$${(tour.selling_price_double_occupancy).toLocaleString()}</td></tr>`;
-    } else if (paxInRoom === 2 && adultsInRoom === 1 && childrenInRoom === 1) {
-      breakdownRows += `<tr><td>Habitación ${i+1}: Servicio en Doble (1 Ad + 1 Niñ como 2 Ad)</td><td>1 Pareja</td><td>$${(2 * tour.selling_price_double_occupancy).toLocaleString()}</td></tr>`;
-    } else {
-      let occupancyLabel = paxInRoom === 4 ? "Cuádruple" : (paxInRoom === 3 ? "Triple" : "Doble");
-      let adultPrice = paxInRoom === 4 ? tour.selling_price_quad_occupancy : (paxInRoom === 3 ? tour.selling_price_triple_occupancy : tour.selling_price_double_occupancy);
-
-      if (adultsInRoom > 0) {
-        breakdownRows += `<tr><td>Habitación ${i+1}: Adultos en Ocupación ${occupancyLabel}</td><td>${adultsInRoom}</td><td>$${(adultsInRoom * adultPrice).toLocaleString()}</td></tr>`;
-      }
-      if (childrenInRoom > 0) {
-        breakdownRows += `<tr><td>Habitación ${i+1}: Tarifa Menor (Niños)</td><td>${childrenInRoom}</td><td>$${(childrenInRoom * tour.selling_price_child).toLocaleString()}</td></tr>`;
-      }
-    }
-
-    tempAdults -= adultsInRoom;
-    tempChildren -= childrenInRoom;
-  }
-
-  return `
-    <html>
-      <head>
-        <style>
-          body { font-family: sans-serif; color: #333; padding: 40px; }
-          .header { border-bottom: 3px solid #91045A; margin-bottom: 20px; }
-          .badge { background: #91045A; color: white; padding: 10px; border-radius: 5px; font-weight: bold; }
-          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th, td { border: 1px solid #eee; padding: 12px; text-align: left; }
-          .total { background: #91045A; color: white; font-size: 22px; font-weight: bold; }
-        </style>
-      </head>
-      <body>
-        <div class="header">
-          <h1>CONTRATO DE SERVICIO - ${client.contract_number}</h1>
-        </div>
-        <p><strong>Titular:</strong> ${client.first_name} ${client.last_name}</p>
-        <p><strong>Viaje:</strong> ${tour.title}</p>
-        <p><span class="badge">HABITACIONES ASIGNADAS: ${roomsCount}</span></p>
-        
-        <table>
-          <thead><tr style="background:#f9f9f9;"><th>Concepto</th><th>Cantidad</th><th>Monto</th></tr></thead>
-          <tbody>
-            ${breakdownRows}
-            <tr class="total"><td>VALOR TOTAL DEL CONTRATO</td><td></td><td>$${client.total_amount.toLocaleString()} MXN</td></tr>
-          </tbody>
-        </table>
-        <p style="margin-top: 50px; border-top: 2px solid #333; width: 250px; text-align: center;">Firma de Conformidad</p>
-      </body>
-    </html>
-  `;
-};
-
-serve(async (req) => {
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
-  try {
-    const { contractNumber } = await req.json();
-    const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
-    const { data: client } = await supabaseAdmin.from('clients').select('*, tours(*)').ilike('contract_number', contractNumber).single();
-    return new Response(generateHtml({ client, tour: client.tours }), { headers: { ...corsHeaders, 'Content-Type': 'text/html' } });
-  } catch (error: any) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: corsHeaders });
-  }
-});

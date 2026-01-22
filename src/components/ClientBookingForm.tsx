@@ -7,10 +7,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Hotel, Info, CheckCircle2 } from 'lucide-react';
+import { Loader2, Hotel } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Textarea } from '@/components/ui/textarea';
-import { TourProviderService, SeatLayout } from '@/types/shared';
+import { TourProviderService } from '@/types/shared';
 import { Badge } from '@/components/ui/badge';
 
 interface ClientBookingFormProps {
@@ -64,17 +64,17 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
       const adultsInRoom = Math.min(paxInRoom, tempAdults);
       const childrenInRoom = paxInRoom - adultsInRoom;
 
-      // REGLA: 1 Adulto Solo
+      // REGLA: 1 Adulto Solo paga el TOTAL de 2 Adultos en Doble
       if (paxInRoom === 1 && adultsInRoom === 1) {
-        calculatedTotal += tourSellingPrices.double;
-        details.push(`Hab. ${i+1}: 1 Adulto Solo (paga tarifa Doble)`);
+        calculatedTotal += (2 * tourSellingPrices.double);
+        details.push(`Hab. ${i+1}: 1 Adulto Solo (Paga total de 2 adultos en doble)`);
       }
-      // REGLA: 1 Adulto + 1 Niño
+      // REGLA: 1 Adulto + 1 Niño = 2 Adultos en Doble
       else if (paxInRoom === 2 && adultsInRoom === 1 && childrenInRoom === 1) {
         calculatedTotal += (2 * tourSellingPrices.double);
-        details.push(`Hab. ${i+1}: 1 Adulto + 1 Niño (como 2 Adultos en Doble)`);
+        details.push(`Hab. ${i+1}: 1 Adulto + 1 Niño (Cobrados como 2 adultos en doble)`);
       }
-      // REGLA: Ocupación Triple/Cuádruple Estándar
+      // REGLA: Estándar (3-4 personas)
       else {
         let occPrice = tourSellingPrices.quad;
         let label = "Cuádruple";
@@ -108,7 +108,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
   }, [selectedSeats.length, formData.contractor_age, formData.companions.length, tourSellingPrices]);
 
   const handleSave = async () => {
-    if (!formData.first_name || !formData.address) return toast.error("Faltan datos obligatorios.");
+    if (!formData.first_name || !formData.address) return toast.error("Datos obligatorios faltantes.");
     setIsSubmitting(true);
     const contractNum = uuidv4().substring(0, 8).toUpperCase();
     
@@ -123,7 +123,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
       room_details: { rooms_count: roomsCount }
     });
 
-    toast.success("¡Reserva enviada!");
+    toast.success("¡Reserva realizada!");
     onClose();
     setIsSubmitting(false);
   };
@@ -131,19 +131,19 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Completar Reserva: {tourTitle}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Detalles de Reserva: {tourTitle}</DialogTitle></DialogHeader>
         
         <div className="space-y-6">
           <div className="grid grid-cols-2 gap-4">
              <div className="space-y-1"><Label>Nombre</Label><Input value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} /></div>
-             <div className="space-y-1"><Label>Edad del Titular</Label><Input type="number" value={formData.contractor_age || ''} onChange={e => setFormData({...formData, contractor_age: parseInt(e.target.value) || null})} /></div>
+             <div className="space-y-1"><Label>Edad</Label><Input type="number" value={formData.contractor_age || ''} onChange={e => setFormData({...formData, contractor_age: parseInt(e.target.value) || null})} /></div>
           </div>
-          <div className="space-y-2"><Label>Domicilio Completo</Label><Textarea value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} /></div>
+          <div className="space-y-2"><Label>Dirección</Label><Textarea value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} /></div>
 
           <div className="bg-gray-900 text-white p-6 rounded-2xl shadow-xl">
              <div className="flex justify-between items-center mb-4">
-                <div className="flex items-center gap-2 text-rosa-mexicano font-black uppercase text-xs tracking-widest">
-                  <Hotel className="h-4 w-4" /> Distribución
+                <div className="text-rosa-mexicano font-black uppercase text-xs tracking-widest flex items-center gap-2">
+                  <Hotel className="h-4 w-4" /> Alojamiento
                 </div>
                 <Badge className="bg-rosa-mexicano">{roomsCount} {roomsCount === 1 ? 'Habitación' : 'Habitaciones'}</Badge>
              </div>
@@ -157,14 +157,15 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
                   ))}
                 </div>
                 <div className="flex justify-between font-black text-xl pt-2">
-                  <span className="text-gray-400">TOTAL:</span>
-                  <span className="text-yellow-400">${totalAmount.toLocaleString()}</span>
+                  <span className="text-gray-400 uppercase text-xs self-center">Total a Pagar:</span>
+                  <span className="text-yellow-400 text-2xl">${totalAmount.toLocaleString()}</span>
                 </div>
+                <p className="text-[9px] text-gray-500 mt-2">* Política: Las habitaciones son para 4 personas. Un pasajero solo o pareja debe cubrir el costo base de habitación doble.</p>
              </div>
           </div>
 
-          <Button onClick={handleSave} disabled={isSubmitting} className="w-full bg-rosa-mexicano h-14 text-lg font-black">
-            {isSubmitting ? <Loader2 className="animate-spin" /> : 'Confirmar Reserva'}
+          <Button onClick={handleSave} disabled={isSubmitting} className="w-full bg-rosa-mexicano h-14 text-lg font-black rounded-xl">
+            {isSubmitting ? <Loader2 className="animate-spin" /> : 'Confirmar y Reservar'}
           </Button>
         </div>
       </DialogContent>

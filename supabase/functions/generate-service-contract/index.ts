@@ -20,21 +20,25 @@ const generateHtml = (data: any) => {
   let breakdownRows = "";
 
   for (let i = 0; i < roomsCount; i++) {
-    const paxInRoom = Math.min(4, tempAdults + tempChildren);
+    const remainingInContract = tempAdults + tempChildren;
+    const paxInRoom = Math.min(4, remainingInContract);
     const adultsInRoom = Math.min(paxInRoom, tempAdults);
     const childrenInRoom = paxInRoom - adultsInRoom;
 
-    if (paxInRoom === 2 && adultsInRoom === 1 && childrenInRoom === 1) {
-      breakdownRows += `<tr><td>Habitación ${i+1}: Servicio en Doble (1 Ad + 1 Niñ como 2 Ad)</td><td>1 Pareja</td><td>$${(2 * tour.selling_price_double_occupancy).toLocaleString()}</td></tr>`;
+    // REGLA: 1 Adulto Solo o Pareja (1 ad + 1 niñ) pagan el total de Habitación Doble
+    if (paxInRoom === 1 && adultsInRoom === 1) {
+      breakdownRows += `<tr><td>Habitación ${i+1}: 1 Adulto Solo (Servicio en Hab. Doble)</td><td>2 pax (costo)</td><td>$${(2 * tour.selling_price_double_occupancy).toLocaleString()}</td></tr>`;
+    } else if (paxInRoom === 2 && adultsInRoom === 1 && childrenInRoom === 1) {
+      breakdownRows += `<tr><td>Habitación ${i+1}: Servicio en Doble (1 Ad + 1 Niñ como 2 Ad)</td><td>2 pax (costo)</td><td>$${(2 * tour.selling_price_double_occupancy).toLocaleString()}</td></tr>`;
     } else {
       let occupancyLabel = paxInRoom === 4 ? "Cuádruple" : (paxInRoom === 3 ? "Triple" : "Doble");
       let adultPrice = paxInRoom === 4 ? tour.selling_price_quad_occupancy : (paxInRoom === 3 ? tour.selling_price_triple_occupancy : tour.selling_price_double_occupancy);
 
       if (adultsInRoom > 0) {
-        breakdownRows += `<tr><td>Habitación ${i+1}: Adultos en Ocupación ${occupancyLabel}</td><td>${adultsInRoom}</td><td>$${(adultsInRoom * adultPrice).toLocaleString()}</td></tr>`;
+        breakdownRows += `<tr><td>Habitación ${i+1}: Adultos en Ocupación ${occupancyLabel}</td><td>${adultsInRoom} pax</td><td>$${(adultsInRoom * adultPrice).toLocaleString()}</td></tr>`;
       }
       if (childrenInRoom > 0) {
-        breakdownRows += `<tr><td>Habitación ${i+1}: Tarifa Menor (Niños)</td><td>${childrenInRoom}</td><td>$${(childrenInRoom * tour.selling_price_child).toLocaleString()}</td></tr>`;
+        breakdownRows += `<tr><td>Habitación ${i+1}: Tarifa de Menor (Niños)</td><td>${childrenInRoom} pax</td><td>$${(childrenInRoom * tour.selling_price_child).toLocaleString()}</td></tr>`;
       }
     }
 
@@ -46,30 +50,47 @@ const generateHtml = (data: any) => {
     <html>
       <head>
         <style>
-          body { font-family: sans-serif; color: #333; padding: 40px; }
-          .header { border-bottom: 3px solid #91045A; margin-bottom: 20px; }
-          .badge { background: #91045A; color: white; padding: 10px; border-radius: 5px; font-weight: bold; }
-          table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-          th, td { border: 1px solid #eee; padding: 12px; text-align: left; }
-          .total { background: #91045A; color: white; font-size: 22px; font-weight: bold; }
+          body { font-family: 'Helvetica', sans-serif; color: #1a1a1a; padding: 40px; line-height: 1.6; }
+          .header { border-bottom: 4px solid #91045A; padding-bottom: 20px; margin-bottom: 30px; text-align: center; }
+          .badge { background: #91045A; color: white; padding: 8px 15px; border-radius: 4px; font-weight: bold; text-transform: uppercase; font-size: 14px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 30px; }
+          th { background: #f8f8f8; color: #666; text-transform: uppercase; font-size: 12px; letter-spacing: 1px; padding: 15px; border-bottom: 2px solid #eee; }
+          td { padding: 15px; border-bottom: 1px solid #f1f1f1; font-size: 14px; }
+          .total { background: #91045A; color: white; font-size: 22px; font-weight: 900; }
+          .footer { margin-top: 60px; text-align: center; }
+          .sign { border-top: 2px solid #91045A; width: 300px; margin: 0 auto; padding-top: 10px; font-weight: bold; }
         </style>
       </head>
       <body>
         <div class="header">
-          <h1>CONTRATO DE SERVICIO - ${client.contract_number}</h1>
+          <h1 style="color: #91045A; margin: 0;">CONTRATO DE PRESTACIÓN DE SERVICIOS</h1>
+          <p style="margin: 5px 0; font-weight: bold;">Contrato No: ${client.contract_number}</p>
         </div>
-        <p><strong>Titular:</strong> ${client.first_name} ${client.last_name}</p>
-        <p><strong>Viaje:</strong> ${tour.title}</p>
-        <p><span class="badge">HABITACIONES ASIGNADAS: ${roomsCount}</span></p>
         
+        <div style="display: flex; justify-content: space-between;">
+          <div>
+            <p><strong>CLIENTE:</strong> ${client.first_name} ${client.last_name}</p>
+            <p><strong>DESTINO:</strong> ${tour.title}</p>
+          </div>
+          <div style="text-align: right;">
+            <span class="badge">HABITACIONES: ${roomsCount}</span>
+          </div>
+        </div>
+
         <table>
-          <thead><tr style="background:#f9f9f9;"><th>Concepto</th><th>Cantidad</th><th>Monto</th></tr></thead>
+          <thead><tr><th align="left">Concepto de Alojamiento y Viaje</th><th align="center">Pasajeros</th><th align="right">Subtotal</th></tr></thead>
           <tbody>
             ${breakdownRows}
-            <tr class="total"><td>VALOR TOTAL DEL CONTRATO</td><td></td><td>$${client.total_amount.toLocaleString()} MXN</td></tr>
+            <tr class="total"><td colspan="2" align="right">VALOR TOTAL DEL CONTRATO:</td><td align="right">$${client.total_amount.toLocaleString()} MXN</td></tr>
           </tbody>
         </table>
-        <p style="margin-top: 50px; border-top: 2px solid #333; width: 250px; text-align: center;">Firma de Conformidad</p>
+
+        <p style="font-size: 10px; color: #888; margin-top: 20px;">* Las habitaciones son compartidas para 4 personas. Reservas individuales o de pareja cubren el costo total de la habitación doble.</p>
+
+        <div class="footer">
+          <div class="sign">FIRMA DEL CLIENTE</div>
+          <p style="font-size: 11px;">Acepto los términos y condiciones de este contrato.</p>
+        </div>
       </body>
     </html>
   `;
