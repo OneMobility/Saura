@@ -7,19 +7,18 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Hotel, Bus, Info } from 'lucide-react';
+import { Loader2, Hotel } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Textarea } from '@/components/ui/textarea';
 import { TourProviderService } from '@/types/shared';
 import { Badge } from '@/components/ui/badge';
-import { Switch } from '@/components/ui/switch';
 
 interface ClientBookingFormProps {
   isOpen: boolean;
   onClose: () => void;
   tourId: string;
   tourTitle: string;
-  tourSellingPrices: { double: number; triple: number; quad: number; child: number; transport_only: number };
+  tourSellingPrices: { double: number; triple: number; quad: number; child: number };
   advancePaymentPerPerson: number;
   agencySettings: any;
   initialSelectedSeats: number[];
@@ -32,7 +31,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
   const [formData, setFormData] = useState({
     first_name: '', last_name: '', email: '', phone: '', address: '',
     identification_number: '', contractor_age: null as number | null,
-    companions: [] as any[], is_transport_only: false
+    companions: [] as any[], extra_services: [] as TourProviderService[],
   });
   const [selectedSeats, setSelectedSeats] = useState<number[]>(initialSelectedSeats);
   const [totalAmount, setTotalAmount] = useState(0);
@@ -48,53 +47,74 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     const totalPax = selectedSeats.length;
     if (totalPax === 0) return;
 
-    if (formData.is_transport_only) {
-      const total = totalPax * (tourSellingPrices.transport_only || 0);
-      setTotalAmount(total);
-      setRoomsCount(0);
-      setBreakdown({ adults: totalPax, children: 0, details: [`${totalPax} Pasajeros en modalidad SOLO TRASLADO`] });
-    } else {
-      const neededRooms = Math.ceil(totalPax / 4);
-      setRoomsCount(neededRooms);
-      
-      let adultsCount = (formData.contractor_age === null || formData.contractor_age > 12) ? 1 : 0;
-      let childrenCount = (formData.contractor_age !== null && formData.contractor_age <= 12) ? 1 : 0;
-      formData.companions.forEach(c => { (c.age === null || c.age > 12) ? adultsCount++ : childrenCount++; });
+    const neededRooms = Math.ceil(totalPax / 4);
+    setRoomsCount(neededRooms);
 
-      let tempAdults = adultsCount;
-      let tempChildren = childrenCount;
-      let calculatedTotal = 0;
-      let details: string[] = [];
+    let adultsCount = (formData.contractor_age === null || formData.contractor_age > 12) ? 1 : 0;
+    let childrenCount = (formData.contractor_age !== null && formData.contractor_age <= 12) ? 1 : 0;
+    formData.companions.forEach(c => { (c.age === null || c.age > 12) ? adultsCount++ : childrenCount++; });
 
-      for (let i = 0; i < neededRooms; i++) {
-        const paxInRoom = Math.min(4, tempAdults + tempChildren);
-        const adultsInRoom = Math.min(paxInRoom, tempAdults);
-        const childrenInRoom = paxInRoom - adultsInRoom;
+    let tempAdults = adultsCount;
+    let tempChildren = childrenCount;
+    let calculatedTotal = 0;
+    let details: string[] = [];
 
-        if (paxInRoom === 1 && adultsInRoom === 1) {
-          calculatedTotal += (2 * tourSellingPrices.double);
-          details.push(`Hab. ${i+1}: Adulto Solo (Total Doble)`);
-        } else if (paxInRoom === 2 && adultsInRoom === 1 && childrenInRoom === 1) {
-          calculatedTotal += (2 * tourSellingPrices.double);
-          details.push(`Hab. ${i+1}: 1 Ad + 1 Niñ (Total Doble)`);
-        } else {
-          let occPrice = paxInRoom === 4 ? tourSellingPrices.quad : (paxInRoom === 3 ? tourSellingPrices.triple : tourSellingPrices.double);
-          calculatedTotal += (adultsInRoom * occPrice) + (childrenInRoom * tourSellingPrices.child);
-          details.push(`Hab. ${i+1}: Ocupación de ${paxInRoom} pax`);
-        }
-        tempAdults -= adultsInRoom;
-        tempChildren -= childrenInRoom;
+    for (let i = 0; i < neededRooms; i++) {
+      const paxInRoom = Math.min(4, tempAdults + tempChildren);
+      const adultsInRoom = Math.min(paxInRoom, tempAdults);
+      const childrenInRoom = paxInRoom - adultsInRoom;
+
+      // REGLA: 1 Adulto Solo paga el TOTAL de 2 Adultos en Doble
+      if (paxInRoom === 1 && adultsInRoom === 1) {
+        calculatedTotal += (2 * tourSellingPrices.double);
+        details.push(`Hab. ${i+1}: 1 Adulto Solo (Paga total de 2 adultos en doble)`);
       }
-      setTotalAmount(calculatedTotal);
-      setBreakdown({ adults: adultsCount, children: childrenCount, details });
+      // REGLA: 1 Adulto + 1 Niño = 2 Adultos en Doble
+      else if (paxInRoom === 2 && adultsInRoom === 1 && childrenInRoom === 1) {
+        calculatedTotal += (2 * tourSellingPrices.double);
+        details.push(`Hab. ${i+1}: 1 Adulto + 1 Niño (Cobrados como 2 adultos en doble)`);
+      }
+      // REGLA: Estándar (3-4 personas)
+      else {
+        let occPrice = tourSellingPrices.quad;
+        let label = "Cuádruple";
+        if (paxInRoom === 3) { occPrice = tourSellingPrices.triple; label = "Triple"; }
+        else if (paxInRoom === 2) { occPrice = tourSellingPrices.double; label = "Doble"; }
+
+        calculatedTotal += (adultsInRoom * occPrice) + (childrenInRoom * tourSellingPrices.child);
+        details.push(`Hab. ${i+1}: ${adultsInRoom} Ad. (${label}) + ${childrenInRoom} Niñ.`);
+      }
+
+      tempAdults -= adultsInRoom;
+      tempChildren -= childrenInRoom;
     }
-  }, [selectedSeats.length, formData.contractor_age, formData.companions.length, formData.is_transport_only, tourSellingPrices]);
+
+    setTotalAmount(calculatedTotal);
+    setBreakdown({ adults: adultsCount, children: childrenCount, details });
+
+    const neededComps = totalPax - 1;
+    if (neededComps !== formData.companions.length && neededComps >= 0) {
+      setFormData(p => {
+        let newComps = [...p.companions];
+        if (neededComps > newComps.length) {
+          const toAdd = neededComps - newComps.length;
+          newComps = [...newComps, ...Array.from({ length: toAdd }, () => ({ id: uuidv4(), name: '', age: null }))];
+        } else {
+          newComps = newComps.slice(0, neededComps);
+        }
+        return { ...p, companions: newComps };
+      });
+    }
+  }, [selectedSeats.length, formData.contractor_age, formData.companions.length, tourSellingPrices]);
 
   const handleSave = async () => {
+    if (!formData.first_name || !formData.address) return toast.error("Datos obligatorios faltantes.");
     setIsSubmitting(true);
-    const { error } = await supabase.from('clients').insert({
+    const contractNum = uuidv4().substring(0, 8).toUpperCase();
+    
+    await supabase.from('clients').insert({
       ...formData,
-      contract_number: uuidv4().substring(0, 8).toUpperCase(),
+      contract_number: contractNum,
       tour_id: tourId,
       number_of_people: selectedSeats.length,
       total_amount: totalAmount,
@@ -102,50 +122,50 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
       status: 'pending',
       room_details: { rooms_count: roomsCount }
     });
-    if (!error) { toast.success("Reserva realizada"); onClose(); }
+
+    toast.success("¡Reserva realizada!");
+    onClose();
     setIsSubmitting(false);
   };
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[700px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader><DialogTitle>Nueva Reserva: {tourTitle}</DialogTitle></DialogHeader>
+        <DialogHeader><DialogTitle>Detalles de Reserva: {tourTitle}</DialogTitle></DialogHeader>
+        
         <div className="space-y-6">
-          <div className="flex items-center justify-between p-4 bg-blue-50 border border-blue-100 rounded-2xl">
-            <div className="flex items-center gap-3">
-              <Bus className="h-6 w-6 text-blue-600" />
-              <div>
-                <Label className="text-blue-900 font-bold">¿Solo requiere traslado redondo?</Label>
-                <p className="text-[10px] text-blue-700">Sin hospedaje incluido. Precio especial por persona.</p>
-              </div>
-            </div>
-            <Switch checked={formData.is_transport_only} onCheckedChange={val => setFormData({...formData, is_transport_only: val})} />
-          </div>
-
           <div className="grid grid-cols-2 gap-4">
-             <Input placeholder="Nombre" value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} />
-             <Input placeholder="Edad" type="number" value={formData.contractor_age || ''} onChange={e => setFormData({...formData, contractor_age: parseInt(e.target.value) || null})} />
+             <div className="space-y-1"><Label>Nombre</Label><Input value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} /></div>
+             <div className="space-y-1"><Label>Edad</Label><Input type="number" value={formData.contractor_age || ''} onChange={e => setFormData({...formData, contractor_age: parseInt(e.target.value) || null})} /></div>
           </div>
-          <Textarea placeholder="Domicilio" value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} />
+          <div className="space-y-2"><Label>Dirección</Label><Textarea value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} /></div>
 
           <div className="bg-gray-900 text-white p-6 rounded-2xl shadow-xl">
              <div className="flex justify-between items-center mb-4">
-                <span className="text-rosa-mexicano font-black text-xs uppercase tracking-widest">Resumen de Liquidación</span>
-                <Badge variant="outline" className="text-white border-white/20">
-                  {formData.is_transport_only ? 'MODALIDAD TRASLADO' : `${roomsCount} Habitaciones`}
-                </Badge>
+                <div className="text-rosa-mexicano font-black uppercase text-xs tracking-widest flex items-center gap-2">
+                  <Hotel className="h-4 w-4" /> Alojamiento
+                </div>
+                <Badge className="bg-rosa-mexicano">{roomsCount} {roomsCount === 1 ? 'Habitación' : 'Habitaciones'}</Badge>
              </div>
-             <div className="space-y-2 text-sm opacity-80 italic">
-                {breakdown.details.map((d, i) => <p key={i}>- {d}</p>)}
-             </div>
-             <div className="flex justify-between font-black text-2xl pt-4 mt-4 border-t border-white/10">
-                <span>TOTAL:</span>
-                <span className="text-yellow-400">${totalAmount.toLocaleString()}</span>
+             
+             <div className="space-y-3 text-sm">
+                <div className="grid grid-cols-1 gap-1 border-b border-white/10 pb-3">
+                  {breakdown.details.map((d, i) => (
+                    <div key={i} className="flex items-center gap-2 opacity-80 italic">
+                      <div className="w-1 h-1 bg-rosa-mexicano rounded-full" /> {d}
+                    </div>
+                  ))}
+                </div>
+                <div className="flex justify-between font-black text-xl pt-2">
+                  <span className="text-gray-400 uppercase text-xs self-center">Total a Pagar:</span>
+                  <span className="text-yellow-400 text-2xl">${totalAmount.toLocaleString()}</span>
+                </div>
+                <p className="text-[9px] text-gray-500 mt-2">* Política: Las habitaciones son para 4 personas. Un pasajero solo o pareja debe cubrir el costo base de habitación doble.</p>
              </div>
           </div>
 
-          <Button onClick={handleSave} disabled={isSubmitting} className="w-full bg-rosa-mexicano h-14 text-lg font-black">
-            {isSubmitting ? <Loader2 className="animate-spin" /> : 'Confirmar Reserva'}
+          <Button onClick={handleSave} disabled={isSubmitting} className="w-full bg-rosa-mexicano h-14 text-lg font-black rounded-xl">
+            {isSubmitting ? <Loader2 className="animate-spin" /> : 'Confirmar y Reservar'}
           </Button>
         </div>
       </DialogContent>
