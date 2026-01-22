@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import ClientPaymentHistoryTable from '@/components/admin/clients/ClientPaymentHistoryTable';
+import { cn } from '@/lib/utils';
 
 const AdminClientFormPage = () => {
   const { id: clientIdFromParams } = useParams<{ id: string }>();
@@ -86,11 +87,7 @@ const AdminClientFormPage = () => {
         <main className="flex-grow container mx-auto px-4 py-8 max-w-6xl">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-6">
-              {formData.status === 'cancelled' && (
-                <AlertCircle className="absolute -left-12 h-10 w-10 text-red-600" />
-              )}
-              
-              <Card className={cn("shadow-lg border-none", formData.status === 'cancelled' && "border-l-8 border-red-600")}>
+              <Card className={cn("shadow-lg border-none relative overflow-hidden", formData.status === 'cancelled' && "border-l-8 border-red-600")}>
                 <CardHeader className="bg-gray-50 border-b flex flex-row justify-between items-center">
                   <CardTitle className="text-lg flex items-center gap-2">
                     <User className="h-5 w-5 text-rosa-mexicano" /> Datos del Contrato #{formData.contract_number}
