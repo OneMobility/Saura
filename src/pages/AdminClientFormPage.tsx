@@ -70,7 +70,6 @@ const AdminClientFormPage = () => {
     [selectedTour, availableBuses]
   );
 
-  // Lógica de Cálculo de Precios y Habitaciones
   useEffect(() => {
     if (!selectedTour) return;
     
@@ -84,7 +83,7 @@ const AdminClientFormPage = () => {
         const price = selectedTour.transport_only_price || 0;
         newTotal = totalPax * price;
         newRooms = 0;
-        newDetails = [`${totalPax} Pasajero(s) en Modalidad Solo Traslado ($${price} p/p)`];
+        newDetails = [`${totalPax} Pax en Solo Traslado ($${price} c/u)`];
       } else {
         newRooms = Math.ceil(totalPax / 4);
 
@@ -103,16 +102,24 @@ const AdminClientFormPage = () => {
           const childrenInRoom = paxInRoom - adultsInRoom;
 
           if ((paxInRoom === 1 && adultsInRoom === 1) || (paxInRoom === 2 && adultsInRoom === 1 && childrenInRoom === 1)) {
-            newTotal += (2 * selectedTour.selling_price_double_occupancy);
-            newDetails.push(`Hab. ${i+1}: Cargo base de Habitación Doble (2 pax)`);
+            const price = selectedTour.selling_price_double_occupancy;
+            newTotal += (2 * price);
+            newDetails.push(`Hab. ${i+1}: Cargo base Doble (2 Adultos x $${price})`);
           } else {
             let occPrice = selectedTour.selling_price_quad_occupancy;
             let label = "Cuádruple";
             if (paxInRoom === 3) { occPrice = selectedTour.selling_price_triple_occupancy; label = "Triple"; }
             else if (paxInRoom === 2) { occPrice = selectedTour.selling_price_double_occupancy; label = "Doble"; }
 
-            newTotal += (adultsInRoom * occPrice) + (childrenInRoom * selectedTour.selling_price_child);
-            newDetails.push(`Hab. ${i+1}: ${adultsInRoom} Ad. (${label}) + ${childrenInRoom} Niñ.`);
+            if (adultsInRoom > 0) {
+              newTotal += (adultsInRoom * occPrice);
+              newDetails.push(`Hab. ${i+1}: ${adultsInRoom} Adulto(s) en ${label} ($${occPrice} c/u)`);
+            }
+            if (childrenInRoom > 0) {
+              const childPrice = selectedTour.selling_price_child;
+              newTotal += (childrenInRoom * childPrice);
+              newDetails.push(`Hab. ${i+1}: ${childrenInRoom} Niño(s) ($${childPrice} c/u)`);
+            }
           }
 
           tempAdults -= adultsInRoom;
@@ -125,7 +132,6 @@ const AdminClientFormPage = () => {
     setBreakdownDetails(newDetails);
     setFormData((prev: any) => ({ ...prev, total_amount: newTotal }));
 
-    // Gestionar lista de acompañantes según asientos
     const neededComps = totalPax - 1;
     if (neededComps !== formData.companions.length && neededComps >= 0) {
       setFormData((p: any) => {
@@ -242,13 +248,13 @@ const AdminClientFormPage = () => {
                       <div className="flex items-center justify-between p-4 bg-rosa-mexicano/5 rounded-xl border border-rosa-mexicano/10">
                         <div className="space-y-1">
                           <Label className="text-base font-bold flex items-center gap-2"><BusFront className="h-5 w-5 text-rosa-mexicano" /> Modalidad Solo Traslado</Label>
-                          <p className="text-xs text-muted-foreground">Si se activa, no se cuentan habitaciones y se usa el precio de transporte.</p>
+                          <p className="text-xs text-muted-foreground">Activa esta opción si el cliente no requiere hotel.</p>
                         </div>
                         <Switch checked={formData.is_transport_only} onCheckedChange={val => setFormData({...formData, is_transport_only: val})} />
                       </div>
 
                       <div className="pt-4 border-t">
-                        <Label className="mb-4 block font-bold">Asientos Seleccionados: {clientSelectedSeats.length}</Label>
+                        <Label className="mb-4 block font-bold">Mapa de Asientos ({clientSelectedSeats.length} pax)</Label>
                         <TourSeatMap 
                           tourId={selectedTour.id} 
                           busCapacity={selectedTour.bus_capacity} 
