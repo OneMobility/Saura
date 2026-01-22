@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Edit, Trash2, Loader2, DollarSign, FileText, FileSignature, ChevronDown, ChevronRight, Package, AlertCircle } from 'lucide-react';
+import { Edit, Trash2, Loader2, DollarSign, FileText, FileSignature, ChevronDown, ChevronRight, Package, AlertCircle, Download } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -58,6 +58,42 @@ const ClientsTable: React.FC<{ refreshKey: number; onRegisterPayment: (client: C
       }));
       setClients(processed);
       processed.forEach(c => { if(openGroups[c.tour_title!] === undefined) setOpenGroups(p => ({...p, [c.tour_title!]: true})); });
+    }
+    setLoading(false);
+  };
+
+  const handleDownloadDoc = async (client: Client, functionName: string, label: string) => {
+    setIsDownloading(`${client.id}-${functionName}`);
+    try {
+      const { data, error } = await supabase.functions.invoke(functionName, {
+        body: { contractNumber: client.contract_number }
+      });
+      if (error) throw error;
+      
+      const newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.document.write(data);
+        newWindow.document.close();
+        setTimeout(() => newWindow.print(), 500);
+      }
+    } catch (err) {
+      toast.error(`Error al generar ${label}`);
+    } finally {
+      setIsDownloading(null);
+    }
+  };
+
+  const handleDeleteClient = async (id: string) => {
+    if (!window.confirm('¿Estás seguro de que quieres eliminar este registro por completo? Esta acción es irreversible y eliminará abonos y asientos asignados.')) {
+      return;
+    }
+    setLoading(true);
+    const { error } = await supabase.from('clients').delete().eq('id', id);
+    if (error) {
+      toast.error('Error al eliminar el cliente.');
+    } else {
+      toast.success('Cliente eliminado con éxito.');
+      fetchClients();
     }
     setLoading(false);
   };
@@ -144,8 +180,53 @@ const ClientsTable: React.FC<{ refreshKey: number; onRegisterPayment: (client: C
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          <Button variant="ghost" size="icon" onClick={() => onEditClient(client)} className="text-blue-600"><Edit className="h-4 w-4" /></Button>
-                          <Button variant="ghost" size="icon" onClick={() => onRegisterPayment(client)} className="text-green-600"><DollarSign className="h-4 w-4" /></Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            title="Ver/Editar Ficha"
+                            onClick={() => onEditClient(client)} 
+                            className="text-blue-600"
+                          >
+                            <Edit className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            title="Registrar Abono"
+                            onClick={() => onRegisterPayment(client)} 
+                            className="text-green-600"
+                          >
+                            <DollarSign className="h-4 w-4" />
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            title="Descargar Contrato"
+                            onClick={() => handleDownloadDoc(client, 'generate-service-contract', 'Contrato')} 
+                            className="text-rosa-mexicano"
+                            disabled={!!isDownloading}
+                          >
+                            {isDownloading === `${client.id}-generate-service-contract` ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSignature className="h-4 w-4" />}
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            title="Hoja de Reservación"
+                            onClick={() => handleDownloadDoc(client, 'generate-booking-sheet', 'Hoja de Reserva')} 
+                            className="text-blue-400"
+                            disabled={!!isDownloading}
+                          >
+                            {isDownloading === `${client.id}-generate-booking-sheet` ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                          </Button>
+                          <Button 
+                            variant="ghost" 
+                            size="icon" 
+                            title="Eliminar Registro"
+                            onClick={() => handleDeleteClient(client.id)} 
+                            className="text-red-400 hover:text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </div>
                       </TableCell>
                     </TableRow>
