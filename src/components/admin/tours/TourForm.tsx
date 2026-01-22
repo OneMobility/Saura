@@ -283,13 +283,17 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     }
 
     const { data: { user } } = await supabase.auth.getUser();
+    
+    // Preparar datos, incluyendo la columna obligatoria legacy 'selling_price_per_person'
     const dataToSave = { 
       ...formData, 
       image_url: finalImageUrl,
       user_id: user?.id,
       total_base_cost: financialSummary.totalCost,
       paying_clients_count: financialSummary.capacity,
-      cost_per_paying_person: financialSummary.capacity > 0 ? financialSummary.totalCost / financialSummary.capacity : 0
+      cost_per_paying_person: financialSummary.capacity > 0 ? financialSummary.totalCost / financialSummary.capacity : 0,
+      // Corregir restricción NOT NULL de la DB enviando el precio base (doble)
+      selling_price_per_person: formData.selling_price_double_occupancy 
     };
     
     const { error } = tourId 
@@ -645,7 +649,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
           <CardContent>
             <RichTextEditor value={formData.full_content} onChange={val => setFormData({...formData, full_content: val})} placeholder="Detalles extra..." className="min-h-[300px]" />
           </CardContent>
-        </Card>
 
         <div className="fixed bottom-6 right-6 flex gap-4 z-50">
           <Button type="button" variant="outline" onClick={() => navigate('/admin/tours')} className="bg-white shadow-lg px-6 h-12">Cancelar</Button>
