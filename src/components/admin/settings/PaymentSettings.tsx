@@ -11,6 +11,7 @@ import { Save, Loader2, CreditCard, Landmark, Plus, Trash2, ShieldAlert, Zap } f
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import { v4 as uuidv4 } from 'uuid';
+import { cn } from '@/lib/utils';
 
 interface BankAccount {
   id: string;
