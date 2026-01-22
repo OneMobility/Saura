@@ -10,6 +10,7 @@ import { useNavigate } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 interface Client {
   id: string;
@@ -35,10 +36,17 @@ interface ClientsTableProps {
   onEditClient: (client: Client) => void;
 }
 
+const statusOptions = [
+  { value: 'pending', label: 'Pendiente', color: 'bg-yellow-100 text-yellow-700' },
+  { value: 'confirmed', label: 'Confirmado', color: 'bg-green-100 text-green-700' },
+  { value: 'cancelled', label: 'Cancelado', color: 'bg-red-100 text-red-700' },
+  { value: 'completed', label: 'Completado', color: 'bg-blue-100 text-blue-700' },
+];
+
 const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayment, onEditClient }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isDownloading, setIsDownloading] = useState<string | null>(null); // 'contract-ID' or 'sheet-ID'
+  const [isDownloading, setIsDownloading] = useState<string | null>(null);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
 
@@ -72,6 +80,20 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
       setOpenGroups(initialOpen);
     }
     setLoading(false);
+  };
+
+  const handleStatusChange = async (clientId: string, newStatus: string) => {
+    const { error } = await supabase
+      .from('clients')
+      .update({ status: newStatus })
+      .eq('id', clientId);
+
+    if (error) {
+      toast.error('Error al actualizar el estado.');
+    } else {
+      setClients(prev => prev.map(c => c.id === clientId ? { ...c, status: newStatus } : c));
+      toast.success('Estado actualizado correctamente.');
+    }
   };
 
   const groupedClients = useMemo(() => {
@@ -181,6 +203,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                       <TableHead>Total</TableHead>
                       <TableHead>Abonado</TableHead>
                       <TableHead>Pendiente</TableHead>
+                      <TableHead>Estado</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -199,6 +222,25 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                           <span className={cn("font-bold", client.remaining_payment > 0 ? "text-red-500" : "text-green-600")}>
                             ${client.remaining_payment.toLocaleString()}
                           </span>
+                        </TableCell>
+                        <TableCell>
+                          <Select 
+                            value={client.status} 
+                            onValueChange={(val) => handleStatusChange(client.id, val)}
+                          >
+                            <SelectTrigger className={cn("h-8 w-[130px] text-xs font-bold border-none shadow-none", 
+                              statusOptions.find(o => o.value === client.status)?.color
+                            )}>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {statusOptions.map(opt => (
+                                <SelectItem key={opt.value} value={opt.value} className="text-xs font-bold">
+                                  {opt.label}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
                         </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
