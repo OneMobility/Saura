@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, MapPin, User, Users, BusFront, ArrowLeft } from 'lucide-react';
+import { Loader2, Save, MapPin, User, Users, BusFront, ArrowLeft, CreditCard } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
@@ -18,6 +18,7 @@ import TourSeatMap from '@/components/TourSeatMap';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import ClientPaymentHistoryTable from '@/components/admin/clients/ClientPaymentHistoryTable';
 
 const AdminClientFormPage = () => {
   const { id: clientIdFromParams } = useParams<{ id: string }>();
@@ -43,18 +44,46 @@ const AdminClientFormPage = () => {
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
+  const [refreshHistoryKey, setRefreshHistoryKey] = useState(0); // Para refrescar tabla tras cambios
   const [availableTours, setAvailableTours] = useState<any[]>([]);
   const [availableBuses, setAvailableBuses] = useState<any[]>([]);
   const [clientSelectedSeats, setClientSelectedSeats] = useState<number[]>([]);
   const [roomsCount, setRoomsCount] = useState(0);
   const [breakdownDetails, setBreakdownDetails] = useState<string[]>([]);
 
-  // Cargar dependencias y datos del cliente si es edición
+  const fetchClientData = async () => {
+    if (!clientIdFromParams) return;
+    const { data: client, error } = await supabase
+      .from('clients')
+      .select('*')
+      .eq('id', clientIdFromParams)
+      .single();
+
+    if (error) {
+      toast.error("Error al cargar los datos del cliente.");
+      navigate('/admin/clients');
+      return;
+    }
+
+    if (client) {
+      setFormData({
+        ...client,
+        companions: client.companions || [],
+        is_transport_only: client.is_transport_only || false
+      });
+
+      const { data: seats } = await supabase
+        .from('tour_seat_assignments')
+        .select('seat_number')
+        .eq('client_id', clientIdFromParams);
+      
+      if (seats) setClientSelectedSeats(seats.map(s => s.seat_number));
+    }
+  };
+
   useEffect(() => {
     const fetchData = async () => {
       setIsLoadingData(true);
-      
-      // 1. Cargar Tours y Buses
       const [toursRes, busesRes] = await Promise.all([
         supabase.from('tours').select('*').order('title', { ascending: true }),
         supabase.from('buses').select('*')
@@ -63,48 +92,16 @@ const AdminClientFormPage = () => {
       if (toursRes.data) setAvailableTours(toursRes.data);
       if (busesRes.data) setAvailableBuses(busesRes.data);
 
-      // 2. Si es edición, cargar datos del cliente
       if (clientIdFromParams) {
-        const { data: client, error } = await supabase
-          .from('clients')
-          .select('*')
-          .eq('id', clientIdFromParams)
-          .single();
-
-        if (error) {
-          toast.error("Error al cargar los datos del cliente.");
-          navigate('/admin/clients');
-          return;
-        }
-
-        if (client) {
-          setFormData({
-            ...client,
-            companions: client.companions || [],
-            is_transport_only: client.is_transport_only || false
-          });
-
-          // Cargar asientos reservados
-          const { data: seats } = await supabase
-            .from('tour_seat_assignments')
-            .select('seat_number')
-            .eq('client_id', clientIdFromParams);
-          
-          if (seats) {
-            setClientSelectedSeats(seats.map(s => s.seat_number));
-          }
-        }
+        await fetchClientData();
       } else {
-        // Si es nuevo, generar folio
         setFormData((prev: any) => ({
           ...prev,
           contract_number: uuidv4().substring(0, 8).toUpperCase()
         }));
       }
-      
       setIsLoadingData(false);
     };
-
     fetchData();
   }, [clientIdFromParams, navigate]);
 
@@ -118,7 +115,6 @@ const AdminClientFormPage = () => {
     [selectedTour, availableBuses]
   );
 
-  // Lógica de Cálculo de Liquidación
   useEffect(() => {
     if (!selectedTour || isLoadingData) return;
     
@@ -135,7 +131,6 @@ const AdminClientFormPage = () => {
         newDetails = [`${totalPax} Pax en Solo Traslado ($${price} c/u)`];
       } else {
         newRooms = Math.ceil(totalPax / 4);
-
         let adultsCount = (formData.contractor_age === null || formData.contractor_age > 12) ? 1 : 0;
         let childrenCount = (formData.contractor_age !== null && formData.contractor_age <= 12) ? 1 : 0;
         
@@ -171,7 +166,6 @@ const AdminClientFormPage = () => {
               newDetails.push(`Hab. ${i+1}: ${childrenInRoom} Niño(s) ($${selectedTour.selling_price_child} c/u)`);
             }
           }
-
           tempAdults -= adultsInRoom;
           tempChildren -= childrenInRoom;
         }
@@ -182,7 +176,6 @@ const AdminClientFormPage = () => {
     setBreakdownDetails(newDetails);
     setFormData((prev: any) => ({ ...prev, total_amount: newTotal }));
 
-    // Ajustar campos de acompañantes
     const neededComps = Math.max(0, totalPax - 1);
     if (neededComps !== formData.companions.length) {
       setFormData((p: any) => {
@@ -215,17 +208,14 @@ const AdminClientFormPage = () => {
       let currentId = clientIdFromParams;
 
       if (clientIdFromParams) {
-        // Actualizar cliente
         const { error } = await supabase.from('clients').update(dataToSave).eq('id', clientIdFromParams);
         if (error) throw error;
       } else {
-        // Insertar nuevo
         const { data, error } = await supabase.from('clients').insert(dataToSave).select('id').single();
         if (error) throw error;
         currentId = data.id;
       }
 
-      // Actualizar Asientos: Eliminar anteriores y crear nuevos para asegurar sincronía
       if (currentId) {
         await supabase.from('tour_seat_assignments').delete().eq('client_id', currentId);
         await supabase.from('tour_seat_assignments').insert(clientSelectedSeats.map(s => ({ 
@@ -243,6 +233,11 @@ const AdminClientFormPage = () => {
     } finally {
       setIsSubmitting(false);
     }
+  };
+
+  const handlePaymentsUpdated = () => {
+    setRefreshHistoryKey(p => p + 1);
+    fetchClientData(); // Recargar datos del cliente para ver el total_paid actualizado
   };
 
   if (sessionLoading || isLoadingData) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-rosa-mexicano h-12 w-12" /></div>;
@@ -312,32 +307,20 @@ const AdminClientFormPage = () => {
                 </CardContent>
               </Card>
 
-              {formData.companions.length > 0 && (
-                <Card className="shadow-lg border-none">
-                  <CardHeader className="bg-gray-50 border-b">
-                    <CardTitle className="text-lg flex items-center gap-2"><Users className="h-5 w-5 text-rosa-mexicano" /> Acompañantes</CardTitle>
-                  </CardHeader>
-                  <CardContent className="pt-6 space-y-4">
-                    {formData.companions.map((comp: any, idx: number) => (
-                      <div key={comp.id} className="grid grid-cols-3 gap-4 p-3 bg-gray-50 rounded-lg border">
-                        <div className="col-span-2 space-y-1">
-                          <Label className="text-[10px] uppercase font-bold">Nombre</Label>
-                          <Input value={comp.name} onChange={e => { const newC = [...formData.companions]; newC[idx].name = e.target.value; setFormData({...formData, companions: newC}); }} />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-[10px] uppercase font-bold">Edad</Label>
-                          <Input type="number" value={comp.age || ''} onChange={e => { const newC = [...formData.companions]; newC[idx].age = parseInt(e.target.value) || null; setFormData({...formData, companions: newC}); }} />
-                        </div>
-                      </div>
-                    ))}
-                  </CardContent>
-                </Card>
+              {clientIdFromParams && (
+                <ClientPaymentHistoryTable 
+                  clientId={clientIdFromParams} 
+                  key={refreshHistoryKey} 
+                  onPaymentsUpdated={handlePaymentsUpdated} 
+                />
               )}
             </div>
 
             <div className="space-y-6">
               <Card className="bg-gray-900 text-white shadow-xl sticky top-8">
-                <CardHeader className="border-b border-white/10"><CardTitle className="text-white">Resumen</CardTitle></CardHeader>
+                <CardHeader className="border-b border-white/10">
+                  <CardTitle className="text-white flex items-center gap-2"><CreditCard className="h-5 w-5 text-rosa-mexicano" /> Resumen de Contrato</CardTitle>
+                </CardHeader>
                 <CardContent className="pt-6 space-y-6">
                   <div className="flex justify-between items-center bg-white/5 p-4 rounded-xl">
                     <span className="text-xs font-bold text-gray-400">HABITACIONES</span>
@@ -351,11 +334,23 @@ const AdminClientFormPage = () => {
                       </div>
                     ))}
                   </div>
-                  <div className="pt-6 border-t border-white/10 flex justify-between items-end">
-                    <span className="text-xs font-bold text-gray-400 uppercase">Monto Total:</span>
-                    <span className="text-4xl font-black text-yellow-400">${formData.total_amount.toLocaleString()}</span>
+                  
+                  <div className="space-y-3 pt-4 border-t border-white/10">
+                    <div className="flex justify-between text-xs font-bold">
+                      <span className="text-gray-400">TOTAL CONTRATO:</span>
+                      <span className="text-white">${formData.total_amount.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between text-xs font-bold">
+                      <span className="text-gray-400">TOTAL ABONADO:</span>
+                      <span className="text-green-400">${formData.total_paid.toLocaleString()}</span>
+                    </div>
+                    <div className="flex justify-between items-end pt-2">
+                      <span className="text-xs font-bold text-gray-400 uppercase">PENDIENTE:</span>
+                      <span className="text-4xl font-black text-yellow-400">${(formData.total_amount - formData.total_paid).toLocaleString()}</span>
+                    </div>
                   </div>
-                  <Button type="submit" disabled={isSubmitting || !selectedTour} className="w-full bg-rosa-mexicano hover:bg-rosa-mexicano/90 h-14 text-lg font-black">
+
+                  <Button type="submit" disabled={isSubmitting || !selectedTour} className="w-full bg-rosa-mexicano hover:bg-rosa-mexicano/90 h-14 text-lg font-black rounded-xl">
                     {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
                     {clientIdFromParams ? "Actualizar Contrato" : "Confirmar Contrato"}
                   </Button>
