@@ -34,12 +34,11 @@ const generateServiceContractHtml = (data: any) => {
   // Acompañantes
   let companionsHtml = '<p>Sin acompañantes registrados.</p>';
   if (client.companions && client.companions.length > 0) {
-    companionsHtml = `<ol style="margin-top: 5px;">${client.companions.map((c: any) => `<li>${c.name} ${c.age ? `(${c.age} años)` : ''}</li>`).join('')}</ol>`;
+    companionsHtml = `<ol style="margin-top: 5px; padding-left: 15px;">${client.companions.map((c: any) => `<li>${c.name} ${c.age ? `(${c.age} años)` : ''}</li>`).join('')}</ol>`;
   } else if (!isTour && busPassengers && busPassengers.length > 1) {
-    // Si es bus, los acompañantes están en la tabla de pasajeros
     const others = busPassengers.filter((p: any) => !p.is_contractor);
     if (others.length > 0) {
-      companionsHtml = `<ol style="margin-top: 5px;">${others.map((c: any) => `<li>${c.first_name} ${c.last_name} (Asiento: ${c.seat_number})</li>`).join('')}</ol>`;
+      companionsHtml = `<ol style="margin-top: 5px; padding-left: 15px;">${others.map((c: any) => `<li>${c.first_name} ${c.last_name} (Asiento: ${c.seat_number})</li>`).join('')}</ol>`;
     }
   }
 
@@ -51,21 +50,23 @@ const generateServiceContractHtml = (data: any) => {
         <title>Contrato de Venta - ${client.contract_number}</title>
         <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;900&display=swap" rel="stylesheet">
         <style>
-            body { font-family: 'Poppins', sans-serif; line-height: 1.4; color: #333; margin: 0; padding: 0; font-size: 9pt; }
-            .page { width: 215.9mm; min-height: 279.4mm; margin: 0 auto; padding: 20mm; box-sizing: border-box; background: white; }
-            .header { text-align: center; border-bottom: 2px solid #91045A; padding-bottom: 10px; margin-bottom: 15px; }
-            .logo { max-width: 100px; margin-bottom: 5px; display: block; margin-left: auto; margin-right: auto; }
-            .contract-title { font-size: 14pt; font-weight: 900; color: #91045A; margin: 0; text-transform: uppercase; }
-            .contract-number { font-size: 11pt; font-weight: 700; margin-top: 3px; color: #333; }
-            .section-title { font-weight: 700; text-transform: uppercase; font-size: 10pt; color: #91045A; margin-top: 12px; border-bottom: 1px solid #eee; padding-bottom: 2px; margin-bottom: 8px; }
-            .details-table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
-            .details-table td { padding: 4px 8px; border: 1px solid #eee; font-size: 9pt; vertical-align: top; }
-            .details-table .label { font-weight: 600; background-color: #fcfcfc; width: 25%; color: #666; }
-            .clause { text-align: justify; margin-bottom: 6px; font-size: 8.5pt; }
-            .signatures { display: flex; justify-content: space-around; margin-top: 40px; }
-            .signature-box { border-top: 1px solid #000; width: 40%; text-align: center; padding-top: 5px; font-weight: 600; font-size: 9pt; }
+            body { font-family: 'Poppins', sans-serif; line-height: 1.25; color: #333; margin: 0; padding: 0; font-size: 8.5pt; }
+            .page { width: 215.9mm; min-height: 279.4mm; margin: 0 auto; padding: 15mm; box-sizing: border-box; background: white; border: 1px solid #eee; }
+            .header { text-align: center; border-bottom: 2px solid #91045A; padding-bottom: 8px; margin-bottom: 12px; }
+            .logo { max-width: 80px; margin-bottom: 4px; display: block; margin-left: auto; margin-right: auto; }
+            .contract-title { font-size: 12pt; font-weight: 900; color: #91045A; margin: 0; text-transform: uppercase; }
+            .contract-number { font-size: 10pt; font-weight: 700; margin-top: 2px; color: #333; }
+            .section-title { font-weight: 700; text-transform: uppercase; font-size: 9pt; color: #91045A; margin-top: 10px; border-bottom: 1px solid #eee; padding-bottom: 2px; margin-bottom: 6px; }
+            .details-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
+            .details-table td { padding: 3px 6px; border: 1px solid #eee; font-size: 8.5pt; vertical-align: top; }
+            .details-table .label { font-weight: 600; background-color: #fcfcfc; width: 20%; color: #666; }
+            .clauses-container { margin-top: 10px; }
+            .clause { text-align: justify; margin-bottom: 4px; font-size: 7.5pt; color: #444; }
+            .clause-title { font-weight: 700; color: #333; }
+            .signatures { display: flex; justify-content: space-around; margin-top: 25px; }
+            .signature-box { border-top: 1px solid #000; width: 40%; text-align: center; padding-top: 4px; font-weight: 600; font-size: 8.5pt; }
             .bold { font-weight: 700; }
-            @media print { .page { width: 100%; padding: 15mm; margin: 0; } }
+            @media print { .page { width: 100%; padding: 10mm; margin: 0; border: none; } }
         </style>
     </head>
     <body>
@@ -76,61 +77,71 @@ const generateServiceContractHtml = (data: any) => {
                 <p class="contract-number">CONTRATO No: ${client.contract_number}</p>
             </div>
 
-            <p class="clause">Contrato que celebran <span class="bold">SAURA TOURS</span> ("LA AGENCIA") y el/la <span class="bold">SR(A). ${clientFullName}</span> ("EL CLIENTE"), bajo las siguientes declaraciones y cláusulas:</p>
+            <p style="font-size: 8pt; margin-bottom: 8px;">Contrato que celebran <span class="bold">SAURA TOURS</span> ("LA AGENCIA") y el/la <span class="bold">SR(A). ${clientFullName}</span> ("EL CLIENTE"), bajo las siguientes declaraciones y cláusulas:</p>
 
-            <div class="section-title">DATOS DEL TITULAR (CLIENTE)</div>
+            <div class="section-title">DATOS DEL TITULAR Y VIAJE</div>
             <table class="details-table">
                 <tr>
-                    <td class="label">Nombre:</td><td>${clientFullName}</td>
-                    <td class="label">Identificación:</td><td>${client.identification_number || 'No proporcionada'}</td>
+                    <td class="label">Titular:</td><td>${clientFullName}</td>
+                    <td class="label">Identificación:</td><td>${client.identification_number || 'N/A'}</td>
                 </tr>
                 <tr>
                     <td class="label">Edad:</td><td>${client.contractor_age ? `${client.contractor_age} años` : 'N/A'}</td>
-                    <td class="label">Teléfono:</td><td>${client.phone || 'N/A'}</td>
+                    <td class="label">Domicilio:</td><td>${client.address || 'N/A'}</td>
                 </tr>
                 <tr>
-                    <td class="label">Domicilio:</td><td colspan="3">${client.address || 'Domicilio no registrado'}</td>
+                    <td class="label">Servicio:</td><td colspan="3"><span class="bold">${title}</span></td>
                 </tr>
-            </table>
-
-            <div class="section-title">DETALLES DEL VIAJE Y ACOMPAÑANTES</div>
-            <table class="details-table">
-                <tr><td class="label">Servicio:</td><td colspan="3"><span class="bold">${title}</span></td></tr>
                 <tr>
                     <td class="label">Salida:</td><td>${departureDate} - ${departureTime}</td>
                     <td class="label">Regreso:</td><td>${returnDate} - ${returnTime}</td>
                 </tr>
                 <tr>
                     <td class="label">Asientos:</td><td class="bold" style="color: #91045A;">${seatNumbers}</td>
-                    <td class="label">Pasajeros:</td><td>${client.number_of_people} Persona(s)</td>
+                    <td class="label">Total Pax:</td><td>${client.number_of_people} Persona(s)</td>
                 </tr>
             </table>
             
-            <div style="margin-left: 10px; margin-bottom: 15px;">
-                <span class="bold" style="font-size: 8.5pt; color: #666;">LISTA DE ACOMPAÑANTES:</span>
-                <div style="font-size: 8.5pt;">${companionsHtml}</div>
+            <div style="margin-bottom: 10px;">
+                <span class="bold" style="font-size: 8pt; color: #666;">ACOMPAÑANTES:</span>
+                <div style="font-size: 7.5pt;">${companionsHtml}</div>
             </div>
 
             <div class="section-title">ESTADO DE CUENTA</div>
             <table class="details-table">
                 <tr>
-                    <td class="label">Total Contrato:</td><td class="bold">$${client.total_amount.toLocaleString()} MXN</td>
-                    <td class="label">Liquidado:</td><td>$${client.total_paid.toLocaleString()} MXN</td>
-                    <td class="label">Pendiente:</td><td class="bold" style="color: red;">$${amountRemaining.toLocaleString()} MXN</td>
+                    <td class="label">Total Contrato:</td><td class="bold">$${client.total_amount.toLocaleString()}</td>
+                    <td class="label">Pagado:</td><td style="color: green;">$${client.total_paid.toLocaleString()}</td>
+                    <td class="label">Pendiente:</td><td class="bold" style="color: red;">$${(client.total_amount - client.total_paid).toLocaleString()}</td>
                 </tr>
             </table>
 
-            <div class="section-title">CLÁUSULAS PRINCIPALES</div>
-            <p class="clause"><span class="bold">1. ANTICIPOS:</span> La reservación solo es válida con el pago del anticipo pactado. <span class="bold">2. LIQUIDACIÓN:</span> El saldo debe cubrirse en su totalidad antes de la fecha de salida. <span class="bold">3. CANCELACIONES:</span> No hay reembolsos en cancelaciones con menos de 72h de anticipación. <span class="bold">4. IDENTIFICACIÓN:</span> Es obligatorio portar identificación oficial original para abordar. <span class="bold">5. SEGURO:</span> El servicio incluye seguro de viajero limitado a la responsabilidad civil del transporte.</p>
+            <div class="section-title">CLÁUSULAS DEL CONTRATO</div>
+            <div class="clauses-container">
+                <p class="clause"><span class="clause-title">PRIMERA (OBJETO):</span> LA AGENCIA se obliga a prestar a EL CLIENTE los servicios turísticos descritos en la carátula de este contrato.</p>
+                <p class="clause"><span class="clause-title">SEGUNDA (ANTICIPO):</span> EL CLIENTE se obliga a cubrir el anticipo pactado para garantizar su lugar. Sin anticipo, la reservación no tiene validez legal.</p>
+                <p class="clause"><span class="clause-title">TERCERA (LIQUIDACIÓN):</span> El saldo total deberá ser cubierto por EL CLIENTE a más tardar 15 días antes de la fecha programada de salida.</p>
+                <p class="clause"><span class="clause-title">CUARTA (CANCELACIONES):</span> Si EL CLIENTE cancela con más de 15 días de antelación, perderá el anticipo. Con menos de 72 horas, no habrá reembolso alguno.</p>
+                <p class="clause"><span class="clause-title">QUINTA (REPROGRAMACIÓN):</span> LA AGENCIA se reserva el derecho de modificar itinerarios por causas de fuerza mayor para garantizar la seguridad del grupo.</p>
+                <p class="clause"><span class="clause-title">SEXTA (IDENTIFICACIÓN):</span> Es responsabilidad de EL CLIENTE portar identificación oficial original (INE o Pasaporte) para abordar la unidad.</p>
+                <p class="clause"><span class="clause-title">SÉPTIMA (SEGURO):</span> El servicio incluye seguro de viajero limitado exclusivamente a la responsabilidad civil del transporte durante los traslados.</p>
+                <p class="clause"><span class="clause-title">OCTAVA (COMPORTAMIENTO):</span> LA AGENCIA podrá negar el servicio a personas bajo el influjo de sustancias o que alteren el orden del grupo.</p>
+                <p class="clause"><span class="clause-title">NOVENA (EQUIPAJE):</span> LA AGENCIA no se hace responsable por pérdida de objetos personales o equipaje olvidado en la unidad o instalaciones.</p>
+                <p class="clause"><span class="clause-title">DÉCIMA (ASIENTOS):</span> Los números de asiento asignados al momento de la reserva son definitivos y no están sujetos a cambios el día de la salida.</p>
+                <p class="clause"><span class="clause-title">DÉCIMA PRIMERA (MENORES):</span> Los menores de edad son responsabilidad absoluta de sus padres o tutores durante todo el trayecto y estancia.</p>
+                <p class="clause"><span class="clause-title">DÉCIMA SEGUNDA (IMPUNTUALIDAD):</span> LA AGENCIA no se responsabiliza por clientes que no lleguen a la hora pactada de salida; se aplicará política de NO SHOW.</p>
+                <p class="clause"><span class="clause-title">DÉCIMA TERCERA (JURISDICCIÓN):</span> Para la interpretación de este contrato, las partes se someten a las leyes y tribunales de la ciudad de Saltillo, Coahuila.</p>
+                <p class="clause"><span class="clause-title">DÉCIMA CUARTA (PRIVACIDAD):</span> Los datos personales proporcionados serán tratados conforme a la Ley Federal de Protección de Datos Personales.</p>
+            </div>
 
             <div class="signatures">
                 <div class="signature-box"><p>Representante Legal<br>SAURA TOURS</p></div>
                 <div class="signature-box"><p>${clientFullName}<br>EL CLIENTE</p></div>
             </div>
 
-            <div style="margin-top: 20px; text-align: center; font-size: 7pt; color: #999; border-top: 1px solid #eee; padding-top: 10px;">
+            <div style="margin-top: 15px; text-align: center; font-size: 7pt; color: #999; border-top: 1px solid #eee; padding-top: 8px;">
                 ${agency?.agency_address || ''} | WhatsApp: ${agency?.agency_phone || ''}<br>
-                Este documento es un comprobante oficial de su reservación. Fecha de emisión: ${contractDate}
+                Emisión: ${contractDate} | Documento Oficial de Saura Tours
             </div>
         </div>
     </body>
