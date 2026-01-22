@@ -58,9 +58,12 @@ const ToursTable: React.FC<{ onEditTour: (tour: any) => void; onTourDeleted: () 
         const clientsRevenue = activeClients.reduce((sum: number, c: any) => sum + (c.total_amount || 0), 0);
         const clientsPaid = activeClients.reduce((sum: number, c: any) => sum + (c.total_paid || 0), 0);
         
+        // Métrica C-V (Costo vs Venta Total proyectada)
         const totalVenta = clientsRevenue + (tour.other_income || 0);
         const balanceCV = (tour.total_base_cost || 0) - totalVenta;
-        const balanceAbonoCliente = clientsRevenue - clientsPaid;
+        
+        // Métrica C-Abono (Costo del Tour - Abono real en caja de clientes)
+        const balanceAbonoCliente = (tour.total_base_cost || 0) - clientsPaid;
 
         const busPaid = busesMap.get(tour.bus_id) || 0;
         const hotelsPaid = (tour.hotel_details || []).reduce((sum: number, h: any) => sum + (hotelsMap.get(h.hotel_quote_id) || 0), 0);
@@ -128,7 +131,7 @@ const ToursTable: React.FC<{ onEditTour: (tour: any) => void; onTourDeleted: () 
               <TableCell className="font-black text-xs text-rosa-mexicano">${tour.total_collected?.toLocaleString()}</TableCell>
               <TableCell>
                 <div className={cn("font-black text-xs", tour.balance_abono > 0 ? "text-red-500" : "text-green-600")}>
-                  ${tour.balance_abono.toLocaleString()}
+                  ${Math.abs(tour.balance_abono).toLocaleString()}
                 </div>
               </TableCell>
               <TableCell className="text-right">
