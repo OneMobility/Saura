@@ -51,6 +51,7 @@ const TourInquirySection = () => {
       if (newWindow) {
         newWindow.document.write(data);
         newWindow.document.close();
+        newWindow.focus();
       }
     } catch (err) {
       toast.error('No se pudo generar el documento.');
@@ -104,7 +105,6 @@ const TourInquirySection = () => {
 
         {contractDetails && (
           <div className="bg-white text-black p-0 rounded-3xl text-left shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* Header de Info */}
             <div className="bg-gray-900 text-white p-8">
               <div className="flex flex-wrap justify-between items-center gap-6">
                 <div>
@@ -120,7 +120,6 @@ const TourInquirySection = () => {
             </div>
 
             <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-12">
-              {/* Columna Izquierda: Datos y Documentos */}
               <div className="space-y-8">
                 <div>
                   <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4 flex items-center gap-2">
@@ -170,7 +169,6 @@ const TourInquirySection = () => {
                 </div>
               </div>
 
-              {/* Columna Derecha: Pagos y Estado */}
               <div className="space-y-8 bg-gray-50 p-6 rounded-3xl border border-gray-100">
                 <div>
                   <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-6">Estado de Cuenta</h4>
@@ -205,7 +203,6 @@ const TourInquirySection = () => {
               </div>
             </div>
 
-            {/* Tabla de Historial de Pagos */}
             <div className="p-8 border-t bg-white">
               <h4 className="text-lg font-black text-gray-800 mb-6 flex items-center gap-2">
                 <Calendar className="h-5 w-5 text-rosa-mexicano" /> Historial de Abonos Registrados
