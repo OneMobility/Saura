@@ -10,7 +10,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2, CreditCard, Landmark, Info, Save, CheckCircle2, UserCheck, MapPin } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Textarea } from '@/components/ui/textarea';
-import TourSeatMap from '@/components/TourSeatMap';
 import { TourProviderService, SeatLayout } from '@/types/shared';
 import { Badge } from '@/components/ui/badge';
 
@@ -173,7 +172,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
             clientId: newClient.id, 
             amount: advance, 
             description: `Anticipo Tour: ${tourTitle}`,
-            contractNumber: contractNum // Enviamos el número para la redirección
+            contractNumber: contractNum
           }
         });
 
@@ -207,18 +206,21 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Finalizar Reserva: {tourTitle}</DialogTitle>
-          {agencySettings?.payment_mode === 'test' && <Badge className="bg-yellow-400 text-black w-fit">Modo Sandbox (Pruebas)</Badge>}
         </DialogHeader>
 
         {!showBankInfo ? (
           <div className="space-y-8 py-4">
             <div className="p-4 bg-muted/50 rounded-xl border-l-4 border-rosa-mexicano flex items-center justify-between">
               <div>
-                <h3 className="font-bold flex items-center gap-2"><Info className="h-4 w-4" /> Resumen</h3>
-                <p className="text-sm">Asientos: <strong>{selectedSeats.join(', ')}</strong></p>
+                <h3 className="font-bold flex items-center gap-2"><Info className="h-4 w-4" /> Resumen de Selección</h3>
+                <div className="flex gap-1 mt-1 flex-wrap">
+                  {selectedSeats.map(s => (
+                    <Badge key={s} className="bg-rosa-mexicano/10 text-rosa-mexicano border-rosa-mexicano/20 font-bold">Asiento {s}</Badge>
+                  ))}
+                </div>
               </div>
               <div className="text-right">
-                <p className="text-xs uppercase opacity-60">Anticipo Total</p>
+                <p className="text-xs uppercase opacity-60 font-bold">Anticipo Requerido</p>
                 <p className="text-xl font-black text-rosa-mexicano">${(selectedSeats.length * advancePaymentPerPerson).toLocaleString()}</p>
               </div>
             </div>
@@ -246,11 +248,6 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
                 </div>
               </div>
             )}
-
-            <div className="space-y-4 pt-4 border-t">
-              <h3 className="font-bold">Verificar Asientos</h3>
-              <TourSeatMap tourId={tourId} busCapacity={busDetails.bus_capacity} courtesies={busDetails.courtesies} seatLayoutJson={busDetails.seat_layout_json} onSeatsSelected={setSelectedSeats} initialSelectedSeats={selectedSeats} />
-            </div>
 
             <div className="p-6 bg-gray-900 text-white rounded-2xl shadow-xl flex justify-between items-center border-b-4 border-rosa-mexicano">
               <div><p className="text-xs uppercase font-bold opacity-60">Total Reserva</p><h3 className="text-4xl font-black">${totalAmount.toLocaleString()}</h3></div>
