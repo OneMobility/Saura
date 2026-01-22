@@ -8,16 +8,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, MapPin, Hotel, User, Users, BusFront, ArrowLeft } from 'lucide-react';
+import { Loader2, Save, MapPin, User, Users, BusFront, ArrowLeft } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
 import TourSeatMap from '@/components/TourSeatMap';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
 
 const AdminClientFormPage = () => {
   const { id: clientIdFromParams } = useParams<{ id: string }>();
@@ -31,7 +31,7 @@ const AdminClientFormPage = () => {
     phone: '',
     address: '',
     identification_number: '',
-    contract_number: uuidv4().substring(0, 8).toUpperCase(),
+    contract_number: '',
     tour_id: null,
     companions: [],
     total_amount: 0,
@@ -42,23 +42,71 @@ const AdminClientFormPage = () => {
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isLoadingData, setIsLoadingData] = useState(true);
   const [availableTours, setAvailableTours] = useState<any[]>([]);
   const [availableBuses, setAvailableBuses] = useState<any[]>([]);
   const [clientSelectedSeats, setClientSelectedSeats] = useState<number[]>([]);
   const [roomsCount, setRoomsCount] = useState(0);
   const [breakdownDetails, setBreakdownDetails] = useState<string[]>([]);
 
+  // Cargar dependencias y datos del cliente si es edición
   useEffect(() => {
-    const fetchDeps = async () => {
+    const fetchData = async () => {
+      setIsLoadingData(true);
+      
+      // 1. Cargar Tours y Buses
       const [toursRes, busesRes] = await Promise.all([
         supabase.from('tours').select('*').order('title', { ascending: true }),
         supabase.from('buses').select('*')
       ]);
+      
       if (toursRes.data) setAvailableTours(toursRes.data);
       if (busesRes.data) setAvailableBuses(busesRes.data);
+
+      // 2. Si es edición, cargar datos del cliente
+      if (clientIdFromParams) {
+        const { data: client, error } = await supabase
+          .from('clients')
+          .select('*')
+          .eq('id', clientIdFromParams)
+          .single();
+
+        if (error) {
+          toast.error("Error al cargar los datos del cliente.");
+          navigate('/admin/clients');
+          return;
+        }
+
+        if (client) {
+          setFormData({
+            ...client,
+            companions: client.companions || [],
+            is_transport_only: client.is_transport_only || false
+          });
+
+          // Cargar asientos reservados
+          const { data: seats } = await supabase
+            .from('tour_seat_assignments')
+            .select('seat_number')
+            .eq('client_id', clientIdFromParams);
+          
+          if (seats) {
+            setClientSelectedSeats(seats.map(s => s.seat_number));
+          }
+        }
+      } else {
+        // Si es nuevo, generar folio
+        setFormData((prev: any) => ({
+          ...prev,
+          contract_number: uuidv4().substring(0, 8).toUpperCase()
+        }));
+      }
+      
+      setIsLoadingData(false);
     };
-    fetchDeps();
-  }, []);
+
+    fetchData();
+  }, [clientIdFromParams, navigate]);
 
   const selectedTour = useMemo(() => 
     availableTours.find(t => t.id === formData.tour_id), 
@@ -72,7 +120,7 @@ const AdminClientFormPage = () => {
 
   // Lógica de Cálculo de Liquidación
   useEffect(() => {
-    if (!selectedTour) return;
+    if (!selectedTour || isLoadingData) return;
     
     const totalPax = clientSelectedSeats.length;
     let newTotal = 0;
@@ -88,7 +136,6 @@ const AdminClientFormPage = () => {
       } else {
         newRooms = Math.ceil(totalPax / 4);
 
-        // Conteo preciso de Adultos y Niños
         let adultsCount = (formData.contractor_age === null || formData.contractor_age > 12) ? 1 : 0;
         let childrenCount = (formData.contractor_age !== null && formData.contractor_age <= 12) ? 1 : 0;
         
@@ -108,7 +155,7 @@ const AdminClientFormPage = () => {
           if ((paxInRoom === 1 && adultsInRoom === 1) || (paxInRoom === 2 && adultsInRoom === 1 && childrenInRoom === 1)) {
             const price = selectedTour.selling_price_double_occupancy;
             newTotal += (2 * price);
-            newDetails.push(`Hab. ${i+1}: Cargo Doble (Sencillo/Pareja paga x 2) ($${price} c/u)`);
+            newDetails.push(`Hab. ${i+1}: Cargo Doble ($${price} c/u)`);
           } else {
             let occPrice = selectedTour.selling_price_quad_occupancy;
             let label = "Cuádruple";
@@ -120,9 +167,8 @@ const AdminClientFormPage = () => {
               newDetails.push(`Hab. ${i+1}: ${adultsInRoom} Adulto(s) en ${label} ($${occPrice} c/u)`);
             }
             if (childrenInRoom > 0) {
-              const childPrice = selectedTour.selling_price_child;
-              newTotal += (childrenInRoom * childPrice);
-              newDetails.push(`Hab. ${i+1}: ${childrenInRoom} Niño(s) ($${childPrice} c/u)`);
+              newTotal += (childrenInRoom * selectedTour.selling_price_child);
+              newDetails.push(`Hab. ${i+1}: ${childrenInRoom} Niño(s) ($${selectedTour.selling_price_child} c/u)`);
             }
           }
 
@@ -137,8 +183,8 @@ const AdminClientFormPage = () => {
     setFormData((prev: any) => ({ ...prev, total_amount: newTotal }));
 
     // Ajustar campos de acompañantes
-    const neededComps = totalPax - 1;
-    if (neededComps !== formData.companions.length && neededComps >= 0) {
+    const neededComps = Math.max(0, totalPax - 1);
+    if (neededComps !== formData.companions.length) {
       setFormData((p: any) => {
         let newComps = [...p.companions];
         if (neededComps > newComps.length) {
@@ -150,34 +196,47 @@ const AdminClientFormPage = () => {
         return { ...p, companions: newComps };
       });
     }
-  }, [clientSelectedSeats.length, formData.contractor_age, formData.companions, formData.is_transport_only, selectedTour]);
+  }, [clientSelectedSeats.length, formData.contractor_age, formData.companions, formData.is_transport_only, selectedTour, isLoadingData]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!formData.tour_id) return toast.error("Selecciona un tour.");
     if (clientSelectedSeats.length === 0) return toast.error("Selecciona asientos.");
-    if (!formData.first_name || !formData.email) return toast.error("Faltan datos del contratante.");
 
     setIsSubmitting(true);
     try {
-      const { data, error } = await supabase.from('clients').insert({ 
+      const dataToSave = { 
         ...formData, 
         number_of_people: clientSelectedSeats.length,
-        room_details: formData.is_transport_only ? { transport_only: true } : { rooms_count: roomsCount }
-      }).select('id').single();
+        room_details: formData.is_transport_only ? { transport_only: true } : { rooms_count: roomsCount },
+        updated_at: new Date().toISOString()
+      };
 
-      if (error) throw error;
+      let currentId = clientIdFromParams;
 
-      if (data) {
+      if (clientIdFromParams) {
+        // Actualizar cliente
+        const { error } = await supabase.from('clients').update(dataToSave).eq('id', clientIdFromParams);
+        if (error) throw error;
+      } else {
+        // Insertar nuevo
+        const { data, error } = await supabase.from('clients').insert(dataToSave).select('id').single();
+        if (error) throw error;
+        currentId = data.id;
+      }
+
+      // Actualizar Asientos: Eliminar anteriores y crear nuevos para asegurar sincronía
+      if (currentId) {
+        await supabase.from('tour_seat_assignments').delete().eq('client_id', currentId);
         await supabase.from('tour_seat_assignments').insert(clientSelectedSeats.map(s => ({ 
           tour_id: formData.tour_id, 
           seat_number: s, 
           status: 'booked', 
-          client_id: data.id 
+          client_id: currentId 
         })));
       }
 
-      toast.success("Reserva administrativa creada con éxito.");
+      toast.success(clientIdFromParams ? "Cliente actualizado." : "Reserva creada con éxito.");
       navigate('/admin/clients');
     } catch (err: any) {
       toast.error(`Error: ${err.message}`);
@@ -186,13 +245,13 @@ const AdminClientFormPage = () => {
     }
   };
 
-  if (sessionLoading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
+  if (sessionLoading || isLoadingData) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-rosa-mexicano h-12 w-12" /></div>;
 
   return (
     <div className="flex min-h-screen bg-gray-100">
       <AdminSidebar />
       <div className="flex flex-col flex-grow">
-        <AdminHeader pageTitle="Registro Manual de Cliente">
+        <AdminHeader pageTitle={clientIdFromParams ? "Editar Cliente" : "Registro Manual de Cliente"}>
            <Button variant="outline" asChild><Link to="/admin/clients"><ArrowLeft className="h-4 w-4 mr-2" /> Volver</Link></Button>
         </AdminHeader>
 
@@ -204,34 +263,13 @@ const AdminClientFormPage = () => {
                   <CardTitle className="text-lg flex items-center gap-2"><User className="h-5 w-5 text-rosa-mexicano" /> Datos del Contratante</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Nombre(s)</Label>
-                    <Input value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Apellido(s)</Label>
-                    <Input value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Correo Electrónico</Label>
-                    <Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Teléfono / WhatsApp</Label>
-                    <Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Edad</Label>
-                    <Input type="number" value={formData.contractor_age || ''} onChange={e => setFormData({...formData, contractor_age: parseInt(e.target.value) || null})} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Identificación (INE/Pasaporte)</Label>
-                    <Input value={formData.identification_number} onChange={e => setFormData({...formData, identification_number: e.target.value})} />
-                  </div>
-                  <div className="md:col-span-2 space-y-2">
-                    <Label>Dirección</Label>
-                    <Textarea value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} rows={2} />
-                  </div>
+                  <div className="space-y-2"><Label>Nombre(s)</Label><Input value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} required /></div>
+                  <div className="space-y-2"><Label>Apellido(s)</Label><Input value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} required /></div>
+                  <div className="space-y-2"><Label>Email</Label><Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required /></div>
+                  <div className="space-y-2"><Label>WhatsApp</Label><Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
+                  <div className="space-y-2"><Label>Edad</Label><Input type="number" value={formData.contractor_age || ''} onChange={e => setFormData({...formData, contractor_age: parseInt(e.target.value) || null})} /></div>
+                  <div className="space-y-2"><Label>Identificación</Label><Input value={formData.identification_number} onChange={e => setFormData({...formData, identification_number: e.target.value})} /></div>
+                  <div className="md:col-span-2 space-y-2"><Label>Dirección</Label><Textarea value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} rows={2} /></div>
                 </CardContent>
               </Card>
 
@@ -243,7 +281,7 @@ const AdminClientFormPage = () => {
                   <div className="space-y-2">
                     <Label>Destino / Tour</Label>
                     <Select value={formData.tour_id} onValueChange={v => setFormData({...formData, tour_id: v})}>
-                      <SelectTrigger className="h-12"><SelectValue placeholder="Selecciona un tour activo" /></SelectTrigger>
+                      <SelectTrigger className="h-12"><SelectValue placeholder="Selecciona un tour" /></SelectTrigger>
                       <SelectContent>{availableTours.map(t => <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>)}</SelectContent>
                     </Select>
                   </div>
@@ -252,21 +290,21 @@ const AdminClientFormPage = () => {
                     <div className="space-y-6">
                       <div className="flex items-center justify-between p-4 bg-rosa-mexicano/5 rounded-xl border border-rosa-mexicano/10">
                         <div className="space-y-1">
-                          <Label className="text-base font-bold flex items-center gap-2"><BusFront className="h-5 w-5 text-rosa-mexicano" /> Modalidad Solo Traslado</Label>
-                          <p className="text-xs text-muted-foreground">Activa esta opción si el cliente no requiere hotel.</p>
+                          <Label className="text-base font-bold flex items-center gap-2"><BusFront className="h-5 w-5 text-rosa-mexicano" /> Solo Traslado</Label>
+                          <p className="text-xs text-muted-foreground">Activa si no requiere hotel.</p>
                         </div>
                         <Switch checked={formData.is_transport_only} onCheckedChange={val => setFormData({...formData, is_transport_only: val})} />
                       </div>
-
                       <div className="pt-4 border-t">
-                        <Label className="mb-4 block font-bold">Selección de Asientos ({clientSelectedSeats.length} pax)</Label>
+                        <Label className="mb-4 block font-bold">Mapa de Asientos ({clientSelectedSeats.length} pax)</Label>
                         <TourSeatMap 
                           tourId={selectedTour.id} 
                           busCapacity={selectedTour.bus_capacity} 
                           courtesies={selectedTour.courtesies} 
                           seatLayoutJson={currentBus?.seat_layout_json} 
                           onSeatsSelected={setClientSelectedSeats} 
-                          initialSelectedSeats={clientSelectedSeats} 
+                          initialSelectedSeats={clientSelectedSeats}
+                          currentClientId={clientIdFromParams}
                         />
                       </div>
                     </div>
@@ -283,27 +321,12 @@ const AdminClientFormPage = () => {
                     {formData.companions.map((comp: any, idx: number) => (
                       <div key={comp.id} className="grid grid-cols-3 gap-4 p-3 bg-gray-50 rounded-lg border">
                         <div className="col-span-2 space-y-1">
-                          <Label className="text-[10px] uppercase font-bold">Nombre Completo</Label>
-                          <Input 
-                            value={comp.name} 
-                            onChange={e => {
-                              const newC = [...formData.companions];
-                              newC[idx].name = e.target.value;
-                              setFormData({...formData, companions: newC});
-                            }}
-                          />
+                          <Label className="text-[10px] uppercase font-bold">Nombre</Label>
+                          <Input value={comp.name} onChange={e => { const newC = [...formData.companions]; newC[idx].name = e.target.value; setFormData({...formData, companions: newC}); }} />
                         </div>
                         <div className="space-y-1">
                           <Label className="text-[10px] uppercase font-bold">Edad</Label>
-                          <Input 
-                            type="number" 
-                            value={comp.age || ''} 
-                            onChange={e => {
-                              const newC = [...formData.companions];
-                              newC[idx].age = parseInt(e.target.value) || null;
-                              setFormData({...formData, companions: newC});
-                            }}
-                          />
+                          <Input type="number" value={comp.age || ''} onChange={e => { const newC = [...formData.companions]; newC[idx].age = parseInt(e.target.value) || null; setFormData({...formData, companions: newC}); }} />
                         </div>
                       </div>
                     ))}
@@ -314,23 +337,13 @@ const AdminClientFormPage = () => {
 
             <div className="space-y-6">
               <Card className="bg-gray-900 text-white shadow-xl sticky top-8">
-                <CardHeader className="border-b border-white/10">
-                  <CardTitle className="text-white flex items-center gap-2">Resumen de Liquidación</CardTitle>
-                </CardHeader>
+                <CardHeader className="border-b border-white/10"><CardTitle className="text-white">Resumen</CardTitle></CardHeader>
                 <CardContent className="pt-6 space-y-6">
-                  {!formData.is_transport_only ? (
-                    <div className="flex justify-between items-center bg-white/5 p-4 rounded-xl border border-white/10">
-                      <span className="text-xs uppercase font-bold text-gray-400">Habitaciones</span>
-                      <span className="text-3xl font-black text-rosa-mexicano">{roomsCount}</span>
-                    </div>
-                  ) : (
-                    <div className="bg-rosa-mexicano/20 p-4 rounded-xl border border-rosa-mexicano/30 text-center">
-                      <p className="text-xs font-black uppercase text-rosa-mexicano">MODALIDAD SOLO TRASLADO</p>
-                    </div>
-                  )}
-
+                  <div className="flex justify-between items-center bg-white/5 p-4 rounded-xl">
+                    <span className="text-xs font-bold text-gray-400">HABITACIONES</span>
+                    <span className="text-3xl font-black text-rosa-mexicano">{roomsCount}</span>
+                  </div>
                   <div className="space-y-2">
-                    <p className="text-[10px] uppercase font-bold text-gray-500 tracking-tighter">Desglose de Cargos:</p>
                     {breakdownDetails.map((d, i) => (
                       <div key={i} className="text-[11px] opacity-80 flex items-start gap-2">
                         <div className="w-1.5 h-1.5 rounded-full bg-rosa-mexicano mt-1 shrink-0" />
@@ -338,21 +351,13 @@ const AdminClientFormPage = () => {
                       </div>
                     ))}
                   </div>
-
-                  <div className="pt-6 border-t border-white/10">
-                    <div className="flex justify-between items-end">
-                      <span className="text-xs font-bold text-gray-400 uppercase">Monto Total:</span>
-                      <span className="text-4xl font-black text-yellow-400">${formData.total_amount.toLocaleString()}</span>
-                    </div>
+                  <div className="pt-6 border-t border-white/10 flex justify-between items-end">
+                    <span className="text-xs font-bold text-gray-400 uppercase">Monto Total:</span>
+                    <span className="text-4xl font-black text-yellow-400">${formData.total_amount.toLocaleString()}</span>
                   </div>
-
-                  <Button 
-                    type="submit" 
-                    disabled={isSubmitting || !selectedTour} 
-                    className="w-full bg-rosa-mexicano hover:bg-rosa-mexicano/90 h-14 text-lg font-black shadow-xl mt-4"
-                  >
+                  <Button type="submit" disabled={isSubmitting || !selectedTour} className="w-full bg-rosa-mexicano hover:bg-rosa-mexicano/90 h-14 text-lg font-black">
                     {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
-                    Confirmar Contrato
+                    {clientIdFromParams ? "Actualizar Contrato" : "Confirmar Contrato"}
                   </Button>
                 </CardContent>
               </Card>
