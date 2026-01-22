@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Printer, Trash2, CreditCard, Hand, ShieldCheck, Landmark } from 'lucide-react';
+import { Loader2, Printer, Trash2, CreditCard, Hand, ShieldCheck, Landmark, Globe } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
@@ -66,7 +66,8 @@ const ClientPaymentHistoryTable: React.FC<ClientPaymentHistoryTableProps> = ({ c
   };
 
   const getMethodBadge = (method: string) => {
-    switch (method) {
+    const m = method?.toLowerCase();
+    switch (m) {
       case 'mercadopago':
         return (
           <Badge variant="default" className="bg-blue-600 hover:bg-blue-700 gap-1">
@@ -77,6 +78,12 @@ const ClientPaymentHistoryTable: React.FC<ClientPaymentHistoryTableProps> = ({ c
         return (
           <Badge variant="default" className="bg-indigo-600 hover:bg-indigo-700 gap-1">
             <ShieldCheck className="h-3 w-3" /> Stripe
+          </Badge>
+        );
+      case 'online':
+        return (
+          <Badge variant="default" className="bg-pink-600 hover:bg-pink-700 gap-1">
+            <Globe className="h-3 w-3" /> Pago en Línea
           </Badge>
         );
       case 'transferencia':

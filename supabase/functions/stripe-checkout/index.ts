@@ -53,7 +53,7 @@ serve(async (req) => {
         quantity: 1,
       }],
       mode: 'payment',
-      success_url: `${req.headers.get("origin")}/payment-success?contract=${contractNumber}&amount=${amount}`,
+      success_url: `${req.headers.get("origin")}/payment-success?contract=${contractNumber}&amount=${amount}&method=stripe`,
       cancel_url: `${req.headers.get("origin")}/payment-failure`,
       client_reference_id: clientId,
     });
