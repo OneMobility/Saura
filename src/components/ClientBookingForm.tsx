@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Hotel, Info, MapPin, User, CheckCircle2 } from 'lucide-react';
+import { Loader2, Hotel, Info, CheckCircle2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Textarea } from '@/components/ui/textarea';
 import { TourProviderService, SeatLayout } from '@/types/shared';
@@ -47,42 +47,46 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     const totalPax = selectedSeats.length;
     if (totalPax === 0) return;
 
-    // 1. Calcular número de habitaciones (1 cada 4 personas)
+    // 1. Una habitación cada 4 personas (1-4 = 1 hab, 5-8 = 2 habs, etc)
     const neededRooms = Math.ceil(totalPax / 4);
     setRoomsCount(neededRooms);
 
-    // 2. Contar Adultos y Niños (<= 12 años)
+    // 2. Clasificar por edad (<= 12 es niño)
     let adultsCount = (formData.contractor_age === null || formData.contractor_age > 12) ? 1 : 0;
     let childrenCount = (formData.contractor_age !== null && formData.contractor_age <= 12) ? 1 : 0;
     formData.companions.forEach(c => { (c.age === null || c.age > 12) ? adultsCount++ : childrenCount++; });
 
-    // 3. Algoritmo de Cobro por Ocupación
+    // 3. Motor de Cálculo por Ocupación
     let tempAdults = adultsCount;
     let tempChildren = childrenCount;
     let calculatedTotal = 0;
     let details: string[] = [];
 
-    // Llenamos las habitaciones
     for (let i = 0; i < neededRooms; i++) {
-      // Determinar cuántos van en esta habitación (máximo 4)
-      const remainingPax = tempAdults + tempChildren;
-      const paxInRoom = Math.min(4, remainingPax);
-      
-      // La ocupación de la habitación define el precio del adulto
-      let occupancyPrice = tourSellingPrices.quad;
-      let label = "Cuádruple";
-      
-      if (paxInRoom === 3) { occupancyPrice = tourSellingPrices.triple; label = "Triple"; }
-      else if (paxInRoom <= 2) { occupancyPrice = tourSellingPrices.double; label = "Doble"; }
-
+      const paxInRoom = Math.min(4, tempAdults + tempChildren);
       const adultsInRoom = Math.min(paxInRoom, tempAdults);
       const childrenInRoom = paxInRoom - adultsInRoom;
 
-      calculatedTotal += (adultsInRoom * occupancyPrice);
-      calculatedTotal += (childrenInRoom * tourSellingPrices.child);
-
-      if (adultsInRoom > 0) details.push(`${adultsInRoom} Adulto(s) en ${label}`);
-      if (childrenInRoom > 0) details.push(`${childrenInRoom} Niño(s) en ${label}`);
+      // REGLA: 1 Adulto + 1 Niño = 2 Adultos en Doble (Niños no aplican en dobles)
+      if (paxInRoom === 2 && adultsInRoom === 1 && childrenInRoom === 1) {
+        calculatedTotal += (2 * tourSellingPrices.double);
+        details.push(`Hab. ${i+1}: 1 Adulto + 1 Niño (Cobrados como 2 Adultos en Doble)`);
+      } 
+      // REGLA: Ocupación Triple
+      else if (paxInRoom === 3) {
+        calculatedTotal += (adultsInRoom * tourSellingPrices.triple) + (childrenInRoom * tourSellingPrices.child);
+        details.push(`Hab. ${i+1}: ${adultsInRoom} Adulto(s) en Triple + ${childrenInRoom} Niño(s)`);
+      }
+      // REGLA: Ocupación Cuádruple
+      else if (paxInRoom === 4) {
+        calculatedTotal += (adultsInRoom * tourSellingPrices.quad) + (childrenInRoom * tourSellingPrices.child);
+        details.push(`Hab. ${i+1}: ${adultsInRoom} Adulto(s) en Cuádruple + ${childrenInRoom} Niño(s)`);
+      }
+      // REGLA: Ocupación Doble (2 adultos) o Sencilla (usamos doble como base)
+      else {
+        calculatedTotal += (adultsInRoom * tourSellingPrices.double) + (childrenInRoom * tourSellingPrices.child);
+        details.push(`Hab. ${i+1}: ${adultsInRoom} Adulto(s) en Doble/Sencilla`);
+      }
 
       tempAdults -= adultsInRoom;
       tempChildren -= childrenInRoom;
@@ -91,7 +95,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     setTotalAmount(calculatedTotal);
     setBreakdown({ adults: adultsCount, children: childrenCount, details });
 
-    // Sincronizar acompañantes
+    // Sincronizar campos de acompañantes
     const neededComps = totalPax - 1;
     if (neededComps !== formData.companions.length && neededComps >= 0) {
       setFormData(p => {
@@ -120,7 +124,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
       total_amount: totalAmount,
       advance_payment: selectedSeats.length * advancePaymentPerPerson,
       status: 'pending',
-      room_details: { rooms_count: roomsCount } // Guardamos el conteo
+      room_details: { rooms_count: roomsCount }
     });
 
     toast.success("¡Reserva enviada exitosamente!");
@@ -138,15 +142,14 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
              <div className="space-y-1"><Label>Nombre</Label><Input value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} /></div>
              <div className="space-y-1"><Label>Edad del Titular</Label><Input type="number" value={formData.contractor_age || ''} onChange={e => setFormData({...formData, contractor_age: parseInt(e.target.value) || null})} /></div>
           </div>
-          
           <div className="space-y-2"><Label>Domicilio Completo</Label><Textarea value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} /></div>
 
           <div className="bg-gray-900 text-white p-6 rounded-2xl shadow-xl">
              <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2 text-rosa-mexicano font-black uppercase text-xs tracking-widest">
-                  <Hotel className="h-4 w-4" /> Distribución de Viaje
+                  <Hotel className="h-4 w-4" /> Resumen de Alojamiento
                 </div>
-                <Badge className="bg-rosa-mexicano text-sm">{roomsCount} {roomsCount === 1 ? 'Habitación' : 'Habitaciones'}</Badge>
+                <Badge className="bg-rosa-mexicano">{roomsCount} {roomsCount === 1 ? 'Habitación' : 'Habitaciones'}</Badge>
              </div>
              
              <div className="space-y-3 text-sm">
@@ -161,11 +164,11 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
                   <span className="text-gray-400">TOTAL:</span>
                   <span className="text-yellow-400">${totalAmount.toLocaleString()}</span>
                 </div>
-                <p className="text-[10px] text-gray-500">* Los adultos pagan según la ocupación final de la habitación.</p>
+                <p className="text-[10px] text-gray-500">* Nota: En habitaciones compartidas por solo 1 adulto y 1 niño, el menor se cobra como adulto para cubrir la tarifa de habitación doble.</p>
              </div>
           </div>
 
-          <Button onClick={handleSave} disabled={isSubmitting} className="w-full bg-rosa-mexicano h-14 text-lg font-black shadow-lg">
+          <Button onClick={handleSave} disabled={isSubmitting} className="w-full bg-rosa-mexicano h-14 text-lg font-black">
             {isSubmitting ? <Loader2 className="animate-spin" /> : 'Confirmar Reserva'}
           </Button>
         </div>

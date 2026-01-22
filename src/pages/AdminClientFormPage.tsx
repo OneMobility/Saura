@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, Users, Armchair, MapPin, DollarSign, Hotel, List, Wallet } from 'lucide-react';
+import { Loader2, Save, Users, Armchair, MapPin, DollarSign, Hotel, List } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
@@ -71,19 +71,23 @@ const AdminClientFormPage = () => {
 
     for (let i = 0; i < neededRooms; i++) {
       const paxInRoom = Math.min(4, tempAdults + tempChildren);
-      let occupancyPrice = selectedTour.selling_price_quad_occupancy;
-      let label = "Cuádruple";
-      
-      if (paxInRoom === 3) { occupancyPrice = selectedTour.selling_price_triple_occupancy; label = "Triple"; }
-      else if (paxInRoom <= 2) { occupancyPrice = selectedTour.selling_price_double_occupancy; label = "Doble"; }
-
       const adultsInRoom = Math.min(paxInRoom, tempAdults);
       const childrenInRoom = paxInRoom - adultsInRoom;
 
-      calculatedTotal += (adultsInRoom * occupancyPrice) + (childrenInRoom * selectedTour.selling_price_child);
-      
-      if (adultsInRoom > 0) details.push(`${adultsInRoom} Ad. (${label})`);
-      if (childrenInRoom > 0) details.push(`${childrenInRoom} Niñ. (${label})`);
+      // REGLA: 1 Adulto + 1 Niño = 2 Adultos en Doble
+      if (paxInRoom === 2 && adultsInRoom === 1 && childrenInRoom === 1) {
+        calculatedTotal += (2 * selectedTour.selling_price_double_occupancy);
+        details.push(`Hab. ${i+1}: 1 Ad + 1 Niñ (como 2 Ad Doble)`);
+      } else if (paxInRoom === 3) {
+        calculatedTotal += (adultsInRoom * selectedTour.selling_price_triple_occupancy) + (childrenInRoom * selectedTour.selling_price_child);
+        details.push(`Hab. ${i+1}: ${adultsInRoom} Ad (Trp) + ${childrenInRoom} Niñ`);
+      } else if (paxInRoom === 4) {
+        calculatedTotal += (adultsInRoom * selectedTour.selling_price_quad_occupancy) + (childrenInRoom * selectedTour.selling_price_child);
+        details.push(`Hab. ${i+1}: ${adultsInRoom} Ad (Cua) + ${childrenInRoom} Niñ`);
+      } else {
+        calculatedTotal += (adultsInRoom * selectedTour.selling_price_double_occupancy) + (childrenInRoom * selectedTour.selling_price_child);
+        details.push(`Hab. ${i+1}: ${adultsInRoom} Ad (Dbl) + ${childrenInRoom} Niñ`);
+      }
 
       tempAdults -= adultsInRoom;
       tempChildren -= childrenInRoom;
@@ -109,7 +113,7 @@ const AdminClientFormPage = () => {
         tour_id: formData.tour_id, seat_number: s, status: 'booked', client_id: data.id 
       })));
     }
-    toast.success("Reserva administrativa guardada.");
+    toast.success("Reserva guardada.");
     navigate('/admin/clients');
   };
 

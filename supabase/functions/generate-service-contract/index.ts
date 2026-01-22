@@ -21,17 +21,21 @@ const generateHtml = (data: any) => {
 
   for (let i = 0; i < roomsCount; i++) {
     const paxInRoom = Math.min(4, tempAdults + tempChildren);
-    let occupancyLabel = paxInRoom === 4 ? "Cuádruple" : (paxInRoom === 3 ? "Triple" : "Doble");
-    let adultPrice = paxInRoom === 4 ? tour.selling_price_quad_occupancy : (paxInRoom === 3 ? tour.selling_price_triple_occupancy : tour.selling_price_double_occupancy);
-
     const adultsInRoom = Math.min(paxInRoom, tempAdults);
     const childrenInRoom = paxInRoom - adultsInRoom;
 
-    if (adultsInRoom > 0) {
-      breakdownRows += `<tr><td>Habitación ${i+1} - Adultos en ${occupancyLabel}</td><td>${adultsInRoom}</td><td>$${(adultsInRoom * adultPrice).toLocaleString()}</td></tr>`;
-    }
-    if (childrenInRoom > 0) {
-      breakdownRows += `<tr><td>Habitación ${i+1} - Niños (<=12 años)</td><td>${childrenInRoom}</td><td>$${(childrenInRoom * tour.selling_price_child).toLocaleString()}</td></tr>`;
+    if (paxInRoom === 2 && adultsInRoom === 1 && childrenInRoom === 1) {
+      breakdownRows += `<tr><td>Habitación ${i+1}: Servicio en Doble (1 Ad + 1 Niñ como 2 Ad)</td><td>1 Pareja</td><td>$${(2 * tour.selling_price_double_occupancy).toLocaleString()}</td></tr>`;
+    } else {
+      let occupancyLabel = paxInRoom === 4 ? "Cuádruple" : (paxInRoom === 3 ? "Triple" : "Doble");
+      let adultPrice = paxInRoom === 4 ? tour.selling_price_quad_occupancy : (paxInRoom === 3 ? tour.selling_price_triple_occupancy : tour.selling_price_double_occupancy);
+
+      if (adultsInRoom > 0) {
+        breakdownRows += `<tr><td>Habitación ${i+1}: Adultos en Ocupación ${occupancyLabel}</td><td>${adultsInRoom}</td><td>$${(adultsInRoom * adultPrice).toLocaleString()}</td></tr>`;
+      }
+      if (childrenInRoom > 0) {
+        breakdownRows += `<tr><td>Habitación ${i+1}: Tarifa Menor (Niños)</td><td>${childrenInRoom}</td><td>$${(childrenInRoom * tour.selling_price_child).toLocaleString()}</td></tr>`;
+      }
     }
 
     tempAdults -= adultsInRoom;
@@ -44,7 +48,7 @@ const generateHtml = (data: any) => {
         <style>
           body { font-family: sans-serif; color: #333; padding: 40px; }
           .header { border-bottom: 3px solid #91045A; margin-bottom: 20px; }
-          .badge { background: #91045A; color: white; padding: 5px 15px; border-radius: 20px; font-weight: bold; }
+          .badge { background: #91045A; color: white; padding: 10px; border-radius: 5px; font-weight: bold; }
           table { width: 100%; border-collapse: collapse; margin-top: 20px; }
           th, td { border: 1px solid #eee; padding: 12px; text-align: left; }
           .total { background: #91045A; color: white; font-size: 22px; font-weight: bold; }
@@ -56,16 +60,16 @@ const generateHtml = (data: any) => {
         </div>
         <p><strong>Titular:</strong> ${client.first_name} ${client.last_name}</p>
         <p><strong>Viaje:</strong> ${tour.title}</p>
-        <p><span class="badge">HABITACIONES: ${roomsCount}</span></p>
+        <p><span class="badge">HABITACIONES ASIGNADAS: ${roomsCount}</span></p>
         
         <table>
-          <thead><tr style="background:#f9f9f9;"><th>Concepto</th><th>Pax</th><th>Monto</th></tr></thead>
+          <thead><tr style="background:#f9f9f9;"><th>Concepto</th><th>Cantidad</th><th>Monto</th></tr></thead>
           <tbody>
             ${breakdownRows}
-            <tr class="total"><td>TOTAL CONTRATO</td><td></td><td>$${client.total_amount.toLocaleString()} MXN</td></tr>
+            <tr class="total"><td>VALOR TOTAL DEL CONTRATO</td><td></td><td>$${client.total_amount.toLocaleString()} MXN</td></tr>
           </tbody>
         </table>
-        <p style="margin-top: 50px; border-top: 2px solid #333; width: 250px; text-align: center;">Firma de Aceptación</p>
+        <p style="margin-top: 50px; border-top: 2px solid #333; width: 250px; text-align: center;">Firma de Conformidad</p>
       </body>
     </html>
   `;
