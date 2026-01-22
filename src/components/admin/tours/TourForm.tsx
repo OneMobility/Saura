@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, ImageIcon, MapPin, Clock, Hotel, ListChecks, Armchair, Info, Upload, Crown, Star, DollarSign } from 'lucide-react';
+import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, ImageIcon, MapPin, Clock, Hotel, ListChecks, Armchair, Info, Upload, Crown, Star, DollarSign, BusFront } from 'lucide-react';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { v4 as uuidv4 } from 'uuid';
 import { format, parseISO, addDays } from 'date-fns';
@@ -20,7 +20,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import RichTextEditor from '@/components/RichTextEditor';
 import TourSeatMap from '@/components/TourSeatMap';
-import { stripHtmlTags } from '@/utils/html'; // Import stripHtmlTags
+import { stripHtmlTags } from '@/utils/html';
 
 interface HotelQuote {
   id: string;
@@ -67,6 +67,7 @@ interface Tour {
   selling_price_triple_occupancy: number;
   selling_price_quad_occupancy: number;
   selling_price_child: number;
+  transport_only_price: number; // NEW
   other_income: number;
   departure_date: string | null;
   return_date: string | null;
@@ -77,7 +78,7 @@ interface Tour {
 interface TourFormProps {
   tourId?: string;
   onSave: () => void;
-  costOptimizationMode?: boolean; // NEW PROP
+  costOptimizationMode?: boolean;
 }
 
 const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMode = false }) => {
@@ -86,7 +87,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
     title: '', slug: '', description: '', full_content: '', duration: '', includes: [], itinerary: [],
     bus_id: null, bus_capacity: 0, bus_cost: 0, courtesies: 0, hotel_details: [], provider_details: [],
     selling_price_double_occupancy: 0, selling_price_triple_occupancy: 0, selling_price_quad_occupancy: 0,
-    selling_price_child: 0, other_income: 0, departure_date: null, return_date: null, departure_time: '08:00', return_time: '18:00',
+    selling_price_child: 0, transport_only_price: 0, other_income: 0, departure_date: null, return_date: null, departure_time: '08:00', return_time: '18:00',
   });
   
   const [desiredProfitFixed, setDesiredProfitFixed] = useState(45000);
@@ -140,16 +141,13 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
     fetchData();
   }, []);
 
-  // Lógica avanzada de recomendación: Mejor opción por Mes Y por Noches
   const hotelStats = useMemo(() => {
     const minsByMonthAndNights: Record<string, number> = {};
-
     availableHotelQuotes.forEach(h => {
       if (!h.quoted_date) return;
       const monthKey = format(parseISO(h.quoted_date), 'yyyy-MM');
       const nights = h.num_nights_quoted || 1;
       const key = `${monthKey}-${nights}`;
-      
       if (!minsByMonthAndNights[key] || h.estimated_total_cost < minsByMonthAndNights[key]) {
         minsByMonthAndNights[key] = h.estimated_total_cost;
       }
@@ -170,9 +168,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
     });
   }, [availableHotelQuotes]);
 
-  // NEW: Logic to find the cheapest provider for each service type
   const cheapestProviders = useMemo(() => {
-    const cheapestMap: Record<string, AvailableProvider> = {}; // Key: service_type
+    const cheapestMap: Record<string, AvailableProvider> = {};
     availableProviders.forEach(p => {
       if (!cheapestMap[p.service_type] || p.cost_per_unit < cheapestMap[p.service_type].cost_per_unit) {
         cheapestMap[p.service_type] = p;
@@ -246,59 +243,24 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
     const returnDateStr = formData.return_date ? format(parseISO(formData.return_date), 'dd/MM/yy', { locale: es }) : 'Fecha de Regreso';
     const nights = selectedHotelQuote?.num_nights_quoted || 0;
     const nightsDisplay = nights > 0 ? `${nights} noche${nights > 1 ? 's' : ''}` : 'Estadía';
-    const datesDisplay = [];
-    if (selectedHotelQuote?.quoted_date && nights > 0) {
-      for (let i = 0; i < nights; i++) {
-        datesDisplay.push(format(addDays(parseISO(selectedHotelQuote.quoted_date), i), 'dd', { locale: es }));
-      }
-    }
-    const datesList = datesDisplay.length > 0 ? datesDisplay.join(', ') : 'Fechas de estadía';
 
     const baseText = `
       <p>🌴 VIAJE A ${formData.title.toUpperCase()} 🌴</p>
-      <p>Vive una experiencia cómoda y bien organizada al Pacífico mexicano, con transporte y hospedaje cuidadosamente seleccionados.</p>
       <p>🗓 Salida: ${departure}</p>
       <p>🏨 Estadía: ${nightsDisplay}</p>
       <p>🗓 Regreso: ${returnDateStr}</p>
       <p>🚍 Autobús: ${busName}</p>
       <p>🏨 Hotel: ${hotelName}</p>
-      <p>💳 Aparta tu lugar con $${(formData.selling_price_double_occupancy || 0).toFixed(2)}</p>
-      <p>Viaja con tranquilidad y disfruta ${formData.title} sin preocuparte por la logística.</p>
-      <p>📲 Cupo limitado.</p>
     `;
 
-    if (!isFullContent) {
-      // Short description (plain text summary)
-      return stripHtmlTags(baseText).substring(0, 160) + '...';
-    } else {
-      // Full content (HTML)
-      return `
-        <h2>Detalles del Viaje</h2>
-        ${baseText}
-        
-        <h2>Servicios Incluidos</h2>
-        <ul>
-          <li>Transporte en ${busName}</li>
-          <li>Hospedaje en ${hotelName} por ${nightsDisplay}</li>
-          <li>Seguro de viajero</li>
-          ${formData.includes.map(i => `<li>${i}</li>`).join('')}
-        </ul>
-
-        <h2>Itinerario Básico</h2>
-        <ol>
-          ${formData.itinerary.map(i => `<li>Día ${i.day}: ${i.activity || 'Actividad pendiente de definir'}</li>`).join('')}
-        </ol>
-
-        <h2>Políticas de Reserva</h2>
-        <p>Se realiza contrato de prestación de servicios. Aparta tu lugar con un anticipo y liquida el resto antes de la fecha de salida.</p>
-      `;
-    }
-  }, [formData.title, formData.departure_date, formData.return_date, formData.bus_id, formData.includes, formData.itinerary, formData.selling_price_double_occupancy, availableBuses, selectedHotelQuote]);
+    if (!isFullContent) return stripHtmlTags(baseText).substring(0, 160) + '...';
+    return `<h2>Detalles del Viaje</h2>${baseText}<h2>Servicios Incluidos</h2><ul><li>Transporte en ${busName}</li><li>Hospedaje en ${hotelName}</li><li>Seguro de viajero</li></ul>`;
+  }, [formData.title, formData.departure_date, formData.return_date, formData.bus_id, availableBuses, selectedHotelQuote]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
     setFormData(prev => {
-      const numericFields = ['bus_capacity', 'courtesies', 'selling_price_double_occupancy', 'selling_price_triple_occupancy', 'selling_price_quad_occupancy', 'selling_price_child', 'other_income'];
+      const numericFields = ['bus_capacity', 'courtesies', 'selling_price_double_occupancy', 'selling_price_triple_occupancy', 'selling_price_quad_occupancy', 'selling_price_child', 'transport_only_price', 'other_income'];
       const updated = { ...prev, [id]: numericFields.includes(id) ? parseFloat(value) || 0 : value };
       if (id === 'title') updated.slug = value.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
       return updated;
@@ -317,10 +279,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      setImageFile(file);
-      setImageUrlPreview(URL.createObjectURL(file));
-    }
+    if (file) { setImageFile(file); setImageUrlPreview(URL.createObjectURL(file)); }
   };
 
   const uploadImage = async (file: File): Promise<string | null> => {
@@ -331,45 +290,28 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
       if (uploadError) return null;
       const { data: { publicUrl } } = supabase.storage.from('tour-images').getPublicUrl(fileName);
       return publicUrl;
-    } catch (err) {
-      return null;
-    } finally {
-      setIsUploadingImage(false);
-    }
+    } catch (err) { return null; } finally { setIsUploadingImage(false); }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
-
     let finalImageUrl = formData.image_url;
     if (imageFile) {
       const uploadedUrl = await uploadImage(imageFile);
       if (!uploadedUrl) { setIsSubmitting(false); return; }
       finalImageUrl = uploadedUrl;
     }
-
-    // Generate default content if fields are empty
     const finalDescription = formData.description.trim() === '' ? generateDefaultDescription(false) : formData.description;
     const finalFullContent = formData.full_content.trim() === '' ? generateDefaultDescription(true) : formData.full_content;
-
     const { data: { user } } = await supabase.auth.getUser();
     const dataToSave = { 
-      ...formData, 
-      image_url: finalImageUrl,
-      description: finalDescription, // Use generated description if empty
-      full_content: finalFullContent, // Use generated full content if empty
-      user_id: user?.id,
-      total_base_cost: financialSummary.totalCost,
-      paying_clients_count: financialSummary.capacity,
+      ...formData, image_url: finalImageUrl, description: finalDescription, full_content: finalFullContent, user_id: user?.id,
+      total_base_cost: financialSummary.totalCost, paying_clients_count: financialSummary.capacity,
       cost_per_paying_person: financialSummary.capacity > 0 ? financialSummary.totalCost / financialSummary.capacity : 0,
       selling_price_per_person: formData.selling_price_double_occupancy 
     };
-    
-    const { error } = tourId 
-      ? await supabase.from('tours').update(dataToSave).eq('id', tourId)
-      : await supabase.from('tours').insert(dataToSave);
-      
+    const { error } = tourId ? await supabase.from('tours').update(dataToSave).eq('id', tourId) : await supabase.from('tours').insert(dataToSave);
     if (error) toast.error(`Error: ${error.message}`);
     else { toast.success('Tour guardado.'); onSave(); }
     setIsSubmitting(false);
@@ -382,42 +324,18 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
   });
 
   const addProviderDetail = () => setFormData(p => ({
-    ...p,
-    provider_details: [...p.provider_details, {
-      id: uuidv4(),
-      provider_id: '',
-      quantity: 1,
-      cost_per_unit_snapshot: 0,
-      selling_price_per_unit_snapshot: 0,
-      name_snapshot: '',
-      service_type_snapshot: '',
-      unit_type_snapshot: 'person',
-    }],
+    ...p, provider_details: [...p.provider_details, { id: uuidv4(), provider_id: '', quantity: 1, cost_per_unit_snapshot: 0, selling_price_per_unit_snapshot: 0, name_snapshot: '', service_type_snapshot: '', unit_type_snapshot: 'person' }],
   }));
 
-  const removeProviderDetail = (id: string) => setFormData(p => ({
-    ...p,
-    provider_details: p.provider_details.filter(d => d.id !== id),
-  }));
+  const removeProviderDetail = (id: string) => setFormData(p => ({ ...p, provider_details: p.provider_details.filter(d => d.id !== id) }));
 
   const updateProviderDetail = (id: string, field: keyof TourProviderService, value: string | number) => {
     setFormData(prev => ({
-      ...prev,
-      provider_details: prev.provider_details.map(d => {
+      ...prev, provider_details: prev.provider_details.map(d => {
         if (d.id === id) {
           if (field === 'provider_id') {
             const provider = availableProviders.find(p => p.id === value);
-            if (provider) {
-              return {
-                ...d,
-                provider_id: value as string,
-                cost_per_unit_snapshot: provider.cost_per_unit,
-                selling_price_per_unit_snapshot: provider.selling_price_per_unit,
-                name_snapshot: provider.name,
-                service_type_snapshot: provider.service_type,
-                unit_type_snapshot: provider.unit_type,
-              };
-            }
+            if (provider) return { ...d, provider_id: value as string, cost_per_unit_snapshot: provider.cost_per_unit, selling_price_per_unit_snapshot: provider.selling_price_per_unit, name_snapshot: provider.name, service_type_snapshot: provider.service_type, unit_type_snapshot: provider.unit_type };
           }
           return { ...d, [field]: value };
         }
@@ -430,24 +348,9 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
 
   return (
     <div className="space-y-8 pb-20">
-      {costOptimizationMode && (
-        <Card className="border-t-4 border-green-500 shadow-xl bg-green-50">
-          <CardHeader>
-            <CardTitle className="text-2xl font-bold flex items-center gap-2">
-              <DollarSign className="text-green-700" /> Modo: Optimización de Costos
-            </CardTitle>
-            <p className="text-sm text-green-600">
-              Esta guía te ayudará a seleccionar las opciones más económicas para cada componente del tour.
-            </p>
-          </CardHeader>
-        </Card>
-      )}
-
       <Card className="border-t-4 border-rosa-mexicano shadow-xl">
         <CardHeader className="bg-gray-50/50">
-          <CardTitle className="text-2xl font-bold flex items-center gap-2">
-            <TrendingUp className="text-rosa-mexicano" /> Simulador de Rentabilidad
-          </CardTitle>
+          <CardTitle className="text-2xl font-bold flex items-center gap-2"><TrendingUp className="text-rosa-mexicano" /> Simulador de Rentabilidad</CardTitle>
         </CardHeader>
         <CardContent className="space-y-8 pt-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -457,17 +360,11 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
                 <div className="flex justify-between text-sm"><span>🚌 Bus:</span> <span className="font-bold">${financialSummary.busCost.toLocaleString()}</span></div>
                 <div className="flex justify-between text-sm"><span>🏨 Hotel:</span> <span className="font-bold">${financialSummary.hotelCost.toLocaleString()}</span></div>
                 <div className="flex justify-between text-sm"><span>🎟️ Servicios:</span> <span className="font-bold">${financialSummary.providerCost.toLocaleString()}</span></div>
-                <div className="pt-3 mt-2 border-t-2 border-rosa-mexicano/20 flex justify-between text-xl font-black text-rosa-mexicano">
-                  <span>TOTAL:</span>
-                  <span>${financialSummary.totalCost.toLocaleString()}</span>
-                </div>
+                <div className="pt-3 mt-2 border-t-2 border-rosa-mexicano/20 flex justify-between text-xl font-black text-rosa-mexicano"><span>TOTAL:</span><span>${financialSummary.totalCost.toLocaleString()}</span></div>
               </div>
             </div>
-
             <div className="p-5 bg-blue-50/60 rounded-2xl border border-blue-100">
-              <h3 className="text-xs font-black uppercase text-blue-600 mb-4 flex items-center gap-1 tracking-widest">
-                <AlertCircle className="h-4 w-4" /> Equilibrio
-              </h3>
+              <h3 className="text-xs font-black uppercase text-blue-600 mb-4 flex items-center gap-1 tracking-widest"><AlertCircle className="h-4 w-4" /> Equilibrio</h3>
               <div className="space-y-3">
                 <p className="text-[10px] leading-tight text-blue-800 font-medium">Pax para cubrir gastos:</p>
                 <div className="flex justify-between text-sm"><span>En Cuádruple:</span> <span className="font-bold">{financialSummary.beQuad} pax</span></div>
@@ -475,11 +372,8 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
                 <div className="flex justify-between text-sm"><span>En Doble:</span> <span className="font-bold">{financialSummary.beDouble} pax</span></div>
               </div>
             </div>
-
             <div className="p-5 bg-green-50/60 rounded-2xl border border-green-100">
-              <h3 className="text-xs font-black uppercase text-green-600 mb-4 flex items-center gap-1 tracking-widest">
-                <Calculator className="h-4 w-4" /> Recomendaciones
-              </h3>
+              <h3 className="text-xs font-black uppercase text-green-600 mb-4 flex items-center gap-1 tracking-widest"><Calculator className="h-4 w-4" /> Recomendaciones</h3>
               <div className="space-y-4">
                 <div>
                   <Label className="text-[10px] font-bold text-gray-500">Ganancia meta ($):</Label>
@@ -494,35 +388,25 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
               </div>
             </div>
           </div>
-
           <div className="p-6 bg-gray-900 rounded-3xl text-white shadow-2xl">
             <h3 className="text-lg font-bold mb-6">Proyección de Utilidad Real</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               {['double', 'triple', 'quad', 'child'].map((type) => (
                 <div key={type} className="space-y-2">
                   <Label className="capitalize text-xs font-bold text-gray-400">Ventas {type}</Label>
-                  <Input 
-                    type="number" 
-                    value={projectedSales[type as keyof typeof projectedSales]}
-                    onChange={e => setProjectedSales({...projectedSales, [type]: parseInt(e.target.value) || 0})}
-                    className="bg-white/10 border-white/20 text-white font-bold h-12 text-xl"
-                  />
+                  <Input type="number" value={projectedSales[type as keyof typeof projectedSales]} onChange={e => setProjectedSales({...projectedSales, [type]: parseInt(e.target.value) || 0})} className="bg-white/10 border-white/20 text-white font-bold h-12 text-xl" />
                 </div>
               ))}
             </div>
             <div className="mt-8 flex flex-wrap items-center justify-between gap-6 pt-6 border-t border-white/10">
               <div className="flex items-center gap-3">
                 <span className="text-xs text-gray-400 font-bold uppercase">Ocupación:</span>
-                <span className={cn("text-4xl font-black", (projectedSales.double + projectedSales.triple + projectedSales.quad + projectedSales.child) > financialSummary.capacity ? "text-red-500" : "text-rosa-mexicano")}>
-                  {projectedSales.double + projectedSales.triple + projectedSales.quad + projectedSales.child}
-                </span>
+                <span className={cn("text-4xl font-black", (projectedSales.double + projectedSales.triple + projectedSales.quad + projectedSales.child) > financialSummary.capacity ? "text-red-500" : "text-rosa-mexicano")}>{projectedSales.double + projectedSales.triple + projectedSales.quad + projectedSales.child}</span>
                 <span className="text-xl text-gray-500">/ {financialSummary.capacity} pax</span>
               </div>
               <div className="text-right">
                 <span className="text-xs text-gray-400 font-bold block mb-1">Utilidad Estimada</span>
-                <span className={cn("text-5xl font-black", financialSummary.projectedProfit >= 0 ? "text-green-400" : "text-red-500")}>
-                  ${financialSummary.projectedProfit.toLocaleString()}
-                </span>
+                <span className={cn("text-5xl font-black", financialSummary.projectedProfit >= 0 ? "text-green-400" : "text-red-500")}>${financialSummary.projectedProfit.toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -535,44 +419,21 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
             <Card>
               <CardHeader><CardTitle className="text-lg flex items-center gap-2"><MapPin className="h-5 w-5 text-rosa-mexicano" /> Datos Principales</CardTitle></CardHeader>
               <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Nombre del Tour</Label>
-                  <Input id="title" value={formData.title} onChange={handleChange} required />
-                </div>
+                <div className="space-y-2"><Label>Nombre del Tour</Label><Input id="title" value={formData.title} onChange={handleChange} required /></div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Autobús</Label>
                     <Select value={formData.bus_id || ''} onValueChange={val => {
                       const bus = availableBuses.find(b => b.id === val);
                       setFormData(p => ({ ...p, bus_id: val, bus_capacity: bus?.total_capacity || 0, bus_cost: bus?.rental_cost || 0 }));
-                    }}>
-                      <SelectTrigger><SelectValue placeholder="Elegir Bus" /></SelectTrigger>
-                      <SelectContent>
-                        {availableBuses.map(b => (
-                          <SelectItem key={b.id} value={b.id}>
-                            {b.name} (Costo: ${b.rental_cost.toLocaleString()})
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    }}><SelectTrigger><SelectValue placeholder="Elegir Bus" /></SelectTrigger><SelectContent>{availableBuses.map(b => (<SelectItem key={b.id} value={b.id}>{b.name} (Costo: ${b.rental_cost.toLocaleString()})</SelectItem>))}</SelectContent></Select>
                   </div>
-                  <div className="space-y-2">
-                    <Label>Duración</Label>
-                    <Input id="duration" value={formData.duration} onChange={handleChange} placeholder="Ej: 3 días, 2 noches" />
-                  </div>
+                  <div className="space-y-2"><Label>Duración</Label><Input id="duration" value={formData.duration} onChange={handleChange} placeholder="Ej: 3 días, 2 noches" /></div>
                 </div>
-
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                  <div className="space-y-2">
-                    <Label>Coordinadores</Label>
-                    <Input type="number" id="courtesies" value={formData.courtesies} onChange={handleChange} />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Otros Ingresos ($)</Label>
-                    <Input type="number" id="other_income" value={formData.other_income} onChange={handleChange} />
-                  </div>
+                  <div className="space-y-2"><Label>Coordinadores</Label><Input type="number" id="courtesies" value={formData.courtesies} onChange={handleChange} /></div>
+                  <div className="space-y-2"><Label>Otros Ingresos ($)</Label><Input type="number" id="other_income" value={formData.other_income} onChange={handleChange} /></div>
                 </div>
-
                 <div className="space-y-3 pt-4 border-t">
                   <Label className="flex items-center gap-2"><Hotel className="h-4 w-4" /> Hoteles Asociados</Label>
                   {formData.hotel_details.map((detail, index) => (
@@ -580,120 +441,39 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
                       <Select value={detail.hotel_quote_id} onValueChange={val => {
                         const newH = [...formData.hotel_details]; newH[index].hotel_quote_id = val;
                         setFormData({...formData, hotel_details: newH});
-                      }}>
-                        <SelectTrigger className="flex-grow">
-                          <SelectValue placeholder="Elegir Cotización" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {groupedAndSortedQuotes.map(([name, quotes]) => (
-                            <SelectGroup key={name}>
-                              <SelectLabel className="bg-muted py-1 px-2 text-rosa-mexicano font-bold">{name}</SelectLabel>
+                      }}><SelectTrigger className="flex-grow"><SelectValue placeholder="Elegir Cotización" /></SelectTrigger>
+                        <SelectContent>{groupedAndSortedQuotes.map(([name, quotes]) => (
+                            <SelectGroup key={name}><SelectLabel className="bg-muted py-1 px-2 text-rosa-mexicano font-bold">{name}</SelectLabel>
                               {quotes.map(q => {
                                 const monthKey = q.quoted_date ? format(parseISO(q.quoted_date), 'yyyy-MM') : '';
                                 const nights = q.num_nights_quoted || 1;
                                 const key = `${monthKey}-${nights}`;
                                 const isBestOptionForDuration = hotelStats.minsByMonthAndNights[key] === q.estimated_total_cost;
-
-                                return (
-                                  <SelectItem key={q.id} value={q.id} className="cursor-pointer">
-                                    <div className="flex flex-col">
-                                      <div className="flex items-center gap-2">
-                                        <span className={cn(isBestOptionForDuration ? "text-green-600 font-bold" : "text-foreground")}>
-                                          ${q.estimated_total_cost.toLocaleString()}
-                                        </span>
-                                        {isBestOptionForDuration && (
-                                          <span className="bg-yellow-400 text-yellow-900 text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                                            <Star className="h-2.5 w-2.5 fill-yellow-900" /> MEJOR OPCIÓN ({nights} N)
-                                          </span>
-                                        )}
-                                      </div>
-                                      <span className="text-[10px] text-muted-foreground">{nights} noches • {q.quoted_date ? format(parseISO(q.quoted_date), 'dd/MM/yy') : 'Sin fecha'}</span>
-                                    </div>
-                                  </SelectItem>
-                                );
+                                return (<SelectItem key={q.id} value={q.id} className="cursor-pointer"><div className="flex flex-col"><div className="flex items-center gap-2"><span className={cn(isBestOptionForDuration ? "text-green-600 font-bold" : "text-foreground")}>${q.estimated_total_cost.toLocaleString()}</span>{isBestOptionForDuration && (<span className="bg-yellow-400 text-yellow-900 text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5"><Star className="h-2.5 w-2.5 fill-yellow-900" /> MEJOR OPCIÓN ({nights} N)</span>)}</div><span className="text-[10px] text-muted-foreground">{nights} noches • {q.quoted_date ? format(parseISO(q.quoted_date), 'dd/MM/yy') : 'Sin fecha'}</span></div></SelectItem>);
                               })}
                             </SelectGroup>
                           ))}
-                        </SelectContent>
-                      </Select>
-                      <Button variant="ghost" size="icon" onClick={() => setFormData({...formData, hotel_details: formData.hotel_details.filter(d => d.id !== detail.id)})}>
-                        <MinusCircle className="h-4 w-4 text-red-400" />
-                      </Button>
+                        </SelectContent></Select>
+                      <Button variant="ghost" size="icon" onClick={() => setFormData({...formData, hotel_details: formData.hotel_details.filter(d => d.id !== detail.id)})}><MinusCircle className="h-4 w-4 text-red-400" /></Button>
                     </div>
                   ))}
-                  <Button type="button" variant="outline" className="w-full border-dashed" onClick={() => setFormData({...formData, hotel_details: [...formData.hotel_details, { id: uuidv4(), hotel_quote_id: '' }]})}>
-                    <PlusCircle className="mr-2 h-4 w-4" /> Añadir Hotel
-                  </Button>
+                  <Button type="button" variant="outline" className="w-full border-dashed" onClick={() => setFormData({...formData, hotel_details: [...formData.hotel_details, { id: uuidv4(), hotel_quote_id: '' }]})}><PlusCircle className="mr-2 h-4 w-4" /> Añadir Hotel</Button>
                 </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader><CardTitle className="text-lg flex items-center gap-2"><DollarSign className="h-5 w-5 text-rosa-mexicano" /> Servicios de Proveedores</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                {formData.provider_details.map((detail) => {
-                  const provider = availableProviders.find(p => p.id === detail.provider_id);
-                  const isCheapest = provider && cheapestProviders[provider.service_type]?.id === provider.id;
-                  
-                  return (
-                    <div key={detail.id} className="border p-3 rounded-lg bg-gray-50 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-xs font-bold uppercase text-gray-500">Servicio</Label>
-                        <Button variant="ghost" size="icon" onClick={() => removeProviderDetail(detail.id)}><MinusCircle className="h-4 w-4 text-red-400" /></Button>
-                      </div>
-                      <Select value={detail.provider_id} onValueChange={val => updateProviderDetail(detail.id, 'provider_id', val)}>
-                        <SelectTrigger className={cn("w-full", isCheapest && costOptimizationMode && "border-2 border-green-500 ring-2 ring-green-200")}>
-                          <SelectValue placeholder="Elegir Proveedor" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {availableProviders.map(p => {
-                            const isCheapestOption = cheapestProviders[p.service_type]?.id === p.id;
-                            return (
-                              <SelectItem key={p.id} value={p.id} className="cursor-pointer">
-                                <div className="flex flex-col">
-                                  <div className="flex items-center gap-2">
-                                    <span className={cn(isCheapestOption ? "text-green-600 font-bold" : "text-foreground")}>
-                                      {p.name}
-                                    </span>
-                                    {isCheapestOption && costOptimizationMode && (
-                                      <span className="bg-green-400 text-green-900 text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5">
-                                        <Star className="h-2.5 w-2.5 fill-green-900" /> MENOR COSTO
-                                      </span>
-                                    )}
-                                  </div>
-                                  <span className="text-[10px] text-muted-foreground">{p.service_type} (${p.cost_per_unit.toFixed(2)}/{p.unit_type})</span>
-                                </div>
-                              </SelectItem>
-                            );
-                          })}
-                        </SelectContent>
-                      </Select>
-                      <div className="grid grid-cols-2 gap-2">
-                        <div className="space-y-1">
-                          <Label className="text-xs">Cantidad</Label>
-                          <Input type="number" value={detail.quantity} onChange={e => updateProviderDetail(detail.id, 'quantity', parseFloat(e.target.value) || 0)} />
-                        </div>
-                        <div className="space-y-1">
-                          <Label className="text-xs">Costo Total</Label>
-                          <Input value={(detail.cost_per_unit_snapshot * detail.quantity).toFixed(2)} readOnly className="bg-white/50 font-bold" />
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-                <Button type="button" variant="outline" className="w-full border-dashed" onClick={addProviderDetail}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Añadir Proveedor
-                </Button>
               </CardContent>
             </Card>
 
             <Card className="border-rosa-mexicano/30">
               <CardHeader><CardTitle className="text-lg">Precios de Venta</CardTitle></CardHeader>
               <CardContent className="grid grid-cols-2 gap-4">
-                <div className="space-y-2"><Label>Doble (p/p)</Label><Input type="number" id="selling_price_double_occupancy" value={formData.selling_price_double_occupancy} onChange={handleChange} className="font-bold border-rosa-mexicano/30" /></div>
-                <div className="space-y-2"><Label>Triple (p/p)</Label><Input type="number" id="selling_price_triple_occupancy" value={formData.selling_price_triple_occupancy} onChange={handleChange} className="font-bold border-rosa-mexicano/30" /></div>
-                <div className="space-y-2"><Label>Cuádruple (p/p)</Label><Input type="number" id="selling_price_quad_occupancy" value={formData.selling_price_quad_occupancy} onChange={handleChange} className="font-bold border-rosa-mexicano/30" /></div>
-                <div className="space-y-2"><Label>Niño</Label><Input type="number" id="selling_price_child" value={formData.selling_price_child} onChange={handleChange} className="font-bold border-rosa-mexicano/30" /></div>
+                <div className="space-y-2"><Label>Doble (p/p)</Label><Input type="number" id="selling_price_double_occupancy" value={formData.selling_price_double_occupancy} onChange={handleChange} className="font-bold" /></div>
+                <div className="space-y-2"><Label>Triple (p/p)</Label><Input type="number" id="selling_price_triple_occupancy" value={formData.selling_price_triple_occupancy} onChange={handleChange} className="font-bold" /></div>
+                <div className="space-y-2"><Label>Cuádruple (p/p)</Label><Input type="number" id="selling_price_quad_occupancy" value={formData.selling_price_quad_occupancy} onChange={handleChange} className="font-bold" /></div>
+                <div className="space-y-2"><Label>Niño</Label><Input type="number" id="selling_price_child" value={formData.selling_price_child} onChange={handleChange} className="font-bold" /></div>
+                <div className="space-y-2 col-span-2 border-t pt-4">
+                  <Label className="flex items-center gap-2 font-black text-rosa-mexicano"><BusFront className="h-4 w-4" /> Precio Solo Transporte (p/p)</Label>
+                  <Input type="number" id="transport_only_price" value={formData.transport_only_price} onChange={handleChange} className="font-black border-rosa-mexicano/50 bg-rosa-mexicano/5" />
+                  <p className="text-[10px] text-muted-foreground mt-1">Tarifa directa por asiento sin considerar hospedaje.</p>
+                </div>
               </CardContent>
             </Card>
 
@@ -715,108 +495,25 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
             <Card>
               <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Clock className="h-5 w-5 text-rosa-mexicano" /> Tiempos y Foto</CardTitle></CardHeader>
               <CardContent className="space-y-6">
-                <div className="space-y-2">
-                  <Label>Imagen Principal (Obligatoria)</Label>
-                  <div className="relative border-2 border-dashed rounded-xl h-48 flex items-center justify-center overflow-hidden bg-gray-50 hover:bg-gray-100 transition-colors group">
-                    {isUploadingImage ? (
-                      <div className="text-center"><Loader2 className="animate-spin mx-auto mb-2 text-rosa-mexicano" /><span className="text-xs font-bold text-rosa-mexicano">Subiendo...</span></div>
-                    ) : imageUrlPreview ? (
-                      <div className="relative w-full h-full"><img src={imageUrlPreview} className="w-full h-full object-cover" alt="Preview" /><div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><p className="text-white text-xs font-bold flex items-center gap-1"><Upload className="h-3 w-3" /> Cambiar Imagen</p></div></div>
-                    ) : (
-                      <div className="text-center text-gray-400"><ImageIcon className="mx-auto mb-2" /><span className="text-xs">Haz clic para seleccionar foto</span></div>
-                    )}
-                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={handleFileChange} accept="image/*" disabled={isUploadingImage} />
-                  </div>
-                </div>
-
+                <div className="space-y-2"><Label>Imagen Principal</Label><div className="relative border-2 border-dashed rounded-xl h-48 flex items-center justify-center overflow-hidden bg-gray-50 hover:bg-gray-100 transition-colors group">{isUploadingImage ? (<div className="text-center"><Loader2 className="animate-spin mx-auto mb-2 text-rosa-mexicano" /><span className="text-xs font-bold text-rosa-mexicano">Subiendo...</span></div>) : imageUrlPreview ? (<div className="relative w-full h-full"><img src={imageUrlPreview} className="w-full h-full object-cover" alt="Preview" /><div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><p className="text-white text-xs font-bold flex items-center gap-1"><Upload className="h-3 w-3" /> Cambiar Imagen</p></div></div>) : (<div className="text-center text-gray-400"><ImageIcon className="mx-auto mb-2" /><span className="text-xs">Haz clic para seleccionar foto</span></div>)}<input type="file" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={handleFileChange} accept="image/*" disabled={isUploadingImage} /></div></div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Salida</Label>
-                    <Popover>
-                      <PopoverTrigger asChild><Button variant="outline" className="w-full justify-start gap-2"><CalendarIcon className="h-4 w-4" />{departureDate ? format(departureDate, 'dd/MM/yy') : 'Fecha'}</Button></PopoverTrigger>
-                      <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={departureDate} onSelect={d => handleDateSelect('departure_date', d)} locale={es} /></PopoverContent>
-                    </Popover>
-                    <Input id="departure_time" value={formData.departure_time || ''} onChange={handleChange} placeholder="08:00 AM" />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Regreso</Label>
-                    <Popover>
-                      <PopoverTrigger asChild><Button variant="outline" className="w-full justify-start gap-2"><CalendarIcon className="h-4 w-4" />{returnDate ? format(returnDate, 'dd/MM/yy') : 'Fecha'}</Button></PopoverTrigger>
-                      <PopoverContent className="w-auto p-0"><Calendar mode="single" selected={returnDate} onSelect={d => handleDateSelect('return_date', d)} locale={es} /></PopoverContent>
-                    </Popover>
-                    <Input id="return_time" value={formData.return_time || ''} onChange={handleChange} placeholder="06:00 PM" />
-                  </div>
+                  <div className="space-y-2"><Label>Salida</Label><Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start gap-2"><CalendarIcon className="h-4 w-4" />{departureDate ? format(departureDate, 'dd/MM/yy') : 'Fecha'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={departureDate} onSelect={d => handleDateSelect('departure_date', d)} locale={es} /></PopoverContent></Popover><Input id="departure_time" value={formData.departure_time || ''} onChange={handleChange} placeholder="08:00 AM" /></div>
+                  <div className="space-y-2"><Label>Regreso</Label><Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start gap-2"><CalendarIcon className="h-4 w-4" />{returnDate ? format(returnDate, 'dd/MM/yy') : 'Fecha'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={returnDate} onSelect={d => handleDateSelect('return_date', d)} locale={es} /></PopoverContent></Popover><Input id="return_time" value={formData.return_time || ''} onChange={handleChange} placeholder="06:00 PM" /></div>
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
-              <CardHeader><CardTitle className="text-lg">Descripción de Venta (Corta)</CardTitle></CardHeader>
-              <CardContent>
-                <RichTextEditor value={formData.description} onChange={val => handleRichTextChange('description', val)} placeholder={generateDefaultDescription(false)} className="min-h-[150px]" />
-              </CardContent>
-            </Card>
+            <Card><CardHeader><CardTitle className="text-lg">Descripción de Venta (Corta)</CardTitle></CardHeader><CardContent><RichTextEditor value={formData.description} onChange={val => handleRichTextChange('description', val)} placeholder={generateDefaultDescription(false)} className="min-h-[150px]" /></CardContent></Card>
           </div>
         </div>
 
-        {formData.bus_id && (
-          <Card className="border-2 border-rosa-mexicano/20 shadow-lg">
-            <CardHeader className="bg-rosa-mexicano/5">
-              <CardTitle className="text-xl flex items-center gap-2"><Armchair className="text-rosa-mexicano" /> Gestión de Asientos para este Tour</CardTitle>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="bg-blue-50 p-4 rounded-xl mb-6 flex gap-4 items-start border border-blue-100">
-                <Info className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
-                <div className="text-sm text-blue-800">
-                  <p className="font-bold mb-1">Instrucciones para el Administrador:</p>
-                  <ul className="list-disc list-inside space-y-1 opacity-90">
-                    <li>Haz clic en un asiento disponible para <strong>bloquearlo</strong>.</li>
-                    <li>Los asientos de <strong>Coordinador</strong> (morados) se asignan automáticamente.</li>
-                    <li>Los asientos <strong>Ocupados</strong> (rojos) son reservas de clientes.</li>
-                  </ul>
-                </div>
-              </div>
-              <div className="max-w-3xl mx-auto">
-                <TourSeatMap tourId={tourId || 'new-tour'} busCapacity={formData.bus_capacity} courtesies={formData.courtesies} seatLayoutJson={selectedBusLayout} adminMode={true} readOnly={false} />
-              </div>
-            </CardContent>
-          </Card>
-        )}
+        {formData.bus_id && (<Card className="border-2 border-rosa-mexicano/20 shadow-lg"><CardHeader className="bg-rosa-mexicano/5"><CardTitle className="text-xl flex items-center gap-2"><Armchair className="text-rosa-mexicano" /> Gestión de Asientos</CardTitle></CardHeader><CardContent className="pt-6"><div className="bg-blue-50 p-4 rounded-xl mb-6 flex gap-4 items-start border border-blue-100"><Info className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" /><div className="text-sm text-blue-800"><p className="font-bold mb-1">Instrucciones:</p><ul className="list-disc list-inside space-y-1 opacity-90"><li>Haz clic en un asiento disponible para <strong>bloquearlo</strong>.</li><li>Los asientos <strong>Ocupados</strong> (rojos) son reservas de clientes.</li></ul></div></div><div className="max-w-3xl mx-auto"><TourSeatMap tourId={tourId || 'new-tour'} busCapacity={formData.bus_capacity} courtesies={formData.courtesies} seatLayoutJson={selectedBusLayout} adminMode={true} readOnly={false} /></div></CardContent></Card>)}
 
-        <Card>
-          <CardHeader><CardTitle className="text-lg">Itinerario Detallado</CardTitle></CardHeader>
-          <CardContent className="space-y-4">
-            {formData.itinerary.map((item, idx) => (
-              <div key={idx} className="flex gap-2 items-start bg-gray-50 p-3 rounded-lg border">
-                <div className="bg-rosa-mexicano text-white rounded-full h-6 w-6 flex-shrink-0 flex items-center justify-center text-xs font-bold mt-2">{item.day}</div>
-                <Textarea value={item.activity} onChange={e => {
-                  const newI = [...formData.itinerary]; newI[idx].activity = e.target.value;
-                  setFormData({...formData, itinerary: newI});
-                }} className="bg-white" />
-                <Button variant="ghost" size="icon" onClick={() => setFormData({...formData, itinerary: formData.itinerary.filter((_, i) => i !== idx)})}><MinusCircle className="h-4 w-4 text-red-400" /></Button>
-              </div>
-            ))}
-            <Button type="button" variant="outline" className="w-full" onClick={() => setFormData({...formData, itinerary: [...formData.itinerary, { day: formData.itinerary.length + 1, activity: '' }]})}><PlusCircle className="mr-2 h-4 w-4" /> Añadir Día</Button>
-          </CardContent>
-        </Card>
+        <Card><CardHeader><CardTitle className="text-lg">Itinerario Detallado</CardTitle></CardHeader><CardContent className="space-y-4">{formData.itinerary.map((item, idx) => (<div key={idx} className="flex gap-2 items-start bg-gray-50 p-3 rounded-lg border"><div className="bg-rosa-mexicano text-white rounded-full h-6 w-6 flex-shrink-0 flex items-center justify-center text-xs font-bold mt-2">{item.day}</div><Textarea value={item.activity} onChange={e => { const newI = [...formData.itinerary]; newI[idx].activity = e.target.value; setFormData({...formData, itinerary: newI}); }} className="bg-white" /><Button variant="ghost" size="icon" onClick={() => setFormData({...formData, itinerary: formData.itinerary.filter((_, i) => i !== idx)})}><MinusCircle className="h-4 w-4 text-red-400" /></Button></div>))}<Button type="button" variant="outline" className="w-full" onClick={() => setFormData({...formData, itinerary: [...formData.itinerary, { day: formData.itinerary.length + 1, activity: '' }]})}><PlusCircle className="mr-2 h-4 w-4" /> Añadir Día</Button></CardContent></Card>
 
-        <Card>
-          <CardHeader><CardTitle className="text-lg">Información Adicional (Políticas, etc)</CardTitle></CardHeader>
-          <CardContent>
-            <RichTextEditor value={formData.full_content} onChange={val => handleRichTextChange('full_content', val)} placeholder={generateDefaultDescription(true)} className="min-h-[300px]" />
-          </CardContent>
-        </Card>
+        <Card><CardHeader><CardTitle className="text-lg">Información Adicional</CardTitle></CardHeader><CardContent><RichTextEditor value={formData.full_content} onChange={val => handleRichTextChange('full_content', val)} placeholder={generateDefaultDescription(true)} className="min-h-[300px]" /></CardContent></Card>
 
-        <div className="fixed bottom-6 right-6 flex gap-4 z-50">
-          <Button type="button" variant="outline" onClick={() => navigate('/admin/tours')} className="bg-white shadow-lg px-6 h-12">Cancelar</Button>
-          <Button type="submit" disabled={isSubmitting || isUploadingImage} className="bg-rosa-mexicano text-white shadow-lg px-10 h-12 text-lg font-bold rounded-xl">
-            {isSubmitting || isUploadingImage ? (
-              <><Loader2 className="animate-spin mr-2" /> {isUploadingImage ? 'Subiendo...' : 'Guardando...'}</>
-            ) : (
-              <><Save className="mr-2" /> {tourId ? 'Actualizar Tour' : 'Publicar Tour'}</>
-            )}
-          </Button>
-        </div>
+        <div className="fixed bottom-6 right-6 flex gap-4 z-50"><Button type="button" variant="outline" onClick={() => navigate('/admin/tours')} className="bg-white shadow-lg px-6 h-12">Cancelar</Button><Button type="submit" disabled={isSubmitting || isUploadingImage} className="bg-rosa-mexicano text-white shadow-lg px-10 h-12 text-lg font-bold rounded-xl">{isSubmitting || isUploadingImage ? (<><Loader2 className="animate-spin mr-2" /> Guardando...</>) : (<><Save className="mr-2" /> Guardar Tour</>)}</Button></div>
       </form>
     </div>
   );
