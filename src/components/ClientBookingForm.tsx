@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Hotel, BusFront, CreditCard, Save, Info, CheckCircle2 } from 'lucide-react';
+import { Loader2, Hotel, BusFront, CreditCard, Save, Info } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -192,7 +192,14 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[750px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="text-2xl font-black text-rosa-mexicano">{step === 'info' ? `Reservar: ${tourTitle}` : '¡Reserva Registrada!'}</DialogTitle>
+          <DialogTitle className="text-2xl font-black text-rosa-mexicano">
+            {step === 'info' ? `Reservar: ${tourTitle}` : '¡Reserva Registrada!'}
+          </DialogTitle>
+          <DialogDescription>
+            {step === 'info' 
+              ? 'Por favor, completa los datos del titular y acompañantes para asegurar tus lugares.' 
+              : 'Tu lugar ha sido apartado. Procede al pago del anticipo para confirmar.'}
+          </DialogDescription>
         </DialogHeader>
         
         {step === 'info' ? (
