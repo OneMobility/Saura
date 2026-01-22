@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, ImageIcon, MapPin, Clock, Hotel, ListChecks, Armchair, Info, Upload, Crown, Star, DollarSign, BusFront } from 'lucide-react';
+import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, ImageIcon, MapPin, Clock, Hotel, ListChecks, Armchair, Info, Upload, Crown, Star, DollarSign, BusFront, CheckCircle2 } from 'lucide-react';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { v4 as uuidv4 } from 'uuid';
 import { format, parseISO, addDays } from 'date-fns';
@@ -21,6 +21,7 @@ import { Textarea } from '@/components/ui/textarea';
 import RichTextEditor from '@/components/RichTextEditor';
 import TourSeatMap from '@/components/TourSeatMap';
 import { stripHtmlTags } from '@/utils/html';
+import { Badge } from '@/components/ui/badge';
 
 interface HotelQuote {
   id: string;
@@ -32,6 +33,7 @@ interface HotelQuote {
   cost_per_night_triple: number;
   cost_per_night_quad: number;
   estimated_total_cost: number;
+  total_paid: number; // NEW
 }
 
 interface TourHotelDetail {
@@ -44,6 +46,7 @@ interface Bus {
   name: string;
   rental_cost: number;
   total_capacity: number;
+  total_paid: number; // NEW
   seat_layout_json: SeatLayout | null;
 }
 
@@ -131,11 +134,11 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
                                        (quote.num_triple_rooms || 0) * quote.cost_per_night_triple +
                                        (quote.num_quad_rooms || 0) * quote.cost_per_night_quad) -
                                        ((quote.num_courtesy_rooms || 0) * (quote.cost_per_night_quad || 0))) * numNights;
-          return { ...quote, estimated_total_cost };
+          return { ...quote, estimated_total_cost, total_paid: quote.total_paid || 0 };
         });
         setAvailableHotelQuotes(quotesWithCost);
       }
-      if (busesRes.data) setAvailableBuses(busesRes.data);
+      if (busesRes.data) setAvailableBuses(busesRes.data.map((b: any) => ({...b, total_paid: b.total_paid || 0})));
       if (providersRes.data) setAvailableProviders(providersRes.data);
     };
     fetchData();
@@ -168,16 +171,6 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
     });
   }, [availableHotelQuotes]);
 
-  const cheapestProviders = useMemo(() => {
-    const cheapestMap: Record<string, AvailableProvider> = {};
-    availableProviders.forEach(p => {
-      if (!cheapestMap[p.service_type] || p.cost_per_unit < cheapestMap[p.service_type].cost_per_unit) {
-        cheapestMap[p.service_type] = p;
-      }
-    });
-    return cheapestMap;
-  }, [availableProviders]);
-
   useEffect(() => {
     const fetchTourData = async () => {
       if (tourId && tourId !== 'new') {
@@ -188,7 +181,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
             ...data,
             includes: data.includes || [], itinerary: data.itinerary || [],
             hotel_details: data.hotel_details || [], provider_details: data.provider_details || [],
-            description: stripHtmlTags(data.description) // Ensure existing HTML is stripped for the new textarea
+            description: stripHtmlTags(data.description)
           });
           setImageUrlPreview(data.image_url);
           if (data.departure_date) setDepartureDate(parseISO(data.departure_date));
@@ -203,13 +196,20 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
   const financialSummary = useMemo(() => {
     const bus = availableBuses.find(b => b.id === formData.bus_id);
     const busCost = bus?.rental_cost || 0;
+    const busPaid = bus?.total_paid || 0;
+
     const providerCost = formData.provider_details.reduce((sum, p) => sum + (p.cost_per_unit_snapshot * p.quantity), 0);
-    const hotelCost = formData.hotel_details.reduce((sum, d) => {
+    
+    let hotelCost = 0;
+    let hotelPaid = 0;
+    formData.hotel_details.forEach(d => {
       const q = availableHotelQuotes.find(q => q.id === d.hotel_quote_id);
-      return sum + (q?.estimated_total_cost || 0);
-    }, 0);
+      hotelCost += (q?.estimated_total_cost || 0);
+      hotelPaid += (q?.total_paid || 0);
+    });
 
     const totalCost = busCost + providerCost + hotelCost;
+    const totalPaidToSuppliers = busPaid + hotelPaid;
     const capacity = (formData.bus_capacity || bus?.total_capacity || 0) - formData.courtesies;
     
     const currentRevenue = (projectedSales.double * formData.selling_price_double_occupancy) +
@@ -224,7 +224,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
     const avgRequiredPerPerson = capacity > 0 ? targetRevenue / capacity : 0;
 
     return {
-      busCost, hotelCost, providerCost, totalCost, capacity, projectedProfit,
+      busCost, busPaid, hotelCost, hotelPaid, providerCost, totalCost, totalPaidToSuppliers, capacity, projectedProfit,
       beQuad: formData.selling_price_quad_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_quad_occupancy) : 0,
       beTriple: formData.selling_price_triple_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_triple_occupancy) : 0,
       beDouble: formData.selling_price_double_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_double_occupancy) : 0,
@@ -324,33 +324,21 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
 
   const removeProviderDetail = (id: string) => setFormData(p => ({ ...p, provider_details: p.provider_details.filter(d => d.id !== id) }));
 
-  const updateProviderDetail = (id: string, field: keyof TourProviderService, value: string | number) => {
-    setFormData(prev => ({
-      ...prev, provider_details: prev.provider_details.map(d => {
-        if (d.id === id) {
-          if (field === 'provider_id') {
-            const provider = availableProviders.find(p => p.id === value);
-            if (provider) return { ...d, provider_id: value as string, cost_per_unit_snapshot: provider.cost_per_unit, selling_price_per_unit_snapshot: provider.selling_price_per_unit, name_snapshot: provider.name, service_type_snapshot: provider.service_type, unit_type_snapshot: provider.unit_type };
-          }
-          return { ...d, [field]: value };
-        }
-        return d;
-      }),
-    }));
-  };
-
   if (loadingInitialData) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin h-12 w-12 text-rosa-mexicano" /></div>;
 
   return (
     <div className="space-y-8 pb-20">
       <Card className="border-t-4 border-rosa-mexicano shadow-xl">
         <CardHeader className="bg-gray-50/50">
-          <CardTitle className="text-2xl font-bold flex items-center gap-2"><TrendingUp className="text-rosa-mexicano" /> Simulador de Rentabilidad</CardTitle>
+          <CardTitle className="text-2xl font-bold flex items-center justify-between">
+            <div className="flex items-center gap-2"><TrendingUp className="text-rosa-mexicano" /> Simulador y Seguimiento Financiero</div>
+            {tourId && <Badge variant="outline" className="bg-white border-rosa-mexicano text-rosa-mexicano uppercase font-black tracking-tighter">Ficha Activa</Badge>}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-8 pt-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
             <div className="p-5 bg-muted/40 rounded-2xl border border-dashed border-gray-300">
-              <h3 className="text-xs font-black uppercase text-gray-500 mb-4 tracking-widest">Egresos</h3>
+              <h3 className="text-[10px] font-black uppercase text-gray-500 mb-4 tracking-widest">Egresos Totales Est.</h3>
               <div className="space-y-3">
                 <div className="flex justify-between text-sm"><span>🚌 Bus:</span> <span className="font-bold">${financialSummary.busCost.toLocaleString()}</span></div>
                 <div className="flex justify-between text-sm"><span>🏨 Hotel:</span> <span className="font-bold">${financialSummary.hotelCost.toLocaleString()}</span></div>
@@ -358,23 +346,38 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
                 <div className="pt-3 mt-2 border-t-2 border-rosa-mexicano/20 flex justify-between text-xl font-black text-rosa-mexicano"><span>TOTAL:</span><span>${financialSummary.totalCost.toLocaleString()}</span></div>
               </div>
             </div>
-            <div className="p-5 bg-blue-50/60 rounded-2xl border border-blue-100">
-              <h3 className="text-xs font-black uppercase text-blue-600 mb-4 flex items-center gap-1 tracking-widest"><AlertCircle className="h-4 w-4" /> Equilibrio</h3>
+
+            {/* SECCIÓN NUEVA: SEGUIMIENTO DE PAGOS A PROVEEDORES */}
+            <div className="p-5 bg-amber-50/60 rounded-2xl border border-amber-200">
+              <h3 className="text-[10px] font-black uppercase text-amber-700 mb-4 flex items-center gap-1 tracking-widest"><DollarSign className="h-3 w-3" /> Liquidación Real</h3>
               <div className="space-y-3">
-                <p className="text-[10px] leading-tight text-blue-800 font-medium">Pax para cubrir gastos:</p>
+                <div className="flex justify-between text-xs"><span>Abonado a Bus:</span> <span className="font-bold text-amber-900">${financialSummary.busPaid.toLocaleString()}</span></div>
+                <div className="flex justify-between text-xs"><span>Abonado a Hoteles:</span> <span className="font-bold text-amber-900">${financialSummary.hotelPaid.toLocaleString()}</span></div>
+                <div className="pt-3 mt-2 border-t border-amber-200">
+                   <div className="text-[9px] uppercase font-black text-amber-600 mb-1">Restan para liquidar tour:</div>
+                   <div className="text-2xl font-black text-amber-900">${(financialSummary.totalCost - financialSummary.totalPaidToSuppliers).toLocaleString()}</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-5 bg-blue-50/60 rounded-2xl border border-blue-100">
+              <h3 className="text-[10px] font-black uppercase text-blue-600 mb-4 flex items-center gap-1 tracking-widest"><AlertCircle className="h-3 w-3" /> Equilibrio (Punto Cero)</h3>
+              <div className="space-y-3">
+                <p className="text-[10px] leading-tight text-blue-800 font-medium">Pax necesarios para no perder:</p>
                 <div className="flex justify-between text-sm"><span>En Cuádruple:</span> <span className="font-bold">{financialSummary.beQuad} pax</span></div>
                 <div className="flex justify-between text-sm"><span>En Triple:</span> <span className="font-bold">{financialSummary.beTriple} pax</span></div>
                 <div className="flex justify-between text-sm"><span>En Doble:</span> <span className="font-bold">{financialSummary.beDouble} pax</span></div>
               </div>
             </div>
+
             <div className="p-5 bg-green-50/60 rounded-2xl border border-green-100">
-              <h3 className="text-xs font-black uppercase text-green-600 mb-4 flex items-center gap-1 tracking-widest"><Calculator className="h-4 w-4" /> Recomendaciones</h3>
+              <h3 className="text-[10px] font-black uppercase text-green-600 mb-4 flex items-center gap-1 tracking-widest"><Calculator className="h-3 w-3" /> Precios Sugeridos</h3>
               <div className="space-y-4">
-                <div>
-                  <Label className="text-[10px] font-bold text-gray-500">Ganancia meta ($):</Label>
-                  <Input type="number" value={desiredProfitFixed} onChange={e => setDesiredProfitFixed(parseFloat(e.target.value) || 0)} className="h-8 bg-white font-bold" />
+                <div className="flex items-center gap-2">
+                  <Label className="text-[9px] font-black text-gray-500 uppercase">Utilidad Meta:</Label>
+                  <Input type="number" value={desiredProfitFixed} onChange={e => setDesiredProfitFixed(parseFloat(e.target.value) || 0)} className="h-7 bg-white font-bold text-xs" />
                 </div>
-                <div className="p-3 bg-white/80 rounded-xl border border-green-100 grid grid-cols-2 gap-2 text-[11px] font-black text-green-700">
+                <div className="p-3 bg-white/80 rounded-xl border border-green-100 grid grid-cols-2 gap-2 text-[10px] font-black text-green-700">
                   <div>QUAD: ${financialSummary.recPrice.quad.toFixed(0)}</div>
                   <div>TRIP: ${financialSummary.recPrice.triple.toFixed(0)}</div>
                   <div>DBL: ${financialSummary.recPrice.double.toFixed(0)}</div>
@@ -383,8 +386,9 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
               </div>
             </div>
           </div>
+          
           <div className="p-6 bg-gray-900 rounded-3xl text-white shadow-2xl">
-            <h3 className="text-lg font-bold mb-6">Proyección de Utilidad Real</h3>
+            <h3 className="text-lg font-bold mb-6">Proyección de Utilidad de Ventas</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               {['double', 'triple', 'quad', 'child'].map((type) => (
                 <div key={type} className="space-y-2">
@@ -400,7 +404,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
                 <span className="text-xl text-gray-500">/ {financialSummary.capacity} pax</span>
               </div>
               <div className="text-right">
-                <span className="text-xs text-gray-400 font-bold block mb-1">Utilidad Estimada</span>
+                <span className="text-xs text-gray-400 font-bold block mb-1">Utilidad Proyectada</span>
                 <span className={cn("text-5xl font-black", financialSummary.projectedProfit >= 0 ? "text-green-400" : "text-red-500")}>${financialSummary.projectedProfit.toLocaleString()}</span>
               </div>
             </div>
