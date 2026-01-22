@@ -14,8 +14,11 @@ import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface AgencySettings {
+  payment_mode: 'test' | 'production';
   mp_public_key: string | null;
+  mp_test_public_key: string | null;
   stripe_public_key: string | null;
+  stripe_test_public_key: string | null;
   agency_phone: string | null;
   bank_accounts: any[] | null;
 }
@@ -70,7 +73,7 @@ const TourInquirySection = () => {
     const fetchSettings = async () => {
       const { data } = await supabase
         .from('agency_settings')
-        .select('mp_public_key, stripe_public_key, agency_phone, bank_accounts')
+        .select('payment_mode, mp_public_key, mp_test_public_key, stripe_public_key, stripe_test_public_key, agency_phone, bank_accounts')
         .single();
       setAgencySettings(data);
     };
@@ -147,8 +150,10 @@ const TourInquirySection = () => {
   };
 
   const remainingPayment = contractDetails ? contractDetails.total_amount - contractDetails.total_paid : 0;
-  const hasMP = !!agencySettings?.mp_public_key;
-  const hasStripe = !!agencySettings?.stripe_public_key;
+  
+  const isProduction = agencySettings?.payment_mode === 'production';
+  const hasMP = isProduction ? !!agencySettings?.mp_public_key : !!agencySettings?.mp_test_public_key;
+  const hasStripe = isProduction ? !!agencySettings?.stripe_public_key : !!agencySettings?.stripe_test_public_key;
   const hasTransfer = Array.isArray(agencySettings?.bank_accounts) && agencySettings.bank_accounts.length > 0;
 
   return (

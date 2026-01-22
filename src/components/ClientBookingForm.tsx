@@ -225,8 +225,9 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     onClose();
   };
 
-  const hasMP = !!agencySettings?.mp_public_key;
-  const hasStripe = !!agencySettings?.stripe_public_key;
+  const isProduction = agencySettings?.payment_mode === 'production';
+  const hasMP = isProduction ? !!agencySettings?.mp_public_key : !!agencySettings?.mp_test_public_key;
+  const hasStripe = isProduction ? !!agencySettings?.stripe_public_key : !!agencySettings?.stripe_test_public_key;
   const hasTransfer = Array.isArray(agencySettings?.bank_accounts) && agencySettings.bank_accounts.length > 0;
 
   return (
