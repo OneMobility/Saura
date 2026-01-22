@@ -8,10 +8,13 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
+  console.log("[stripe-checkout] Función invocada");
+
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
     const { clientId, amount, description } = await req.json();
+    console.log("[stripe-checkout] Datos recibidos:", { clientId, amount, description });
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -23,19 +26,22 @@ serve(async (req) => {
       .select('*')
       .single();
 
-    if (settingsError) {
+    if (settingsError || !settings) {
+      console.error("[stripe-checkout] Error al cargar configuración:", settingsError);
       throw new Error("No se pudo cargar la configuración de la agencia.");
     }
 
-    const isTestMode = settings?.payment_mode === 'test';
+    const isTestMode = settings.payment_mode === 'test';
+    console.log("[stripe-checkout] Modo de pago:", isTestMode ? "TEST" : "PRODUCTION");
     
-    // Check multiple possible env variable names for the Stripe Secret Key
-    let STRIPE_SECRET_KEY = isTestMode
+    // Buscar la llave secreta
+    const STRIPE_SECRET_KEY = isTestMode
       ? (Deno.env.get('STRIPE_TEST_SECRET_KEY') || Deno.env.get('stripe'))
       : (Deno.env.get('STRIPE_SECRET_KEY') || Deno.env.get('stripe'));
 
     if (!STRIPE_SECRET_KEY) {
-      throw new Error(`Configuración incompleta: No se encontró la llave secreta de Stripe en los secretos de Supabase. Asegúrate de tener una variable llamada 'stripe' o 'STRIPE_TEST_SECRET_KEY'.`);
+      console.error("[stripe-checkout] Llave de Stripe no encontrada");
+      throw new Error(`Configuración incompleta: No se encontró la llave secreta de Stripe en los secretos de Supabase.`);
     }
 
     const stripe = new Stripe(STRIPE_SECRET_KEY, {
@@ -43,14 +49,17 @@ serve(async (req) => {
       httpClient: Stripe.createFetchHttpClient(),
     });
 
-    const percentage = (settings?.stripe_commission_percentage || 4.0) / 100;
-    const fixed = settings?.stripe_fixed_fee || 5.0;
+    // Cálculos de comisiones
+    const percentage = (settings.stripe_commission_percentage || 4.0) / 100;
+    const fixed = settings.stripe_fixed_fee || 5.0;
     const taxFactor = 1.16; // IVA
     
     const totalToPay = (amount + fixed) / (1 - (percentage * taxFactor));
     const roundedTotalCentavos = Math.ceil(totalToPay * 100);
 
-    // Stripe requires at least 10.00 MXN roughly
+    console.log("[stripe-checkout] Monto final calculado (centavos):", roundedTotalCentavos);
+
+    // Validación de monto mínimo para Stripe MXN (aprox $10 MXN)
     if (roundedTotalCentavos < 1000) {
       throw new Error("El monto del anticipo es demasiado bajo para procesar con tarjeta. Debe ser mayor a $10.00 MXN.");
     }
@@ -73,12 +82,14 @@ serve(async (req) => {
       client_reference_id: clientId,
     });
 
+    console.log("[stripe-checkout] Sesión creada con éxito");
+
     return new Response(JSON.stringify({ url: session.url }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error: any) {
-    console.error("[stripe-checkout] Error:", error.message);
+    console.error("[stripe-checkout] Error crítico:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

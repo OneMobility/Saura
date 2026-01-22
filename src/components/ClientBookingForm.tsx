@@ -161,17 +161,23 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
         const { data, error } = await supabase.functions.invoke('mercadopago-checkout', {
           body: { clientId: newClient.id, amount: advance, description: `Anticipo Tour: ${tourTitle}` }
         });
-        if (error) throw new Error(data?.error || "Error al conectar con Mercado Pago.");
+        
+        if (error) {
+          const res = await error.context.json();
+          throw new Error(res.error || "Error en Mercado Pago.");
+        }
         window.location.href = data.init_point;
       } else if (method === 'stripe') {
         const { data, error } = await supabase.functions.invoke('stripe-checkout', {
           body: { clientId: newClient.id, amount: advance, description: `Anticipo Tour: ${tourTitle}` }
         });
-        // Important: check if data is null or error is present to show the real cause
-        if (error || !data?.url) {
-          const msg = data?.error || (error ? "Error de red o configuración." : "La respuesta del servidor no fue válida.");
-          throw new Error(msg);
+
+        if (error) {
+          const res = await error.context.json();
+          throw new Error(res.error || "Error en la pasarela de Stripe.");
         }
+        
+        if (!data?.url) throw new Error("No se recibió la URL de pago de Stripe.");
         window.location.href = data.url;
       } else if (method === 'transferencia') {
         setShowBankInfo(true);
@@ -181,8 +187,8 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
         onClose();
       }
     } catch (e: any) {
-      console.error(e);
-      toast.error('Atención: ' + (e.message || 'Ocurrió un error inesperado.'));
+      console.error("Booking Error:", e);
+      toast.error(e.message || 'Ocurrió un error inesperado al procesar tu reserva.');
     } finally {
       setIsSubmitting(false);
     }
