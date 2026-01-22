@@ -16,12 +16,8 @@ const generateServiceContractHtml = (data: any) => {
   
   const isTour = !!client.tour_id;
   const title = isTour ? tour?.title : `Boleto de Autobús: ${busRoute?.name || 'N/A'}`;
-  const description = isTour ? (tour?.description || 'N/A') : 'Servicio de transporte terrestre.';
-  const duration = isTour ? (tour?.duration || 'N/A') : 'Viaje sencillo';
-  const includes = isTour ? (tour?.includes?.join(', ') || 'N/A') : 'Transporte y seguro de viajero.';
-  const notIncludes = isTour ? 'Gastos personales, comidas no especificadas, propinas.' : 'Gastos personales, comidas, hospedaje.';
   
-  // Obtener fechas y horas específicas
+  // Obtener detalles del viaje
   const departureDate = isTour ? (client.tours?.departure_date ? format(parseISO(client.tours.departure_date), 'dd/MM/yyyy', { locale: es }) : 'N/A') : 'N/A';
   const returnDate = isTour ? (client.tours?.return_date ? format(parseISO(client.tours.return_date), 'dd/MM/yyyy', { locale: es }) : 'N/A') : 'N/A';
   const departureTime = isTour ? (client.tours?.departure_time || 'N/A') : 'N/A';
@@ -35,6 +31,24 @@ const generateServiceContractHtml = (data: any) => {
   }
 
   const amountRemaining = (client.total_amount - client.total_paid).toFixed(2);
+
+  // Generar HTML para el itinerario
+  let itineraryHtml = '<p>N/A</p>';
+  if (isTour && tour?.itinerary && tour.itinerary.length > 0) {
+    itineraryHtml = tour.itinerary.map((item: any) => `
+      <p class="clause" style="text-indent: 0; padding-left: 0;">
+        <span class="bold">Día ${item.day}:</span> ${item.activity}
+      </p>
+    `).join('');
+  }
+
+  // Generar HTML para lo que incluye
+  let includesHtml = '<p>N/A</p>';
+  if (isTour && tour?.includes && tour.includes.length > 0) {
+    includesHtml = `<ul>${tour.includes.map((item: string) => `<li>${item}</li>`).join('')}</ul>`;
+  } else if (!isTour) {
+    includesHtml = '<ul><li>Transporte terrestre.</li><li>Seguro de viajero (limitado a la responsabilidad civil del transporte).</li></ul>';
+  }
 
   return `
     <!DOCTYPE html>
@@ -146,6 +160,15 @@ const generateServiceContractHtml = (data: any) => {
                 border-top: 1px solid #eee; 
                 padding-top: 10px; 
             }
+            ul {
+                list-style-type: disc;
+                padding-left: 20px;
+                margin-top: 5px;
+                margin-bottom: 10px;
+            }
+            ul li {
+                margin-bottom: 5px;
+            }
             @media print { 
                 .page { 
                     width: 100%; 
@@ -178,7 +201,7 @@ const generateServiceContractHtml = (data: any) => {
                 <p class="section-title">DATOS DEL SERVICIO</p>
                 <table class="details-table">
                     <tr><td class="label">Destino o Servicio:</td><td><span class="bold">${title}</span></td></tr>
-                    <tr><td class="label">Fecha de Contrato:</td><td>${contractDate}</td></tr>
+                    <tr><td class="label">Fecha de Reserva:</td><td>${contractDate}</td></tr>
                     <tr><td class="label">Salida:</td><td><span class="bold">${departureDate}</span> a las <span class="bold">${departureTime}</span></td></tr>
                     <tr><td class="label">Regreso:</td><td><span class="bold">${returnDate}</span> a las <span class="bold">${returnTime}</span></td></tr>
                     <tr><td class="label">Asientos Asignados:</td><td class="bold" style="font-size: 14px; color: #91045A;">${seatNumbers}</td></tr>
@@ -187,6 +210,16 @@ const generateServiceContractHtml = (data: any) => {
                     <tr><td class="label">Monto Liquidado a la Fecha:</td><td>$${client.total_paid.toLocaleString()} MXN</td></tr>
                     <tr><td class="label">Saldo Pendiente:</td><td class="bold" style="color: red;">$${amountRemaining.toLocaleString()} MXN</td></tr>
                 </table>
+            </div>
+
+            <div class="section">
+                <p class="section-title">ITINERARIO</p>
+                ${itineraryHtml}
+            </div>
+
+            <div class="section">
+                <p class="section-title">EL SERVICIO INCLUYE</p>
+                ${includesHtml}
             </div>
 
             <div class="section">
