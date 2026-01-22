@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Edit, Trash2, Loader2, Users, AlertCircle, CheckCircle2, Calendar, Handshake } from 'lucide-react';
+import { Edit, Trash2, Loader2, Users, AlertCircle, CheckCircle2, Calendar, Handshake, CornerDownLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
@@ -60,8 +60,8 @@ const ToursTable: React.FC<{ onEditTour: (tour: any) => void; onTourDeleted: () 
         
         const totalVenta = clientsRevenue + (tour.other_income || 0);
         const balanceCV = (tour.total_base_cost || 0) - totalVenta;
+        const balanceAbonoCliente = clientsRevenue - clientsPaid;
 
-        // Calcular pagos a proveedores
         const busPaid = busesMap.get(tour.bus_id) || 0;
         const hotelsPaid = (tour.hotel_details || []).reduce((sum: number, h: any) => sum + (hotelsMap.get(h.hotel_quote_id) || 0), 0);
         const totalProvPaid = busPaid + hotelsPaid;
@@ -72,6 +72,7 @@ const ToursTable: React.FC<{ onEditTour: (tour: any) => void; onTourDeleted: () 
           nights: nightsMatch ? nightsMatch[1] : '0',
           total_collected: clientsPaid,
           balance_cv: balanceCV,
+          balance_abono: balanceAbonoCliente,
           total_prov_paid: totalProvPaid
         };
       });
@@ -96,12 +97,13 @@ const ToursTable: React.FC<{ onEditTour: (tour: any) => void; onTourDeleted: () 
         <TableHeader>
           <TableRow className="bg-gray-50/50">
             <TableHead className="font-bold">Nombre</TableHead>
-            <TableHead className="font-bold">Salida</TableHead>
+            <TableHead className="font-bold">Salida / Regreso</TableHead>
             <TableHead className="font-bold text-center">Noches</TableHead>
             <TableHead className="font-bold">Costo</TableHead>
             <TableHead className="font-bold">C-V</TableHead>
             <TableHead className="font-bold">Pagado Prov</TableHead>
             <TableHead className="font-bold">Abonos Clientes</TableHead>
+            <TableHead className="font-bold">C-Abono</TableHead>
             <TableHead className="text-right font-bold">Acciones</TableHead>
           </TableRow>
         </TableHeader>
@@ -109,16 +111,26 @@ const ToursTable: React.FC<{ onEditTour: (tour: any) => void; onTourDeleted: () 
           {tours.map((tour) => (
             <TableRow key={tour.id} className="hover:bg-gray-50/50">
               <TableCell className="font-bold text-gray-900">{tour.title}</TableCell>
-              <TableCell className="text-xs font-medium">{tour.departure_date ? format(parseISO(tour.departure_date), 'dd/MM/yy') : 'N/A'}</TableCell>
-              <TableCell className="text-center"><Badge variant="outline" className="font-black border-gray-300">{tour.nights}</Badge></TableCell>
-              <TableCell className="font-bold text-gray-600">${tour.total_base_cost?.toLocaleString()}</TableCell>
               <TableCell>
-                <div className={cn("font-black text-sm", tour.balance_cv > 0 ? "text-red-500" : "text-green-600")}>
+                <div className="text-[10px] space-y-0.5">
+                   <div className="flex items-center gap-1 font-bold text-green-600"><Calendar className="h-3 w-3" /> {tour.departure_date ? format(parseISO(tour.departure_date), 'dd/MM/yy') : 'N/A'}</div>
+                   <div className="flex items-center gap-1 font-bold text-blue-600"><CornerDownLeft className="h-3 w-3" /> {tour.return_date ? format(parseISO(tour.return_date), 'dd/MM/yy') : 'N/A'}</div>
+                </div>
+              </TableCell>
+              <TableCell className="text-center"><Badge variant="outline" className="font-black border-gray-300">{tour.nights}</Badge></TableCell>
+              <TableCell className="font-bold text-gray-600 text-xs">${tour.total_base_cost?.toLocaleString()}</TableCell>
+              <TableCell>
+                <div className={cn("font-black text-xs", tour.balance_cv > 0 ? "text-red-500" : "text-green-600")}>
                   ${Math.abs(tour.balance_cv).toLocaleString()}
                 </div>
               </TableCell>
-              <TableCell className="font-black text-blue-600">${tour.total_prov_paid.toLocaleString()}</TableCell>
-              <TableCell className="font-black text-rosa-mexicano">${tour.total_collected?.toLocaleString()}</TableCell>
+              <TableCell className="font-black text-xs text-blue-600">${tour.total_prov_paid.toLocaleString()}</TableCell>
+              <TableCell className="font-black text-xs text-rosa-mexicano">${tour.total_collected?.toLocaleString()}</TableCell>
+              <TableCell>
+                <div className={cn("font-black text-xs", tour.balance_abono > 0 ? "text-red-500" : "text-green-600")}>
+                  ${tour.balance_abono.toLocaleString()}
+                </div>
+              </TableCell>
               <TableCell className="text-right">
                 <div className="flex justify-end gap-1">
                   <Button variant="outline" size="sm" onClick={() => navigate(`/admin/tours/${tour.id}/passengers`)} className="text-rosa-mexicano border-rosa-mexicano h-8 text-[10px] font-black uppercase">Pax</Button>

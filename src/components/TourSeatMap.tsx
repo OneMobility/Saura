@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Loader2, CarFront, Toilet, LogIn, Crown } from 'lucide-react';
+import { Loader2, CarFront, Toilet, LogIn, Crown, User } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useSession } from '@/components/SessionContextProvider';
@@ -13,6 +13,7 @@ interface Seat {
   seat_number: number;
   status: 'available' | 'booked' | 'blocked' | 'courtesy';
   client_id: string | null;
+  client_name?: string;
 }
 
 interface TourSeatMapProps {
@@ -54,17 +55,15 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
     if (isValidUUID(tourId)) {
       const { data, error } = await supabase
         .from('tour_seat_assignments')
-        .select('*')
+        .select('*, clients(first_name, last_name)')
         .eq('tour_id', tourId);
       
       if (!error) fetchedAssignments = data || [];
-      else toast.error('Error al cargar disponibilidad.');
     }
 
     const currentLayout = seatLayoutJson || [];
     const seatNumbers: number[] = [];
     
-    // 1. Extraer todos los números de asiento físicos presentes en el layout
     currentLayout.forEach(row => {
       row.forEach(item => {
         if (item.type === 'seat' && item.number !== undefined) {
@@ -73,31 +72,27 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
       });
     });
     
-    // Ordenar numéricamente para la lógica de asignación
     seatNumbers.sort((a, b) => a - b);
 
-    // 2. Mapear estados base (vendidos o bloqueados)
     const baseSeats = seatNumbers.map(num => {
       const dbEntry = fetchedAssignments.find(s => s.seat_number === num);
+      const clientName = dbEntry?.clients ? `${dbEntry.clients.first_name} ${dbEntry.clients.last_name}` : undefined;
+      
       return {
         seat_number: num,
         status: (dbEntry?.status || 'available') as Seat['status'],
-        client_id: dbEntry?.client_id || null
+        client_id: dbEntry?.client_id || null,
+        client_name: clientName
       };
     });
 
-    // 3. Aplicar lógica de cortesías sobre los asientos NO vendidos
     let courtesyCount = 0;
     const finalSeats = baseSeats.map(s => {
-      // Si ya está vendido a un cliente, se queda como 'booked'
       if (s.status === 'booked') return s;
-
-      // Si aún necesitamos cortesías, este asiento disponible se convierte en cortesía
       if (courtesyCount < courtesies) {
         courtesyCount++;
         return { ...s, status: 'courtesy' as const };
       }
-
       return s;
     });
 
@@ -109,26 +104,37 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
     fetchSeats();
   }, [fetchSeats]);
 
-  const handleSeatClick = async (seatNumber: number, currentStatus: Seat['status'], assignedClientId: string | null) => {
+  const handleSeatClick = async (seatNumber: number, currentStatus: Seat['status'], assignedClientId: string | null, clientName?: string) => {
     if (readOnly || !onSeatsSelected) return;
+
+    // Si el asiento está vendido, mostrar el nombre del cliente
+    if (currentStatus === 'booked') {
+      if (clientName) {
+        toast.info(`Asiento ${seatNumber}: ${clientName}`, {
+          icon: <User className="h-4 w-4 text-blue-500" />,
+        });
+      } else if (assignedClientId === currentClientId) {
+        // Permitir deselección si es el mismo cliente en modo reserva
+        const newSelection = initialSelectedSeats.filter(s => s !== seatNumber);
+        onSeatsSelected(newSelection);
+      } else {
+        toast.info(`Asiento ${seatNumber} ya reservado.`);
+      }
+      return;
+    }
 
     if (adminMode && isAdmin) {
       if (!isValidUUID(tourId)) {
         toast.error('Guarda el tour primero para bloquear asientos.');
         return;
       }
-      if (currentStatus === 'booked') {
-        toast.info('Asiento reservado por cliente.');
-        return;
-      }
       if (currentStatus === 'courtesy') {
-        toast.info('Asiento reservado para Coordinadores por sistema.');
+        toast.info('Asiento reservado para Coordinadores.');
         return;
       }
 
       setIsUpdatingSeats(true);
       const newStatus = (currentStatus === 'available') ? 'blocked' : 'available';
-      
       await supabase.from('tour_seat_assignments').upsert({
         tour_id: tourId, seat_number: seatNumber, status: newStatus, client_id: null
       }, { onConflict: 'tour_id,seat_number' });
@@ -138,13 +144,8 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
       return;
     }
 
-    // Lógica de Selección de Cliente
-    if (currentStatus === 'booked' && assignedClientId !== currentClientId) {
-      toast.info('Asiento ya reservado.');
-      return;
-    }
     if (currentStatus === 'blocked' || currentStatus === 'courtesy') {
-      toast.info('Este asiento no está disponible para venta.');
+      toast.info('Asiento no disponible.');
       return;
     }
 
@@ -167,9 +168,9 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
     const isSelected = initialSelectedSeats.includes(seat.seat_number);
 
     if (isSelected) return cn(base, "bg-rosa-mexicano text-white scale-110 shadow-lg z-10");
-    if (seat.status === 'booked') return cn(base, "bg-red-100 text-red-400 cursor-not-allowed opacity-50");
+    if (seat.status === 'booked') return cn(base, "bg-red-100 text-red-500 border border-red-200 cursor-pointer hover:bg-red-200");
     if (seat.status === 'blocked') return cn(base, "bg-gray-400 text-white cursor-pointer hover:bg-gray-500");
-    if (seat.status === 'courtesy') return cn(base, "bg-yellow-100 text-yellow-700 cursor-not-allowed border-2 border-yellow-400");
+    if (seat.status === 'courtesy') return cn(base, "bg-yellow-100 text-yellow-700 border-2 border-yellow-400 cursor-default");
     
     return cn(base, "bg-gray-100 text-gray-700 hover:bg-gray-200 cursor-pointer border border-gray-200");
   };
@@ -193,10 +194,9 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
                     <Button
                       type="button"
                       className={getSeatClasses(seat, 'seat')}
-                      onClick={() => handleSeatClick(item.number!, seat?.status || 'available', seat?.client_id || null)}
+                      onClick={() => handleSeatClick(item.number!, seat?.status || 'available', seat?.client_id || null, seat?.client_name)}
                       disabled={isUpdatingSeats}
                       variant="ghost"
-                      title={isCourtesy ? "Espacio de Coordinador" : ""}
                     >
                       {isCourtesy ? <Crown className="h-4 w-4 absolute -top-1 -right-1 text-yellow-600" /> : null}
                       {item.number}
@@ -217,7 +217,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
       <div className="flex flex-wrap gap-4 text-[10px] uppercase font-black text-gray-400 justify-center border-t pt-4 tracking-tighter">
         <div className="flex items-center gap-1"><div className="w-3 h-3 bg-gray-100 border rounded" /> Libre</div>
         <div className="flex items-center gap-1"><div className="w-3 h-3 bg-rosa-mexicano rounded" /> Seleccionado</div>
-        <div className="flex items-center gap-1"><div className="w-3 h-3 bg-red-100 rounded" /> Vendido</div>
+        <div className="flex items-center gap-1"><div className="w-3 h-3 bg-red-100 border-red-200 rounded" /> Vendido</div>
         <div className="flex items-center gap-1"><div className="w-3 h-3 bg-gray-400 rounded" /> Bloqueado</div>
         <div className="flex items-center gap-1"><div className="w-3 h-3 bg-yellow-100 border-yellow-400 border rounded" /> Coordinador</div>
       </div>
