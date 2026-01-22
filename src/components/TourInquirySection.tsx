@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -13,12 +13,29 @@ import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
+interface AgencySettings {
+  mp_public_key: string | null;
+  stripe_public_key: string | null;
+}
+
 const TourInquirySection = () => {
   const [contractNumber, setContractNumber] = useState('');
   const [contractDetails, setContractDetails] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [isDownloading, setIsDownloading] = useState<string | null>(null);
+  const [agencySettings, setAgencySettings] = useState<AgencySettings | null>(null); // NEW: Agency settings state
+
+  useEffect(() => {
+    const fetchSettings = async () => {
+      const { data } = await supabase
+        .from('agency_settings')
+        .select('mp_public_key, stripe_public_key')
+        .single();
+      setAgencySettings(data);
+    };
+    fetchSettings();
+  }, []);
 
   const handleInquiry = async () => {
     if (!contractNumber.trim()) return;
@@ -83,6 +100,10 @@ const TourInquirySection = () => {
       setIsPaying(false);
     }
   };
+
+  const remainingPayment = contractDetails ? contractDetails.total_amount - contractDetails.total_paid : 0;
+  const hasMercadoPago = !!agencySettings?.mp_public_key;
+  const hasStripe = !!agencySettings?.stripe_public_key;
 
   return (
     <section className="py-16 px-4 md:px-8 lg:px-16 bg-rosa-mexicano text-white">
@@ -184,7 +205,7 @@ const TourInquirySection = () => {
                     <div className="pt-4 border-t border-dashed border-gray-300 flex justify-between items-center">
                       <span className="font-bold">ADEUDO PENDIENTE:</span>
                       <span className="text-3xl font-black text-red-600">
-                        ${(contractDetails.total_amount - contractDetails.total_paid).toLocaleString()}
+                        ${remainingPayment.toLocaleString()}
                       </span>
                     </div>
                   </div>
@@ -192,13 +213,30 @@ const TourInquirySection = () => {
 
                 <div className="space-y-3">
                   <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Opciones de Pago Online</p>
-                  <Button onClick={() => handleOnlinePayment('mercadopago')} disabled={isPaying || (contractDetails.total_amount - contractDetails.total_paid) <= 0} className="bg-blue-600 hover:bg-blue-700 w-full h-14 text-lg font-bold">
-                    {isPaying ? <Loader2 className="animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
-                    Pagar con Mercado Pago
-                  </Button>
-                  <Button variant="outline" onClick={() => window.open(`https://wa.me/528444041469`, '_blank')} className="w-full border-green-600 text-green-600 hover:bg-green-50 h-12">
-                    <MessageSquare className="mr-2 h-4 w-4" /> Ayuda por WhatsApp
-                  </Button>
+                  
+                  {remainingPayment > 0 ? (
+                    <>
+                      {hasMercadoPago && (
+                        <Button onClick={() => handleOnlinePayment('mercadopago')} disabled={isPaying} className="bg-blue-600 hover:bg-blue-700 w-full h-14 text-lg font-bold">
+                          {isPaying ? <Loader2 className="animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
+                          Pagar con Mercado Pago
+                        </Button>
+                      )}
+                      {hasStripe && (
+                        <Button onClick={() => handleOnlinePayment('stripe')} disabled={isPaying} className="bg-indigo-600 hover:bg-indigo-700 w-full h-14 text-lg font-bold">
+                          {isPaying ? <Loader2 className="animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
+                          Pagar con Stripe
+                        </Button>
+                      )}
+                      <Button variant="outline" onClick={() => window.open(`https://wa.me/528444041469`, '_blank')} className="w-full border-green-600 text-green-600 hover:bg-green-50 h-12">
+                        <MessageSquare className="mr-2 h-4 w-4" /> Ayuda por WhatsApp
+                      </Button>
+                    </>
+                  ) : (
+                    <div className="text-center p-4 bg-green-100 rounded-xl text-green-800 font-bold flex items-center justify-center gap-2">
+                      <CheckCircle2 className="h-5 w-5" /> Contrato Liquidado
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
