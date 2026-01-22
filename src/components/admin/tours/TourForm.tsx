@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, TrendingUp, DollarSign, Hotel, Bus, Clock, MapPin, Receipt, AlertCircle } from 'lucide-react';
+import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, TrendingUp, DollarSign, Hotel, Bus, Clock, MapPin, Receipt, AlertCircle, Info } from 'lucide-react';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { v4 as uuidv4 } from 'uuid';
 import { format, parseISO } from 'date-fns';
@@ -39,7 +39,7 @@ interface Tour {
   selling_price_triple_occupancy: number;
   selling_price_quad_occupancy: number;
   selling_price_child: number;
-  transport_only_price: number; // NUEVO
+  transport_only_price: number;
   other_income: number;
   departure_date: string | null;
   return_date: string | null;
@@ -79,7 +79,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
         if (tourData) {
           setFormData({ ...tourData, includes: tourData.includes || [], itinerary: tourData.itinerary || [], hotel_details: tourData.hotel_details || [], provider_details: tourData.provider_details || [] });
           
-          // Obtener pagos realizados al bus y hotel de este tour
           if (tourData.bus_id) {
             const { data: bP } = await supabase.from('bus_payments').select('amount').eq('bus_id', tourData.bus_id);
             const busTotal = bP?.reduce((s, p) => s + p.amount, 0) || 0;
@@ -148,7 +147,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
               <p className="text-[10px] uppercase font-bold text-gray-400">Total Pagado a Autobús</p>
               <p className="text-2xl font-black text-green-400">${providerPayments.bus.toLocaleString()}</p>
             </div>
-            <p className="text-[10px] text-gray-500 italic">* Estos montos reflejan la suma de abonos registrados en las tablas de pagos de proveedores.</p>
           </CardContent>
         </Card>
       </div>
@@ -164,8 +162,8 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
       </Card>
 
       <div className="fixed bottom-6 right-6 z-50">
-        <Button type="submit" disabled={isSubmitting} className="bg-rosa-mexicano h-14 px-10 text-lg font-bold shadow-2xl">
-          {isSubmitting ? <Loader2 className="animate-spin" /> : <Save className="mr-2" />} Guardar Tour
+        <Button type="submit" className="bg-rosa-mexicano h-14 px-10 text-lg font-bold shadow-2xl">
+          <Save className="mr-2" /> Guardar Tour
         </Button>
       </div>
     </form>
