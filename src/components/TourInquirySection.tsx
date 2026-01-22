@@ -16,6 +16,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 interface AgencySettings {
   mp_public_key: string | null;
   stripe_public_key: string | null;
+  agency_phone: string | null;
+  bank_accounts: any[] | null;
 }
 
 const TourInquirySection = () => {
@@ -41,7 +43,6 @@ const TourInquirySection = () => {
       if (error) throw error;
       setContractDetails(data.contractDetails);
       
-      // Establecer el monto por defecto al adeudo restante
       const remaining = data.contractDetails.total_amount - data.contractDetails.total_paid;
       setPaymentAmount(remaining.toString());
       
@@ -69,7 +70,7 @@ const TourInquirySection = () => {
     const fetchSettings = async () => {
       const { data } = await supabase
         .from('agency_settings')
-        .select('mp_public_key, stripe_public_key')
+        .select('mp_public_key, stripe_public_key, agency_phone, bank_accounts')
         .single();
       setAgencySettings(data);
     };
@@ -132,9 +133,23 @@ const TourInquirySection = () => {
     }
   };
 
+  const handleWhatsAppContact = () => {
+    if (!contractDetails) return;
+    const phone = agencySettings?.agency_phone?.replace(/\D/g, '') || '528444041469';
+    const text = encodeURIComponent(
+      `Hola Saura Tours, solicito información sobre mi reserva.\n\n` +
+      `📌 *Folio:* ${contractDetails.contract_number}\n` +
+      `🌍 *Tour:* ${contractDetails.tour_title}\n` +
+      `💰 *Monto a Abonar:* $${parseFloat(paymentAmount).toLocaleString()}\n\n` +
+      `Me gustaría recibir los datos de transferencia bancaria.`
+    );
+    window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
+  };
+
   const remainingPayment = contractDetails ? contractDetails.total_amount - contractDetails.total_paid : 0;
-  const hasMercadoPago = !!agencySettings?.mp_public_key;
+  const hasMP = !!agencySettings?.mp_public_key;
   const hasStripe = !!agencySettings?.stripe_public_key;
+  const hasTransfer = Array.isArray(agencySettings?.bank_accounts) && agencySettings.bank_accounts.length > 0;
 
   return (
     <section id="consultar" ref={sectionRef} className="py-16 px-4 md:px-8 lg:px-16 bg-rosa-mexicano text-white scroll-mt-20">
@@ -258,22 +273,28 @@ const TourInquirySection = () => {
                             max={remainingPayment}
                           />
                         </div>
-                        <p className="text-[10px] text-gray-400 italic">Puedes realizar pagos parciales o liquidar el total.</p>
                       </div>
 
                       <div className="grid grid-cols-1 gap-3">
-                        {hasMercadoPago && (
+                        {hasMP && (
                           <Button onClick={() => handleOnlinePayment('mercadopago')} disabled={isPaying} className="bg-blue-600 hover:bg-blue-700 w-full h-14 text-lg font-bold">
                             {isPaying ? <Loader2 className="animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
-                            Pagar con Mercado Pago
+                            Abonar con Mercado Pago
                           </Button>
                         )}
                         {hasStripe && (
                           <Button onClick={() => handleOnlinePayment('stripe')} disabled={isPaying} className="bg-indigo-600 hover:bg-indigo-700 w-full h-14 text-lg font-bold">
                             {isPaying ? <Loader2 className="animate-spin" /> : <CreditCard className="mr-2 h-5 w-5" />}
-                            Pagar con Stripe
+                            Abonar con Stripe
                           </Button>
                         )}
+                        <Button 
+                          variant="outline" 
+                          onClick={handleWhatsAppContact} 
+                          className="w-full h-14 border-rosa-mexicano text-rosa-mexicano font-black text-lg gap-2 hover:bg-rosa-mexicano hover:text-white"
+                        >
+                          <MessageSquare /> {hasTransfer ? 'Transferencia / Pagar después' : 'Pagar después / Contactar'}
+                        </Button>
                       </div>
                     </>
                   ) : (

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Hotel, BusFront, CreditCard, Save, Info } from 'lucide-react';
+import { Loader2, Hotel, BusFront, CreditCard, Save, Info, MessageSquare } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -130,13 +130,24 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
   ]);
 
   const handleSave = async () => {
-    if (!formData.first_name || !formData.last_name || !formData.email || !formData.phone) return toast.error("Por favor completa tus datos de contacto.");
+    if (!formData.first_name || !formData.last_name || !formData.email || !formData.phone) {
+      toast.error("Por favor completa tus datos de contacto.");
+      return;
+    }
     
     setIsSubmitting(true);
     const contractNum = uuidv4().substring(0, 8).toUpperCase();
     
     const { data, error } = await supabase.from('clients').insert({
-      ...formData,
+      first_name: formData.first_name,
+      last_name: formData.last_name,
+      email: formData.email,
+      phone: formData.phone,
+      address: formData.address,
+      identification_number: formData.identification_number,
+      contractor_age: formData.contractor_age,
+      companions: formData.companions,
+      is_transport_only: formData.is_transport_only,
       contract_number: contractNum,
       tour_id: tourId,
       number_of_people: selectedSeats.length,
@@ -153,9 +164,18 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     }
 
     if (data) {
-      await supabase.from('tour_seat_assignments').insert(selectedSeats.map(s => ({
-        tour_id: tourId, seat_number: s, status: 'booked', client_id: data.id
-      })));
+      const seatAssignments = selectedSeats.map(s => ({
+        tour_id: tourId, 
+        seat_number: s, 
+        status: 'booked', 
+        client_id: data.id
+      }));
+      
+      const { error: seatError } = await supabase.from('tour_seat_assignments').insert(seatAssignments);
+      
+      if (seatError) {
+        console.error("Error al asignar asientos:", seatError);
+      }
       
       setCreatedClientId(data.id);
       setContractNumber(contractNum);
@@ -187,6 +207,27 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
       setIsPaying(false);
     }
   };
+
+  const handlePagarDespues = () => {
+    const phone = agencySettings?.agency_phone?.replace(/\D/g, '') || '528444041469';
+    const text = encodeURIComponent(
+      `Hola Saura Tours, acabo de realizar una reserva.\n\n` +
+      `📌 *Folio:* ${contractNumber}\n` +
+      `🌍 *Tour:* ${tourTitle}\n` +
+      `👤 *Cliente:* ${formData.first_name} ${formData.last_name}\n` +
+      `👥 *Pax:* ${selectedSeats.length}\n` +
+      `💰 *Total:* $${totalAmount.toLocaleString()}\n` +
+      `💳 *Anticipo:* $${(selectedSeats.length * advancePaymentPerPerson).toLocaleString()}\n\n` +
+      `Solicito los datos para realizar mi transferencia bancaria.`
+    );
+    
+    window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
+    onClose();
+  };
+
+  const hasMP = !!agencySettings?.mp_public_key;
+  const hasStripe = !!agencySettings?.stripe_public_key;
+  const hasTransfer = Array.isArray(agencySettings?.bank_accounts) && agencySettings.bank_accounts.length > 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
@@ -296,20 +337,24 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
             </div>
 
             <div className="grid grid-cols-1 gap-4">
-              {agencySettings?.mp_public_key && (
+              {hasMP && (
                 <Button onClick={() => handleOnlinePayment('mercadopago')} disabled={isPaying} className="bg-blue-600 hover:bg-blue-700 h-16 text-lg font-bold gap-3 rounded-2xl">
                   {isPaying ? <Loader2 className="animate-spin" /> : <CreditCard />}
                   Pagar con Mercado Pago
                 </Button>
               )}
-              {agencySettings?.stripe_public_key && (
+              {hasStripe && (
                 <Button onClick={() => handleOnlinePayment('stripe')} disabled={isPaying} className="bg-indigo-600 hover:bg-indigo-700 h-16 text-lg font-bold gap-3 rounded-2xl">
                   {isPaying ? <Loader2 className="animate-spin" /> : <CreditCard />}
                   Pagar con Tarjeta (Stripe)
                 </Button>
               )}
-              <Button variant="outline" onClick={onClose} className="h-14 border-gray-200 text-gray-500 rounded-2xl">
-                Pagar después / Transferencia
+              <Button 
+                variant="outline" 
+                onClick={handlePagarDespues} 
+                className="h-16 border-rosa-mexicano text-rosa-mexicano font-black rounded-2xl gap-3 text-lg hover:bg-rosa-mexicano hover:text-white transition-all"
+              >
+                <MessageSquare /> {hasTransfer ? 'Transferencia / Pagar después' : 'Pagar después / Contactar'}
               </Button>
             </div>
           </div>
