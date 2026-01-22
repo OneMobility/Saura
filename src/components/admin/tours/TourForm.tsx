@@ -125,6 +125,20 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     fetchData();
   }, []);
 
+  // Lógica para agrupar hoteles en el select
+  const groupedAndSortedQuotes = useMemo(() => {
+    const groups: Record<string, HotelQuote[]> = {};
+    availableHotelQuotes.forEach(quote => {
+      if (!groups[quote.name]) groups[quote.name] = [];
+      groups[quote.name].push(quote);
+    });
+    return Object.entries(groups).sort((a, b) => {
+      const minA = Math.min(...a[1].map(q => q.estimated_total_cost));
+      const minB = Math.min(...b[1].map(q => q.estimated_total_cost));
+      return minA - minB;
+    });
+  }, [availableHotelQuotes]);
+
   useEffect(() => {
     const fetchTourData = async () => {
       if (tourId && tourId !== 'new') {
@@ -166,11 +180,17 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     
     const projectedProfit = currentRevenue - totalCost;
 
+    // Punto de equilibrio
+    const beQuad = Math.ceil(totalCost / (formData.selling_price_quad_occupancy || 1));
+    const beTriple = Math.ceil(totalCost / (formData.selling_price_triple_occupancy || 1));
+    const beDouble = Math.ceil(totalCost / (formData.selling_price_double_occupancy || 1));
+
     const targetRevenue = totalCost + desiredProfitFixed;
     const avgRequiredPerPerson = capacity > 0 ? targetRevenue / capacity : 0;
 
     return {
       busCost, hotelCost, providerCost, totalCost, capacity, projectedProfit,
+      beQuad, beTriple, beDouble,
       recPrice: {
         quad: avgRequiredPerPerson,
         triple: avgRequiredPerPerson * 1.12,
@@ -231,7 +251,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
 
     let finalImageUrl = formData.image_url;
 
-    // Validación de imagen para tours nuevos
     if (!tourId && !imageFile) {
       toast.error("Debes seleccionar una imagen para publicar el tour.");
       setIsSubmitting(false);
@@ -309,9 +328,9 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
               </h3>
               <div className="space-y-3">
                 <p className="text-[10px] leading-tight text-blue-800 font-medium">Pax para cubrir gastos:</p>
-                <div className="flex justify-between text-sm"><span>En Cuádruple:</span> <span className="font-bold">{Math.ceil(financialSummary.totalCost / (formData.selling_price_quad_occupancy || 1))} pax</span></div>
-                <div className="flex justify-between text-sm"><span>En Triple:</span> <span className="font-bold">{Math.ceil(financialSummary.totalCost / (formData.selling_price_triple_occupancy || 1))} pax</span></div>
-                <div className="flex justify-between text-sm"><span>En Doble:</span> <span className="font-bold">{Math.ceil(financialSummary.totalCost / (formData.selling_price_double_occupancy || 1))} pax</span></div>
+                <div className="flex justify-between text-sm"><span>En Cuádruple:</span> <span className="font-bold">{financialSummary.beQuad} pax</span></div>
+                <div className="flex justify-between text-sm"><span>En Triple:</span> <span className="font-bold">{financialSummary.beTriple} pax</span></div>
+                <div className="flex justify-between text-sm"><span>En Doble:</span> <span className="font-bold">{financialSummary.beDouble} pax</span></div>
               </div>
             </div>
 
@@ -399,7 +418,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
 
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                   <div className="space-y-2">
-                    <Label>Coordinadores (Cortesías)</Label>
+                    <Label>Coordinadores (No pagan)</Label>
                     <Input type="number" id="courtesies" value={formData.courtesies} onChange={handleChange} />
                   </div>
                   <div className="space-y-2">
@@ -533,14 +552,27 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
           </div>
         </div>
 
+        {/* GESTIÓN DE ASIENTOS */}
         {formData.bus_id && (
           <Card className="border-2 border-rosa-mexicano/20 shadow-lg">
             <CardHeader className="bg-rosa-mexicano/5">
               <CardTitle className="text-xl flex items-center gap-2">
-                <Armchair className="text-rosa-mexicano" /> Gestión de Asientos
+                <Armchair className="text-rosa-mexicano" /> Gestión de Asientos para este Tour
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-6">
+              <div className="bg-blue-50 p-4 rounded-xl mb-6 flex gap-4 items-start border border-blue-100">
+                <Info className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+                <div className="text-sm text-blue-800">
+                  <p className="font-bold mb-1">Instrucciones para el Administrador:</p>
+                  <ul className="list-disc list-inside space-y-1 opacity-90">
+                    <li>Haz clic en un asiento disponible para <strong>bloquearlo</strong> (aparecerá en gris).</li>
+                    <li>Los asientos de <strong>Coordinador</strong> (morados) se asignan automáticamente según el número de cortesías.</li>
+                    <li>Los asientos <strong>Ocupados</strong> (rojos) son reservas ya confirmadas de clientes.</li>
+                  </ul>
+                </div>
+              </div>
+              
               <div className="max-w-3xl mx-auto">
                 <TourSeatMap
                   tourId={tourId || 'new-tour'}
@@ -581,12 +613,9 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
 
         <div className="fixed bottom-6 right-6 flex gap-4 z-50">
           <Button type="button" variant="outline" onClick={() => navigate('/admin/tours')} className="bg-white shadow-lg px-6 h-12">Cancelar</Button>
-          <Button type="submit" disabled={isSubmitting || isUploadingImage} className="bg-rosa-mexicano text-white shadow-lg px-10 h-12 text-lg font-bold rounded-xl">
-            {isSubmitting || isUploadingImage ? (
-              <><Loader2 className="animate-spin mr-2" /> {isUploadingImage ? 'Subiendo imagen...' : 'Guardando...'}</>
-            ) : (
-              <><Save className="mr-2" /> {tourId ? 'Actualizar Tour' : 'Publicar Tour'}</>
-            )}
+          <Button type="submit" disabled={isSubmitting} className="bg-rosa-mexicano text-white shadow-lg px-10 h-12 text-lg font-bold rounded-xl">
+            {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
+            {tourId ? 'Actualizar Tour' : 'Publicar Tour'}
           </Button>
         </div>
       </form>
