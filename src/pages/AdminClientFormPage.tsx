@@ -15,17 +15,8 @@ import AdminHeader from '@/components/admin/AdminHeader';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
 import TourSeatMap from '@/components/TourSeatMap';
-import { TourProviderService, AvailableProvider } from '@/types/shared';
+import { TourProviderService, AvailableProvider, SeatLayout } from '@/types/shared';
 import ClientPaymentHistoryTable from '@/components/admin/clients/ClientPaymentHistoryTable';
-import BusSeatMap from '@/components/bus-tickets/BusSeatMap';
-
-// Definición de tipos para el layout de asientos
-type SeatLayoutItem = {
-  type: 'seat' | 'aisle' | 'bathroom' | 'driver' | 'empty' | 'entry';
-  number?: number;
-};
-type SeatLayoutRow = SeatLayoutItem[];
-type SeatLayout = SeatLayoutRow[];
 
 interface BusPassenger {
   id: string;
@@ -73,6 +64,8 @@ interface Client {
   contractor_age: number | null;
   room_details: RoomDetails;
   remaining_payment?: number;
+  bus_capacity?: number;
+  courtesies?: number;
 }
 
 interface Tour {
@@ -84,6 +77,7 @@ interface Tour {
   selling_price_child: number;
   bus_id: string | null;
   courtesies: number;
+  bus_capacity: number;
 }
 
 interface BusRoute {
@@ -92,10 +86,11 @@ interface BusRoute {
   bus_id: string | null;
 }
 
-interface BusDetails {
-  bus_id: string | null;
-  bus_capacity: number;
-  courtesies: number;
+interface Bus {
+  id: string;
+  name: string;
+  rental_cost: number;
+  total_capacity: number;
   seat_layout_json: SeatLayout | null;
 }
 
@@ -141,16 +136,17 @@ const AdminClientFormPage = () => {
     number_of_people: 1, companions: [], bus_passengers: [], extra_services: [],
     total_amount: 0, advance_payment: 0, total_paid: 0, status: 'pending',
     contractor_age: null, room_details: { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
+    bus_capacity: 0, courtesies: 0
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true);
   const [availableTours, setAvailableTours] = useState<Tour[]>([]);
+  const [availableBuses, setAvailableBuses] = useState<Bus[]>([]); // ADDED
   const [availableBusRoutes, setAvailableBusRoutes] = useState<BusRoute[]>([]);
   const [availableBusSchedules, setAvailableBusSchedules] = useState<BusSchedule[]>([]);
   const [availableProviders, setAvailableProviders] = useState<AvailableProvider[]>([]);
   const [selectedTourPrices, setSelectedTourPrices] = useState<Tour | null>(null);
-  const [busDetails, setBusDetails] = useState<BusDetails | null>(null);
   const [clientSelectedSeats, setClientSelectedSeats] = useState<number[]>([]);
   const [roomDetails, setRoomDetails] = useState<RoomDetails>({ double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
   const [agencySettings, setAgencySettings] = useState<AgencySettings | null>(null);
@@ -158,12 +154,13 @@ const AdminClientFormPage = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      const [toursRes, routesRes, schedulesRes, settingsRes, providersRes] = await Promise.all([
+      const [toursRes, routesRes, schedulesRes, settingsRes, providersRes, busesRes] = await Promise.all([
         supabase.from('tours').select('*').order('title', { ascending: true }),
         supabase.from('bus_routes').select('*').order('name', { ascending: true }),
         supabase.from('bus_schedules').select('*').order('departure_time', { ascending: true }),
         supabase.from('agency_settings').select('advance_payment_amount').single(),
-        supabase.from('providers').select('*').eq('is_active', true).order('name', { ascending: true })
+        supabase.from('providers').select('*').eq('is_active', true).order('name', { ascending: true }),
+        supabase.from('buses').select('*').order('name', { ascending: true }) // ADDED
       ]);
 
       if (toursRes.data) setAvailableTours(toursRes.data);
@@ -171,6 +168,7 @@ const AdminClientFormPage = () => {
       if (schedulesRes.data) setAvailableBusSchedules(schedulesRes.data);
       if (settingsRes.data) setAgencySettings(settingsRes.data);
       if (providersRes.data) setAvailableProviders(providersRes.data);
+      if (busesRes.data) setAvailableBuses(busesRes.data); // ADDED
     };
     fetchData();
   }, []);
@@ -183,15 +181,32 @@ const AdminClientFormPage = () => {
         let companionsForForm = clientData.companions || [];
         let busPassengersForForm = [];
         let assignedSeats = [];
+        
+        let tourBusCapacity = 0;
+        let tourCourtesies = 0;
+
         if (clientData.tour_id) {
           const { data: seats } = await supabase.from('tour_seat_assignments').select('seat_number').eq('client_id', clientData.id);
           assignedSeats = seats?.map(s => s.seat_number) || [];
+          
+          const { data: tourData } = await supabase.from('tours').select('bus_capacity, courtesies').eq('id', clientData.tour_id).single();
+          if (tourData) {
+            tourBusCapacity = tourData.bus_capacity;
+            tourCourtesies = tourData.courtesies;
+          }
         } else if (clientData.bus_route_id) {
           const { data: passengers } = await supabase.from('bus_passengers').select('*').eq('client_id', clientData.id);
           busPassengersForForm = passengers || [];
           assignedSeats = busPassengersForForm.map(p => p.seat_number);
         }
-        setFormData({ ...clientData, companions: companionsForForm, bus_passengers: busPassengersForForm });
+        
+        setFormData({ 
+          ...clientData, 
+          companions: companionsForForm, 
+          bus_passengers: busPassengersForForm,
+          bus_capacity: tourBusCapacity,
+          courtesies: tourCourtesies
+        });
         setRoomDetails(clientData.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
         setClientSelectedSeats(assignedSeats);
       }
@@ -217,6 +232,13 @@ const AdminClientFormPage = () => {
         const fixed = agencySettings.advance_payment_amount || 500;
         const percent = minPrice * 0.10;
         setCalculatedMinAdvance(Math.max(fixed, percent));
+        
+        // Update bus data if switching tours
+        setFormData(prev => ({ 
+          ...prev, 
+          bus_capacity: tour.bus_capacity, 
+          courtesies: tour.courtesies 
+        }));
       }
     }
   }, [formData.tour_id, availableTours, agencySettings]);
@@ -242,7 +264,7 @@ const AdminClientFormPage = () => {
       setRoomDetails(rd);
     }
 
-    const servicesTotal = formData.extra_services.reduce((sum, s) => sum + (s.selling_price_per_unit_snapshot * s.quantity), 0);
+    const servicesTotal = (formData.extra_services || []).reduce((sum, s) => sum + (s.selling_price_per_unit_snapshot * s.quantity), 0);
     calculatedTotalAmount += servicesTotal;
 
     const totalAdvance = clientSelectedSeats.length * calculatedMinAdvance;
@@ -251,7 +273,7 @@ const AdminClientFormPage = () => {
       ...prev,
       number_of_people: totalPeople,
       total_amount: calculatedTotalAmount,
-      advance_payment: prev.advance_payment || totalAdvance // Sugerir el calculado si está en 0
+      advance_payment: prev.advance_payment || totalAdvance
     }));
   }, [formData.companions.length, formData.bus_passengers.length, selectedTourPrices, formData.contractor_age, formData.companions, formData.bus_passengers, formData.extra_services, formData.tour_id, formData.bus_route_id, clientSelectedSeats.length, calculatedMinAdvance]);
 
@@ -273,7 +295,22 @@ const AdminClientFormPage = () => {
     if (!authUser) return setIsSubmitting(false);
 
     const clientDataToSave = {
-      ...formData,
+      first_name: formData.first_name,
+      last_name: formData.last_name,
+      email: formData.email,
+      phone: formData.phone,
+      address: formData.address,
+      contract_number: formData.contract_number,
+      identification_number: formData.identification_number,
+      tour_id: formData.tour_id,
+      bus_route_id: formData.bus_route_id,
+      number_of_people: formData.number_of_people,
+      companions: formData.companions,
+      extra_services: formData.extra_services,
+      total_amount: formData.total_amount,
+      advance_payment: formData.advance_payment,
+      status: formData.status,
+      contractor_age: formData.contractor_age,
       room_details: roomDetails,
       user_id: authUser.id,
       updated_at: new Date().toISOString(),
@@ -281,9 +318,11 @@ const AdminClientFormPage = () => {
 
     let savedId = clientIdFromParams;
     if (clientIdFromParams) {
-      await supabase.from('clients').update(clientDataToSave).eq('id', clientIdFromParams);
+      const { error } = await supabase.from('clients').update(clientDataToSave).eq('id', clientIdFromParams);
+      if (error) { toast.error('Error al actualizar.'); setIsSubmitting(false); return; }
     } else {
-      const { data } = await supabase.from('clients').insert(clientDataToSave).select('id').single();
+      const { data, error } = await supabase.from('clients').insert(clientDataToSave).select('id').single();
+      if (error) { toast.error('Error al crear.'); setIsSubmitting(false); return; }
       savedId = data?.id;
     }
 
@@ -301,6 +340,8 @@ const AdminClientFormPage = () => {
   };
 
   if (loadingInitialData) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-rosa-mexicano" /></div>;
+
+  const currentBus = selectedTourPrices?.bus_id ? availableBuses.find(b => b.id === selectedTourPrices.bus_id) : null;
 
   return (
     <div className="flex min-h-screen bg-gray-100">
@@ -372,9 +413,9 @@ const AdminClientFormPage = () => {
                   <Label className="text-lg font-bold block mb-4">Selección de Asientos</Label>
                   <TourSeatMap 
                     tourId={formData.tour_id} 
-                    busCapacity={formData.bus_capacity} 
-                    courtesies={formData.courtesies} 
-                    seatLayoutJson={selectedTourPrices?.bus_id ? availableBuses.find(b => b.id === selectedTourPrices.bus_id)?.seat_layout_json || null : null}
+                    busCapacity={formData.bus_capacity || 0} 
+                    courtesies={formData.courtesies || 0} 
+                    seatLayoutJson={currentBus?.seat_layout_json || null}
                     onSeatsSelected={handleSeatsSelected}
                     initialSelectedSeats={clientSelectedSeats}
                     currentClientId={formData.id}
