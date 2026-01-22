@@ -118,7 +118,15 @@ const ClientPaymentDialog: React.FC<ClientPaymentDialogProps> = ({ isOpen, onClo
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="amount" className="text-right">Monto</Label>
-            <Input id="amount" type="number" value={amount} onChange={(e) => setAmount(parseFloat(e.target.value) || 0)} className="col-span-3" required />
+            <Input 
+              id="amount" 
+              type="text" // Changed to text for robustness
+              pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
+              value={amount} 
+              onChange={(e) => setAmount(parseFloat(e.target.value) || 0)} 
+              className="col-span-3" 
+              required 
+            />
           </div>
           
           <div className="grid grid-cols-4 items-center gap-4">

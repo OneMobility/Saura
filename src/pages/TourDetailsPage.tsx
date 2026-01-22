@@ -92,7 +92,14 @@ const TourDetailsPage = () => {
       if (settingsError && settingsError.code !== 'PGRST116') {
         console.error('Error fetching agency settings:', settingsError);
       }
-      const settings = settingsData || { advance_payment_amount: 500 }; // Default to 500 if not found
+      
+      // Ensure advance_payment_amount is treated as a number, defaulting to 500 if null/undefined
+      const advanceAmount = settingsData?.advance_payment_amount ? parseFloat(String(settingsData.advance_payment_amount)) : 500;
+      
+      const settings = {
+        ...settingsData,
+        advance_payment_amount: advanceAmount,
+      } as AgencySettings;
       setAgencySettings(settings);
 
       // 2. Fetch all buses to get their layouts
@@ -168,7 +175,7 @@ const TourDetailsPage = () => {
           tourDetails.selling_price_child
         );
         
-        const fixedAdvance = settings.advance_payment_amount || 500;
+        const fixedAdvance = settings.advance_payment_amount; // Use the numeric value from settings
         const percentageAdvance = minPricePerPerson * 0.10;
         
         setAdvancePaymentPerPerson(Math.max(fixedAdvance, percentageAdvance));
