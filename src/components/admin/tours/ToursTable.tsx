@@ -5,9 +5,11 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Edit, Trash2, Loader2, Users, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Edit, Trash2, Loader2, Users, AlertCircle, CheckCircle2, Calendar } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { format, parseISO } from 'date-fns';
+import { es } from 'date-fns/locale';
 
 interface Tour {
   id: string;
@@ -20,7 +22,9 @@ interface Tour {
   total_base_cost: number | null;
   created_at: string;
   other_income: number;
-  clients: Array<{ total_amount: number; status: string }> | null;
+  departure_date: string | null;
+  return_date: string | null;
+  clients: Array<{ total_amount: number; total_paid: number; status: string }> | null;
 }
 
 interface ToursTableProps {
@@ -45,6 +49,7 @@ const ToursTable: React.FC<ToursTableProps> = ({ onEditTour, onTourDeleted }) =>
         *,
         clients (
           total_amount,
+          total_paid,
           status
         )
       `)
@@ -54,18 +59,25 @@ const ToursTable: React.FC<ToursTableProps> = ({ onEditTour, onTourDeleted }) =>
       toast.error('Error al cargar los tours.');
     } else {
       const processed = (data || []).map(tour => {
-        const clientsRevenue = (tour.clients || [])
-          .filter(client => client.status !== 'cancelled')
-          .reduce((sum, client) => sum + client.total_amount, 0);
+        const activeClients = (tour.clients || []).filter(c => c.status !== 'cancelled');
+        
+        const clientsRevenue = activeClients.reduce((sum, c) => sum + (c.total_amount || 0), 0);
+        const clientsPaid = activeClients.reduce((sum, c) => sum + (c.total_paid || 0), 0);
         
         const totalVenta = clientsRevenue + (tour.other_income || 0);
         const totalCosto = tour.total_base_cost || 0;
-        const restan = totalCosto - totalVenta;
+        const balanceCV = totalCosto - totalVenta;
+
+        // Intentar extraer el número de noches del string de duración (ej: "3 días, 2 noches")
+        const nightsMatch = tour.duration?.match(/(\d+)\s*noche/i);
+        const nights = nightsMatch ? nightsMatch[1] : '0';
 
         return {
           ...tour,
+          nights,
           total_sold_revenue: totalVenta,
-          restan: restan
+          total_collected: clientsPaid,
+          balance_cv: balanceCV
         };
       });
       setTours(processed);
@@ -82,53 +94,61 @@ const ToursTable: React.FC<ToursTableProps> = ({ onEditTour, onTourDeleted }) =>
     setLoading(false);
   };
 
+  const formatDate = (dateStr: string | null) => {
+    if (!dateStr) return 'N/A';
+    return format(parseISO(dateStr), 'dd/MM/yy', { locale: es });
+  };
+
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-rosa-mexicano" /></div>;
 
   return (
-    <div className="bg-white rounded-lg shadow-lg p-6">
-      <h2 className="text-xl font-semibold mb-4">Tours Existentes</h2>
+    <div className="bg-white rounded-xl shadow-lg p-6 border-none">
       <div className="overflow-x-auto">
         <Table>
           <TableHeader>
-            <TableRow>
-              <TableHead>Título</TableHead>
-              <TableHead>Costo Est.</TableHead>
-              <TableHead>Venta Real</TableHead>
-              <TableHead>Restan (C-V)</TableHead>
-              <TableHead className="text-right">Acciones</TableHead>
+            <TableRow className="bg-gray-50/50 hover:bg-gray-50/50">
+              <TableHead className="font-bold">Nombre</TableHead>
+              <TableHead className="font-bold">Salida</TableHead>
+              <TableHead className="font-bold">Regreso</TableHead>
+              <TableHead className="font-bold">Noches</TableHead>
+              <TableHead className="font-bold">Costo</TableHead>
+              <TableHead className="font-bold">C-V</TableHead>
+              <TableHead className="font-bold">Abonos</TableHead>
+              <TableHead className="text-right font-bold">Acciones</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {tours.map((tour) => (
-              <TableRow key={tour.id}>
-                <TableCell className="font-medium">
-                   <div>{tour.title}</div>
-                   <div className="text-[10px] text-gray-400 uppercase font-bold">{tour.duration}</div>
-                </TableCell>
+              <TableRow key={tour.id} className="hover:bg-gray-50/50 transition-colors">
+                <TableCell className="font-bold text-gray-900">{tour.title}</TableCell>
+                <TableCell className="text-xs font-medium text-gray-600">{formatDate(tour.departure_date)}</TableCell>
+                <TableCell className="text-xs font-medium text-gray-600">{formatDate(tour.return_date)}</TableCell>
+                <TableCell className="text-center"><Badge variant="outline" className="font-black border-gray-300">{tour.nights}</Badge></TableCell>
                 <TableCell className="font-bold text-gray-600">${tour.total_base_cost?.toLocaleString()}</TableCell>
-                <TableCell className="font-bold text-rosa-mexicano">${tour.total_sold_revenue?.toLocaleString()}</TableCell>
                 <TableCell>
                   <div className={cn(
-                    "flex items-center gap-2 font-black",
-                    tour.restan > 0 ? "text-red-500" : "text-green-600"
+                    "flex items-center gap-1 font-black",
+                    tour.balance_cv > 0 ? "text-red-500" : "text-green-600"
                   )}>
-                    {tour.restan > 0 ? <AlertCircle className="h-4 w-4" /> : <CheckCircle2 className="h-4 w-4" />}
-                    ${Math.abs(tour.restan).toLocaleString()}
-                    {tour.restan <= 0 && <span className="text-[10px] uppercase ml-1">(Utilidad)</span>}
+                    ${Math.abs(tour.balance_cv).toLocaleString()}
+                    {tour.balance_cv <= 0 && <span className="text-[8px] uppercase">Utilidad</span>}
                   </div>
                 </TableCell>
+                <TableCell className="font-black text-rosa-mexicano">
+                   ${tour.total_collected?.toLocaleString()}
+                </TableCell>
                 <TableCell className="text-right">
-                  <div className="flex justify-end gap-2">
+                  <div className="flex justify-end gap-1">
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      onClick={() => window.open(`/admin/tours/${tour.id}/passengers`, '_blank')}
-                      className="text-rosa-mexicano border-rosa-mexicano hover:bg-rosa-mexicano hover:text-white h-8 text-xs font-bold"
+                      onClick={() => navigate(`/admin/tours/${tour.id}/passengers`)}
+                      className="text-rosa-mexicano border-rosa-mexicano hover:bg-rosa-mexicano hover:text-white h-8 text-[10px] font-black uppercase tracking-tighter"
                     >
                       <Users className="h-3 w-3 mr-1" /> Pax
                     </Button>
-                    <Button variant="ghost" size="icon" onClick={() => onEditTour(tour)} className="text-blue-600"><Edit className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDeleteTour(tour.id)} className="text-red-500"><Trash2 className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => onEditTour(tour)} className="text-blue-600 hover:bg-blue-50 h-8 w-8"><Edit className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleDeleteTour(tour.id)} className="text-red-500 hover:bg-red-50 h-8 w-8"><Trash2 className="h-4 w-4" /></Button>
                   </div>
                 </TableCell>
               </TableRow>
