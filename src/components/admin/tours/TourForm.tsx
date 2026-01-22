@@ -67,7 +67,7 @@ interface Tour {
   selling_price_triple_occupancy: number;
   selling_price_quad_occupancy: number;
   selling_price_child: number;
-  transport_only_price: number; // NEW
+  transport_only_price: number;
   other_income: number;
   departure_date: string | null;
   return_date: string | null;
@@ -188,6 +188,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
             ...data,
             includes: data.includes || [], itinerary: data.itinerary || [],
             hotel_details: data.hotel_details || [], provider_details: data.provider_details || [],
+            description: stripHtmlTags(data.description) // Ensure existing HTML is stripped for the new textarea
           });
           setImageUrlPreview(data.image_url);
           if (data.departure_date) setDepartureDate(parseISO(data.departure_date));
@@ -244,17 +245,11 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
     const nights = selectedHotelQuote?.num_nights_quoted || 0;
     const nightsDisplay = nights > 0 ? `${nights} noche${nights > 1 ? 's' : ''}` : 'Estadía';
 
-    const baseText = `
-      <p>🌴 VIAJE A ${formData.title.toUpperCase()} 🌴</p>
-      <p>🗓 Salida: ${departure}</p>
-      <p>🏨 Estadía: ${nightsDisplay}</p>
-      <p>🗓 Regreso: ${returnDateStr}</p>
-      <p>🚍 Autobús: ${busName}</p>
-      <p>🏨 Hotel: ${hotelName}</p>
-    `;
+    if (!isFullContent) {
+      return `🌴 VIAJE A ${formData.title.toUpperCase() || 'DESTINO'} 🌴\n🗓 Salida: ${departure}\n🏨 Estadía: ${nightsDisplay}\n🗓 Regreso: ${returnDateStr}\n🚍 Autobús: ${busName}\n🏨 Hotel: ${hotelName}`.substring(0, 160);
+    }
 
-    if (!isFullContent) return stripHtmlTags(baseText).substring(0, 160) + '...';
-    return `<h2>Detalles del Viaje</h2>${baseText}<h2>Servicios Incluidos</h2><ul><li>Transporte en ${busName}</li><li>Hospedaje en ${hotelName}</li><li>Seguro de viajero</li></ul>`;
+    return `<h2>Detalles del Viaje</h2><p>🌴 VIAJE A ${formData.title.toUpperCase()} 🌴</p><p>🗓 Salida: ${departure}</p><p>🏨 Estadía: ${nightsDisplay}</p><p>🗓 Regreso: ${returnDateStr}</p><p>🚍 Autobús: ${busName}</p><p>🏨 Hotel: ${hotelName}</p><h2>Servicios Incluidos</h2><ul><li>Transporte en ${busName}</li><li>Hospedaje en ${hotelName}</li><li>Seguro de viajero</li></ul>`;
   }, [formData.title, formData.departure_date, formData.return_date, formData.bus_id, availableBuses, selectedHotelQuote]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -503,7 +498,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
               </CardContent>
             </Card>
 
-            <Card><CardHeader><CardTitle className="text-lg">Descripción de Venta (Corta)</CardTitle></CardHeader><CardContent><RichTextEditor value={formData.description} onChange={val => handleRichTextChange('description', val)} placeholder={generateDefaultDescription(false)} className="min-h-[150px]" /></CardContent></Card>
+            <Card><CardHeader><CardTitle className="text-lg">Descripción de Venta (Corta)</CardTitle></CardHeader><CardContent><Textarea id="description" value={formData.description} onChange={handleChange} placeholder="Escribe un resumen atractivo para las tarjetas de venta." className="min-h-[120px]" /></CardContent></Card>
           </div>
         </div>
 

@@ -9,7 +9,9 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Loader2, Save, Upload } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
-import RichTextEditor from '@/components/RichTextEditor'; // Import the new RichTextEditor
+import { Textarea } from '@/components/ui/textarea';
+import RichTextEditor from '@/components/RichTextEditor';
+import { stripHtmlTags } from '@/utils/html';
 
 interface BlogPost {
   id?: string;
@@ -25,7 +27,7 @@ interface BlogPost {
 interface BlogFormDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSave: () => void; // Callback to refresh blog list
+  onSave: () => void;
   initialData?: BlogPost | null;
 }
 
@@ -45,7 +47,10 @@ const BlogFormDialog: React.FC<BlogFormDialogProps> = ({ isOpen, onClose, onSave
 
   useEffect(() => {
     if (initialData) {
-      setFormData(initialData);
+      setFormData({
+        ...initialData,
+        description: stripHtmlTags(initialData.description)
+      });
       setImageUrlPreview(initialData.image_url);
     } else {
       setFormData({
@@ -61,26 +66,21 @@ const BlogFormDialog: React.FC<BlogFormDialogProps> = ({ isOpen, onClose, onSave
     }
   }, [initialData, isOpen]);
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
-    setFormData((prev) => ({ ...prev, [id]: value }));
-
-    if (id === 'title') {
-      setFormData((prev) => ({ ...prev, slug: generateSlug(value) }));
-    }
+    setFormData((prev) => {
+      const updated = { ...prev, [id]: value };
+      if (id === 'title') updated.slug = generateSlug(value);
+      return updated;
+    });
   };
 
-  const handleRichTextChange = (field: 'description' | 'full_content', content: string) => {
-    setFormData((prev) => ({ ...prev, [field]: content }));
+  const handleRichTextChange = (content: string) => {
+    setFormData((prev) => ({ ...prev, full_content: content }));
   };
 
   const generateSlug = (title: string) => {
-    return title
-      .toLowerCase()
-      .trim()
-      .replace(/[^\w\s-]/g, '') // Remove non-word chars
-      .replace(/[\s_-]+/g, '-') // Replace spaces/underscores with single dash
-      .replace(/^-+|-+$/g, ''); // Remove leading/trailing dashes
+    return title.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
   };
 
   const handleImageFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -96,30 +96,12 @@ const BlogFormDialog: React.FC<BlogFormDialogProps> = ({ isOpen, onClose, onSave
 
   const uploadImage = async (file: File): Promise<string | null> => {
     setIsUploadingImage(true);
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${uuidv4()}.${fileExt}`;
-    const filePath = `blog-images/${fileName}`; // Store in a 'blog-images' folder within the bucket
-
-    const { data, error } = await supabase.storage
-      .from('tour-images') // Changed to 'tour-images' bucket
-      .upload(filePath, file, {
-        cacheControl: '3600',
-        upsert: false,
-      });
-
+    const fileName = `${uuidv4()}-${file.name.replace(/\s/g, '_')}`;
+    const { data, error } = await supabase.storage.from('tour-images').upload(`blog/${fileName}`, file);
     setIsUploadingImage(false);
-
-    if (error) {
-      console.error('Error uploading image:', error);
-      toast.error('Error al subir la imagen.');
-      return null;
-    }
-
-    const { data: publicUrlData } = supabase.storage
-      .from('tour-images') // Changed to 'tour-images' bucket
-      .getPublicUrl(filePath);
-
-    return publicUrlData.publicUrl;
+    if (error) return null;
+    const { data: { publicUrl } } = supabase.storage.from('tour-images').getPublicUrl(`blog/${fileName}`);
+    return publicUrl;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -127,67 +109,21 @@ const BlogFormDialog: React.FC<BlogFormDialogProps> = ({ isOpen, onClose, onSave
     setIsSubmitting(true);
 
     let finalImageUrl = formData.image_url;
-
     if (imageFile) {
       const uploadedUrl = await uploadImage(imageFile);
-      if (!uploadedUrl) {
-        setIsSubmitting(false);
-        return;
-      }
+      if (!uploadedUrl) { setIsSubmitting(false); return; }
       finalImageUrl = uploadedUrl;
-    } else if (!formData.image_url && !initialData?.image_url) { // Ensure image is present for new posts or if it was cleared
-      toast.error('Por favor, sube una imagen de portada.');
-      setIsSubmitting(false);
-      return;
     }
 
     const { data: { user } } = await supabase.auth.getUser();
-    if (!user) {
-      toast.error('Debes iniciar sesión para crear o editar entradas de blog.');
-      setIsSubmitting(false);
-      return;
-    }
+    const blogPostData = { ...formData, image_url: finalImageUrl, user_id: user?.id };
 
-    const blogPostData = {
-      title: formData.title,
-      slug: formData.slug,
-      description: formData.description,
-      image_url: finalImageUrl,
-      full_content: formData.full_content,
-      video_url: formData.video_url || null, // Save video_url
-      user_id: user.id,
-    };
+    const { error } = initialData?.id 
+      ? await supabase.from('blog_posts').update({ ...blogPostData, updated_at: new Date().toISOString() }).eq('id', initialData.id)
+      : await supabase.from('blog_posts').insert(blogPostData);
 
-    if (initialData?.id) {
-      // Update existing blog post
-      const { error } = await supabase
-        .from('blog_posts')
-        .update({ ...blogPostData, updated_at: new Date().toISOString() })
-        .eq('id', initialData.id);
-
-      if (error) {
-        console.error('Error updating blog post:', error);
-        toast.error('Error al actualizar la entrada del blog.');
-      } else {
-        toast.success('Entrada del blog actualizada con éxito.');
-        onSave();
-        onClose();
-      }
-    } else {
-      // Insert new blog post
-      const { error } = await supabase
-        .from('blog_posts')
-        .insert(blogPostData);
-
-      if (error) {
-        console.error('Error creating blog post:', error);
-        toast.error('Error al crear la entrada del blog.');
-      } else {
-        toast.success('Entrada del blog creada con éxito.');
-        onSave();
-        onClose();
-      }
-    }
+    if (error) toast.error('Error al guardar.');
+    else { toast.success('Entrada guardada.'); onSave(); onClose(); }
     setIsSubmitting(false);
   };
 
@@ -195,102 +131,30 @@ const BlogFormDialog: React.FC<BlogFormDialogProps> = ({ isOpen, onClose, onSave
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{initialData ? 'Editar Entrada de Blog' : 'Crear Nueva Entrada de Blog'}</DialogTitle>
-          <DialogDescription>
-            {initialData ? 'Modifica los detalles de la entrada del blog.' : 'Rellena los campos para crear una nueva entrada de blog.'}
-          </DialogDescription>
+          <DialogTitle>{initialData ? 'Editar Entrada de Blog' : 'Nueva Entrada'}</DialogTitle>
         </DialogHeader>
         <form onSubmit={handleSubmit} className="grid gap-4 py-4">
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="title" className="text-right">
-              Título
-            </Label>
-            <Input
-              id="title"
-              value={formData.title}
-              onChange={handleChange}
-              className="col-span-3"
-              required
-            />
+          <div className="space-y-2"><Label>Título</Label><Input id="title" value={formData.title} onChange={handleChange} required /></div>
+          <div className="space-y-2"><Label>Slug (URL)</Label><Input id="slug" value={formData.slug} onChange={handleChange} required /></div>
+          <div className="space-y-2"><Label>Resumen (Sin etiquetas HTML)</Label><Textarea id="description" value={formData.description} onChange={handleChange} placeholder="Breve texto para la tarjeta." required /></div>
+          
+          <div className="space-y-2">
+            <Label>Imagen</Label>
+            <Input type="file" accept="image/*" onChange={handleImageFileChange} />
+            {imageUrlPreview && <img src={imageUrlPreview} className="w-48 h-32 object-cover rounded-md mt-2" />}
           </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="slug" className="text-right">
-              Slug (URL)
-            </Label>
-            <Input
-              id="slug"
-              value={formData.slug}
-              onChange={handleChange}
-              className="col-span-3"
-              placeholder="titulo-de-la-entrada"
-              required
-            />
+
+          <div className="space-y-2"><Label>URL Video</Label><Input id="video_url" value={formData.video_url || ''} onChange={handleChange} /></div>
+          
+          <div className="space-y-2">
+            <Label>Contenido Completo</Label>
+            <RichTextEditor value={formData.full_content} onChange={handleRichTextChange} className="min-h-[200px]" />
           </div>
-          <div className="grid grid-cols-4 items-start gap-4">
-            <Label htmlFor="description" className="text-right pt-2">
-              Descripción Corta
-            </Label>
-            <div className="col-span-3">
-              <RichTextEditor
-                value={formData.description}
-                onChange={(content) => handleRichTextChange('description', content)}
-                placeholder="Escribe una descripción breve para la entrada del blog."
-                className="min-h-[100px]"
-              />
-            </div>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="image_file" className="text-right">
-              Imagen de Portada
-            </Label>
-            <div className="col-span-3 flex flex-col gap-2">
-              <Input
-                id="image_file"
-                type="file"
-                accept="image/*"
-                onChange={handleImageFileChange}
-                className="file:text-rosa-mexicano file:font-semibold file:border-0 file:bg-transparent file:mr-4"
-              />
-              {imageUrlPreview && (
-                <div className="mt-2">
-                  <img src={imageUrlPreview} alt="Vista previa" className="w-48 h-32 object-cover rounded-md" />
-                </div>
-              )}
-              {!imageFile && !imageUrlPreview && (
-                <p className="text-sm text-gray-500">Sube una imagen para la portada del blog.</p>
-              )}
-            </div>
-          </div>
-          <div className="grid grid-cols-4 items-center gap-4">
-            <Label htmlFor="video_url" className="text-right">
-              URL de Video (YouTube/TikTok)
-            </Label>
-            <Input
-              id="video_url"
-              type="url"
-              value={formData.video_url || ''}
-              onChange={handleChange}
-              className="col-span-3"
-              placeholder="https://www.youtube.com/watch?v=..."
-            />
-          </div>
-          <div className="grid grid-cols-4 items-start gap-4">
-            <Label htmlFor="full_content" className="text-right pt-2">
-              Contenido Completo
-            </Label>
-            <div className="col-span-3">
-              <RichTextEditor
-                value={formData.full_content}
-                onChange={(content) => handleRichTextChange('full_content', content)}
-                placeholder="Escribe el contenido completo de tu entrada de blog aquí."
-                className="min-h-[200px]"
-              />
-            </div>
-          </div>
+
           <DialogFooter>
             <Button type="submit" disabled={isSubmitting || isUploadingImage}>
-              {isSubmitting || isUploadingImage ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-              {isUploadingImage ? 'Subiendo imagen...' : (initialData ? 'Guardar Cambios' : 'Crear Entrada')}
+              {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2 h-4 w-4" />}
+              Guardar Entrada
             </Button>
           </DialogFooter>
         </form>
