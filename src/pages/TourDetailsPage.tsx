@@ -53,6 +53,15 @@ interface Tour {
   return_time: string | null;
 }
 
+interface AgencySettings {
+  mp_public_key: string | null;
+  stripe_public_key: string | null;
+  bank_name: string | null;
+  bank_clabe: string | null;
+  bank_holder: string | null;
+  advance_payment_amount: number;
+}
+
 const TourDetailsPage = () => {
   const { id } = useParams<{ id: string }>();
   const [tour, setTour] = useState<Tour | null>(null);
@@ -61,7 +70,9 @@ const TourDetailsPage = () => {
   const [busLayout, setBusLayout] = useState<SeatLayout | null>(null);
   const [isBookingFormOpen, setIsBookingFormOpen] = useState(false);
   const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
-  const [hotelNames, setHotelNames] = useState<string>(''); // State to hold formatted hotel names
+  const [hotelNames, setHotelNames] = useState<string>('');
+  const [agencySettings, setAgencySettings] = useState<AgencySettings | null>(null);
+  const [advancePaymentPerPerson, setAdvancePaymentPerPerson] = useState(0);
 
   const handleSeatsSelected = useCallback((seats: number[]) => {
     setSelectedSeats(seats);
@@ -72,19 +83,30 @@ const TourDetailsPage = () => {
       setLoading(true);
       setError(null);
 
-      // 1. Fetch all buses to get their layouts
+      // 1. Fetch Agency Settings
+      const { data: settingsData, error: settingsError } = await supabase
+        .from('agency_settings')
+        .select('mp_public_key, stripe_public_key, bank_name, bank_clabe, bank_holder, advance_payment_amount')
+        .single();
+      
+      if (settingsError && settingsError.code !== 'PGRST116') {
+        console.error('Error fetching agency settings:', settingsError);
+      }
+      const settings = settingsData || { advance_payment_amount: 500 }; // Default to 500 if not found
+      setAgencySettings(settings);
+
+      // 2. Fetch all buses to get their layouts
       const { data: busesData, error: busesError } = await supabase
         .from('buses')
         .select('id, seat_layout_json');
 
       if (busesError) {
         console.error('Error fetching buses:', busesError);
-        // Continue even if buses fail, but log error
       }
       const busesMap = new Map<string, Bus>();
       busesData?.forEach(bus => busesMap.set(bus.id, bus as Bus));
 
-      // 2. Fetch tour details (simplified query)
+      // 3. Fetch tour details
       const { data: tourData, error: tourError } = await supabase
         .from('tours')
         .select(`
@@ -138,27 +160,34 @@ const TourDetailsPage = () => {
           return_time: tourData.return_time || null,
         } as Tour;
 
-        // 3. Fetch hotel names based on IDs in hotel_details (JSONB field)
+        // 4. Calculate Advance Payment Per Person
+        const minPricePerPerson = Math.min(
+          tourDetails.selling_price_double_occupancy,
+          tourDetails.selling_price_triple_occupancy,
+          tourDetails.selling_price_quad_occupancy,
+          tourDetails.selling_price_child
+        );
+        
+        const fixedAdvance = settings.advance_payment_amount || 500;
+        const percentageAdvance = minPricePerPerson * 0.10;
+        
+        setAdvancePaymentPerPerson(Math.max(fixedAdvance, percentageAdvance));
+
+        // 5. Fetch hotel names
         const hotelQuoteIds = tourDetails.hotel_details.map(d => d.hotel_quote_id).filter(Boolean);
         
         if (hotelQuoteIds.length > 0) {
-          const { data: hotelsData, error: hotelsError } = await supabase
+          const { data: hotelsData } = await supabase
             .from('hotels')
             .select('id, name')
             .in('id', hotelQuoteIds);
-
-          if (hotelsError) {
-            console.error('Error fetching linked hotel names:', hotelsError);
-            setHotelNames('Error al cargar nombres de hoteles');
-          } else {
-            const names = (hotelsData || []).map(h => h.name).join(', ');
-            setHotelNames(names);
-          }
+          const names = (hotelsData || []).map(h => h.name).join(', ');
+          setHotelNames(names);
         } else {
           setHotelNames('N/A');
         }
 
-        // Set bus layout
+        // 6. Set bus layout
         if (tourDetails.bus_id) {
           const bus = busesMap.get(tourDetails.bus_id);
           const layout = bus?.seat_layout_json || null;
@@ -329,7 +358,7 @@ const TourDetailsPage = () => {
             <div className="lg:col-span-1 bg-gray-50 p-6 rounded-lg shadow-inner">
               <h3 className="text-2xl font-bold text-gray-800 mb-4">¡Reserva Ahora!</h3>
               <p className="text-gray-700 mb-6">
-                ¿Listo para tu próxima aventura? Selecciona tus asientos y reserva.
+                Anticipo requerido por persona: <span className="font-bold text-rosa-mexicano">${advancePaymentPerPerson.toFixed(2)} MXN</span>
               </p>
               {tour.bus_capacity > 0 && (
                 <div className="mb-6">
@@ -359,7 +388,7 @@ const TourDetailsPage = () => {
                     Reservar Tour ({selectedSeats.length} personas)
                   </Button>
                 </DialogTrigger>
-                {tour && (
+                {tour && agencySettings && (
                   <ClientBookingForm
                     isOpen={isBookingFormOpen}
                     onClose={() => setIsBookingFormOpen(false)}
@@ -380,7 +409,8 @@ const TourDetailsPage = () => {
                       seat_layout_json: busLayout,
                     }}
                     tourAvailableExtraServices={tour.provider_details}
-                    initialSelectedSeats={selectedSeats}
+                    advancePaymentPerPerson={advancePaymentPerPerson}
+                    agencySettings={agencySettings}
                   />
                 )}
               </Dialog>
