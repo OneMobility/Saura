@@ -24,23 +24,18 @@ serve(async (req) => {
       .single();
 
     if (settingsError) {
-      console.error("[stripe-checkout] Error fetching settings:", settingsError);
       throw new Error("No se pudo cargar la configuración de la agencia.");
     }
 
     const isTestMode = settings?.payment_mode === 'test';
     
-    // Diagnostic log
-    console.log(`[stripe-checkout] Payment mode: ${isTestMode ? 'TEST' : 'PRODUCTION'}`);
-
-    const STRIPE_SECRET_KEY = isTestMode
-      ? Deno.env.get('STRIPE_TEST_SECRET_KEY')
-      : Deno.env.get('STRIPE_SECRET_KEY');
+    // Check multiple possible env variable names for the Stripe Secret Key
+    let STRIPE_SECRET_KEY = isTestMode
+      ? (Deno.env.get('STRIPE_TEST_SECRET_KEY') || Deno.env.get('stripe'))
+      : (Deno.env.get('STRIPE_SECRET_KEY') || Deno.env.get('stripe'));
 
     if (!STRIPE_SECRET_KEY) {
-      const errorMsg = `Llave secreta de Stripe (${isTestMode ? 'STRIPE_TEST_SECRET_KEY' : 'STRIPE_SECRET_KEY'}) no encontrada en los secretos de Supabase.`;
-      console.error(`[stripe-checkout] ${errorMsg}`);
-      throw new Error(errorMsg);
+      throw new Error(`Configuración incompleta: No se encontró la llave secreta de Stripe en los secretos de Supabase. Asegúrate de tener una variable llamada 'stripe' o 'STRIPE_TEST_SECRET_KEY'.`);
     }
 
     const stripe = new Stripe(STRIPE_SECRET_KEY, {
@@ -50,13 +45,15 @@ serve(async (req) => {
 
     const percentage = (settings?.stripe_commission_percentage || 4.0) / 100;
     const fixed = settings?.stripe_fixed_fee || 5.0;
-    const taxFactor = 1.16; // Mexican VAT
+    const taxFactor = 1.16; // IVA
     
-    // Calculate total including commissions to receive the exact 'amount'
     const totalToPay = (amount + fixed) / (1 - (percentage * taxFactor));
     const roundedTotalCentavos = Math.ceil(totalToPay * 100);
 
-    console.log(`[stripe-checkout] Creating session for amount: ${amount}, total with fees: ${totalToPay}`);
+    // Stripe requires at least 10.00 MXN roughly
+    if (roundedTotalCentavos < 1000) {
+      throw new Error("El monto del anticipo es demasiado bajo para procesar con tarjeta. Debe ser mayor a $10.00 MXN.");
+    }
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
@@ -65,19 +62,15 @@ serve(async (req) => {
           currency: 'mxn',
           product_data: { 
             name: description || "Anticipo de Reserva",
-            description: `Contrato de servicios turísticos`
           },
           unit_amount: roundedTotalCentavos,
         },
         quantity: 1,
       }],
       mode: 'payment',
-      success_url: `${req.headers.get("origin")}/bus-tickets/confirmation/SUCCESS`, // Placeholder, usually handled by webhook or redirect
+      success_url: `${req.headers.get("origin")}/bus-tickets/confirmation/SUCCESS`,
       cancel_url: `${req.headers.get("origin")}/payment-failure`,
       client_reference_id: clientId,
-      metadata: {
-        clientId: clientId
-      }
     });
 
     return new Response(JSON.stringify({ url: session.url }), {
@@ -85,7 +78,7 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error("[stripe-checkout] Fatal error:", error.message);
+    console.error("[stripe-checkout] Error:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

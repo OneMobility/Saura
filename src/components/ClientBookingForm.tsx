@@ -133,7 +133,6 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
       const contractNum = uuidv4().substring(0, 8).toUpperCase();
       const advance = selectedSeats.length * advancePaymentPerPerson;
 
-      // 1. Crear el cliente
       const { data: newClient, error: clientErr } = await supabase.from('clients').insert({
         first_name: formData.first_name, last_name: formData.last_name,
         email: formData.email, phone: formData.phone, address: formData.address,
@@ -144,9 +143,8 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
         contractor_age: formData.contractor_age, room_details: roomDetails
       }).select('id').single();
 
-      if (clientErr || !newClient) throw new Error("No se pudo crear el registro de cliente.");
+      if (clientErr || !newClient) throw new Error("Error al crear el registro de cliente.");
 
-      // 2. Asignar asientos usando UPSERT para evitar error 409 (Conflict)
       const { error: seatErr } = await supabase.from('tour_seat_assignments').upsert(
         selectedSeats.map(s => ({
           tour_id: tourId,
@@ -157,31 +155,34 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
         { onConflict: 'tour_id,seat_number' }
       );
 
-      if (seatErr) throw new Error("Error al asignar asientos: " + seatErr.message);
+      if (seatErr) throw new Error("Error al asignar los asientos.");
 
-      // 3. Procesar Pago
       if (method === 'mercadopago') {
         const { data, error } = await supabase.functions.invoke('mercadopago-checkout', {
           body: { clientId: newClient.id, amount: advance, description: `Anticipo Tour: ${tourTitle}` }
         });
-        if (error || !data.init_point) throw new Error(data?.error || "Error al conectar con Mercado Pago.");
+        if (error) throw new Error(data?.error || "Error al conectar con Mercado Pago.");
         window.location.href = data.init_point;
       } else if (method === 'stripe') {
         const { data, error } = await supabase.functions.invoke('stripe-checkout', {
           body: { clientId: newClient.id, amount: advance, description: `Anticipo Tour: ${tourTitle}` }
         });
-        if (error || !data.url) throw new Error(data?.error || "Error al conectar con Stripe.");
+        // Important: check if data is null or error is present to show the real cause
+        if (error || !data?.url) {
+          const msg = data?.error || (error ? "Error de red o configuración." : "La respuesta del servidor no fue válida.");
+          throw new Error(msg);
+        }
         window.location.href = data.url;
       } else if (method === 'transferencia') {
         setShowBankInfo(true);
-        toast.success(`Reserva ${contractNum} registrada correctamente.`);
+        toast.success(`Reserva ${contractNum} registrada.`);
       } else {
-        toast.success(`¡Felicidades! Reserva ${contractNum} creada con éxito.`);
+        toast.success(`Reserva ${contractNum} exitosa.`);
         onClose();
       }
     } catch (e: any) {
       console.error(e);
-      toast.error(e.message || 'Ocurrió un error inesperado al procesar tu reserva.');
+      toast.error('Atención: ' + (e.message || 'Ocurrió un error inesperado.'));
     } finally {
       setIsSubmitting(false);
     }
@@ -202,8 +203,8 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
           <div className="space-y-8 py-4">
             <div className="p-4 bg-muted/50 rounded-xl border-l-4 border-rosa-mexicano flex items-center justify-between">
               <div>
-                <h3 className="font-bold flex items-center gap-2"><Info className="h-4 w-4" /> Resumen de Reserva</h3>
-                <p className="text-sm">Asientos seleccionados: <strong>{selectedSeats.join(', ')}</strong></p>
+                <h3 className="font-bold flex items-center gap-2"><Info className="h-4 w-4" /> Resumen</h3>
+                <p className="text-sm">Asientos: <strong>{selectedSeats.join(', ')}</strong></p>
               </div>
               <div className="text-right">
                 <p className="text-xs uppercase opacity-60">Anticipo Total</p>
@@ -215,9 +216,9 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
               <div className="space-y-1"><Label>Nombre(s)</Label><Input value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} placeholder="Ej: Juan" /></div>
               <div className="space-y-1"><Label>Apellido(s)</Label><Input value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} placeholder="Ej: Pérez" /></div>
               <div className="space-y-1"><Label>Email</Label><Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} placeholder="ejemplo@correo.com" /></div>
-              <div className="space-y-1"><Label>WhatsApp (10 dígitos)</Label><Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="8441234567" /></div>
-              <div className="space-y-1"><Label>Identificación (INE/Pasaporte)</Label><Input value={formData.identification_number} onChange={e => setFormData({...formData, identification_number: e.target.value})} placeholder="Número de documento" /></div>
-              <div className="space-y-1"><Label>Edad del Titular</Label><Input type="number" value={formData.contractor_age || ''} onChange={e => setFormData({...formData, contractor_age: parseInt(e.target.value) || null})} placeholder="Años" /></div>
+              <div className="space-y-1"><Label>WhatsApp</Label><Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="8441234567" /></div>
+              <div className="space-y-1"><Label>Identificación</Label><Input value={formData.identification_number} onChange={e => setFormData({...formData, identification_number: e.target.value})} placeholder="INE / Pasaporte" /></div>
+              <div className="space-y-1"><Label>Edad</Label><Input type="number" value={formData.contractor_age || ''} onChange={e => setFormData({...formData, contractor_age: parseInt(e.target.value) || null})} placeholder="Años" /></div>
             </div>
 
             {formData.companions.length > 0 && (
@@ -240,8 +241,8 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
             </div>
 
             <div className="p-6 bg-gray-900 text-white rounded-2xl shadow-xl flex justify-between items-center border-b-4 border-rosa-mexicano">
-              <div><p className="text-xs uppercase font-bold opacity-60">Total a Pagar</p><h3 className="text-4xl font-black">${totalAmount.toLocaleString()}</h3></div>
-              <div className="text-right"><p className="text-xs uppercase font-bold opacity-60">Paga Hoy (Anticipo)</p><h3 className="text-4xl font-black text-yellow-400">${(selectedSeats.length * advancePaymentPerPerson).toLocaleString()}</h3></div>
+              <div><p className="text-xs uppercase font-bold opacity-60">Total Reserva</p><h3 className="text-4xl font-black">${totalAmount.toLocaleString()}</h3></div>
+              <div className="text-right"><p className="text-xs uppercase font-bold opacity-60">Pagar Hoy</p><h3 className="text-4xl font-black text-yellow-400">${(selectedSeats.length * advancePaymentPerPerson).toLocaleString()}</h3></div>
             </div>
 
             <div className="space-y-3">
@@ -250,7 +251,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
                 {hasOnlineMP && <Button onClick={() => handlePayment('mercadopago')} disabled={isSubmitting} className="bg-[#009EE3] hover:bg-[#0086c3] h-14 font-bold rounded-xl text-white shadow-lg"><CreditCard className="mr-2 h-5 w-5" /> Mercado Pago</Button>}
                 {hasOnlineStripe && <Button onClick={() => handlePayment('stripe')} disabled={isSubmitting} className="bg-[#635BFF] hover:bg-[#5249d3] h-14 font-bold rounded-xl text-white shadow-lg"><CreditCard className="mr-2 h-5 w-5" /> Pagar con Tarjeta</Button>}
                 {agencySettings?.bank_accounts.length ? <Button onClick={() => handlePayment('transferencia')} disabled={isSubmitting} variant="outline" className="border-green-600 text-green-700 h-14 font-bold rounded-xl hover:bg-green-50"><Landmark className="mr-2 h-5 w-5" /> Transferencia Bancaria</Button> : null}
-                <Button onClick={() => handlePayment('manual')} disabled={isSubmitting} variant="outline" className="h-14 font-bold rounded-xl hover:bg-gray-100 text-gray-700 border-gray-300">Reservar y pagar después</Button>
+                <Button onClick={() => handlePayment('manual')} disabled={isSubmitting} variant="outline" className="h-14 font-bold rounded-xl hover:bg-gray-100 text-gray-700 border-gray-300">Pagar después</Button>
               </div>
             </div>
           </div>
@@ -260,12 +261,12 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
               <CheckCircle2 className="h-12 w-12 text-green-600" />
             </div>
             <div>
-              <h2 className="text-3xl font-black text-gray-900">¡Listo! Reserva creada</h2>
-              <p className="text-gray-500 mt-2">Tu contrato es el: <span className="font-bold text-rosa-mexicano">{formData.contract_number}</span></p>
+              <h2 className="text-3xl font-black text-gray-900">¡Reserva creada!</h2>
+              <p className="text-gray-500 mt-2">Tu contrato es: <span className="font-bold text-rosa-mexicano">{formData.contract_number}</span></p>
             </div>
             
             <div className="bg-muted/30 p-6 rounded-3xl border-2 border-dashed border-gray-200">
-              <p className="font-bold mb-4 text-sm uppercase tracking-widest text-gray-400">Datos Bancarios para Pago</p>
+              <p className="font-bold mb-4 text-sm uppercase tracking-widest text-gray-400">Datos para Depósito</p>
               <div className="grid gap-4">
                 {agencySettings?.bank_accounts.map(bank => (
                   <div key={bank.id} className="p-4 bg-white rounded-2xl shadow-sm border border-gray-100 text-left">
@@ -281,7 +282,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
             </div>
             
             <div className="flex flex-col gap-3">
-              <Button onClick={() => window.open(`https://wa.me/528444041469?text=Hola, acabo de reservar el tour ${tourTitle} con el contrato ${formData.contract_number}. ¿Me podrían confirmar?`, '_blank')} className="bg-green-600 h-14 text-lg font-bold rounded-2xl">
+              <Button onClick={() => window.open(`https://wa.me/528444041469?text=Hola, reservé el tour ${tourTitle} con el contrato ${formData.contract_number}. ¿Me podrían confirmar?`, '_blank')} className="bg-green-600 h-14 text-lg font-bold rounded-2xl">
                 Confirmar por WhatsApp
               </Button>
               <Button onClick={onClose} variant="ghost" className="text-gray-400">Cerrar</Button>
