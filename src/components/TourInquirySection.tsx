@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -18,12 +19,48 @@ interface AgencySettings {
 }
 
 const TourInquirySection = () => {
+  const [searchParams] = useSearchParams();
   const [contractNumber, setContractNumber] = useState('');
   const [contractDetails, setContractDetails] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [isDownloading, setIsDownloading] = useState<string | null>(null);
   const [agencySettings, setAgencySettings] = useState<AgencySettings | null>(null);
+  const sectionRef = useRef<HTMLDivElement>(null);
+
+  const handleInquiry = useCallback(async (customNumber?: string) => {
+    const numberToQuery = (customNumber || contractNumber).trim();
+    if (!numberToQuery) return;
+    
+    setLoading(true);
+    try {
+      const { data, error } = await supabase.functions.invoke('get-public-contract-details', {
+        body: { contractNumber: numberToQuery.toUpperCase() },
+      });
+      if (error) throw error;
+      setContractDetails(data.contractDetails);
+    } catch (err) {
+      toast.error('Folio no encontrado. Verifica tu número de contrato.');
+      setContractDetails(null);
+    } finally {
+      setLoading(false);
+    }
+  }, [contractNumber]);
+
+  // Efecto para detectar contrato en la URL y auto-consultar
+  useEffect(() => {
+    const contractFromUrl = searchParams.get('contract');
+    if (contractFromUrl) {
+      const folio = contractFromUrl.toUpperCase();
+      setContractNumber(folio);
+      
+      // Ejecutar consulta y scroll
+      setTimeout(() => {
+        handleInquiry(folio);
+        sectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }, 100);
+    }
+  }, [searchParams, handleInquiry]);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -35,23 +72,6 @@ const TourInquirySection = () => {
     };
     fetchSettings();
   }, []);
-
-  const handleInquiry = async () => {
-    if (!contractNumber.trim()) return;
-    setLoading(true);
-    try {
-      const { data, error } = await supabase.functions.invoke('get-public-contract-details', {
-        body: { contractNumber: contractNumber.trim() },
-      });
-      if (error) throw error;
-      setContractDetails(data.contractDetails);
-    } catch (err) {
-      toast.error('Contrato no encontrado o error en la consulta.');
-      setContractDetails(null);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const downloadDocument = async (type: 'contract' | 'sheet') => {
     if (!contractDetails) return;
@@ -106,10 +126,10 @@ const TourInquirySection = () => {
   const hasStripe = !!agencySettings?.stripe_public_key;
 
   return (
-    <section className="py-16 px-4 md:px-8 lg:px-16 bg-rosa-mexicano text-white">
+    <section id="consultar" ref={sectionRef} className="py-16 px-4 md:px-8 lg:px-16 bg-rosa-mexicano text-white scroll-mt-20">
       <div className="max-w-4xl mx-auto text-center">
         <h2 className="text-3xl md:text-4xl font-black mb-6 uppercase tracking-tight">Consulta tu Contrato</h2>
-        <p className="mb-8 opacity-90 text-lg">Ingresa tu número de reserva para ver detalles, descargar tus documentos o realizar pagos periódicos.</p>
+        <p className="mb-8 opacity-90 text-lg">Ingresa tu número de reserva para ver detalles o realizar abonos.</p>
         
         <div className="flex gap-2 max-w-md mx-auto mb-12 bg-white/10 p-2 rounded-2xl backdrop-blur-md border border-white/20">
           <Input 
@@ -119,7 +139,7 @@ const TourInquirySection = () => {
             onChange={e => setContractNumber(e.target.value.toUpperCase())}
             onKeyDown={e => e.key === 'Enter' && handleInquiry()}
           />
-          <Button onClick={handleInquiry} disabled={loading} className="bg-white text-rosa-mexicano hover:bg-gray-100 h-12 px-8 rounded-xl font-bold">
+          <Button onClick={() => handleInquiry()} disabled={loading} className="bg-white text-rosa-mexicano hover:bg-gray-100 h-12 px-8 rounded-xl font-bold">
             {loading ? <Loader2 className="animate-spin" /> : 'Consultar'}
           </Button>
         </div>
@@ -148,7 +168,7 @@ const TourInquirySection = () => {
                   </h4>
                   <p className="text-xl font-bold">{contractDetails.first_name} {contractDetails.last_name}</p>
                   <p className="text-gray-500">{contractDetails.email}</p>
-                  <p className="text-gray-500">{contractDetails.phone || 'Sin teléfono registrado'}</p>
+                  <p className="text-gray-500">{contractDetails.phone || 'Sin teléfono'}</p>
                 </div>
 
                 <div>
@@ -162,11 +182,10 @@ const TourInquirySection = () => {
                       </Badge>
                     ))}
                   </div>
-                  <p className="text-xs text-gray-500 mt-2 italic">* Asientos seleccionados para {contractDetails.number_of_people} personas.</p>
                 </div>
 
                 <div className="pt-4 space-y-3">
-                  <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 text-rosa-mexicano">Documentación Oficial</h4>
+                  <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 text-rosa-mexicano">Documentación</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Button 
                       variant="outline" 
@@ -193,14 +212,6 @@ const TourInquirySection = () => {
               <div className="space-y-8 bg-gray-50 p-6 rounded-3xl border border-gray-100">
                 <div>
                   <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Estado de Cuenta</h4>
-                  
-                  <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl mb-6 flex gap-3 items-start">
-                    <Info className="h-4 w-4 text-blue-600 shrink-0 mt-1" />
-                    <p className="text-[11px] text-blue-900 leading-tight">
-                      <strong>POLÍTICA DE PAGO:</strong> Puedes abonar semanal o quincenalmente. El total <span className="font-bold underline">DEBE ESTAR LIQUIDADO</span> antes de abordar.
-                    </p>
-                  </div>
-
                   <div className="space-y-4">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Monto Total:</span>
@@ -220,8 +231,6 @@ const TourInquirySection = () => {
                 </div>
 
                 <div className="space-y-3">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Opciones de Pago Seguro</p>
-                  
                   {remainingPayment > 0 ? (
                     <>
                       {hasMercadoPago && (
@@ -236,9 +245,6 @@ const TourInquirySection = () => {
                           Pagar con Stripe
                         </Button>
                       )}
-                      <Button variant="outline" onClick={() => window.open(`https://wa.me/528444041469`, '_blank')} className="w-full border-green-600 text-green-600 hover:bg-green-50 h-12">
-                        <MessageSquare className="mr-2 h-4 w-4" /> Hablar con Asesor
-                      </Button>
                     </>
                   ) : (
                     <div className="text-center p-4 bg-green-100 rounded-xl text-green-800 font-bold flex items-center justify-center gap-2">
@@ -251,7 +257,7 @@ const TourInquirySection = () => {
 
             <div className="p-8 border-t bg-white">
               <h4 className="text-lg font-black text-gray-800 mb-6 flex items-center gap-2">
-                <Calendar className="h-5 w-5 text-rosa-mexicano" /> Historial de Abonos Registrados
+                <Calendar className="h-5 w-5 text-rosa-mexicano" /> Historial de Abonos
               </h4>
               {contractDetails.payments_history && contractDetails.payments_history.length > 0 ? (
                 <div className="overflow-hidden rounded-2xl border border-gray-100">
@@ -261,27 +267,21 @@ const TourInquirySection = () => {
                         <TableHead className="font-black text-gray-700">Fecha</TableHead>
                         <TableHead className="font-black text-gray-700">Monto</TableHead>
                         <TableHead className="font-black text-gray-700">Método</TableHead>
-                        <TableHead className="text-right font-black text-gray-700">Estado</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {contractDetails.payments_history.map((p: any) => (
                         <TableRow key={p.id}>
-                          <TableCell className="font-medium">{format(parseISO(p.payment_date), 'PPP', { locale: es })}</TableCell>
+                          <TableCell className="font-medium text-xs">{format(parseISO(p.payment_date), 'dd/MM/yyyy')}</TableCell>
                           <TableCell className="font-bold text-green-600">${p.amount.toLocaleString()}</TableCell>
-                          <TableCell className="capitalize text-xs text-gray-500 font-bold tracking-wider">{p.payment_method}</TableCell>
-                          <TableCell className="text-right">
-                            <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-100 border-none font-bold">Aplicado</Badge>
-                          </TableCell>
+                          <TableCell className="capitalize text-[10px] text-gray-500 font-bold">{p.payment_method}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
               ) : (
-                <div className="text-center py-12 bg-gray-50 rounded-2xl border border-dashed border-gray-200">
-                  <p className="text-gray-400 italic">No se han registrado abonos todavía.</p>
-                </div>
+                <p className="text-center text-gray-400 italic py-8">No se han registrado abonos todavía.</p>
               )}
             </div>
           </div>
