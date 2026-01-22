@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, User, Users, BusFront, ArrowLeft, CreditCard, Edit3, X, PlusCircle, MinusCircle, Calculator, Info } from 'lucide-react';
+import { Loader2, Save, User, Users, BusFront, ArrowLeft, CreditCard, Edit3, X, PlusCircle, MinusCircle, Calculator, Info, DollarSign } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
@@ -19,6 +19,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
 import ClientPaymentHistoryTable from '@/components/admin/clients/ClientPaymentHistoryTable';
+import ClientPaymentDialog from '@/components/admin/clients/ClientPaymentDialog';
 import { cn } from '@/lib/utils';
 
 const AdminClientFormPage = () => {
@@ -29,8 +30,9 @@ const AdminClientFormPage = () => {
   const [isEditMode, setIsEditMode] = useState(!clientIdFromParams);
   const [isLoadingData, setIsLoadingData] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   
-  const [formData, setFormData] = useState<any>({
+  const [formData, setFormData] = useState<any>( Episcopal{
     first_name: '', last_name: '', email: '', phone: '', address: '',
     identification_number: '', contract_number: '', tour_id: null,
     companions: [], total_amount: 0, total_paid: 0, status: 'confirmed',
@@ -70,7 +72,6 @@ const AdminClientFormPage = () => {
   const selectedTour = useMemo(() => availableTours.find(t => t.id === formData.tour_id), [formData.tour_id, availableTours]);
   const currentBus = useMemo(() => selectedTour?.bus_id ? availableBuses.find(b => b.id === selectedTour.bus_id) : null, [selectedTour, availableBuses]);
 
-  // Lógica de cálculo de precios (Sincronizada con la versión pública)
   useEffect(() => {
     if (!selectedTour || !isEditMode) return;
 
@@ -190,7 +191,6 @@ const AdminClientFormPage = () => {
         <main className="flex-grow container mx-auto px-4 py-8 max-w-6xl">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-6">
-              {/* DATOS PERSONALES */}
               <Card className="shadow-lg border-none">
                 <CardHeader className="bg-gray-50 border-b"><CardTitle className="text-lg flex items-center gap-2"><User className="h-5 w-5 text-rosa-mexicano" /> Datos del Titular</CardTitle></CardHeader>
                 <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -203,7 +203,6 @@ const AdminClientFormPage = () => {
                 </CardContent>
               </Card>
 
-              {/* VIAJE Y ASIENTOS */}
               <Card className="shadow-lg border-none">
                 <CardHeader className="bg-gray-50 border-b"><CardTitle className="text-lg flex items-center gap-2"><BusFront className="h-5 w-5 text-rosa-mexicano" /> Asignación de Viaje</CardTitle></CardHeader>
                 <CardContent className="pt-6 space-y-6">
@@ -238,7 +237,6 @@ const AdminClientFormPage = () => {
                 </CardContent>
               </Card>
 
-              {/* ACOMPAÑANTES */}
               <Card className="shadow-lg border-none">
                 <CardHeader className="bg-gray-50 border-b"><CardTitle className="text-lg flex items-center gap-2"><Users className="h-5 w-5 text-rosa-mexicano" /> Acompañantes</CardTitle></CardHeader>
                 <CardContent className="pt-6 space-y-4">
@@ -260,7 +258,6 @@ const AdminClientFormPage = () => {
               </Card>
             </div>
 
-            {/* BARRA LATERAL FINANCIERA */}
             <div className="space-y-6">
               <Card className="bg-gray-900 text-white shadow-xl sticky top-8">
                 <CardHeader className="border-b border-white/10"><CardTitle className="text-white flex items-center gap-2"><CreditCard className="h-5 w-5 text-rosa-mexicano" /> Resumen del Contrato</CardTitle></CardHeader>
@@ -278,7 +275,6 @@ const AdminClientFormPage = () => {
                   <div className="space-y-2">
                     <Label className="text-gray-400">Inversión Total ($)</Label>
                     <Input type="number" value={formData.total_amount} disabled={!isEditMode} onChange={e => setFormData({...formData, total_amount: parseFloat(e.target.value)||0})} className="bg-white/10 border-white/20 text-white text-xl font-bold" />
-                    {isEditMode && <p className="text-[9px] text-gray-500 italic">El sistema calcula el precio automáticamente, pero puedes ajustarlo si es necesario.</p>}
                   </div>
 
                   <div className="flex justify-between text-green-400"><span>Abonado Real:</span><span className="font-bold">${formData.total_paid.toLocaleString()}</span></div>
@@ -287,6 +283,12 @@ const AdminClientFormPage = () => {
                     <span className="text-xs uppercase font-bold text-gray-400">Saldo Pendiente:</span>
                     <span className="text-3xl font-black text-yellow-400">${(formData.total_amount - formData.total_paid).toLocaleString()}</span>
                   </div>
+
+                  {!isEditMode && (
+                    <Button onClick={() => setIsPaymentDialogOpen(true)} className="w-full bg-green-600 hover:bg-green-700 h-12 font-bold mt-4">
+                      <DollarSign className="mr-2 h-4 w-4" /> Registrar Abono
+                    </Button>
+                  )}
 
                   {isEditMode && (
                     <Button onClick={handleSave} disabled={isSaving} className="w-full bg-rosa-mexicano h-12 font-bold mt-4">
@@ -301,6 +303,18 @@ const AdminClientFormPage = () => {
           </div>
         </main>
       </div>
+
+      {clientIdFromParams && (
+        <ClientPaymentDialog
+          isOpen={isPaymentDialogOpen}
+          onClose={() => setIsPaymentDialogOpen(false)}
+          client={{
+            ...formData,
+            remaining_payment: formData.total_amount - formData.total_paid
+          }}
+          onPaymentRegistered={fetchData}
+        />
+      )}
     </div>
   );
 };
