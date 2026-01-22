@@ -106,6 +106,14 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
     return availableBuses.find(b => b.id === formData.bus_id)?.seat_layout_json || null;
   }, [formData.bus_id, availableBuses]);
 
+  const selectedHotelQuote = useMemo(() => {
+    if (formData.hotel_details.length > 0) {
+      const quoteId = formData.hotel_details[0].hotel_quote_id;
+      return availableHotelQuotes.find(q => q.id === quoteId);
+    }
+    return null;
+  }, [formData.hotel_details, availableHotelQuotes]);
+
   useEffect(() => {
     const fetchData = async () => {
       const [hotelsRes, busesRes, providersRes] = await Promise.all([
@@ -135,14 +143,14 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
   const hotelStats = useMemo(() => {
     const minsByMonthAndNights: Record<string, number> = {};
 
-    availableHotelQuotes.forEach(q => {
-      if (!q.quoted_date) return;
-      const monthKey = format(parseISO(q.quoted_date), 'yyyy-MM');
-      const nights = q.num_nights_quoted || 1;
+    availableHotelQuotes.forEach(h => {
+      if (!h.quoted_date) return;
+      const monthKey = format(parseISO(h.quoted_date), 'yyyy-MM');
+      const nights = h.num_nights_quoted || 1;
       const key = `${monthKey}-${nights}`;
       
-      if (!minsByMonthAndNights[key] || q.estimated_total_cost < minsByMonthAndNights[key]) {
-        minsByMonthAndNights[key] = q.estimated_total_cost;
+      if (!minsByMonthAndNights[key] || h.estimated_total_cost < minsByMonthAndNights[key]) {
+        minsByMonthAndNights[key] = h.estimated_total_cost;
       }
     });
     return { minsByMonthAndNights };
@@ -230,6 +238,62 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
     };
   }, [formData, projectedSales, desiredProfitFixed, availableBuses, availableHotelQuotes]);
 
+  const generateDefaultDescription = useCallback((isFullContent: boolean) => {
+    const hotelName = selectedHotelQuote?.name || 'Hospedaje de Calidad';
+    const busName = availableBuses.find(b => b.id === formData.bus_id)?.name || 'Autobús Turístico';
+    const departure = formData.departure_date ? format(parseISO(formData.departure_date), 'dd/MM/yy', { locale: es }) : 'Fecha de Salida';
+    const returnDateStr = formData.return_date ? format(parseISO(formData.return_date), 'dd/MM/yy', { locale: es }) : 'Fecha de Regreso';
+    const nights = selectedHotelQuote?.num_nights_quoted || 0;
+    const nightsDisplay = nights > 0 ? `${nights} noche${nights > 1 ? 's' : ''}` : 'Estadía';
+    const datesDisplay = [];
+    if (selectedHotelQuote?.quoted_date && nights > 0) {
+      for (let i = 0; i < nights; i++) {
+        datesDisplay.push(format(addDays(parseISO(selectedHotelQuote.quoted_date), i), 'dd', { locale: es }));
+      }
+    }
+    const datesList = datesDisplay.length > 0 ? datesDisplay.join(', ') : 'Fechas de estadía';
+
+    const baseText = `
+      <p>🌴 VIAJE A ${formData.title.toUpperCase()} 🌴</p>
+      <p>Vive una experiencia cómoda y bien organizada al Pacífico mexicano, con transporte y hospedaje cuidadosamente seleccionados.</p>
+      <p>🗓 Salida: ${departure}</p>
+      <p>🏨 Estadía: ${nightsDisplay}</p>
+      <p>🗓 Regreso: ${returnDateStr}</p>
+      <p>🚍 Autobús: ${busName}</p>
+      <p>🏨 Hotel: ${hotelName}</p>
+      <p>💳 Aparta tu lugar con $${(formData.selling_price_double_occupancy || 0).toFixed(2)}</p>
+      <p>Viaja con tranquilidad y disfruta ${formData.title} sin preocuparte por la logística.</p>
+      <p>📲 Cupo limitado.</p>
+    `;
+
+    if (!isFullContent) {
+      // Short description (plain text summary)
+      return stripHtmlTags(baseText).substring(0, 160) + '...';
+    } else {
+      // Full content (HTML)
+      return `
+        <h2>Detalles del Viaje</h2>
+        ${baseText}
+        
+        <h2>Servicios Incluidos</h2>
+        <ul>
+          <li>Transporte en ${busName}</li>
+          <li>Hospedaje en ${hotelName} por ${nightsDisplay}</li>
+          <li>Seguro de viajero</li>
+          ${formData.includes.map(i => `<li>${i}</li>`).join('')}
+        </ul>
+
+        <h2>Itinerario Básico</h2>
+        <ol>
+          ${formData.itinerary.map(i => `<li>Día ${i.day}: ${i.activity || 'Actividad pendiente de definir'}</li>`).join('')}
+        </ol>
+
+        <h2>Políticas de Reserva</h2>
+        <p>Se realiza contrato de prestación de servicios. Aparta tu lugar con un anticipo y liquida el resto antes de la fecha de salida.</p>
+      `;
+    }
+  }, [formData.title, formData.departure_date, formData.return_date, formData.bus_id, formData.includes, formData.itinerary, formData.selling_price_double_occupancy, availableBuses, selectedHotelQuote]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { id, value } = e.target;
     setFormData(prev => {
@@ -238,6 +302,10 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
       if (id === 'title') updated.slug = value.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '');
       return updated;
     });
+  };
+
+  const handleRichTextChange = (field: 'description' | 'full_content', content: string) => {
+    setFormData(prev => ({ ...prev, [field]: content }));
   };
 
   const handleDateSelect = (field: 'departure_date' | 'return_date', date: Date | undefined) => {
@@ -280,10 +348,16 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
       finalImageUrl = uploadedUrl;
     }
 
+    // Generate default content if fields are empty
+    const finalDescription = formData.description.trim() === '' ? generateDefaultDescription(false) : formData.description;
+    const finalFullContent = formData.full_content.trim() === '' ? generateDefaultDescription(true) : formData.full_content;
+
     const { data: { user } } = await supabase.auth.getUser();
     const dataToSave = { 
       ...formData, 
       image_url: finalImageUrl,
+      description: finalDescription, // Use generated description if empty
+      full_content: finalFullContent, // Use generated full content if empty
       user_id: user?.id,
       total_base_cost: financialSummary.totalCost,
       paying_clients_count: financialSummary.capacity,
@@ -358,7 +432,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
       {costOptimizationMode && (
         <Card className="border-t-4 border-green-500 shadow-xl bg-green-50">
           <CardHeader>
-            <CardTitle className="text-2xl font-bold flex items-center gap-2 text-green-700">
+            <CardTitle className="text-2xl font-bold flex items-center gap-2">
               <DollarSign className="text-green-700" /> Modo: Optimización de Costos
             </CardTitle>
             <p className="text-sm text-green-600">
@@ -678,7 +752,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
             <Card>
               <CardHeader><CardTitle className="text-lg">Descripción de Venta (Corta)</CardTitle></CardHeader>
               <CardContent>
-                <RichTextEditor value={formData.description} onChange={val => setFormData({...formData, description: val})} placeholder="Breve texto comercial..." className="min-h-[150px]" />
+                <RichTextEditor value={formData.description} onChange={val => handleRichTextChange('description', val)} placeholder={generateDefaultDescription(false)} className="min-h-[150px]" />
               </CardContent>
             </Card>
           </div>
@@ -728,7 +802,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
         <Card>
           <CardHeader><CardTitle className="text-lg">Información Adicional (Políticas, etc)</CardTitle></CardHeader>
           <CardContent>
-            <RichTextEditor value={formData.full_content} onChange={val => setFormData({...formData, full_content: val})} placeholder="Detalles extra..." className="min-h-[300px]" />
+            <RichTextEditor value={formData.full_content} onChange={val => handleRichTextChange('full_content', val)} placeholder={generateDefaultDescription(true)} className="min-h-[300px]" />
           </CardContent>
         </Card>
 
