@@ -81,7 +81,7 @@ const ClientPaymentDialog: React.FC<ClientPaymentDialogProps> = ({ isOpen, onClo
         .insert({
           client_id: client.id,
           amount: amount,
-          payment_method: paymentMethod,
+          payment_method: paymentMethod, // Now the column exists in DB
           payment_date: format(paymentDate, 'yyyy-MM-dd'),
         });
 
@@ -120,8 +120,8 @@ const ClientPaymentDialog: React.FC<ClientPaymentDialogProps> = ({ isOpen, onClo
             <Label htmlFor="amount" className="text-right">Monto</Label>
             <Input 
               id="amount" 
-              type="text" // Changed to text for robustness
-              pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
+              type="text" 
+              pattern="[0-9]*\.?[0-9]*" 
               value={amount} 
               onChange={(e) => setAmount(parseFloat(e.target.value) || 0)} 
               className="col-span-3" 
