@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, ImageIcon, MapPin, Clock, Hotel, ListChecks, Armchair, Wallet, DollarSign, CheckCircle2, Star } from 'lucide-react';
+import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, ImageIcon, MapPin, Clock, Hotel, ListChecks, Armchair, Wallet, DollarSign, CheckCircle2, Star, BusFront } from 'lucide-react';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { v4 as uuidv4 } from 'uuid';
 import { format, parseISO } from 'date-fns';
@@ -125,9 +125,20 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const financialSummary = useMemo(() => {
     const bus = availableBuses.find(b => b.id === formData.bus_id);
     const busCost = bus?.rental_cost || 0;
+    const busPaid = bus?.total_paid || 0;
+
     const providerCost = formData.provider_details.reduce((sum, p) => sum + (p.cost_per_unit_snapshot * p.quantity), 0);
-    const hotelCost = formData.hotel_details.reduce((sum, d) => sum + (availableHotelQuotes.find(q => q.id === d.hotel_quote_id)?.estimated_total_cost || 0), 0);
+    
+    let hotelCost = 0;
+    let hotelPaid = 0;
+    formData.hotel_details.forEach(d => {
+      const q = availableHotelQuotes.find(q => q.id === d.hotel_quote_id);
+      hotelCost += (q?.estimated_total_cost || 0);
+      hotelPaid += (q?.total_paid || 0);
+    });
+
     const totalCost = busCost + providerCost + hotelCost;
+    const totalPaidToSuppliers = busPaid + hotelPaid;
 
     const activeClients = (formData.clients || []).filter((c: any) => c.status !== 'cancelled');
     const clientsContracted = activeClients.reduce((sum: number, c: any) => sum + (c.total_amount || 0), 0);
@@ -139,7 +150,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     const avgRequired = capacity > 0 ? (totalCost + desiredProfitFixed) / capacity : 0;
 
     return {
-      totalCost, busCost, hotelCost, providerCost, 
+      totalCost, busCost, busPaid, hotelCost, hotelPaid, providerCost, totalPaidToSuppliers,
       clientsContracted, clientsPaid,
       projectedProfit: projectedRevenue - totalCost,
       beQuad: formData.selling_price_quad_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_quad_occupancy) : 0,
@@ -182,28 +193,32 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       <Card className="border-t-4 border-rosa-mexicano shadow-xl overflow-hidden">
         <CardHeader className="bg-gray-50/50 border-b">
           <CardTitle className="flex items-center gap-2 text-2xl font-black uppercase tracking-tighter">
-            <TrendingUp className="text-rosa-mexicano" /> Proyección y Realidad Financiera
+            <TrendingUp className="text-rosa-mexicano" /> Análisis Financiero del Tour
           </CardTitle>
         </CardHeader>
         <CardContent className="pt-6 space-y-8">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* CARD 1: RESUMEN DE EGRESOS (PROVEEDORES) */}
             <div className="p-5 bg-gray-900 text-white rounded-2xl shadow-xl">
-              <h3 className="text-[10px] font-black uppercase text-rosa-mexicano mb-3 tracking-widest">Egresos Totales (Costo)</h3>
+              <h3 className="text-[10px] font-black uppercase text-rosa-mexicano mb-3 tracking-widest">Resumen de Egresos</h3>
               <div className="space-y-2">
-                <div className="flex justify-between text-xs opacity-70"><span>Bus:</span><span>${financialSummary.busCost.toLocaleString()}</span></div>
-                <div className="flex justify-between text-xs opacity-70"><span>Hotel:</span><span>${financialSummary.hotelCost.toLocaleString()}</span></div>
-                <div className="flex justify-between text-xs opacity-70"><span>Extras:</span><span>${financialSummary.providerCost.toLocaleString()}</span></div>
-                <div className="pt-2 border-t border-white/10 flex justify-between font-black text-xl text-yellow-400"><span>TOTAL:</span><span>${financialSummary.totalCost.toLocaleString()}</span></div>
+                <div className="flex justify-between text-xs opacity-70"><span>Costo Total:</span><span>${financialSummary.totalCost.toLocaleString()}</span></div>
+                <div className="flex justify-between text-xs font-bold text-green-400"><span>Abonado a Prov:</span><span>${financialSummary.totalPaidToSuppliers.toLocaleString()}</span></div>
+                <div className="pt-2 border-t border-white/10 flex justify-between">
+                   <span className="text-[9px] uppercase font-black text-gray-400">Pendiente Prov:</span>
+                   <span className="font-black text-yellow-400 text-lg">${(financialSummary.totalCost - financialSummary.totalPaidToSuppliers).toLocaleString()}</span>
+                </div>
               </div>
             </div>
 
+            {/* CARD 2: COBRANZA CLIENTES */}
             <div className="p-5 bg-rosa-mexicano/5 rounded-2xl border border-rosa-mexicano/20">
               <h3 className="text-[10px] font-black uppercase text-rosa-mexicano mb-3 tracking-widest flex items-center gap-1"><Wallet className="h-3 w-3" /> Cobranza Clientes</h3>
               <div className="space-y-2">
                 <div className="flex justify-between text-xs font-bold text-gray-500"><span>Venta Contratada:</span><span>${financialSummary.clientsContracted.toLocaleString()}</span></div>
                 <div className="flex justify-between text-xs font-bold text-green-600"><span>Abonado Real:</span><span>${financialSummary.clientsPaid.toLocaleString()}</span></div>
                 <div className="pt-2 border-t border-rosa-mexicano/10">
-                   <p className="text-[9px] uppercase font-black text-gray-400">Pendiente de cobro:</p>
+                   <p className="text-[9px] uppercase font-black text-gray-400">Falta por Recaudar:</p>
                    <p className="text-2xl font-black text-rosa-mexicano">${(financialSummary.clientsContracted - financialSummary.clientsPaid).toLocaleString()}</p>
                 </div>
               </div>
@@ -236,7 +251,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           </div>
 
           <div className="bg-gray-50 p-6 rounded-2xl border">
-            <h3 className="text-sm font-black uppercase mb-4 flex items-center gap-2"><Calculator className="h-4 w-4 text-rosa-mexicano" /> Simulación de Venta (Projected)</h3>
+            <h3 className="text-sm font-black uppercase mb-4 flex items-center gap-2"><Calculator className="h-4 w-4 text-rosa-mexicano" /> Simulación de Venta (Proyectado)</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 gap-4">
               <div className="space-y-1"><Label className="text-[10px] font-bold">Pax DBL</Label><Input type="number" value={projectedSales.double} onChange={e => setProjectedSales({...projectedSales, double: parseInt(e.target.value)||0})} /></div>
               <div className="space-y-1"><Label className="text-[10px] font-bold">Pax TRIP</Label><Input type="number" value={projectedSales.triple} onChange={e => setProjectedSales({...projectedSales, triple: parseInt(e.target.value)||0})} /></div>
@@ -330,7 +345,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
         </div>
 
         <div className="space-y-8">
-          <Card className="sticky top-8">
+          <Card>
             <CardHeader className="bg-gray-50/50 border-b"><CardTitle className="text-lg flex items-center gap-2"><ImageIcon className="h-5 w-5 text-rosa-mexicano" /> Multimedia y Tiempos</CardTitle></CardHeader>
             <CardContent className="pt-6 space-y-6">
               <div className="space-y-2">
@@ -359,7 +374,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             </CardContent>
           </Card>
 
-          <Card>
+          <Card className="relative z-0">
             <CardHeader className="bg-gray-50/50 border-b"><CardTitle className="text-lg flex items-center gap-2"><Armchair className="h-5 w-5 text-rosa-mexicano" /> Gestión de Asientos</CardTitle></CardHeader>
             <CardContent className="pt-6 space-y-4">
               <div className="grid grid-cols-2 gap-4">
