@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, MapPin, Hotel } from 'lucide-react';
+import { Loader2, Save, MapPin, Hotel, Bus, Users, DollarSign } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
@@ -17,9 +17,9 @@ import { useSession } from '@/components/SessionContextProvider';
 import TourSeatMap from '@/components/TourSeatMap';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
 
 const AdminClientFormPage = () => {
-  const { id: clientIdFromParams } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, isAdmin, isLoading: sessionLoading } = useSession();
 
@@ -28,7 +28,7 @@ const AdminClientFormPage = () => {
     contract_number: uuidv4().substring(0, 8).toUpperCase(),
     identification_number: null, tour_id: null,
     companions: [], total_amount: 0, total_paid: 0, status: 'pending',
-    contractor_age: null
+    contractor_age: null, is_transport_only: false
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -51,58 +51,56 @@ const AdminClientFormPage = () => {
   }, []);
 
   const selectedTour = useMemo(() => availableTours.find(t => t.id === formData.tour_id), [formData.tour_id, availableTours]);
-  const currentBus = useMemo(() => selectedTour?.bus_id ? availableBuses.find(b => b.id === selectedTour.bus_id) : null, [selectedTour, availableBuses]);
 
   useEffect(() => {
     if (!selectedTour) return;
     
     const totalPax = clientSelectedSeats.length;
-    const neededRooms = Math.ceil(totalPax / 4);
-    setRoomsCount(neededRooms);
+    if (formData.is_transport_only) {
+      const total = totalPax * (selectedTour.transport_only_price || 0);
+      setFormData((p: any) => ({ ...p, total_amount: total }));
+      setRoomsCount(0);
+      setBreakdownDetails([`${totalPax} Pasajeros en modalidad SOLO TRASLADO`]);
+    } else {
+      const neededRooms = Math.ceil(totalPax / 4);
+      setRoomsCount(neededRooms);
 
-    let adults = (formData.contractor_age === null || formData.contractor_age > 12) ? 1 : 0;
-    let children = (formData.contractor_age !== null && formData.contractor_age <= 12) ? 1 : 0;
-    formData.companions.forEach((c: any) => { (c.age === null || c.age > 12) ? adults++ : children++; });
+      let adults = (formData.contractor_age === null || formData.contractor_age > 12) ? 1 : 0;
+      let children = (formData.contractor_age !== null && formData.contractor_age <= 12) ? 1 : 0;
+      formData.companions.forEach((c: any) => { (c.age === null || c.age > 12) ? adults++ : children++; });
 
-    let tempAdults = adults;
-    let tempChildren = children;
-    let calculatedTotal = 0;
-    let details: string[] = [];
+      let tempAdults = adults;
+      let tempChildren = children;
+      let calculatedTotal = 0;
+      let details: string[] = [];
 
-    for (let i = 0; i < neededRooms; i++) {
-      const paxInRoom = Math.min(4, tempAdults + tempChildren);
-      const adultsInRoom = Math.min(paxInRoom, tempAdults);
-      const childrenInRoom = paxInRoom - adultsInRoom;
+      for (let i = 0; i < neededRooms; i++) {
+        const paxInRoom = Math.min(4, tempAdults + tempChildren);
+        const adultsInRoom = Math.min(paxInRoom, tempAdults);
+        const childrenInRoom = paxInRoom - adultsInRoom;
 
-      if (paxInRoom === 1 && adultsInRoom === 1) {
-        calculatedTotal += (2 * selectedTour.selling_price_double_occupancy);
-        details.push(`Hab. ${i+1}: 1 Adulto Solo (Paga 2 pax en Doble)`);
-      } else if (paxInRoom === 2 && adultsInRoom === 1 && childrenInRoom === 1) {
-        calculatedTotal += (2 * selectedTour.selling_price_double_occupancy);
-        details.push(`Hab. ${i+1}: 1 Adulto + 1 Niño (Paga 2 pax en Doble)`);
-      } else {
-        let occPrice = selectedTour.selling_price_quad_occupancy;
-        let label = "Cua.";
-        if (paxInRoom === 3) { occPrice = selectedTour.selling_price_triple_occupancy; label = "Trp."; }
-        else if (paxInRoom === 2) { occPrice = selectedTour.selling_price_double_occupancy; label = "Dbl."; }
-
-        calculatedTotal += (adultsInRoom * occPrice) + (childrenInRoom * selectedTour.selling_price_child);
-        details.push(`Hab. ${i+1}: ${adultsInRoom} Ad. (${label}) + ${childrenInRoom} Niñ.`);
+        if (paxInRoom === 1 && adultsInRoom === 1) {
+          calculatedTotal += (2 * selectedTour.selling_price_double_occupancy);
+          details.push(`Hab. ${i+1}: 1 Ad (Costo Doble Full)`);
+        } else if (paxInRoom === 2 && adultsInRoom === 1 && childrenInRoom === 1) {
+          calculatedTotal += (2 * selectedTour.selling_price_double_occupancy);
+          details.push(`Hab. ${i+1}: 1 Ad + 1 Niñ (Costo Doble Full)`);
+        } else {
+          let occPrice = paxInRoom === 4 ? selectedTour.selling_price_quad_occupancy : (paxInRoom === 3 ? selectedTour.selling_price_triple_occupancy : selectedTour.selling_price_double_occupancy);
+          calculatedTotal += (adultsInRoom * occPrice) + (childrenInRoom * selectedTour.selling_price_child);
+          details.push(`Hab. ${i+1}: Ocupación ${paxInRoom} pax`);
+        }
+        tempAdults -= adultsInRoom;
+        tempChildren -= childrenInRoom;
       }
-
-      tempAdults -= adultsInRoom;
-      tempChildren -= childrenInRoom;
+      setFormData((p: any) => ({ ...p, total_amount: calculatedTotal }));
+      setBreakdownDetails(details);
     }
-
-    setFormData((p: any) => ({ ...p, total_amount: calculatedTotal }));
-    setBreakdownDetails(details);
-  }, [clientSelectedSeats.length, formData.contractor_age, formData.companions, selectedTour]);
+  }, [clientSelectedSeats.length, formData.contractor_age, formData.companions, formData.is_transport_only, selectedTour]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.tour_id || clientSelectedSeats.length === 0) return toast.error("Reserva incompleta.");
     setIsSubmitting(true);
-    
     const { data } = await supabase.from('clients').insert({ 
       ...formData, 
       number_of_people: clientSelectedSeats.length,
@@ -114,7 +112,7 @@ const AdminClientFormPage = () => {
         tour_id: formData.tour_id, seat_number: s, status: 'booked', client_id: data.id 
       })));
     }
-    toast.success("Contrato generado correctamente.");
+    toast.success("Reserva guardada.");
     navigate('/admin/clients');
   };
 
@@ -122,21 +120,29 @@ const AdminClientFormPage = () => {
     <div className="flex min-h-screen bg-gray-100">
       <AdminSidebar />
       <div className="flex flex-col flex-grow">
-        <AdminHeader pageTitle="Registro de Contrato" />
+        <AdminHeader pageTitle="Registro Administrativo" />
         <main className="flex-grow container mx-auto px-4 py-8 max-w-6xl">
           <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <Card className="lg:col-span-2 shadow-lg border-t-4 border-rosa-mexicano">
-              <CardHeader><CardTitle className="text-lg flex items-center gap-2"><MapPin className="h-5 w-5" /> Viaje y Selección de Asientos</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="flex items-center gap-2"><MapPin className="h-5 w-5" /> Viaje y Asientos</CardTitle></CardHeader>
               <CardContent className="space-y-6">
                 <Select value={formData.tour_id} onValueChange={v => setFormData({...formData, tour_id: v})}>
-                  <SelectTrigger className="h-12 font-bold"><SelectValue placeholder="Seleccionar Destino" /></SelectTrigger>
+                  <SelectTrigger className="h-12 font-bold"><SelectValue placeholder="Elegir Tour" /></SelectTrigger>
                   <SelectContent>{availableTours.map(t => <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>)}</SelectContent>
                 </Select>
 
                 {selectedTour && (
-                  <div className="pt-4 border-t">
-                    <TourSeatMap tourId={selectedTour.id} busCapacity={selectedTour.bus_capacity} courtesies={selectedTour.courtesies} seatLayoutJson={currentBus?.seat_layout_json} onSeatsSelected={setClientSelectedSeats} initialSelectedSeats={clientSelectedSeats} />
+                  <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <Bus className="h-5 w-5 text-blue-600" />
+                      <Label className="text-blue-900 font-bold">¿Solo requiere traslado redondo?</Label>
+                    </div>
+                    <Switch checked={formData.is_transport_only} onCheckedChange={val => setFormData({...formData, is_transport_only: val})} />
                   </div>
+                )}
+
+                {selectedTour && (
+                  <TourSeatMap tourId={selectedTour.id} busCapacity={selectedTour.bus_capacity} courtesies={selectedTour.courtesies} seatLayoutJson={availableBuses.find(b => b.id === selectedTour.bus_id)?.seat_layout_json} onSeatsSelected={setClientSelectedSeats} initialSelectedSeats={clientSelectedSeats} />
                 )}
               </CardContent>
             </Card>
@@ -146,14 +152,14 @@ const AdminClientFormPage = () => {
                 <CardHeader><CardTitle className="text-white flex items-center gap-2"><Hotel className="h-5 w-5 text-rosa-mexicano" /> Liquidación</CardTitle></CardHeader>
                 <CardContent className="space-y-4">
                   <div className="flex justify-between items-center bg-white/5 p-4 rounded-xl border border-white/10">
-                    <span className="text-xs uppercase font-bold text-gray-400">Total Habitaciones</span>
-                    <span className="text-2xl font-black text-rosa-mexicano">{roomsCount}</span>
+                    <span className="text-xs font-bold text-gray-400">Modalidad</span>
+                    <Badge className="bg-rosa-mexicano">{formData.is_transport_only ? 'SÓLO TRASLADO' : `${roomsCount} HABITACIONES`}</Badge>
                   </div>
-                  <div className="space-y-1 pt-2">
-                    {breakdownDetails.map((d, i) => <p key={i} className="text-[10px] opacity-60 italic">- {d}</p>)}
+                  <div className="space-y-1 pt-2 opacity-60 text-[10px]">
+                    {breakdownDetails.map((d, i) => <p key={i}>- {d}</p>)}
                   </div>
                   <div className="pt-4 border-t border-white/10 flex justify-between font-black text-xl">
-                    <span>Monto Total:</span>
+                    <span>Total:</span>
                     <span className="text-yellow-400">${formData.total_amount.toLocaleString()}</span>
                   </div>
                 </CardContent>
