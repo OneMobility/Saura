@@ -21,15 +21,15 @@ serve(async (req) => {
     const { data: settings } = await supabaseAdmin.from('agency_settings').select('*').single();
     const isProduction = settings?.payment_mode === 'production';
     
-    // Lógica de selección de llave: 
-    // Si es producción, busca STRIPE_SECRET_KEY, luego el genérico 'stripe'.
-    // Si es test, busca STRIPE_TEST_SECRET_KEY, luego el genérico 'stripe'.
+    // Selección de llave basada en tus secretos de Supabase:
+    // Si el interruptor está en Producción, usa 'stripe live'.
+    // Si está en Test/Sandbox, usa 'stripe'.
     const STRIPE_SECRET_KEY = isProduction
-      ? (Deno.env.get('STRIPE_SECRET_KEY') || Deno.env.get('stripe'))
-      : (Deno.env.get('STRIPE_TEST_SECRET_KEY') || Deno.env.get('stripe'));
+      ? Deno.env.get('stripe live')
+      : Deno.env.get('stripe');
 
-    if (!STRIPE_SECRET_KEY || STRIPE_SECRET_KEY.startsWith('pk_')) {
-      throw new Error(`Configuración de Stripe inválida para modo ${isProduction ? 'PRODUCCIÓN' : 'PRUEBA'}. Se requiere una Secret Key (sk_...).`);
+    if (!STRIPE_SECRET_KEY) {
+      throw new Error(`No se encontró el secreto de Stripe para el modo ${isProduction ? 'PRODUCCIÓN (stripe live)' : 'PRUEBA (stripe)'}.`);
     }
 
     const stripe = new Stripe(STRIPE_SECRET_KEY, {
