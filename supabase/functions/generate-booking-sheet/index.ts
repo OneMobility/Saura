@@ -24,42 +24,67 @@ const generateBookingSheetHtml = (data: any) => {
     <html lang="es">
     <head>
         <meta charset="UTF-8">
-        <title>Hoja de Reserva - ${client.contract_number}</title>
+        <title>Hoja de Control de Reserva - ${client.contract_number}</title>
         <style>
-            body { font-family: Arial, sans-serif; padding: 20px; border: 5px solid #91045A; min-height: 100vh; box-sizing: border-box; }
-            .header { text-align: center; background-color: #91045A; color: white; padding: 10px; margin-bottom: 20px; }
-            .header h1 { margin: 0; font-size: 24px; }
-            .section { margin-bottom: 20px; padding: 10px; border: 1px solid #ddd; border-radius: 8px; }
-            .label { font-weight: bold; color: #555; display: block; margin-bottom: 5px; }
-            .value { font-size: 18px; font-weight: bold; color: #91045A; }
-            .footer { text-align: center; margin-top: 30px; font-style: italic; color: #777; }
+            body { font-family: 'Helvetica', 'Arial', sans-serif; padding: 30px; border: 8px double #91045A; min-height: 90vh; box-sizing: border-box; color: #333; }
+            .header { text-align: center; background-color: #91045A; color: white; padding: 15px; margin-bottom: 25px; }
+            .header h1 { margin: 0; font-size: 26px; text-transform: uppercase; letter-spacing: 1px; }
+            .header p { margin: 5px 0 0; font-weight: bold; font-size: 18px; }
+            .section { margin-bottom: 25px; padding: 15px; border: 1px solid #ccc; border-radius: 5px; }
+            .label { font-weight: bold; color: #666; display: block; margin-bottom: 5px; text-transform: uppercase; font-size: 12px; }
+            .value { font-size: 20px; font-weight: bold; color: #000; }
+            .seats-container { text-align: center; background-color: #f9f9f9; padding: 25px; border: 2px solid #91045A; margin: 20px 0; border-radius: 10px; }
+            .seats-label { font-size: 16px; font-weight: bold; color: #91045A; margin-bottom: 10px; }
+            .seats-value { font-size: 60px; font-weight: bold; color: #91045A; display: block; }
+            .payment-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; }
+            .payment-box { padding: 15px; border: 1px solid #ddd; border-radius: 5px; }
+            .total-label { font-size: 14px; font-weight: bold; }
+            .total-value { font-size: 22px; font-weight: bold; color: #91045A; }
+            .footer { text-align: center; margin-top: 50px; font-size: 13px; color: #888; border-top: 1px dashed #ccc; padding-top: 20px; }
+            .status-badge { display: inline-block; padding: 5px 15px; background: #91045A; color: white; border-radius: 20px; font-size: 12px; margin-top: 10px; }
+            @media print { body { border: 8px double #91045A; -webkit-print-color-adjust: exact; } }
         </style>
     </head>
     <body>
         <div class="header">
-            <h1>HOJA DE CONTROL DE RESERVA</h1>
-            <p>Contrato No: ${client.contract_number}</p>
+            <h1>Hoja de Control de Reserva</h1>
+            <p>Contrato: ${client.contract_number}</p>
         </div>
+
         <div class="section">
-            <span class="label">CLIENTE:</span>
+            <span class="label">Nombre del Cliente:</span>
             <span class="value">${client.first_name} ${client.last_name}</span>
-        </div>
-        <div class="section">
-            <span class="label">DESTINO / SERVICIO:</span>
+            <br><br>
+            <span class="label">Servicio Reservado:</span>
             <span class="value">${title}</span>
         </div>
-        <div class="section" style="text-align: center;">
-            <span class="label">ASIENTOS ASIGNADOS:</span>
-            <span class="value" style="font-size: 48px; display: block; margin-top: 10px;">${seatNumbers}</span>
-            <p><span class="label">TOTAL PERSONAS:</span> ${client.number_of_people}</p>
+
+        <div class="seats-container">
+            <span class="seats-label">ASIENTOS ASIGNADOS</span>
+            <span class="seats-value">${seatNumbers}</span>
+            <div class="status-badge">Estado: ${client.status.toUpperCase()}</div>
         </div>
-        <div class="section">
-            <p><span class="label">TOTAL DEL CONTRATO:</span> $${client.total_amount.toLocaleString()}</p>
-            <p><span class="label">TOTAL PAGADO:</span> $${client.total_paid.toLocaleString()}</p>
-            <p><span class="label">SALDO PENDIENTE:</span> <span style="color: red; font-size: 20px;">$${(client.total_amount - client.total_paid).toLocaleString()}</span></p>
+
+        <div class="payment-grid">
+            <div class="payment-box">
+                <span class="label">Costo Total del Servicio:</span>
+                <span class="total-value">$${client.total_amount.toLocaleString()}</span>
+            </div>
+            <div class="payment-box">
+                <span class="label">Total Abonado:</span>
+                <span class="total-value" style="color: #2e7d32;">$${client.total_paid.toLocaleString()}</span>
+            </div>
         </div>
+
+        <div class="section" style="border-color: #d32f2f; background-color: #fff8f8; text-align: right;">
+            <span class="label" style="color: #d32f2f;">Saldo Pendiente de Liquidar:</span>
+            <span class="total-value" style="color: #d32f2f; font-size: 30px;">$${(client.total_amount - client.total_paid).toLocaleString()} MXN</span>
+        </div>
+
         <div class="footer">
-            <p>Presente este comprobante al momento de abordar. ¡Gracias por viajar con Saura!</p>
+            <p><strong>IMPORTANTE:</strong> Favor de presentar esta hoja al momento de abordar el autobús.</p>
+            <p>Muchas gracias por su preferencia. ¡Disfrute su viaje!</p>
+            <p style="margin-top: 15px;">Saura Tours - Agencia de Viajes y Transporte</p>
         </div>
     </body>
     </html>

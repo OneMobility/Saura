@@ -33,20 +33,21 @@ const generateServiceContractHtml = (data: any) => {
         <meta charset="UTF-8">
         <title>Contrato de Prestación de Servicios - ${client.contract_number}</title>
         <style>
-            body { font-family: Arial, sans-serif; line-height: 1.3; color: #000; margin: 0; padding: 30px; font-size: 10px; }
-            .header { text-align: center; border-bottom: 2px solid #91045A; padding-bottom: 10px; margin-bottom: 15px; }
-            .logo { max-width: 140px; margin-bottom: 5px; }
-            .contract-title { font-size: 14px; font-weight: bold; color: #91045A; margin: 0; }
-            .contract-number { font-size: 12px; font-weight: bold; margin-top: 5px; }
-            .section { margin-bottom: 10px; }
-            .section-title { font-weight: bold; text-decoration: underline; margin-bottom: 3px; text-transform: uppercase; }
-            .details-table { width: 100%; border-collapse: collapse; margin-top: 5px; }
-            .details-table td { padding: 4px; border: 1px solid #000; }
-            .details-table .label { font-weight: bold; background-color: #eee; width: 30%; }
-            .clause { text-align: justify; margin-bottom: 6px; }
-            .signatures { display: flex; justify-content: space-around; margin-top: 30px; }
-            .signature-box { border-top: 1px solid #000; width: 180px; text-align: center; padding-top: 5px; }
+            body { font-family: Arial, sans-serif; line-height: 1.4; color: #000; margin: 0; padding: 40px; font-size: 10px; }
+            .header { text-align: center; border-bottom: 3px solid #91045A; padding-bottom: 10px; margin-bottom: 20px; }
+            .logo { max-width: 160px; margin-bottom: 5px; }
+            .contract-title { font-size: 15px; font-weight: bold; color: #91045A; margin: 0; text-transform: uppercase; }
+            .contract-number { font-size: 13px; font-weight: bold; margin-top: 5px; }
+            .section { margin-bottom: 15px; }
+            .section-title { font-weight: bold; text-decoration: underline; margin-bottom: 5px; text-transform: uppercase; font-size: 11px; }
+            .details-table { width: 100%; border-collapse: collapse; margin-top: 8px; margin-bottom: 15px; }
+            .details-table td { padding: 5px 8px; border: 1px solid #000; font-size: 11px; }
+            .details-table .label { font-weight: bold; background-color: #f0f0f0; width: 35%; }
+            .clause { text-align: justify; margin-bottom: 8px; font-size: 10px; }
+            .signatures { display: flex; justify-content: space-around; margin-top: 40px; }
+            .signature-box { border-top: 1px solid #000; width: 220px; text-align: center; padding-top: 5px; font-weight: bold; }
             .bold { font-weight: bold; }
+            .footer-info { margin-top: 40px; text-align: center; font-size: 9px; color: #666; border-top: 1px solid #eee; padding-top: 10px; }
             @media print { body { padding: 0; } }
         </style>
     </head>
@@ -54,44 +55,60 @@ const generateServiceContractHtml = (data: any) => {
         <div class="header">
             ${agency?.logo_url ? `<img src="${agency.logo_url}" class="logo" alt="Logo">` : ''}
             <p class="contract-title">CONTRATO DE PRESTACIÓN DE SERVICIOS TURÍSTICOS Y DE TRANSPORTE</p>
-            <p class="contract-number">No. DE CONTRATO: ${client.contract_number}</p>
+            <p class="contract-number">CONTRATO No: ${client.contract_number}</p>
         </div>
 
         <div class="section">
-            <p>Contrato que celebran por una parte <span class="bold">SAURA TOURS</span> (en adelante "LA AGENCIA") y por otra el/la <span class="bold">SR(A). ${clientFullName}</span> (en adelante "EL CLIENTE"), bajo las siguientes declaraciones y cláusulas:</p>
+            <p class="clause">Contrato de prestación de servicios que celebran por una parte la empresa denominada <span class="bold">SAURA TOURS</span>, a quien en lo sucesivo se le denominará como "LA AGENCIA", y por la otra parte el/la <span class="bold">SR(A). ${clientFullName}</span>, a quien en lo sucesivo se le denominará como "EL CLIENTE", de conformidad con las siguientes declaraciones y cláusulas:</p>
         </div>
 
         <div class="section">
-            <p class="section-title">DETALLES DEL SERVICIO</p>
+            <p class="section-title">DECLARACIONES</p>
+            <p class="clause">I.- <span class="bold">LA AGENCIA</span> declara ser una empresa legalmente constituida dedicada a la organización y comercialización de servicios turísticos y de transporte, contando con los recursos técnicos y humanos para cumplir con el objeto del presente contrato.</p>
+            <p class="clause">II.- <span class="bold">EL CLIENTE</span> declara por su propio derecho ser mayor de edad, con capacidad legal para contratar y manifiesta su interés en adquirir los servicios detallados a continuación bajo los términos aquí establecidos.</p>
+        </div>
+
+        <div class="section">
+            <p class="section-title">DATOS DEL SERVICIO</p>
             <table class="details-table">
-                <tr><td class="label">Destino / Servicio:</td><td>${title}</td></tr>
+                <tr><td class="label">Destino o Servicio:</td><td><span class="bold">${title}</span></td></tr>
                 <tr><td class="label">Fecha de Contrato:</td><td>${contractDate}</td></tr>
-                <tr><td class="label">Asientos Asignados:</td><td class="bold">${seatNumbers}</td></tr>
-                <tr><td class="label">Número de Pasajeros:</td><td>${client.number_of_people}</td></tr>
+                <tr><td class="label">Asientos Asignados:</td><td class="bold" style="font-size: 14px; color: #91045A;">${seatNumbers}</td></tr>
+                <tr><td class="label">Número de Pasajeros:</td><td>${client.number_of_people} Persona(s)</td></tr>
+                <tr><td class="label">Monto Total del Contrato:</td><td class="bold">$${client.total_amount.toLocaleString()} MXN</td></tr>
+                <tr><td class="label">Monto Liquidado a la Fecha:</td><td>$${client.total_paid.toLocaleString()} MXN</td></tr>
+                <tr><td class="label">Saldo Pendiente:</td><td class="bold" style="color: red;">$${amountRemaining.toLocaleString()} MXN</td></tr>
             </table>
         </div>
 
         <div class="section">
             <p class="section-title">CLÁUSULAS</p>
-            <p class="clause"><span class="bold">PRIMERA (OBJETO):</span> "LA AGENCIA" se obliga a prestar el servicio de transporte y/o tour especificado, garantizando la logística necesaria para su realización.</p>
-            <p class="clause"><span class="bold">SEGUNDA (PRECIO):</span> El monto total es de <span class="bold">$${client.total_amount.toLocaleString()} MXN</span>. Se ha liquidado <span class="bold">$${client.total_paid.toLocaleString()} MXN</span>, quedando pendiente <span class="bold">$${amountRemaining.toLocaleString()} MXN</span>.</p>
-            <p class="clause"><span class="bold">TERCERA (CANCELACIONES):</span> Toda cancelación por parte de "EL CLIENTE" genera un cargo administrativo del 20%. Si se cancela con menos de 72 horas de anticipación, no habrá reembolso del anticipo.</p>
-            <p class="clause"><span class="bold">CUARTA (IDENTIFICACIÓN):</span> Es obligación del pasajero portar identificación oficial vigente durante todo el trayecto. "LA AGENCIA" no se hace responsable por omisiones del cliente.</p>
-            <p class="clause"><span class="bold">QUINTA (EQUIPAJE):</span> Se permite una maleta de mano y una de hasta 20kg por persona. "LA AGENCIA" no se hace responsable por objetos de valor no declarados.</p>
-            <p class="clause"><span class="bold">SEXTA (HORARIOS):</span> El cliente debe presentarse 30 minutos antes en el punto de salida. El transporte no se hace responsable por retrasos del cliente.</p>
-            <p class="clause"><span class="bold">SÉPTIMA (SEGURO):</span> El servicio cuenta con seguro de viajero de responsabilidad civil según las normas de transporte vigentes.</p>
-            <p class="clause"><span class="bold">OCTAVA (CONDUCTA):</span> "LA AGENCIA" se reserva el derecho de negar el servicio a personas bajo influencia de sustancias o que alteren el orden.</p>
-            <p class="clause"><span class="bold">NOVENA (CAMBIOS):</span> "LA AGENCIA" podrá realizar ajustes en itinerarios por causas de fuerza mayor o seguridad, notificando al cliente.</p>
-            <p class="clause"><span class="bold">DÉCIMA (JURISDICCIÓN):</span> Para cualquier controversia, ambas partes se someten a las leyes y tribunales competentes de la ciudad sede de la agencia.</p>
+            <p class="clause"><span class="bold">PRIMERA (OBJETO):</span> El presente contrato tiene por objeto la prestación por parte de "LA AGENCIA" de los servicios de transporte y/o turísticos especificados en la sección de datos, obligándose a prestar el servicio en las condiciones pactadas.</p>
+            <p class="clause"><span class="bold">SEGUNDA (ANTICIPOS Y RESERVACIÓN):</span> Para garantizar el servicio, el cliente deberá cubrir un anticipo. No se considera reservación confirmada hasta haber realizado el pago correspondiente y recibido este documento.</p>
+            <p class="clause"><span class="bold">TERCERA (LIQUIDACIÓN):</span> El cliente se obliga a liquidar el saldo total del servicio en el tiempo estipulado por la agencia. El incumplimiento del pago total en las fechas acordadas facultará a la agencia para cancelar el servicio sin derecho a reembolso.</p>
+            <p class="clause"><span class="bold">CUARTA (CANCELACIONES):</span> En caso de cancelación por parte del cliente: a) Con más de 15 días de anticipación: se aplicará un cargo administrativo del 20%. b) Con menos de 72 horas o no presentarse (No Show): no habrá reembolso alguno bajo ninguna circunstancia.</p>
+            <p class="clause"><span class="bold">QUINTA (RESPONSABILIDAD):</span> "LA AGENCIA" actúa como intermediaria entre el cliente y los prestadores finales de servicios (hoteles, transportes locales, etc.). No se hace responsable por retrasos, huelgas o fenómenos naturales que alteren el itinerario.</p>
+            <p class="clause"><span class="bold">SEXTA (IDENTIFICACIÓN):</span> Es responsabilidad absoluta del cliente y sus acompañantes portar identificación oficial original y vigente durante todo el trayecto. El impedimento de viaje por falta de documentación no genera responsabilidad para la agencia.</p>
+            <p class="clause"><span class="bold">SÉPTIMA (EQUIPAJE):</span> El cliente tiene derecho a una maleta de mano y una de hasta 20kg. La agencia no se responsabiliza por objetos de valor, dinero o electrónicos que no hayan sido declarados explícitamente.</p>
+            <p class="clause"><span class="bold">OCTAVA (CONDUCTA):</span> La agencia se reserva el derecho de negar el servicio o retirar del tour a cualquier persona que altere el orden, se encuentre bajo influjo de sustancias o ponga en riesgo la seguridad del grupo.</p>
+            <p class="clause"><span class="bold">NOVENA (SEGURO):</span> El servicio cuenta con seguro de viajero de acuerdo a las normas de transporte federal vigentes, limitado a la responsabilidad civil del transporte.</p>
+            <p class="clause"><span class="bold">DÉCIMA (JURISDICCIÓN):</span> Para la interpretación y cumplimiento del presente contrato, las partes se someten a las leyes y tribunales competentes de la sede de "LA AGENCIA".</p>
         </div>
 
         <div class="signatures">
-            <div class="signature-box"><p>POR LA AGENCIA</p></div>
-            <div class="signature-box"><p>POR EL CLIENTE</p></div>
+            <div class="signature-box">
+                <p>POR LA AGENCIA</p>
+                <p style="margin-top: 40px; font-size: 8px;">SAURA TOURS</p>
+            </div>
+            <div class="signature-box">
+                <p>POR EL CLIENTE</p>
+                <p style="margin-top: 40px; font-size: 8px;">${clientFullName}</p>
+            </div>
         </div>
 
-        <div style="margin-top: 20px; font-size: 8px; color: #555; text-align: center;">
-            <p>${agency?.agency_address || ''} | WhatsApp: ${agency?.agency_phone || ''}</p>
+        <div class="footer-info">
+            <p>${agency?.agency_address || ''} | WhatsApp: ${agency?.agency_phone || ''} | Email: ${agency?.agency_email || ''}</p>
+            <p>Este documento es un comprobante oficial de su reservación.</p>
         </div>
     </body>
     </html>
