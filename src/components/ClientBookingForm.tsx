@@ -77,6 +77,9 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
   const [roomDetails, setRoomDetails] = useState({ double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showBankInfo, setShowBankInfo] = useState(false);
+  
+  // States for breakdown
+  const [counts, setCounts] = useState({ adults: 0, children: 0 });
 
   useEffect(() => {
     if (isOpen) setSelectedSeats(initialSelectedSeats);
@@ -84,28 +87,29 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
 
   useEffect(() => {
     const totalNeeded = selectedSeats.length;
-    const currentCompanions = formData.companions.length;
     const neededCompanions = totalNeeded - 1;
-
-    if (neededCompanions > currentCompanions) {
-      const toAdd = neededCompanions - currentCompanions;
-      setFormData(p => ({
-        ...p,
-        companions: [...p.companions, ...Array.from({ length: toAdd }, () => ({ id: uuidv4(), name: '', age: null }))]
-      }));
-    } else if (neededCompanions < currentCompanions && neededCompanions >= 0) {
-      setFormData(p => ({
-        ...p,
-        companions: p.companions.slice(0, neededCompanions)
-      }));
-    }
+    setFormData(p => {
+      let newComps = [...p.companions];
+      if (neededCompanions > newComps.length) {
+        const toAdd = neededCompanions - newComps.length;
+        newComps = [...newComps, ...Array.from({ length: toAdd }, () => ({ id: uuidv4(), name: '', age: null }))];
+      } else if (neededCompanions < newComps.length && neededCompanions >= 0) {
+        newComps = newComps.slice(0, neededCompanions);
+      }
+      return { ...p, companions: newComps };
+    });
   }, [selectedSeats.length]);
 
   useEffect(() => {
-    let adults = (formData.contractor_age === null || formData.contractor_age >= 12) ? 1 : 0;
-    let children = (formData.contractor_age !== null && formData.contractor_age < 12) ? 1 : 0;
-    formData.companions.forEach(c => { (c.age === null || c.age >= 12) ? adults++ : children++; });
+    // REGLA: 12 o menores son NIÑOS
+    let adults = (formData.contractor_age === null || formData.contractor_age > 12) ? 1 : 0;
+    let children = (formData.contractor_age !== null && formData.contractor_age <= 12) ? 1 : 0;
     
+    formData.companions.forEach(c => { 
+      (c.age === null || c.age > 12) ? adults++ : children++; 
+    });
+    
+    setCounts({ adults, children });
     const rd = allocateRoomsForPeople(adults);
     setRoomDetails(rd);
 
@@ -122,11 +126,6 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
       toast.error('Nombre, Apellido, Email y Domicilio son obligatorios.');
       return;
     }
-    if (selectedSeats.length === 0) {
-      toast.error('Por favor, selecciona tus asientos.');
-      return;
-    }
-
     setIsSubmitting(true);
     try {
       const contractNum = uuidv4().substring(0, 8).toUpperCase();
@@ -142,160 +141,119 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
         contractor_age: formData.contractor_age, room_details: roomDetails
       }).select('id').single();
 
-      if (clientErr || !newClient) throw new Error("Error al crear el registro de cliente.");
+      if (clientErr) throw clientErr;
 
-      const { error: seatErr } = await supabase.from('tour_seat_assignments').upsert(
-        selectedSeats.map(s => ({
-          tour_id: tourId,
-          seat_number: s,
-          status: 'booked',
-          client_id: newClient.id
-        })),
+      await supabase.from('tour_seat_assignments').upsert(
+        selectedSeats.map(s => ({ tour_id: tourId, seat_number: s, status: 'booked', client_id: newClient.id })),
         { onConflict: 'tour_id,seat_number' }
       );
 
-      if (seatErr) throw new Error("Error al asignar los asientos.");
-
       if (method === 'mercadopago') {
-        const { data, error } = await supabase.functions.invoke('mercadopago-checkout', {
+        const { data } = await supabase.functions.invoke('mercadopago-checkout', {
           body: { clientId: newClient.id, amount: advance, description: `Anticipo Tour: ${tourTitle}` }
         });
-        
-        if (error) {
-          const res = await error.context.json();
-          throw new Error(res.error || "Error en Mercado Pago.");
-        }
         window.location.href = data.init_point;
       } else if (method === 'stripe') {
-        const { data, error } = await supabase.functions.invoke('stripe-checkout', {
-          body: { 
-            clientId: newClient.id, 
-            amount: advance, 
-            description: `Anticipo Tour: ${tourTitle}`,
-            contractNumber: contractNum
-          }
+        const { data } = await supabase.functions.invoke('stripe-checkout', {
+          body: { clientId: newClient.id, amount: advance, description: `Anticipo Tour: ${tourTitle}`, contractNumber: contractNum }
         });
-
-        if (error) {
-          const res = await error.context.json();
-          throw new Error(res.error || "Error en la pasarela de Stripe.");
-        }
-        
-        if (!data?.url) throw new Error("No se recibió la URL de pago de Stripe.");
         window.location.href = data.url;
       } else if (method === 'transferencia') {
         setShowBankInfo(true);
-        toast.success(`Reserva ${contractNum} registrada.`);
       } else {
-        toast.success(`Reserva ${contractNum} exitosa.`);
         onClose();
+        toast.success("Reserva guardada.");
       }
     } catch (e: any) {
-      console.error("Booking Error:", e);
-      toast.error(e.message || 'Ocurrió un error inesperado al procesar tu reserva.');
+      toast.error('Error al procesar reserva.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const hasOnlineMP = !!(agencySettings?.payment_mode === 'test' ? agencySettings?.mp_test_public_key : agencySettings?.mp_public_key);
-  const hasOnlineStripe = !!(agencySettings?.payment_mode === 'test' ? agencySettings?.stripe_test_public_key : agencySettings?.stripe_public_key);
-
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Finalizar Reserva: {tourTitle}</DialogTitle>
-        </DialogHeader>
+        <DialogHeader><DialogTitle>Finalizar Reserva: {tourTitle}</DialogTitle></DialogHeader>
 
         {!showBankInfo ? (
-          <div className="space-y-8 py-4">
-            <div className="p-4 bg-muted/50 rounded-xl border-l-4 border-rosa-mexicano flex items-center justify-between">
-              <div>
-                <h3 className="font-bold flex items-center gap-2"><Info className="h-4 w-4" /> Resumen de Selección</h3>
-                <div className="flex gap-1 mt-1 flex-wrap">
-                  {selectedSeats.map(s => (
-                    <Badge key={s} className="bg-rosa-mexicano/10 text-rosa-mexicano border-rosa-mexicano/20 font-bold">Asiento {s}</Badge>
-                  ))}
-                </div>
-              </div>
-              <div className="text-right">
-                <p className="text-xs uppercase opacity-60 font-bold">Anticipo Requerido</p>
-                <p className="text-xl font-black text-rosa-mexicano">${(selectedSeats.length * advancePaymentPerPerson).toLocaleString()}</p>
-              </div>
-            </div>
-
+          <div className="space-y-6 py-4">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1"><Label>Nombre(s)</Label><Input value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} placeholder="Ej: Juan" /></div>
-              <div className="space-y-1"><Label>Apellido(s)</Label><Input value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} placeholder="Ej: Pérez" /></div>
-              <div className="space-y-1"><Label>Email</Label><Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} placeholder="ejemplo@correo.com" /></div>
-              <div className="space-y-1"><Label>WhatsApp</Label><Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="8441234567" /></div>
-              <div className="space-y-1"><Label>Identificación</Label><Input value={formData.identification_number} onChange={e => setFormData({...formData, identification_number: e.target.value})} placeholder="INE / Pasaporte" /></div>
-              <div className="space-y-1"><Label>Edad</Label><Input type="number" value={formData.contractor_age || ''} onChange={e => setFormData({...formData, contractor_age: parseInt(e.target.value) || null})} placeholder="Años" /></div>
-              <div className="md:col-span-2 space-y-1"><Label>Domicilio Completo</Label><Textarea value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} placeholder="Calle, Número, Colonia, Ciudad y Estado" /></div>
+              <div className="space-y-1"><Label>Nombre(s)</Label><Input value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} /></div>
+              <div className="space-y-1"><Label>Apellido(s)</Label><Input value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} /></div>
+              <div className="space-y-1"><Label>Email</Label><Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
+              <div className="space-y-1"><Label>WhatsApp</Label><Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
+              <div className="space-y-1"><Label>Edad</Label><Input type="number" value={formData.contractor_age || ''} onChange={e => setFormData({...formData, contractor_age: parseInt(e.target.value) || null})} /></div>
+              <div className="space-y-1"><Label>Identificación</Label><Input value={formData.identification_number} onChange={e => setFormData({...formData, identification_number: e.target.value})} /></div>
+              <div className="md:col-span-2 space-y-1"><Label>Domicilio Completo</Label><Textarea value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} /></div>
             </div>
 
             {formData.companions.length > 0 && (
-              <div className="space-y-4">
-                <h3 className="font-bold border-b pb-2 flex items-center gap-2"><UserCheck className="h-4 w-4" /> Datos de Acompañantes</h3>
-                <div className="grid grid-cols-1 gap-3">
-                  {formData.companions.map((c, idx) => (
-                    <div key={c.id} className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
-                      <div className="md:col-span-2 space-y-1"><Label className="text-[10px] uppercase font-bold text-gray-400">Nombre Pasajero {idx + 2}</Label><Input value={c.name} onChange={e => setFormData({...formData, companions: formData.companions.map(x => x.id === c.id ? {...x, name: e.target.value} : x)})} /></div>
-                      <div className="space-y-1"><Label className="text-[10px] uppercase font-bold text-gray-400">Edad</Label><Input type="number" value={c.age || ''} onChange={e => setFormData({...formData, companions: formData.companions.map(x => x.id === c.id ? {...x, age: parseInt(e.target.value) || null} : x)})} /></div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className="p-6 bg-gray-900 text-white rounded-2xl shadow-xl flex justify-between items-center border-b-4 border-rosa-mexicano">
-              <div><p className="text-xs uppercase font-bold opacity-60">Total Reserva</p><h3 className="text-4xl font-black">${totalAmount.toLocaleString()}</h3></div>
-              <div className="text-right"><p className="text-xs uppercase font-bold opacity-60">Pagar Hoy</p><h3 className="text-4xl font-black text-yellow-400">${(selectedSeats.length * advancePaymentPerPerson).toLocaleString()}</h3></div>
-            </div>
-
-            <div className="space-y-3">
-              <Label className="text-center block font-bold text-gray-500 uppercase text-xs tracking-widest">Elige tu método de pago</Label>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {hasOnlineMP && <Button onClick={() => handlePayment('mercadopago')} disabled={isSubmitting} className="bg-[#009EE3] hover:bg-[#0086c3] h-14 font-bold rounded-xl text-white shadow-lg"><CreditCard className="mr-2 h-5 w-5" /> Mercado Pago</Button>}
-                {hasOnlineStripe && <Button onClick={() => handlePayment('stripe')} disabled={isSubmitting} className="bg-[#635BFF] hover:bg-[#5249d3] h-14 font-bold rounded-xl text-white shadow-lg"><CreditCard className="mr-2 h-5 w-5" /> Pagar con Tarjeta</Button>}
-                {agencySettings?.bank_accounts.length ? <Button onClick={() => handlePayment('transferencia')} disabled={isSubmitting} variant="outline" className="border-green-600 text-green-700 h-14 font-bold rounded-xl hover:bg-green-50"><Landmark className="mr-2 h-5 w-5" /> Transferencia Bancaria</Button> : null}
-                <Button onClick={() => handlePayment('manual')} disabled={isSubmitting} variant="outline" className="h-14 font-bold rounded-xl hover:bg-gray-100 text-gray-700 border-gray-300">Pagar después</Button>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div className="py-10 space-y-8 text-center animate-in zoom-in-95 duration-300">
-            <div className="bg-green-100 w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle2 className="h-12 w-12 text-green-600" />
-            </div>
-            <div>
-              <h2 className="text-3xl font-black text-gray-900">¡Reserva creada!</h2>
-              <p className="text-gray-500 mt-2">Tu contrato es: <span className="font-bold text-rosa-mexicano">{formData.contract_number}</span></p>
-            </div>
-            
-            <div className="bg-muted/30 p-6 rounded-3xl border-2 border-dashed border-gray-200">
-              <p className="font-bold mb-4 text-sm uppercase tracking-widest text-gray-400">Datos para Depósito</p>
-              <div className="grid gap-4">
-                {agencySettings?.bank_accounts.map(bank => (
-                  <div key={bank.id} className="p-4 bg-white rounded-2xl shadow-sm border border-gray-100 text-left">
-                    <p className="font-black text-rosa-mexicano text-lg">{bank.bank_name}</p>
-                    <div className="flex items-center justify-between mt-2">
-                      <p className="text-xl font-mono tracking-tighter">{bank.bank_clabe}</p>
-                      <Button variant="ghost" size="sm" onClick={() => { navigator.clipboard.writeText(bank.bank_clabe); toast.success('CLABE copiada'); }}><Save className="h-4 w-4" /></Button>
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-2 uppercase font-bold">{bank.bank_holder}</p>
+              <div className="space-y-3">
+                <h3 className="font-bold border-b pb-1 text-sm uppercase text-gray-400">Acompañantes</h3>
+                {formData.companions.map((c, idx) => (
+                  <div key={c.id} className="grid grid-cols-1 md:grid-cols-3 gap-3 bg-gray-50 p-3 rounded-lg border border-gray-100">
+                    <div className="md:col-span-2 space-y-1"><Label className="text-[10px]">Nombre Pasajero {idx + 2}</Label><Input value={c.name} onChange={e => setFormData({...formData, companions: formData.companions.map(x => x.id === c.id ? {...x, name: e.target.value} : x)})} /></div>
+                    <div className="space-y-1"><Label className="text-[10px]">Edad</Label><Input type="number" value={c.age || ''} onChange={e => setFormData({...formData, companions: formData.companions.map(x => x.id === c.id ? {...x, age: parseInt(e.target.value) || null} : x)})} /></div>
                   </div>
                 ))}
               </div>
+            )}
+
+            {/* DESGLOSE DETALLADO */}
+            <div className="bg-muted/40 p-4 rounded-xl border-2 border-dashed border-gray-200">
+              <h4 className="text-xs font-black uppercase text-gray-500 mb-3 tracking-widest flex items-center gap-2">
+                <Info className="h-3 w-3" /> Desglose de Precios
+              </h4>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span>Pax Adultos ({counts.adults}):</span>
+                  <div className="text-right">
+                    {roomDetails.double_rooms > 0 && <div>{roomDetails.double_rooms} Hab. Doble x ${ (tourSellingPrices.double * 2).toLocaleString() }</div>}
+                    {roomDetails.triple_rooms > 0 && <div>{roomDetails.triple_rooms} Hab. Triple x ${ (tourSellingPrices.triple * 3).toLocaleString() }</div>}
+                    {roomDetails.quad_rooms > 0 && <div>{roomDetails.quad_rooms} Hab. Cuádruple x ${ (tourSellingPrices.quad * 4).toLocaleString() }</div>}
+                  </div>
+                </div>
+                {counts.children > 0 && (
+                  <div className="flex justify-between border-t pt-2">
+                    <span>Pax Niños ({counts.children}):</span>
+                    <span>{counts.children} x ${tourSellingPrices.child.toLocaleString()}</span>
+                  </div>
+                )}
+                <div className="flex justify-between font-black text-rosa-mexicano border-t pt-2 text-base">
+                  <span>TOTAL A PAGAR:</span>
+                  <span>${totalAmount.toLocaleString()}</span>
+                </div>
+              </div>
             </div>
-            
-            <div className="flex flex-col gap-3">
-              <Button onClick={() => window.open(`https://wa.me/528444041469?text=Hola, reservé el tour ${tourTitle} con el contrato ${formData.contract_number}. ¿Me podrían confirmar?`, '_blank')} className="bg-green-600 h-14 text-lg font-bold rounded-2xl">
-                Confirmar por WhatsApp
-              </Button>
-              <Button onClick={onClose} variant="ghost" className="text-gray-400">Cerrar</Button>
+
+            <div className="p-4 bg-gray-900 text-white rounded-xl flex justify-between items-center">
+              <div><p className="text-[10px] uppercase font-bold opacity-60">Anticipo Hoy</p><h3 className="text-2xl font-black text-yellow-400">${(selectedSeats.length * advancePaymentPerPerson).toLocaleString()}</h3></div>
+              <div className="text-right text-[10px] opacity-60 font-bold uppercase">{selectedSeats.length} lugares seleccionados</div>
             </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {hasOnlineMP && <Button onClick={() => handlePayment('mercadopago')} disabled={isSubmitting} className="bg-[#009EE3] h-12 font-bold rounded-xl"><CreditCard className="mr-2 h-4 w-4" /> Mercado Pago</Button>}
+              {hasOnlineStripe && <Button onClick={() => handlePayment('stripe')} disabled={isSubmitting} className="bg-[#635BFF] h-12 font-bold rounded-xl"><CreditCard className="mr-2 h-4 w-4" /> Tarjeta</Button>}
+              {agencySettings?.bank_accounts.length ? <Button onClick={() => handlePayment('transferencia')} disabled={isSubmitting} variant="outline" className="border-green-600 text-green-700 h-12 font-bold rounded-xl"><Landmark className="mr-2 h-4 w-4" /> Transferencia</Button> : null}
+              <Button onClick={() => handlePayment('manual')} disabled={isSubmitting} variant="outline" className="h-12 font-bold rounded-xl">Pagar después</Button>
+            </div>
+          </div>
+        ) : (
+          <div className="py-10 text-center space-y-6">
+             <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto"><CheckCircle2 className="h-10 w-10 text-green-600" /></div>
+             <h2 className="text-2xl font-black">¡Reserva Registrada!</h2>
+             <div className="bg-muted p-4 rounded-xl text-left">
+               <p className="text-xs font-bold uppercase text-gray-400 mb-3">Cuentas Bancarias</p>
+               {agencySettings?.bank_accounts.map(b => (
+                 <div key={b.id} className="mb-3 p-3 bg-white rounded-lg border">
+                   <p className="font-bold text-rosa-mexicano">{b.bank_name}</p>
+                   <p className="font-mono text-lg">{b.bank_clabe}</p>
+                   <p className="text-[10px] uppercase opacity-60">{b.bank_holder}</p>
+                 </div>
+               ))}
+             </div>
+             <Button onClick={onClose} className="w-full bg-green-600">Entendido</Button>
           </div>
         )}
       </DialogContent>

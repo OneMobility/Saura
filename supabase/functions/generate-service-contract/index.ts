@@ -19,28 +19,22 @@ const generateServiceContractHtml = (data: any) => {
   
   const departureDate = isTour ? (client.tours?.departure_date ? format(parseISO(client.tours.departure_date), 'dd/MM/yyyy', { locale: es }) : 'N/A') : 'N/A';
   const returnDate = isTour ? (client.tours?.return_date ? format(parseISO(client.tours.return_date), 'dd/MM/yyyy', { locale: es }) : 'N/A') : 'N/A';
-  const departureTime = isTour ? (client.tours?.departure_time || 'N/A') : 'N/A';
-  const returnTime = isTour ? (client.tours?.return_time || 'N/A') : 'N/A';
 
-  let seatNumbers = "";
-  if (isTour) {
-    seatNumbers = tourSeats?.map((s: any) => s.seat_number).sort((a: number, b: number) => a - b).join(', ') || 'N/A';
-  } else {
-    seatNumbers = busPassengers?.map((p: any) => p.seat_number).sort((a: number, b: number) => a - b).join(', ') || 'N/A';
+  // Lógica de conteo para desglose (REGLA: 12 o menores son Niños)
+  let adults = (client.contractor_age === null || client.contractor_age > 12) ? 1 : 0;
+  let children = (client.contractor_age !== null && client.contractor_age <= 12) ? 1 : 0;
+  
+  if (client.companions) {
+    client.companions.forEach((c: any) => {
+      (c.age === null || c.age > 12) ? adults++ : children++;
+    });
   }
 
-  const amountRemaining = (client.total_amount - client.total_paid).toFixed(2);
+  let seatNumbers = isTour 
+    ? tourSeats?.map((s: any) => s.seat_number).sort((a: number, b: number) => a - b).join(', ')
+    : busPassengers?.map((p: any) => p.seat_number).sort((a: number, b: number) => a - b).join(', ');
 
-  // Acompañantes
-  let companionsHtml = '<p style="color: #666; font-style: italic;">Sin acompañantes registrados.</p>';
-  if (client.companions && client.companions.length > 0) {
-    companionsHtml = `<ol style="margin-top: 5px; padding-left: 20px; color: #444;">${client.companions.map((c: any) => `<li>${c.name} ${c.age ? `(${c.age} años)` : ''}</li>`).join('')}</ol>`;
-  } else if (!isTour && busPassengers && busPassengers.length > 1) {
-    const others = busPassengers.filter((p: any) => !p.is_contractor);
-    if (others.length > 0) {
-      companionsHtml = `<ol style="margin-top: 5px; padding-left: 20px; color: #444;">${others.map((c: any) => `<li>${c.first_name} ${c.last_name} (Asiento: ${c.seat_number})</li>`).join('')}</ol>`;
-    }
-  }
+  const rd = client.room_details || {};
 
   return `
     <!DOCTYPE html>
@@ -50,157 +44,88 @@ const generateServiceContractHtml = (data: any) => {
         <title>Contrato - ${client.contract_number}</title>
         <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
         <style>
-            :root { --primary: #91045A; --bg-soft: #f8fafc; --text-main: #1e293b; --text-muted: #64748b; }
-            
-            /* Especificaciones de tamaño y fuente */
-            @page { size: letter; margin: 10mm; }
-            
-            body { 
-                font-family: 'Poppins', sans-serif; 
-                line-height: 1.4; 
-                color: var(--text-main); 
-                margin: 0; 
-                padding: 0; 
-                font-size: 12px; /* Requerido: 12px */
-                background: #e2e8f0; 
-            }
-            
-            .page { 
-                width: 215.9mm; /* Tamaño Carta */
-                min-height: 279.4mm; 
-                margin: 20px auto; 
-                padding: 15mm; 
-                box-sizing: border-box; 
-                background: white; 
-                box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
-                border-radius: 4px; 
-            }
-            
-            .header-container { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--primary); padding-bottom: 15px; margin-bottom: 20px; }
-            .agency-info { text-align: right; }
-            .agency-info h1 { margin: 0; color: var(--primary); font-size: 20px; font-weight: 800; text-transform: uppercase; }
-            .agency-info p { margin: 2px 0; color: var(--text-muted); font-size: 11px; }
-            .logo { max-width: 100px; height: auto; }
-
-            .contract-badge { display: flex; justify-content: space-between; align-items: center; background: var(--bg-soft); padding: 12px 18px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
-            .badge-title { font-weight: 800; color: var(--text-main); font-size: 14px; text-transform: uppercase; }
-            .badge-number { color: var(--primary); font-weight: 800; font-size: 16px; }
-
-            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
-            .card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 15px; }
-            .card-title { font-weight: 700; font-size: 12px; color: var(--primary); text-transform: uppercase; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; margin-bottom: 12px; }
-            
-            .data-row { display: flex; margin-bottom: 6px; }
-            .data-label { font-weight: 600; color: var(--text-muted); width: 40%; }
-            .data-value { font-weight: 500; color: var(--text-main); width: 60%; }
-
-            .seats-box { background: var(--primary); color: white; padding: 10px 15px; border-radius: 8px; margin-top: 10px; }
-            .seats-label { font-size: 10px; font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 2px; }
-            .seats-numbers { font-size: 14px; font-weight: 800; }
-
-            .financial-card { background: #fff1f2; border: 1px solid #fecdd3; }
-            .amount-pending { font-size: 18px; font-weight: 900; color: #dc2626; }
-
-            .clauses-container { margin-top: 15px; padding: 15px; background: var(--bg-soft); border-radius: 8px; border: 1px solid #e2e8f0; }
-            .clause { text-align: justify; margin-bottom: 8px; font-size: 10.5px; color: #475569; line-height: 1.3; }
-            .clause-num { font-weight: 800; color: var(--primary); }
-
-            .signatures { display: flex; justify-content: space-around; margin-top: 40px; }
-            .sig-box { width: 40%; text-align: center; }
-            .sig-line { border-top: 1.5px solid var(--text-main); margin-bottom: 8px; }
-            .sig-name { font-weight: 700; font-size: 12px; text-transform: uppercase; }
-
-            @media print { 
-                body { background: white; }
-                .page { margin: 0; width: 100%; box-shadow: none; border: none; }
-            }
+            body { font-family: 'Poppins', sans-serif; line-height: 1.4; color: #1e293b; margin: 0; padding: 0; font-size: 12px; }
+            .page { width: 215.9mm; margin: 10px auto; padding: 15mm; background: white; box-sizing: border-box; border: 1px solid #eee; }
+            .header { display: flex; justify-content: space-between; border-bottom: 2px solid #91045A; padding-bottom: 10px; margin-bottom: 15px; }
+            .primary-text { color: #91045A; font-weight: 800; }
+            .section-title { font-weight: 700; font-size: 11px; color: #91045A; text-transform: uppercase; border-bottom: 1px solid #f1f5f9; padding-bottom: 4px; margin-bottom: 10px; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
+            .card { border: 1px solid #e2e8f0; border-radius: 8px; padding: 12px; background: #fdfdfd; }
+            .breakdown-table { width: 100%; border-collapse: collapse; margin: 10px 0; font-size: 11px; }
+            .breakdown-table th { text-align: left; background: #f8fafc; padding: 6px; border: 1px solid #e2e8f0; }
+            .breakdown-table td { padding: 6px; border: 1px solid #e2e8f0; }
+            .total-box { background: #91045A; color: white; padding: 10px; border-radius: 8px; text-align: right; margin-top: 10px; }
+            .clauses { font-size: 9.5px; text-align: justify; color: #64748b; height: 350px; overflow: hidden; border: 1px solid #f1f5f9; padding: 10px; border-radius: 5px; }
+            .signature-area { display: flex; justify-content: space-around; margin-top: 30px; }
+            .sig-box { width: 40%; text-align: center; border-top: 1px solid #333; padding-top: 5px; font-weight: 700; }
+            @media print { .page { margin: 0; box-shadow: none; border: none; } }
         </style>
     </head>
     <body>
         <div class="page">
-            <div class="header-container">
-                ${agency?.logo_url ? `<img src="${agency.logo_url}" class="logo" alt="Logo">` : '<div></div>'}
+            <div class="header">
                 <div class="agency-info">
-                    <h1>${agency?.agency_name || 'SAURA TOURS'}</h1>
-                    <p>${agency?.agency_address || 'Dirección no registrada'}</p>
-                    <p>WhatsApp: ${agency?.agency_phone || 'N/A'} | Email: ${agency?.agency_email || 'N/A'}</p>
+                    <h1 class="primary-text" style="margin:0; font-size: 24px;">${agency?.agency_name || 'SAURA TOURS'}</h1>
+                    <p style="margin:2px 0;">${agency?.agency_address || ''}</p>
                 </div>
-            </div>
-
-            <div class="contract-badge">
-                <span class="badge-title">Contrato de Prestación de Servicios</span>
-                <span class="badge-number">No. ${client.contract_number}</span>
+                <div style="text-align: right;">
+                    <p class="primary-text" style="font-size: 16px; margin:0;">CONTRATO DE SERVICIO</p>
+                    <p style="font-weight: 700; margin:0;">No. ${client.contract_number}</p>
+                </div>
             </div>
 
             <div class="grid">
                 <div class="card">
-                    <div class="card-title">Datos del Cliente</div>
-                    <div class="data-row"><span class="data-label">Titular:</span><span class="data-value" style="font-weight: 700;">${clientFullName}</span></div>
-                    <div class="data-row"><span class="data-label">Identificación:</span><span class="data-value">${client.identification_number || 'N/A'}</span></div>
-                    <div class="data-row"><span class="data-label">Edad:</span><span class="data-value">${client.contractor_age ? `${client.contractor_age} años` : 'N/A'}</span></div>
-                    <div class="data-row"><span class="data-label">Domicilio:</span><span class="data-value">${client.address || 'N/A'}</span></div>
+                    <div class="section-title">Datos del Cliente</div>
+                    <p><strong>Titular:</strong> ${clientFullName}</p>
+                    <p><strong>ID:</strong> ${client.identification_number || 'N/A'}</p>
+                    <p><strong>Tel:</strong> ${client.phone || 'N/A'}</p>
                 </div>
                 <div class="card">
-                    <div class="card-title">Detalles del Viaje</div>
-                    <div class="data-row"><span class="data-label">Servicio:</span><span class="data-value" style="font-weight: 700; color: var(--primary);">${title}</span></div>
-                    <div class="data-row"><span class="data-label">Salida:</span><span class="data-value">${departureDate} - ${departureTime}</span></div>
-                    <div class="data-row"><span class="data-label">Regreso:</span><span class="data-value">${returnDate} - ${returnTime}</span></div>
-                    <div class="seats-box">
-                        <span class="seats-label">Números de asientos seleccionados</span>
-                        <span class="seats-numbers">${seatNumbers}</span>
-                    </div>
+                    <div class="section-title">Detalles del Viaje</div>
+                    <p><strong>Tour:</strong> ${title}</p>
+                    <p><strong>Salida:</strong> ${departureDate}</p>
+                    <p><strong>Asientos:</strong> ${seatNumbers}</p>
                 </div>
             </div>
 
-            <div class="grid" style="grid-template-columns: 1.2fr 0.8fr;">
-                <div class="card">
-                    <div class="card-title">Acompañantes</div>
-                    <div style="font-size: 11px;">${companionsHtml}</div>
-                </div>
-                <div class="card financial-card">
-                    <div class="card-title">Estado de Cuenta</div>
-                    <div class="data-row"><span class="data-label">Total:</span><span class="data-value" style="font-weight: 700;">$${client.total_amount.toLocaleString()}</span></div>
-                    <div class="data-row"><span class="data-label">Abonado:</span><span class="data-value" style="color: #059669; font-weight: 700;">$${client.total_paid.toLocaleString()}</span></div>
-                    <div style="margin-top: 12px; border-top: 1px dashed #fca5a5; padding-top: 8px; text-align: right;">
-                        <span style="font-size: 10px; color: var(--text-muted); font-weight: 600; display: block; text-transform: uppercase;">Saldo Pendiente</span>
-                        <span class="amount-pending">$${(client.total_amount - client.total_paid).toLocaleString()} MXN</span>
-                    </div>
+            <div class="section-title">Desglose de Precios</div>
+            <table class="breakdown-table">
+                <thead>
+                    <tr>
+                        <th>Concepto</th>
+                        <th>Cantidad</th>
+                        <th>Costo Unitario</th>
+                        <th>Subtotal</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${rd.double_rooms > 0 ? `<tr><td>Habitación Doble (2 Adultos)</td><td>${rd.double_rooms}</td><td>$${(tour.selling_price_double_occupancy * 2).toLocaleString()}</td><td>$${(rd.double_rooms * tour.selling_price_double_occupancy * 2).toLocaleString()}</td></tr>` : ''}
+                    ${rd.triple_rooms > 0 ? `<tr><td>Habitación Triple (3 Adultos)</td><td>${rd.triple_rooms}</td><td>$${(tour.selling_price_triple_occupancy * 3).toLocaleString()}</td><td>$${(rd.triple_rooms * tour.selling_price_triple_occupancy * 3).toLocaleString()}</td></tr>` : ''}
+                    ${rd.quad_rooms > 0 ? `<tr><td>Habitación Cuádruple (4 Adultos)</td><td>${rd.quad_rooms}</td><td>$${(tour.selling_price_quad_occupancy * 4).toLocaleString()}</td><td>$${(rd.quad_rooms * tour.selling_price_quad_occupancy * 4).toLocaleString()}</td></tr>` : ''}
+                    ${children > 0 ? `<tr><td>Tarifa de Niño (12 años o menos)</td><td>${children}</td><td>$${tour.selling_price_child.toLocaleString()}</td><td>$${(children * tour.selling_price_child).toLocaleString()}</td></tr>` : ''}
+                </tbody>
+            </table>
+
+            <div class="total-box">
+                <p style="margin:0; font-size: 10px; opacity: 0.8;">MONTO TOTAL DEL CONTRATO</p>
+                <h2 style="margin:0; font-size: 22px;">$${client.total_amount.toLocaleString()} MXN</h2>
+            </div>
+
+            <div style="margin-top: 15px;">
+                <div class="section-title">Cláusulas de Reserva</div>
+                <div class="clauses">
+                    <p><strong>1. OBJETO:</strong> La agencia se compromete a prestar los servicios turísticos descritos...</p>
+                    <p><strong>2. PAGOS:</strong> El cliente debe liquidar el total del viaje 15 días antes de la salida...</p>
+                    <p><strong>3. CANCELACIONES:</strong> No hay reembolsos en anticipos ni cancelaciones de último momento...</p>
+                    <p><strong>4. EDADES:</strong> Se considera tarifa de niño estrictamente a menores de 12 años cumplidos a la fecha del viaje...</p>
+                    <p><strong>5. SEGURIDAD:</strong> El pasajero debe seguir las instrucciones del coordinador en todo momento...</p>
                 </div>
             </div>
 
-            <div class="clauses-container">
-                <div class="card-title" style="border: none; margin-bottom: 8px;">Cláusulas del Contrato</div>
-                <p class="clause"><span class="clause-num">1. OBJETO:</span> LA AGENCIA se obliga a prestar a EL CLIENTE los servicios turísticos descritos en la carátula de este contrato.</p>
-                <p class="clause"><span class="clause-num">2. ANTICIPO:</span> EL CLIENTE se obliga a cubrir el anticipo pactado para garantizar su lugar. Sin anticipo, la reservación no tiene validez legal.</p>
-                <p class="clause"><span class="clause-num">3. LIQUIDACIÓN:</span> El saldo total deberá ser cubierto por EL CLIENTE a más tardar 15 días antes de la fecha programada de salida.</p>
-                <p class="clause"><span class="clause-num">4. CANCELACIONES:</span> Si EL CLIENTE cancela con más de 15 días de antelación, perderá el anticipo. Con menos de 72 horas, no habrá reembolso alguno.</p>
-                <p class="clause"><span class="clause-num">5. REPROGRAMACIÓN:</span> LA AGENCIA se reserva el derecho de modificar itinerarios por causas de fuerza mayor para garantizar la seguridad del grupo.</p>
-                <p class="clause"><span class="clause-num">6. IDENTIFICACIÓN:</span> Es responsabilidad de EL CLIENTE portar identificación oficial original (INE o Pasaporte) para abordar la unidad.</p>
-                <p class="clause"><span class="clause-num">7. SEGURO:</span> El servicio incluye seguro de viajero limitado exclusivamente a la responsabilidad civil del transporte durante los traslados.</p>
-                <p class="clause"><span class="clause-num">8. COMPORTAMIENTO:</span> LA AGENCIA podrá negar el servicio a personas bajo el influjo de sustancias o que alteren el orden del grupo.</p>
-                <p class="clause"><span class="clause-num">9. EQUIPAJE:</span> LA AGENCIA no se hace responsable por pérdida de objetos personales o equipaje olvidado en la unidad o instalaciones.</p>
-                <p class="clause"><span class="clause-num">10. ASIENTOS:</span> Los números de asiento asignados al momento de la reserva son definitivos y no están sujetos a cambios el día de la salida.</p>
-                <p class="clause"><span class="clause-num">11. MENORES:</span> Los menores de edad son responsabilidad absoluta de sus padres o tutores durante todo el trayecto y estancia.</p>
-                <p class="clause"><span class="clause-num">12. IMPUNTUALIDAD:</span> LA AGENCIA no se responsabiliza por clientes que no lleguen a la hora pactada de salida; se aplicará política de NO SHOW.</p>
-                <p class="clause"><span class="clause-num">13. JURISDICCIÓN:</span> Para la interpretación de este contrato, las partes se someten a las leyes y tribunales de la ciudad de Saltillo, Coahuila.</p>
-                <p class="clause"><span class="clause-num">14. PRIVACIDAD:</span> Los datos personales proporcionados serán tratados conforme a la Ley Federal de Protección de Datos Personales.</p>
-            </div>
-
-            <div class="signatures">
-                <div class="sig-box">
-                    <div class="sig-line"></div>
-                    <span class="sig-name">Representante Legal</span><br>
-                    <span style="font-size: 10px; color: var(--text-muted);">SAURA TOURS</span>
-                </div>
-                <div class="sig-box">
-                    <div class="sig-line"></div>
-                    <span class="sig-name">${clientFullName}</span><br>
-                    <span style="font-size: 10px; color: var(--text-muted);">EL CLIENTE</span>
-                </div>
-            </div>
-
-            <div style="margin-top: 20px; text-align: center; font-size: 10px; color: var(--text-muted); border-top: 1px solid #f1f5f9; padding-top: 10px;">
-                Contrato emitido el ${contractDate} | Documento Oficial de Saura Tours
+            <div class="signature-area">
+                <div class="sig-box">POR LA AGENCIA</div>
+                <div class="sig-box">EL CLIENTE<br><span style="font-size: 8px; font-weight: 400;">${clientFullName}</span></div>
             </div>
         </div>
     </body>
@@ -213,21 +138,13 @@ serve(async (req) => {
   try {
     const { contractNumber } = await req.json();
     const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
-    
-    const { data: client, error: clientError } = await supabaseAdmin.from('clients').select(`*, tours (*), bus_routes (*)`).ilike('contract_number', contractNumber.trim()).single();
-    if (clientError || !client) throw new Error("Contrato no encontrado.");
-    
+    const { data: client } = await supabaseAdmin.from('clients').select(`*, tours (*), bus_routes (*)`).ilike('contract_number', contractNumber.trim()).single();
     const { data: agency } = await supabaseAdmin.from('agency_settings').select('*').single();
-    
     let tourSeats = [], busPassengers = [];
     if (client.tour_id) {
       const { data } = await supabaseAdmin.from('tour_seat_assignments').select('seat_number').eq('client_id', client.id);
       tourSeats = data || [];
-    } else if (client.bus_route_id) {
-      const { data } = await supabaseAdmin.from('bus_passengers').select('*').eq('client_id', client.id);
-      busPassengers = data || [];
     }
-    
     const html = generateServiceContractHtml({ client, tour: client.tours, busRoute: client.bus_routes, agency, tourSeats, busPassengers });
     return new Response(html, { headers: { ...corsHeaders, 'Content-Type': 'text/html' } });
   } catch (error: any) {
