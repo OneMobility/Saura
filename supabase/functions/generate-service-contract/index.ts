@@ -31,96 +31,88 @@ const generateServiceContractHtml = (data: any) => {
     <html lang="es">
     <head>
         <meta charset="UTF-8">
-        <title>Contrato Saura - ${client.contract_number}</title>
-        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap" rel="stylesheet">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <title>Contrato de Prestación de Servicios - ${client.contract_number}</title>
         <style>
-            body { font-family: 'Poppins', sans-serif; padding: 40px; color: #1a1a1a; line-height: 1.5; background: #fff; }
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 4px solid #91045A; padding-bottom: 20px; margin-bottom: 30px; }
-            .logo-section h1 { color: #91045A; margin: 0; font-size: 28px; text-transform: uppercase; }
-            .contract-id { text-align: right; }
-            .contract-id h2 { margin: 0; color: #666; font-size: 14px; text-transform: uppercase; }
-            .contract-id p { margin: 0; font-size: 22px; font-weight: 700; color: #91045A; }
-            
-            .section { margin-bottom: 25px; }
-            .section-title { background: #f8f8f8; padding: 8px 15px; font-weight: 700; color: #91045A; text-transform: uppercase; border-left: 5px solid #91045A; margin-bottom: 15px; }
-            
-            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-            .info-box p { margin: 5px 0; font-size: 14px; }
-            .info-box strong { color: #444; }
-            
-            .terms { font-size: 11px; color: #777; text-align: justify; border-top: 1px solid #eee; pt: 20px; margin-top: 40px; }
-            .signatures { margin-top: 60px; display: flex; justify-content: space-around; }
-            .sig-block { border-top: 1px solid #333; width: 220px; text-align: center; padding-top: 10px; font-size: 12px; font-weight: 700; }
-            
-            .price-total { text-align: right; margin-top: 20px; padding: 15px; background: #91045A; color: white; border-radius: 8px; }
-            .price-total h3 { margin: 0; font-size: 24px; }
-            
-            @media print {
-              body { padding: 0; }
-              .header { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-            }
+            body { font-family: Arial, sans-serif; line-height: 1.4; color: #333; margin: 0; padding: 40px; font-size: 11px; }
+            .header { text-align: center; border-bottom: 2px solid #91045A; padding-bottom: 10px; margin-bottom: 20px; }
+            .logo { max-width: 150px; margin-bottom: 5px; }
+            .contract-title { font-size: 16px; font-weight: bold; color: #91045A; margin: 0; }
+            .contract-number { font-size: 14px; font-weight: bold; margin-top: 5px; }
+            .section { margin-bottom: 15px; }
+            .section-title { font-weight: bold; text-decoration: underline; margin-bottom: 5px; text-transform: uppercase; }
+            .details-table { width: 100%; border-collapse: collapse; margin-top: 5px; }
+            .details-table td { padding: 3px 5px; border: 1px solid #ddd; }
+            .details-table .label { font-weight: bold; background-color: #f9f9f9; width: 30%; }
+            .clause { text-align: justify; margin-bottom: 8px; }
+            .signatures { display: flex; justify-content: space-around; margin-top: 40px; }
+            .signature-box { border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 5px; }
+            .bold { font-weight: bold; }
+            .highlight { color: #91045A; font-weight: bold; }
+            @media print { body { padding: 0; } }
         </style>
     </head>
     <body>
         <div class="header">
-            <div class="logo-section">
-                <h1>${agency?.agency_name || 'Saura Tours'}</h1>
-                <p style="font-size: 12px; color: #666;">${agency?.agency_address || 'México'}</p>
-            </div>
-            <div class="contract-id">
-                <h2>Contrato de Servicio</h2>
-                <p>${client.contract_number}</p>
-            </div>
+            ${agency?.logo_url ? `<img src="${agency.logo_url}" class="logo" alt="Logo">` : ''}
+            <p class="contract-title">CONTRATO DE PRESTACIÓN DE SERVICIOS TURÍSTICOS</p>
+            <p class="contract-number">CONTRATO No: ${client.contract_number}</p>
         </div>
 
         <div class="section">
-            <div class="section-title">Información del Cliente</div>
-            <div class="grid">
-                <div class="info-box">
-                    <p><strong>Titular:</strong> ${clientFullName}</p>
-                    <p><strong>Identificación:</strong> ${client.identification_number || 'N/A'}</p>
-                </div>
-                <div class="info-box">
-                    <p><strong>Fecha de Expedición:</strong> ${contractDate}</p>
-                    <p><strong>Teléfono:</strong> ${client.phone || 'N/A'}</p>
-                </div>
-            </div>
+            <p>CONTRATO QUE CELEBRAN POR UNA PARTE <span class="bold">SAURA TOURS</span>, A QUIEN EN LO SUCESIVO SE LE DENOMINARÁ "LA AGENCIA" Y POR OTRA PARTE EL/LA <span class="bold">SR(A). ${clientFullName}</span>, A QUIEN EN LO SUCESIVO SE LE DENOMINARÁ "EL CLIENTE", AL TENOR DE LAS SIGUIENTES DECLARACIONES Y CLÁUSULAS:</p>
         </div>
 
         <div class="section">
-            <div class="section-title">Detalles del Servicio</div>
-            <div class="info-box">
-                <p><strong>Servicio Contratado:</strong> ${title}</p>
-                <p><strong>Asientos Asignados:</strong> <span style="color: #91045A; font-weight: bold;">${seatNumbers}</span></p>
-                <p><strong>Pasajeros:</strong> ${client.number_of_people} Persona(s)</p>
-            </div>
+            <p class="section-title">DECLARACIONES</p>
+            <p>I.- Declara "LA AGENCIA" ser una prestadora de servicios turísticos legalmente constituida y contar con los elementos propios para cumplir con las obligaciones de este contrato.</p>
+            <p>II.- Declara "EL CLIENTE" que es su deseo contratar los servicios de transporte y/o turísticos que se detallan en el presente documento, conociendo y aceptando los términos del mismo.</p>
         </div>
 
         <div class="section">
-            <div class="section-title">Resumen Económico</div>
-            <div class="grid">
-                <div class="info-box">
-                    <p><strong>Costo Total:</strong> $${client.total_amount.toLocaleString()}</p>
-                    <p><strong>Anticipo/Abonado:</strong> $${client.total_paid.toLocaleString()}</p>
-                </div>
-                <div class="info-box" style="text-align: right;">
-                    <p style="color: #d32f2f; font-weight: bold;">Saldo Pendiente: $${amountRemaining.toLocaleString()}</p>
-                </div>
-            </div>
+            <p class="section-title">DETALLES DEL SERVICIO</p>
+            <table class="details-table">
+                <tr>
+                    <td class="label">Servicio/Destino:</td>
+                    <td>${title}</td>
+                </tr>
+                <tr>
+                    <td class="label">Fecha de Expedición:</td>
+                    <td>${contractDate}</td>
+                </tr>
+                <tr>
+                    <td class="label">Asientos Asignados:</td>
+                    <td class="bold highlight">${seatNumbers}</td>
+                </tr>
+                <tr>
+                    <td class="label">Número de Pasajeros:</td>
+                    <td>${client.number_of_people}</td>
+                </tr>
+            </table>
         </div>
 
-        <div class="terms">
-            <strong>TÉRMINOS Y CONDICIONES:</strong> El presente documento acredita la reserva de los servicios descritos. La agencia se compromete a prestar el servicio en las fechas y formas estipuladas. El cliente declara conocer las políticas de cancelación y reembolso. Cualquier cambio en la reserva debe notificarse con anticipación. Este contrato tiene validez legal como comprobante de servicio una vez liquidado el monto total.
+        <div class="section">
+            <p class="section-title">CLÁUSULAS</p>
+            <p class="clause"><span class="bold">PRIMERA:</span> El objeto del presente contrato es la prestación de los servicios de transporte y/o turísticos descritos, comprometiéndose "LA AGENCIA" a cumplir con los mismos en los tiempos y formas acordados.</p>
+            <p class="clause"><span class="bold">SEGUNDA (PAGO):</span> El costo total convenido por el servicio es de <span class="bold">$${client.total_amount.toLocaleString()} MXN</span>. "EL CLIENTE" ha cubierto a la fecha la cantidad de <span class="bold">$${client.total_paid.toLocaleString()} MXN</span>, quedando un saldo pendiente de <span class="bold highlight">$${amountRemaining.toLocaleString()} MXN</span>.</p>
+            <p class="clause"><span class="bold">TERCERA (CANCELACIONES):</span> En caso de cancelación por parte del cliente, "LA AGENCIA" se reserva el derecho de aplicar cargos administrativos. Los depósitos de apartado no son reembolsables salvo causas imputables directamente a la empresa.</p>
+            <p class="clause"><span class="bold">CUARTA (IDENTIFICACIÓN):</span> Los pasajeros deberán portar identificación oficial vigente y presentarse en los puntos de salida 30 minutos antes de la hora señalada.</p>
+            <p class="clause"><span class="bold">QUINTA:</span> El seguro de viajero incluido en el transporte es de responsabilidad civil de acuerdo a las leyes federales vigentes.</p>
         </div>
 
         <div class="signatures">
-            <div class="sig-block">Firma Autorizada Saura</div>
-            <div class="sig-block">Firma del Cliente</div>
+            <div class="signature-box">
+                <p>POR "LA AGENCIA"</p>
+                <p style="margin-top: 30px;">SAURA TOURS</p>
+            </div>
+            <div class="signature-box">
+                <p>POR "EL CLIENTE"</p>
+                <p style="margin-top: 30px;">${clientFullName}</p>
+            </div>
         </div>
 
-        <div class="price-total">
-            <p style="font-size: 12px; margin-bottom: 5px; opacity: 0.9;">Total a Liquidar</p>
-            <h3>$${client.total_amount.toLocaleString()} MXN</h3>
+        <div style="margin-top: 30px; font-size: 9px; color: #666; text-align: center;">
+            <p>${agency?.agency_address || ''} | Tel: ${agency?.agency_phone || ''} | Email: ${agency?.agency_email || ''}</p>
         </div>
     </body>
     </html>
