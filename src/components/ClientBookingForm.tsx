@@ -49,6 +49,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     if (isOpen) setSelectedSeats(initialSelectedSeats);
   }, [isOpen, initialSelectedSeats]);
 
+  // LÓGICA DE CÁLCULO DINÁMICO (FIX: Ahora detecta cambios en las edades de acompañantes)
   useEffect(() => {
     const totalPax = selectedSeats.length;
     if (totalPax === 0) return;
@@ -62,9 +63,17 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
       const neededRooms = Math.ceil(totalPax / 4);
       setRoomsCount(neededRooms);
 
+      // Contar adultos y niños basado en edades (Umbral: 12 años)
       let adultsCount = (formData.contractor_age === null || formData.contractor_age > 12) ? 1 : 0;
       let childrenCount = (formData.contractor_age !== null && formData.contractor_age <= 12) ? 1 : 0;
-      formData.companions.forEach(c => { (c.age === null || c.age > 12) ? adultsCount++ : childrenCount++; });
+      
+      formData.companions.forEach(c => { 
+        if (c.age !== null && c.age <= 12) {
+          childrenCount++;
+        } else {
+          adultsCount++;
+        }
+      });
 
       let tempAdults = adultsCount;
       let tempChildren = childrenCount;
@@ -102,6 +111,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
       setBreakdown({ adults: adultsCount, children: childrenCount, details });
     }
 
+    // Ajustar número de campos de acompañantes según asientos
     const neededComps = totalPax - 1;
     if (neededComps !== formData.companions.length && neededComps >= 0) {
       setFormData(p => {
@@ -113,7 +123,14 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
         return { ...p, companions: newComps };
       });
     }
-  }, [selectedSeats.length, formData.contractor_age, formData.companions.length, formData.is_transport_only, tourSellingPrices, transportOnlyPrice]);
+  }, [
+    selectedSeats.length, 
+    formData.contractor_age, 
+    formData.companions, // FIX: Dependencia completa de la lista de acompañantes (incluyendo edades)
+    formData.is_transport_only, 
+    tourSellingPrices, 
+    transportOnlyPrice
+  ]);
 
   const handleSave = async () => {
     if (!formData.first_name || !formData.last_name || !formData.email || !formData.phone) return toast.error("Por favor completa tus datos de contacto.");
@@ -191,7 +208,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
             </div>
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1"><Label>Edad</Label><Input type="number" value={formData.contractor_age || ''} onChange={e => setFormData({...formData, contractor_age: parseInt(e.target.value) || null})} /></div>
+              <div className="space-y-1"><Label>Edad del Titular</Label><Input type="number" value={formData.contractor_age || ''} onChange={e => setFormData({...formData, contractor_age: parseInt(e.target.value) || null})} /></div>
               <div className="space-y-1"><Label>Identificación (INE/Pasaporte)</Label><Input value={formData.identification_number} onChange={e => setFormData({...formData, identification_number: e.target.value})} /></div>
             </div>
 
