@@ -11,8 +11,6 @@ const generateHtml = (data: any) => {
   const dateStr = new Date().toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' });
   const tourDate = tour?.departure_date ? new Date(tour.departure_date).toLocaleDateString('es-MX', { day: 'numeric', month: 'long', year: 'numeric' }) : 'N/A';
   const primaryColor = agency?.primary_color || '#91045A';
-  const agencyName = agency?.agency_name || "SAURA TOURS";
-  const agencyAddress = agency?.agency_address || "Saltillo, Coahuila, México";
   const clientFullName = `${client.first_name} ${client.last_name}`;
 
   return `
@@ -20,127 +18,127 @@ const generateHtml = (data: any) => {
     <html lang="es">
     <head>
         <meta charset="UTF-8">
-        <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
+        <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700;800&display=swap" rel="stylesheet">
         <style>
-            body { font-family: 'Montserrat', sans-serif; color: #1a1a1a; line-height: 1.4; padding: 0; margin: 0; font-size: 9px; background: #fff; }
-            .page { padding: 40px 50px; max-width: 800px; margin: auto; border: 1px solid #eee; }
+            @page { size: letter; margin: 0; }
+            body { font-family: 'Poppins', sans-serif; color: #1e293b; line-height: 1.5; padding: 0; margin: 0; background: #f8fafc; font-size: 10px; }
+            .document { background: white; width: 216mm; min-height: 279mm; margin: 0 auto; padding: 40px 50px; box-sizing: border-box; position: relative; }
             
-            .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 3px solid ${primaryColor}; padding-bottom: 15px; margin-bottom: 20px; }
-            .logo { max-height: 70px; }
-            .contract-id-box { text-align: right; }
-            .contract-id-box h1 { color: ${primaryColor}; font-size: 16px; margin: 0; font-weight: 900; text-transform: uppercase; }
-            .contract-id-box p { margin: 2px 0; font-weight: bold; color: #555; }
-            
-            .intro-text { text-align: justify; margin-bottom: 20px; font-size: 10px; }
-            .bold { font-weight: 700; }
-            
-            .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
-            .data-card { background: #fdf2f8; padding: 12px; border-radius: 8px; border: 1px solid #fbcfe8; }
-            .data-card h3 { margin: 0 0 8px 0; font-size: 10px; color: ${primaryColor}; text-transform: uppercase; border-bottom: 1px solid #fbcfe8; padding-bottom: 4px; }
-            .data-card p { margin: 3px 0; }
+            /* Encabezado */
+            .header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 30px; border-bottom: 3px solid ${primaryColor}; padding-bottom: 20px; }
+            .agency-brand { display: flex; align-items: center; gap: 15px; }
+            .logo { max-height: 85px; max-width: 180px; object-fit: contain; }
+            .agency-info { text-align: right; font-size: 12px; color: #475569; }
+            .agency-info h2 { margin: 0 0 5px 0; color: ${primaryColor}; font-weight: 800; font-size: 18px; text-transform: uppercase; }
+            .agency-info p { margin: 2px 0; line-height: 1.2; }
 
-            .clauses-section { text-align: justify; columns: 1; }
-            .clause { margin-bottom: 10px; }
-            .clause-num { font-weight: 900; color: #000; }
+            /* Folio Box */
+            .contract-meta { display: flex; justify-content: space-between; align-items: center; background: #f1f5f9; padding: 10px 20px; border-radius: 12px; margin-bottom: 25px; }
+            .folio { font-weight: 800; color: ${primaryColor}; font-size: 14px; }
+            .emit-date { font-weight: 600; color: #64748b; }
+
+            /* Grid de Datos */
+            .data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 25px; }
+            .card { border: 1px solid #e2e8f0; border-radius: 12px; overflow: hidden; }
+            .card-header { background: ${primaryColor}; color: white; padding: 6px 15px; font-weight: 700; text-transform: uppercase; font-size: 11px; letter-spacing: 0.5px; }
+            .card-body { padding: 12px 15px; background: #fff; }
+            .card-body p { margin: 4px 0; }
+            .label { font-weight: 700; color: #64748b; font-size: 9px; text-transform: uppercase; display: inline-block; width: 80px; }
+
+            /* Cláusulas */
+            .legal-content { text-align: justify; border-top: 1px solid #e2e8f0; padding-top: 20px; }
+            .intro-text { margin-bottom: 20px; font-size: 11px; line-height: 1.6; }
+            .clause { margin-bottom: 12px; padding-left: 5px; }
+            .clause-title { font-weight: 800; color: #0f172a; margin-right: 5px; }
             
-            .signatures { margin-top: 40px; display: grid; grid-template-columns: 1fr 1fr; gap: 80px; text-align: center; }
-            .signature-box { border-top: 1px solid #000; padding-top: 10px; }
+            /* Firmas */
+            .signatures { margin-top: 60px; display: grid; grid-template-columns: 1fr 1fr; gap: 100px; text-align: center; }
+            .sign-box { border-top: 1.5px solid #cbd5e1; padding-top: 12px; }
+            .sign-name { font-weight: 700; font-size: 12px; margin-bottom: 2px; }
+            .sign-role { color: #64748b; font-size: 10px; font-weight: 500; }
+
+            .footer-legal { text-align: center; margin-top: 40px; font-size: 8px; color: #94a3b8; border-top: 1px solid #f1f5f9; padding-top: 15px; }
             
-            .footer-legal { text-align: center; margin-top: 30px; font-size: 7px; color: #aaa; border-top: 1px solid #eee; padding-top: 10px; }
-            
-            @media print { .page { border: none; padding: 20px; } }
+            @media print {
+                body { background: white; }
+                .document { box-shadow: none; margin: 0; width: 100%; }
+            }
         </style>
     </head>
     <body>
-        <div class="page">
+        <div class="document">
             <div class="header">
-                ${agency?.logo_url ? `<img src="${agency.logo_url}" class="logo">` : '<div></div>'}
-                <div class="contract-id-box">
-                    <h1>CONTRATO DE VENTA DE TOUR</h1>
-                    <p>No. Contrato: ${client.contract_number}</p>
-                    <p>Fecha de Emisión: ${dateStr}</p>
+                <div class="agency-brand">
+                    ${agency?.logo_url ? `<img src="${agency.logo_url}" class="logo">` : '<div></div>'}
+                </div>
+                <div class="agency-info">
+                    <h2>${agency?.agency_name || 'Saura Tours'}</h2>
+                    <p>${agency?.agency_address || 'Saltillo, Coahuila, México'}</p>
+                    <p>WhatsApp: ${agency?.agency_phone || 'N/A'}</p>
+                    <p>${agency?.agency_email || 'N/A'}</p>
                 </div>
             </div>
 
-            <div class="intro-text">
-                En la ciudad de Saltillo, Coahuila, México, a <span class="bold">${dateStr}</span>, se celebra el presente contrato de prestación de servicios turísticos entre: 
-                <span class="bold">${agencyName}</span>, con domicilio en ${agencyAddress}, representada por el C. Juan De Dios Saucedo Cortés, en adelante “LA AGENCIA”; y 
-                <span class="bold">${clientFullName}</span>, con domicilio en ${client.address || 'Domicilio Conocido'}, identificado con ${client.identification_number || 'N/A'}, en adelante “EL CLIENTE”.
+            <div class="contract-meta">
+                <div class="folio">CONTRATO DE SERVICIO: #${client.contract_number}</div>
+                <div class="emit-date">EMITIDO EL: ${dateStr}</div>
             </div>
 
-            <div class="info-grid">
-                <div class="data-card">
-                    <h3>Detalles del Tour</h3>
-                    <p><span class="bold">Nombre del Tour:</span> ${tour.title}</p>
-                    <p><span class="bold">Fecha del Tour:</span> ${tourDate}</p>
-                    <p><span class="bold">Duración:</span> ${tour.duration || 'N/A'}</p>
-                    <p><span class="bold">Precio Total:</span> $${client.total_amount.toLocaleString()} MXN</p>
+            <div class="data-grid">
+                <div class="card">
+                    <div class="card-header">Detalles del Tour</div>
+                    <div class="card-body">
+                        <p><span class="label">Destino:</span> <strong>${tour.title}</strong></p>
+                        <p><span class="label">Fecha:</span> <strong>${tourDate}</strong></p>
+                        <p><span class="label">Duración:</span> <strong>${tour.duration || 'N/A'}</strong></p>
+                        <p><span class="label">Inversión:</span> <strong>$${client.total_amount.toLocaleString()} MXN</strong></p>
+                    </div>
                 </div>
-                <div class="data-card">
-                    <h3>Servicios</h3>
-                    <p><span class="bold">Incluye:</span> ${tour.includes?.join(', ') || 'Ver itinerario'}</p>
-                    <p><span class="bold">No incluye:</span> Gastos personales, propinas y servicios no especificados.</p>
+                <div class="card">
+                    <div class="card-header">Datos del Cliente</div>
+                    <div class="card-body">
+                        <p><span class="label">Titular:</span> <strong>${clientFullName}</strong></p>
+                        <p><span class="label">ID:</span> <strong>${client.identification_number || 'N/A'}</strong></p>
+                        <p><span class="label">Teléfono:</span> <strong>${client.phone || 'N/A'}</strong></p>
+                        <p><span class="label">Domicilio:</span> <strong>${client.address || 'Conocido'}</strong></p>
+                    </div>
                 </div>
             </div>
 
-            <div class="clauses-section">
-                <div class="clause">
-                    <span class="clause-num">1. OBJETO DEL CONTRATO:</span> LA AGENCIA se compromete a coordinar y poner a disposición de EL CLIENTE el tour denominado ${tour.title}, con las características detalladas en este documento e itinerarios compartidos.
+            <div class="legal-content">
+                <div class="intro-text">
+                    En la ciudad de Saltillo, Coahuila, México, se celebra el presente contrato de prestación de servicios turísticos entre <strong>${agency?.agency_name || 'Saura Tours'}</strong>, representada por el C. <strong>Juan De Dios Saucedo Cortés</strong>, en adelante “LA AGENCIA”; y el ciudadano <strong>${clientFullName}</strong>, en adelante “EL CLIENTE”.
                 </div>
-                <div class="clause">
-                    <span class="clause-num">2. NATURALEZA DEL SERVICIO:</span> LA AGENCIA actúa únicamente como coordinadora de servicios turísticos, contratando servicios con proveedores independientes. EL CLIENTE acepta que cada servicio está sujeto a los términos de dichos proveedores.
-                </div>
-                <div class="clause">
-                    <span class="clause-num">3. EXCLUSIÓN DE RESPONSABILIDAD:</span> LA AGENCIA no será responsable por situaciones de fuerza mayor, desastres naturales, accidentes, averías mecánicas o cancelaciones de proveedores. EL CLIENTE libera a LA AGENCIA de responsabilidad por daños o lesiones.
-                </div>
-                <div class="clause">
-                    <span class="clause-num">4. CANCELACIONES Y REEMBOLSOS:</span> <span class="bold">Por parte del CLIENTE: No habrá reembolso en caso de cancelación.</span> Se puede traspasar el lugar notificando con 48 horas de anticipación. Por parte de LA AGENCIA: Reembolso o reprogramación si es causa imputable a la misma.
-                </div>
-                <div class="clause">
-                    <span class="clause-num">5. PAGOS Y PENALIZACIONES:</span> El servicio debe pagarse totalmente en la fecha límite. Los anticipos son no reembolsables. Los pagos solo son válidos a cuentas oficiales de LA AGENCIA.
-                </div>
-                <div class="clause">
-                    <span class="clause-num">6. OBLIGACIONES DEL CLIENTE:</span> Puntualidad absoluta, contar con identificaciones vigentes, respetar normas de conducta y seguridad, y cubrir gastos personales.
-                </div>
-                <div class="clause">
-                    <span class="clause-num">7. CESIÓN DE DERECHOS Y USO DE IMAGEN:</span> EL CLIENTE autoriza el uso de fotos o videos del tour para fines publicitarios.
-                </div>
-                <div class="clause">
-                    <span class="clause-num">8. SEGUROS Y COBERTURA:</span> Los servicios no incluyen seguros médicos privados salvo que se especifique. El seguro de viajero es de responsabilidad del transportista.
-                </div>
-                <div class="clause">
-                    <span class="clause-num">9. CONFIDENCIALIDAD:</span> LA AGENCIA protege los datos personales conforme a la Ley Federal de Protección de Datos Personales.
-                </div>
-                <div class="clause">
-                    <span class="clause-num">10. COMUNICACIÓN OFICIAL:</span> Solo son válidas comunicaciones por escrito (WhatsApp corporativo o Email). Lo verbal no tiene valor contractual.
-                </div>
-                <div class="clause">
-                    <span class="clause-num">11. SUCESIÓN Y CESIÓN:</span> No se pueden transferir derechos sin autorización. LA AGENCIA puede ceder derechos en caso de reestructuración.
-                </div>
-                <div class="clause">
-                    <span class="clause-num">12. PROPIEDAD INTELECTUAL:</span> Imágenes y marcas de Saura Tours son propiedad exclusiva de la empresa.
-                </div>
-                <div class="clause">
-                    <span class="clause-num">13. LEY APLICABLE Y JURISDICCIÓN:</span> Las partes se someten a las leyes y tribunales de la ciudad de Saltillo, Coahuila.
-                </div>
-                <div class="clause">
-                    <span class="clause-num">14. CLÁUSULA SUPLETORIA:</span> La nulidad de una cláusula no afecta la validez de las demás.
-                </div>
+
+                <div class="clause"><span class="clause-title">1. OBJETO DEL CONTRATO:</span> LA AGENCIA se compromete a coordinar y poner a disposición de EL CLIENTE el tour mencionado en este documento, con las características de itinerario y servicios aquí descritos.</div>
+                <div class="clause"><span class="clause-title">2. NATURALEZA DEL SERVICIO:</span> LA AGENCIA actúa únicamente como coordinadora de servicios turísticos, contratando con proveedores independientes. EL CLIENTE acepta los términos de dichos proveedores. LA AGENCIA no es responsable de fallas atribuibles a terceros.</div>
+                <div class="clause"><span class="clause-title">3. EXCLUSIÓN DE RESPONSABILIDAD:</span> LA AGENCIA no responde por fuerza mayor (desastres, pandemias, cierres viales) ni fallas mecánicas de terceros. EL CLIENTE libera a LA AGENCIA de responsabilidad por daños o pérdidas, salvo negligencia directa comprobada.</div>
+                <div class="clause"><span class="clause-title">4. CANCELACIONES Y REEMBOLSOS:</span> Por parte del CLIENTE: No hay reembolsos; el lugar es traspasable avisando 48h antes. Por parte de LA AGENCIA: Reembolso en 90 días o reprogramación de 1 año si la causa le es imputable.</div>
+                <div class="clause"><span class="clause-title">5. PAGOS Y PENALIZACIONES:</span> El servicio debe liquidarse en la fecha límite. La falta de pago faculta a la cancelación sin reembolso. Los anticipos no son reembolsables bajo ninguna circunstancia.</div>
+                <div class="clause"><span class="clause-title">6. OBLIGACIONES DEL CLIENTE:</span> Puntualidad, portar documentación vigente, respetar normas de conducta y seguridad, y cubrir gastos personales no incluidos expresamente.</div>
+                <div class="clause"><span class="clause-title">7. CESIÓN DE DERECHOS Y USO DE IMAGEN:</span> EL CLIENTE autoriza el uso de material audiovisual tomado en el tour para fines publicitarios. LA AGENCIA no asume cargos por cesiones de lugar entre particulares.</div>
+                <div class="clause"><span class="clause-title">8. SEGUROS Y COBERTURA:</span> Los servicios no incluyen gastos médicos privados. El seguro de viajero es responsabilidad exclusiva de la empresa transportista contratada.</div>
+                <div class="clause"><span class="clause-title">9. CONFIDENCIALIDAD:</span> LA AGENCIA protege los datos personales conforme a la Ley Federal de Protección de Datos Personales en Posesión de los Particulares.</div>
+                <div class="clause"><span class="clause-title">10. COMUNICACIÓN OFICIAL:</span> Solo son válidas comunicaciones por escrito (WhatsApp corporativo o Email). Acuerdos verbales no tienen validez legal.</div>
+                <div class="clause"><span class="clause-title">11. SUCESIÓN Y CESIÓN:</span> EL CLIENTE no puede transferir derechos sin permiso. LA AGENCIA puede ceder derechos en caso de reestructuración corporativa.</div>
+                <div class="clause"><span class="clause-title">12. PROPIEDAD INTELECTUAL:</span> Marcas, logos y material publicitario son propiedad exclusiva de Saura Tours. Queda prohibida su reproducción.</div>
+                <div class="clause"><span class="clause-title">13. LEY APLICABLE Y JURISDICCIÓN:</span> Para cualquier controversia, las partes se someten a los tribunales de la ciudad de Saltillo, Coahuila, México.</div>
+                <div class="clause"><span class="clause-title">14. CLÁUSULA SUPLETORIA:</span> La invalidez de una cláusula no afecta la vigencia y obligatoriedad del resto del contrato.</div>
             </div>
 
             <div class="signatures">
-                <div class="signature-box">
-                    <p class="bold">Juan De Dios Saucedo Cortés</p>
-                    <p>Representante Legal<br>“LA AGENCIA”</p>
+                <div class="sign-box">
+                    <div class="sign-name">Juan De Dios Saucedo Cortés</div>
+                    <div class="sign-role">Representante Legal - LA AGENCIA</div>
                 </div>
-                <div class="signature-box">
-                    <p class="bold">${clientFullName}</p>
-                    <p>“El Cliente”</p>
+                <div class="sign-box">
+                    <div class="sign-name">${clientFullName}</div>
+                    <div class="sign-role">EL CLIENTE</div>
                 </div>
             </div>
 
             <div class="footer-legal">
-                Documento generado electrónicamente por el sistema administrativo de Saura Tours. Saltillo, Coahuila.
+                Documento legal emitido por Saura Tours. Saltillo, Coahuila. Prohibida su reproducción total o parcial.
             </div>
         </div>
     </body>
