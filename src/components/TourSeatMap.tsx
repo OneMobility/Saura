@@ -50,58 +50,58 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
   const fetchSeats = useCallback(async () => {
     setLoading(true);
     
-    if (!isValidUUID(tourId)) {
-      const allSeats: Seat[] = [];
-      const currentLayout = seatLayoutJson || [];
-      currentLayout.forEach(row => {
-        row.forEach(item => {
-          if (item.type === 'seat' && item.number !== undefined) {
-            // Asignar cortesía automáticamente a los primeros X asientos si es tour nuevo
-            const isCourtesy = item.number <= courtesies;
-            allSeats.push({ 
-              seat_number: item.number, 
-              status: isCourtesy ? 'courtesy' : 'available', 
-              client_id: null 
-            });
-          }
-        });
-      });
-      setSeats(allSeats.sort((a, b) => a.seat_number - b.seat_number));
-      setLoading(false);
-      return;
-    }
-
-    const { data, error } = await supabase
-      .from('tour_seat_assignments')
-      .select('*')
-      .eq('tour_id', tourId);
-
-    if (error) {
-      toast.error('Error al cargar disponibilidad.');
-    } else {
-      const fetchedAssignments = data || [];
-      const allSeats: Seat[] = [];
-      const currentLayout = seatLayoutJson || [];
+    let fetchedAssignments: any[] = [];
+    if (isValidUUID(tourId)) {
+      const { data, error } = await supabase
+        .from('tour_seat_assignments')
+        .select('*')
+        .eq('tour_id', tourId);
       
-      if (currentLayout.length > 0) {
-        currentLayout.forEach(row => {
-          row.forEach(item => {
-            if (item.type === 'seat' && item.number !== undefined) {
-              const existing = fetchedAssignments.find(s => s.seat_number === item.number);
-              // Lógica: Si no hay en DB pero es de los primeros X, es cortesía
-              const isDefaultCourtesy = !existing && item.number <= courtesies;
-              
-              allSeats.push({
-                seat_number: item.number,
-                status: isDefaultCourtesy ? 'courtesy' : ((existing?.status || 'available') as Seat['status']),
-                client_id: existing?.client_id || null,
-              });
-            }
-          });
-        });
-      }
-      setSeats(allSeats.sort((a, b) => a.seat_number - b.seat_number));
+      if (!error) fetchedAssignments = data || [];
+      else toast.error('Error al cargar disponibilidad.');
     }
+
+    const currentLayout = seatLayoutJson || [];
+    const seatNumbers: number[] = [];
+    
+    // 1. Extraer todos los números de asiento físicos presentes en el layout
+    currentLayout.forEach(row => {
+      row.forEach(item => {
+        if (item.type === 'seat' && item.number !== undefined) {
+          seatNumbers.push(item.number);
+        }
+      });
+    });
+    
+    // Ordenar numéricamente para la lógica de asignación
+    seatNumbers.sort((a, b) => a - b);
+
+    // 2. Mapear estados base (vendidos o bloqueados)
+    const baseSeats = seatNumbers.map(num => {
+      const dbEntry = fetchedAssignments.find(s => s.seat_number === num);
+      return {
+        seat_number: num,
+        status: (dbEntry?.status || 'available') as Seat['status'],
+        client_id: dbEntry?.client_id || null
+      };
+    });
+
+    // 3. Aplicar lógica de cortesías sobre los asientos NO vendidos
+    let courtesyCount = 0;
+    const finalSeats = baseSeats.map(s => {
+      // Si ya está vendido a un cliente, se queda como 'booked'
+      if (s.status === 'booked') return s;
+
+      // Si aún necesitamos cortesías, este asiento disponible se convierte en cortesía
+      if (courtesyCount < courtesies) {
+        courtesyCount++;
+        return { ...s, status: 'courtesy' as const };
+      }
+
+      return s;
+    });
+
+    setSeats(finalSeats);
     setLoading(false);
   }, [tourId, seatLayoutJson, courtesies]);
 
@@ -121,8 +121,8 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
         toast.info('Asiento reservado por cliente.');
         return;
       }
-      if (seatNumber <= courtesies) {
-        toast.info('Asiento reservado para Coordinadores.');
+      if (currentStatus === 'courtesy') {
+        toast.info('Asiento reservado para Coordinadores por sistema.');
         return;
       }
 
