@@ -24,7 +24,7 @@ const TourInquirySection = () => {
   const [loading, setLoading] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [isDownloading, setIsDownloading] = useState<string | null>(null);
-  const [agencySettings, setAgencySettings] = useState<AgencySettings | null>(null); // NEW: Agency settings state
+  const [agencySettings, setAgencySettings] = useState<AgencySettings | null>(null);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -89,7 +89,8 @@ const TourInquirySection = () => {
         body: { 
           clientId: contractDetails.id, 
           amount: remaining, 
-          description: `Abono Contrato: ${contractDetails.contract_number}` 
+          description: `Abono Contrato: ${contractDetails.contract_number}`,
+          contractNumber: contractDetails.contract_number
         }
       });
       if (error) throw error;

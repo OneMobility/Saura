@@ -14,6 +14,8 @@ import BlogPostPage from "./pages/BlogPostPage";
 import ToursPage from "./pages/ToursPage";
 import ContactPage from "./pages/ContactPage";
 import BusTicketsPage from "./pages/BusTicketsPage";
+import PaymentSuccessPage from "./pages/PaymentSuccessPage";
+import PaymentFailurePage from "./pages/PaymentFailurePage";
 
 // Admin Pages
 import AdminDashboard from "./pages/AdminDashboard";
@@ -107,6 +109,9 @@ const App = () => {
               <Route path="/blog/:id" element={<BlogPostPage />} />
               <Route path="/contact" element={<ContactPage />} />
               
+              <Route path="/payment-success" element={<PaymentSuccessPage />} />
+              <Route path="/payment-failure" element={<PaymentFailurePage />} />
+
               <Route path="/bus-tickets" element={<BusTicketsPage />} />
               <Route path="/bus-tickets/destinations" element={<DestinationsPage />} />
               <Route path="/bus-tickets/about" element={<AboutUsPage />} />

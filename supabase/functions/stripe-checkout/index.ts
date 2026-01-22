@@ -21,9 +21,6 @@ serve(async (req) => {
     const { data: settings } = await supabaseAdmin.from('agency_settings').select('*').single();
     const isProduction = settings?.payment_mode === 'production';
     
-    // Selección de llave basada en tus secretos de Supabase:
-    // Si el interruptor está en Producción, usa 'stripe live'.
-    // Si está en Test/Sandbox, usa 'stripe'.
     const STRIPE_SECRET_KEY = isProduction
       ? Deno.env.get('stripe live')
       : Deno.env.get('stripe');
@@ -55,8 +52,8 @@ serve(async (req) => {
         quantity: 1,
       }],
       mode: 'payment',
-      success_url: `${req.headers.get("origin")}/bus-tickets/confirmation/${contractNumber}`,
-      cancel_url: `${req.headers.get("origin")}/tours`,
+      success_url: `${req.headers.get("origin")}/payment-success?contract=${contractNumber}`,
+      cancel_url: `${req.headers.get("origin")}/payment-failure`,
       client_reference_id: clientId,
     });
 

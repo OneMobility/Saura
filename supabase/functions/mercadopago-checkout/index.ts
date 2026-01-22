@@ -10,18 +10,16 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const { clientId, amount, description } = await req.json();
+    const { clientId, amount, description, contractNumber } = await req.json();
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Obtener modo de pago (test/production)
     const { data: settings } = await supabaseAdmin.from('agency_settings').select('*').single();
     const isTestMode = settings?.payment_mode === 'test';
     
-    // Selección de token según el modo
     const MP_ACCESS_TOKEN = isTestMode 
       ? Deno.env.get('MP_TEST_ACCESS_TOKEN') 
       : Deno.env.get('MP_ACCESS_TOKEN');
@@ -50,7 +48,7 @@ serve(async (req) => {
         }],
         external_reference: clientId,
         back_urls: {
-          success: `${req.headers.get("origin")}/payment-success`,
+          success: `${req.headers.get("origin")}/payment-success?contract=${contractNumber}`,
           failure: `${req.headers.get("origin")}/payment-failure`,
         },
         auto_return: "approved",
