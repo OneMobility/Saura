@@ -6,8 +6,11 @@ import { Button } from '@/components/ui/button';
 import { useNavigate, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { getGreeting } from '@/utils/greetings';
-import { Sun, CloudSun, Moon, Bell, Mail, UserPlus, ArrowRight, Circle } from 'lucide-react';
+import { Sun, CloudSun, Moon, Bell, Mail, UserPlus, ArrowRight, Circle, Check, Package, MessageSquareText } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 interface AdminHeaderProps {
   pageTitle: string;
@@ -23,30 +26,34 @@ const iconMap: { [key: string]: React.ElementType } = {
 const AdminHeader: React.FC<AdminHeaderProps> = ({ pageTitle, children }) => {
   const { firstName, lastName } = useSession();
   const navigate = useNavigate();
-  const [unreadMessages, setUnreadMessages] = useState(0);
-  const [recentClients, setRecentClients] = useState<any[]>([]);
+  const [unreadMessages, setUnreadMessages] = useState<any[]>([]);
+  const [unreadClients, setUnreadClients] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const fetchNotifications = async () => {
+    // Fetch Unread Messages (Formularios)
+    const { data: messages } = await supabase
+      .from('contact_messages')
+      .select('id, name, created_at, status')
+      .eq('status', 'unread')
+      .order('created_at', { ascending: false });
+    setUnreadMessages(messages || []);
+
+    // Fetch Unread Clients (Reservas)
+    const { data: clients } = await supabase
+      .from('clients')
+      .select('id, first_name, last_name, contract_number, created_at, is_read')
+      .eq('is_read', false)
+      .order('created_at', { ascending: false });
+    setUnreadClients(clients || []);
+  };
 
   useEffect(() => {
-    const fetchNotifications = async () => {
-      const { count } = await supabase
-        .from('contact_messages')
-        .select('*', { count: 'exact', head: true })
-        .eq('status', 'unread');
-      setUnreadMessages(count || 0);
-
-      const { data } = await supabase
-        .from('clients')
-        .select('id, first_name, last_name, contract_number')
-        .order('created_at', { ascending: false })
-        .limit(3);
-      setRecentClients(data || []);
-    };
-    
     fetchNotifications();
     
-    const channel = supabase.channel('admin-notifs')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'contact_messages' }, () => fetchNotifications())
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'clients' }, () => fetchNotifications())
+    const channel = supabase.channel('admin-notifs-realtime')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'contact_messages' }, () => fetchNotifications())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => fetchNotifications())
       .subscribe();
 
     return () => { 
@@ -59,9 +66,29 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ pageTitle, children }) => {
     navigate('/login'); 
   };
 
+  const markMessageAsRead = async (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const { error } = await supabase.from('contact_messages').update({ status: 'read' }).eq('id', id);
+    if (!error) {
+      setUnreadMessages(prev => prev.filter(m => m.id !== id));
+      toast.success("Mensaje marcado como leído");
+    }
+  };
+
+  const markClientAsRead = async (e: React.MouseEvent, id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const { error } = await supabase.from('clients').update({ is_read: true }).eq('id', id);
+    if (!error) {
+      setUnreadClients(prev => prev.filter(c => c.id !== id));
+      toast.success("Reserva marcada como vista");
+    }
+  };
+
   const { greetingPart, namePart, icon: greetingIconName } = getGreeting(firstName, lastName);
   const GreetingIcon = iconMap[greetingIconName] || Sun;
-  const totalNotifs = unreadMessages + recentClients.length;
+  const totalNotifs = unreadMessages.length + unreadClients.length;
 
   return (
     <header className="bg-white shadow-sm p-4 sticky top-0 z-40">
@@ -86,40 +113,70 @@ const AdminHeader: React.FC<AdminHeaderProps> = ({ pageTitle, children }) => {
               </Button>
             </PopoverTrigger>
             <PopoverContent className="w-80 p-0 rounded-2xl shadow-2xl border-none overflow-hidden" align="end">
-              <div className="bg-gray-900 p-4 text-white">
-                <h3 className="font-bold flex items-center gap-2">
-                  <Bell className="h-4 w-4 text-rosa-mexicano" /> Notificaciones
+              <div className="bg-gray-900 p-4 text-white flex justify-between items-center">
+                <h3 className="font-bold flex items-center gap-2 text-sm">
+                  <Bell className="h-4 w-4 text-rosa-mexicano" /> Centro de Avisos
                 </h3>
+                <Badge className="bg-rosa-mexicano text-[10px] font-black">{totalNotifs} Pendientes</Badge>
               </div>
-              <div className="max-h-[400px] overflow-auto">
-                {unreadMessages > 0 && (
-                  <Link to="/admin/contacto" className="flex items-center gap-3 p-4 hover:bg-gray-50 border-b transition-colors group">
-                    <div className="bg-rosa-mexicano/10 p-2 rounded-full text-rosa-mexicano">
-                      <Mail className="h-4 w-4" />
-                    </div>
-                    <div className="flex-grow">
-                      <p className="text-sm font-bold">Mensajes sin leer</p>
-                      <p className="text-xs text-gray-500">Tienes {unreadMessages} mensajes nuevos esperando respuesta.</p>
-                    </div>
-                    <ArrowRight className="h-4 w-4 text-gray-300 group-hover:text-rosa-mexicano" />
-                  </Link>
-                )}
-                {recentClients.map(c => (
-                  <Link key={c.id} to={`/admin/clients/edit/${c.id}`} className="flex items-center gap-3 p-4 hover:bg-gray-50 border-b transition-colors group">
-                    <div className="bg-blue-50 p-2 rounded-full text-blue-600">
+              
+              <div className="max-h-[450px] overflow-auto bg-gray-50">
+                {/* SECCIÓN RESERVAS */}
+                <div className="p-2 bg-gray-100/50 text-[10px] font-black uppercase tracking-widest text-gray-500 border-b flex items-center gap-1.5">
+                  <Package className="h-3 w-3" /> Reservas ({unreadClients.length})
+                </div>
+                {unreadClients.length > 0 ? unreadClients.map(c => (
+                  <div key={c.id} className="group relative flex items-center gap-3 p-4 bg-white hover:bg-rosa-mexicano/5 border-b transition-colors">
+                    <div className="bg-blue-50 p-2 rounded-full text-blue-600 shrink-0">
                       <UserPlus className="h-4 w-4" />
                     </div>
-                    <div className="flex-grow">
-                      <p className="text-sm font-bold">Nueva Reserva: {c.contract_number}</p>
-                      <p className="text-xs text-gray-500">{c.first_name} {c.last_name}</p>
+                    <Link to={`/admin/clients/edit/${c.id}`} className="flex-grow min-w-0">
+                      <p className="text-xs font-black truncate">Reserva: {c.contract_number}</p>
+                      <p className="text-[10px] text-gray-500 truncate">{c.first_name} {c.last_name}</p>
+                    </Link>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={(e) => markClientAsRead(e, c.id)}
+                      className="h-8 w-8 text-gray-300 hover:text-green-600 hover:bg-green-50 rounded-full shrink-0"
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )) : (
+                  <div className="p-4 text-center text-[10px] text-gray-400 italic">Sin reservas nuevas</div>
+                )}
+
+                {/* SECCIÓN FORMULARIOS */}
+                <div className="p-2 bg-gray-100/50 text-[10px] font-black uppercase tracking-widest text-gray-500 border-b border-t flex items-center gap-1.5">
+                  <MessageSquareText className="h-3 w-3" /> Formularios ({unreadMessages.length})
+                </div>
+                {unreadMessages.length > 0 ? unreadMessages.map(m => (
+                  <div key={m.id} className="group relative flex items-center gap-3 p-4 bg-white hover:bg-rosa-mexicano/5 border-b transition-colors">
+                    <div className="bg-rosa-mexicano/10 p-2 rounded-full text-rosa-mexicano shrink-0">
+                      <Mail className="h-4 w-4" />
                     </div>
-                    <ArrowRight className="h-4 w-4 text-gray-300 group-hover:text-blue-600" />
-                  </Link>
-                ))}
+                    <Link to={`/admin/contacto`} className="flex-grow min-w-0">
+                      <p className="text-xs font-black truncate">{m.name}</p>
+                      <p className="text-[10px] text-gray-500">Nuevo mensaje de contacto</p>
+                    </Link>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      onClick={(e) => markMessageAsRead(e, m.id)}
+                      className="h-8 w-8 text-gray-300 hover:text-green-600 hover:bg-green-50 rounded-full shrink-0"
+                    >
+                      <Check className="h-4 w-4" />
+                    </Button>
+                  </div>
+                )) : (
+                  <div className="p-4 text-center text-[10px] text-gray-400 italic">Sin mensajes nuevos</div>
+                )}
+                
                 {totalNotifs === 0 && (
-                  <div className="p-8 text-center text-gray-400">
-                    <Circle className="h-8 w-8 mx-auto mb-2 opacity-20" />
-                    <p className="text-sm">Todo al día por aquí.</p>
+                  <div className="p-10 text-center text-gray-400">
+                    <Circle className="h-10 w-10 mx-auto mb-2 opacity-10" />
+                    <p className="text-xs font-bold uppercase tracking-tighter">Todo al día</p>
                   </div>
                 )}
               </div>
