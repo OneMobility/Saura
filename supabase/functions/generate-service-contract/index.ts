@@ -1,6 +1,6 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
-import { format } from 'https://esm.sh/date-fns@2.30.0';
+import { format, parseISO } from 'https://esm.sh/date-fns@2.30.0';
 import es from 'https://esm.sh/date-fns@2.30.0/locale/es';
 
 const corsHeaders = {
@@ -15,11 +15,12 @@ const generateServiceContractHtml = (data: any) => {
   const contractDate = format(new Date(client.created_at), 'dd/MM/yyyy', { locale: es });
   
   const isTour = !!client.tour_id;
-  const title = isTour ? tour?.title : `Boleto de Autobús: ${busRoute?.name}`;
-  const description = isTour ? tour?.description : 'Servicio de transporte terrestre.';
-  const duration = isTour ? tour?.duration : 'Viaje sencillo';
+  const title = isTour ? tour?.title : `Boleto de Autobús: ${busRoute?.name || 'N/A'}`;
+  const description = isTour ? (tour?.description || 'N/A') : 'Servicio de transporte terrestre.';
+  const duration = isTour ? (tour?.duration || 'N/A') : 'Viaje sencillo';
   const includes = isTour ? (tour?.includes?.join(', ') || 'N/A') : 'Transporte y seguro de viajero.';
   const notIncludes = isTour ? 'Gastos personales, comidas no especificadas, propinas.' : 'Gastos personales, comidas, hospedaje.';
+  const departureDate = isTour ? (client.tours?.departure_date ? format(parseISO(client.tours.departure_date), 'dd/MM/yyyy', { locale: es }) : 'N/A') : 'N/A';
 
   let seatNumbers = "";
   if (isTour) {
@@ -70,7 +71,7 @@ const generateServiceContractHtml = (data: any) => {
 
         <div class="section">
             <p class="section-title">1. OBJETO DEL CONTRATO</p>
-            <p class="clause">LA AGENCIA se compromete a coordinar y poner a disposición de EL CLIENTE el tour denominado <span class="bold">${title}</span>, que se llevará a cabo el día <span class="bold">${client.tours?.departure_date ? format(parseISO(client.tours.departure_date), 'dd/MM/yyyy', { locale: es }) : 'N/A'}</span>, con las siguientes características:</p>
+            <p class="clause">LA AGENCIA se compromete a coordinar y poner a disposición de EL CLIENTE el tour denominado <span class="bold">${title}</span>, que se llevará a cabo el día <span class="bold">${departureDate}</span>, con las siguientes características:</p>
             <table class="details-table">
                 <tr><td class="label">Destino / Itinerario:</td><td>${description}</td></tr>
                 <tr><td class="label">Duración:</td><td>${duration}</td></tr>
@@ -163,7 +164,7 @@ const generateServiceContractHtml = (data: any) => {
         </div>
 
         <div class="footer-info">
-            <p>${agency?.agency_address || ''} | WhatsApp: ${agency?.agency_phone || ''} | Email: ${agency?.agency_email || ''}</p>
+            <p>${agency?.agency_address || 'N/A'} | WhatsApp: ${agency?.agency_phone || 'N/A'} | Email: ${agency?.agency_email || 'N/A'}</p>
             <p>Este documento es un comprobante oficial de su reservación.</p>
         </div>
     </body>
@@ -176,20 +177,34 @@ serve(async (req) => {
   try {
     const { contractNumber } = await req.json();
     const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
-    const { data: client, error: clientError } = await supabaseAdmin.from('clients').select(`*, tours (*), bus_routes (*)`).ilike('contract_number', contractNumber.trim()).single();
+    
+    // Fetch client data with nested tour/route details
+    const { data: client, error: clientError } = await supabaseAdmin.from('clients').select(`
+      *, 
+      tours (*), 
+      bus_routes (*)
+    `).ilike('contract_number', contractNumber.trim()).single();
+    
     if (clientError || !client) throw new Error("Contrato no encontrado.");
+    
+    // Fetch agency settings
     const { data: agency } = await supabaseAdmin.from('agency_settings').select('*').single();
+    
     let tourSeats = [], busPassengers = [];
+    
+    // Fetch seats/passengers based on type of booking
     if (client.tour_id) {
       const { data } = await supabaseAdmin.from('tour_seat_assignments').select('seat_number').eq('client_id', client.id);
       tourSeats = data || [];
-    } else {
+    } else if (client.bus_route_id) {
       const { data } = await supabaseAdmin.from('bus_passengers').select('seat_number').eq('client_id', client.id);
       busPassengers = data || [];
     }
+    
     const html = generateServiceContractHtml({ client, tour: client.tours, busRoute: client.bus_routes, agency, tourSeats, busPassengers });
     return new Response(html, { headers: { ...corsHeaders, 'Content-Type': 'text/html' } });
   } catch (error: any) {
+    console.error("[generate-service-contract] Error:", error.message);
     return new Response(JSON.stringify({ error: error.message }), { status: 400, headers: corsHeaders });
   }
 });
