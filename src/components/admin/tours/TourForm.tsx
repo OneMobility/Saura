@@ -125,7 +125,6 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     fetchData();
   }, []);
 
-  // Lógica para agrupar hoteles en el select
   const groupedAndSortedQuotes = useMemo(() => {
     const groups: Record<string, HotelQuote[]> = {};
     availableHotelQuotes.forEach(quote => {
@@ -180,10 +179,10 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
     
     const projectedProfit = currentRevenue - totalCost;
 
-    // Punto de equilibrio
-    const beQuad = Math.ceil(totalCost / (formData.selling_price_quad_occupancy || 1));
-    const beTriple = Math.ceil(totalCost / (formData.selling_price_triple_occupancy || 1));
-    const beDouble = Math.ceil(totalCost / (formData.selling_price_double_occupancy || 1));
+    // Punto de equilibrio - Evitar división por cero
+    const beQuad = formData.selling_price_quad_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_quad_occupancy) : 0;
+    const beTriple = formData.selling_price_triple_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_triple_occupancy) : 0;
+    const beDouble = formData.selling_price_double_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_double_occupancy) : 0;
 
     const targetRevenue = totalCost + desiredProfitFixed;
     const avgRequiredPerPerson = capacity > 0 ? targetRevenue / capacity : 0;
@@ -354,7 +353,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
           </div>
 
           <div className="p-6 bg-gray-900 rounded-3xl text-white shadow-2xl">
-            <h3 className="text-lg font-bold mb-6">Proyección de Utilidad</h3>
+            <h3 className="text-lg font-bold mb-6">Proyección de Utilidad Real</h3>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
               {['double', 'triple', 'quad', 'child'].map((type) => (
                 <div key={type} className="space-y-2">
@@ -418,7 +417,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
 
                 <div className="grid grid-cols-2 gap-4 pt-4 border-t">
                   <div className="space-y-2">
-                    <Label>Coordinadores (No pagan)</Label>
+                    <Label>Coordinadores (Cortesías)</Label>
                     <Input type="number" id="courtesies" value={formData.courtesies} onChange={handleChange} />
                   </div>
                   <div className="space-y-2">
@@ -444,7 +443,7 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
                               <SelectLabel className="bg-muted py-1 px-2 text-rosa-mexicano font-bold">{name}</SelectLabel>
                               {quotes.map(q => (
                                 <SelectItem key={q.id} value={q.id}>
-                                  ${q.estimated_total_cost.toFixed(0)} ({format(parseISO(q.quoted_date!), 'dd/MM/yy')})
+                                  ${q.estimated_total_cost.toFixed(0)} ({format(parseISO(q.quoted_date!), 'dd/MM')})
                                 </SelectItem>
                               ))}
                             </SelectGroup>
@@ -613,9 +612,12 @@ const TourForm: React.FC<{ tourId?: string; onSave: () => void }> = ({ tourId, o
 
         <div className="fixed bottom-6 right-6 flex gap-4 z-50">
           <Button type="button" variant="outline" onClick={() => navigate('/admin/tours')} className="bg-white shadow-lg px-6 h-12">Cancelar</Button>
-          <Button type="submit" disabled={isSubmitting} className="bg-rosa-mexicano text-white shadow-lg px-10 h-12 text-lg font-bold rounded-xl">
-            {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
-            {tourId ? 'Actualizar Tour' : 'Publicar Tour'}
+          <Button type="submit" disabled={isSubmitting || isUploadingImage} className="bg-rosa-mexicano text-white shadow-lg px-10 h-12 text-lg font-bold rounded-xl">
+            {isSubmitting || isUploadingImage ? (
+              <><Loader2 className="animate-spin mr-2" /> {isUploadingImage ? 'Subiendo imagen...' : 'Guardando...'}</>
+            ) : (
+              <><Save className="mr-2" /> {tourId ? 'Actualizar Tour' : 'Publicar Tour'}</>
+            )}
           </Button>
         </div>
       </form>
