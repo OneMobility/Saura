@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,332 +8,123 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, Info, Users, Handshake, Armchair, MapPin, DollarSign, CalendarDays, Wallet, List } from 'lucide-react';
+import { Loader2, Save, Info, Users, Armchair, MapPin, DollarSign, Hotel, List } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
 import TourSeatMap from '@/components/TourSeatMap';
-import { TourProviderService, AvailableProvider, SeatLayout } from '@/types/shared';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import ClientPaymentHistoryTable from '@/components/admin/clients/ClientPaymentHistoryTable';
-
-interface Companion {
-  id: string;
-  name: string;
-  age: number | null;
-}
-
-interface RoomDetails {
-  double_rooms: number;
-  triple_rooms: number;
-  quad_rooms: number;
-}
-
-interface Client {
-  id?: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  phone: string;
-  address: string;
-  contract_number: string;
-  identification_number: string | null;
-  tour_id: string | null;
-  bus_route_id: string | null;
-  number_of_people: number;
-  companions: Companion[];
-  extra_services: TourProviderService[];
-  total_amount: number;
-  advance_payment: number;
-  total_paid: number;
-  status: string;
-  contractor_age: number | null;
-  room_details: RoomDetails;
-}
-
-interface Tour {
-  id: string;
-  title: string;
-  selling_price_double_occupancy: number;
-  selling_price_triple_occupancy: number;
-  selling_price_quad_occupancy: number;
-  selling_price_child: number;
-  bus_id: string | null;
-  courtesies: number;
-  bus_capacity: number;
-}
-
-interface Bus {
-  id: string;
-  name: string;
-  total_capacity: number;
-  seat_layout_json: SeatLayout | null;
-}
-
-const allocateRoomsForPeople = (totalPeople: number): RoomDetails => {
-  let double = 0, triple = 0, quad = 0, remaining = totalPeople;
-  if (remaining <= 0) return { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 };
-  quad = Math.floor(remaining / 4);
-  remaining %= 4;
-  if (remaining === 3) triple++;
-  else if (remaining === 2) double++;
-  else if (remaining === 1) { if (quad > 0) { quad--; triple++; double++; } else { double++; } }
-  return { double_rooms: double, triple_rooms: triple, quad_rooms: quad };
-};
 
 const AdminClientFormPage = () => {
   const { id: clientIdFromParams } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { user, isAdmin, isLoading: sessionLoading } = useSession();
 
-  const [formData, setFormData] = useState<Client>({
+  const [formData, setFormData] = useState<any>({
     first_name: '', last_name: '', email: '', phone: '', address: '',
     contract_number: uuidv4().substring(0, 8).toUpperCase(),
-    identification_number: null, tour_id: null, bus_route_id: null,
-    number_of_people: 0, companions: [], extra_services: [],
-    total_amount: 0, advance_payment: 0, total_paid: 0, status: 'pending',
-    contractor_age: null, room_details: { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }
+    identification_number: null, tour_id: null,
+    companions: [], total_amount: 0, total_paid: 0, status: 'pending',
+    contractor_age: null
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [loadingInitialData, setLoadingInitialData] = useState(true);
-  const [availableTours, setAvailableTours] = useState<Tour[]>([]);
-  const [availableBuses, setAvailableBuses] = useState<Bus[]>([]);
+  const [availableTours, setAvailableTours] = useState<any[]>([]);
+  const [availableBuses, setAvailableBuses] = useState<any[]>([]);
   const [clientSelectedSeats, setClientSelectedSeats] = useState<number[]>([]);
-  const [advancePerPerson, setAdvancePerPerson] = useState(0);
-  
-  const [counts, setCounts] = useState({ adults: 0, children: 0 });
+  const [roomsCount, setRoomsCount] = useState(0);
 
   useEffect(() => {
-    const fetchDependencies = async () => {
-      const [toursRes, busesRes, settingsRes] = await Promise.all([
+    const fetchDeps = async () => {
+      const [toursRes, busesRes] = await Promise.all([
         supabase.from('tours').select('*').order('title', { ascending: true }),
-        supabase.from('buses').select('*').order('name', { ascending: true }),
-        supabase.from('agency_settings').select('advance_payment_amount').single()
+        supabase.from('buses').select('*')
       ]);
-
       if (toursRes.data) setAvailableTours(toursRes.data);
       if (busesRes.data) setAvailableBuses(busesRes.data);
-      if (settingsRes.data) setAdvancePerPerson(settingsRes.data.advance_payment_amount || 0);
     };
-    fetchDependencies();
+    fetchDeps();
   }, []);
 
-  useEffect(() => {
-    const fetchClientData = async () => {
-      if (clientIdFromParams) {
-        setLoadingInitialData(true);
-        const { data: clientData } = await supabase.from('clients').select('*').eq('id', clientIdFromParams).single();
-        if (clientData) {
-          setFormData({
-            ...clientData,
-            companions: clientData.companions || [],
-            extra_services: clientData.extra_services || []
-          });
-          const { data: seats } = await supabase.from('tour_seat_assignments').select('seat_number').eq('client_id', clientData.id);
-          setClientSelectedSeats(seats?.map(s => s.seat_number) || []);
-        }
-      }
-      setLoadingInitialData(false);
-    };
+  const selectedTour = useMemo(() => availableTours.find(t => t.id === formData.tour_id), [formData.tour_id, availableTours]);
+  const currentBus = useMemo(() => selectedTour?.bus_id ? availableBuses.find(b => b.id === selectedTour.bus_id) : null, [selectedTour, availableBuses]);
 
-    if (!sessionLoading) fetchClientData();
-  }, [clientIdFromParams, sessionLoading]);
-
-  const selectedTour = useMemo(() => {
-    return availableTours.find(t => t.id === formData.tour_id) || null;
-  }, [formData.tour_id, availableTours]);
-
-  const currentBus = useMemo(() => {
-    return selectedTour?.bus_id ? availableBuses.find(b => b.id === selectedTour.bus_id) : null;
-  }, [selectedTour, availableBuses]);
-
-  const requiredAdvance = useMemo(() => {
-    return clientSelectedSeats.length * advancePerPerson;
-  }, [clientSelectedSeats.length, advancePerPerson]);
-
-  // Sync companions
-  useEffect(() => {
-    const totalPeople = clientSelectedSeats.length;
-    if (totalPeople > 0) {
-      const neededCompanions = totalPeople - 1;
-      setFormData(prev => {
-        let newCompanions = [...prev.companions];
-        if (neededCompanions > newCompanions.length) {
-          const toAdd = neededCompanions - newCompanions.length;
-          for(let i=0; i<toAdd; i++) newCompanions.push({ id: uuidv4(), name: '', age: null });
-        } else if (neededCompanions < newCompanions.length) {
-          newCompanions = newCompanions.slice(0, neededCompanions);
-        }
-        return { ...prev, companions: newCompanions, number_of_people: totalPeople };
-      });
-    }
-  }, [clientSelectedSeats.length]);
-
-  // REGLA: 12 o menores son NIÑOS
   useEffect(() => {
     if (!selectedTour) return;
+    
+    const totalPeople = clientSelectedSeats.length;
+    setRoomsCount(Math.ceil(totalPeople / 4));
 
     let adults = (formData.contractor_age === null || formData.contractor_age > 12) ? 1 : 0;
     let children = (formData.contractor_age !== null && formData.contractor_age <= 12) ? 1 : 0;
-    formData.companions.forEach(c => { (c.age === null || c.age > 12) ? adults++ : children++; });
+    formData.companions.forEach((c: any) => { (c.age === null || c.age > 12) ? adults++ : children++; });
 
-    setCounts({ adults, children });
-    const rd = allocateRoomsForPeople(adults);
-    const total = (rd.double_rooms * selectedTour.selling_price_double_occupancy * 2) +
-                  (rd.triple_rooms * selectedTour.selling_price_triple_occupancy * 3) +
-                  (rd.quad_rooms * selectedTour.selling_price_quad_occupancy * 4) +
-                  (children * selectedTour.selling_price_child) +
-                  (formData.extra_services || []).reduce((sum, s) => sum + (s.selling_price_per_unit_snapshot * s.quantity), 0);
-
-    setFormData(prev => ({ ...prev, total_amount: total, room_details: rd }));
-  }, [formData.companions, formData.contractor_age, formData.extra_services, selectedTour]);
+    let total = 0;
+    if (adults === 1 && children === 1) {
+      total = 2 * selectedTour.selling_price_double_occupancy;
+    } else if (adults === 1 && (children === 2 || children === 3)) {
+      total = 4 * selectedTour.selling_price_quad_occupancy;
+    } else {
+      total = (adults * selectedTour.selling_price_double_occupancy) + (children * selectedTour.selling_price_child);
+    }
+    setFormData((p: any) => ({ ...p, total_amount: total }));
+  }, [clientSelectedSeats.length, formData.contractor_age, formData.companions, selectedTour]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.tour_id) { toast.error('Selecciona un tour.'); return; }
+    if (!formData.tour_id || clientSelectedSeats.length === 0) return toast.error("Selecciona tour y asientos.");
     setIsSubmitting(true);
     
-    const clientData = {
-      ...formData,
-      advance_payment: requiredAdvance,
-      updated_at: new Date().toISOString(),
-    };
-
-    let savedId = clientIdFromParams;
-    if (clientIdFromParams) {
-      await supabase.from('clients').update(clientData).eq('id', clientIdFromParams);
-    } else {
-      const { data } = await supabase.from('clients').insert(clientData).select('id').single();
-      savedId = data?.id;
-      if (formData.total_paid > 0 && savedId) {
-        await supabase.from('client_payments').insert({ client_id: savedId, amount: formData.total_paid, payment_date: new Date().toISOString(), payment_method: 'manual' });
-      }
+    const { data } = await supabase.from('clients').insert({ ...formData, number_of_people: clientSelectedSeats.length }).select('id').single();
+    if (data) {
+      await supabase.from('tour_seat_assignments').insert(clientSelectedSeats.map(s => ({ tour_id: formData.tour_id, seat_number: s, status: 'booked', client_id: data.id })));
     }
-
-    if (savedId) {
-      await supabase.from('tour_seat_assignments').delete().eq('client_id', savedId).eq('tour_id', formData.tour_id);
-      await supabase.from('tour_seat_assignments').insert(clientSelectedSeats.map(s => ({ tour_id: formData.tour_id, seat_number: s, status: 'booked', client_id: savedId })));
-    }
-
-    toast.success('Reserva guardada.');
+    toast.success("Reserva guardada.");
     navigate('/admin/clients');
-    setIsSubmitting(false);
   };
-
-  if (loadingInitialData) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-rosa-mexicano h-12 w-12" /></div>;
 
   return (
     <div className="flex min-h-screen bg-gray-100">
       <AdminSidebar />
       <div className="flex flex-col flex-grow">
-        <AdminHeader pageTitle={clientIdFromParams ? 'Gestionar Reserva' : 'Nueva Reserva Directa'} />
+        <AdminHeader pageTitle="Consola de Reserva" />
         <main className="flex-grow container mx-auto px-4 py-8 max-w-6xl">
-          <form onSubmit={handleSubmit} className="space-y-8">
-            
-            <Card className="border-t-4 border-rosa-mexicano shadow-lg">
-              <CardHeader className="bg-gray-50/50"><CardTitle className="text-xl flex items-center gap-2"><MapPin className="text-rosa-mexicano h-5 w-5" /> 1. Selección del Viaje</CardTitle></CardHeader>
-              <CardContent className="pt-6 space-y-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-2">
-                    <Label>Elegir Tour</Label>
-                    <Select value={formData.tour_id || 'none'} onValueChange={v => setFormData({...formData, tour_id: v === 'none' ? null : v})}>
-                      <SelectTrigger className="h-12 text-lg font-bold"><SelectValue placeholder="Busca un tour..." /></SelectTrigger>
-                      <SelectContent><SelectItem value="none">-- Seleccionar Tour --</SelectItem>{availableTours.map(t => <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>)}</SelectContent>
-                    </Select>
-                  </div>
-                  {selectedTour && (
-                    <div className="p-4 bg-muted rounded-xl flex items-center justify-between font-medium">
-                      <div><p className="opacity-60 text-[10px] uppercase">Anticipo Requerido p/p</p><p className="text-xl font-bold text-rosa-mexicano">${advancePerPerson.toLocaleString()}</p></div>
-                    </div>
-                  )}
-                </div>
+          <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <Card className="lg:col-span-2 shadow-lg border-t-4 border-rosa-mexicano">
+              <CardHeader><CardTitle className="text-lg flex items-center gap-2"><MapPin className="h-5 w-5" /> Datos del Viaje</CardTitle></CardHeader>
+              <CardContent className="space-y-6">
+                <Select value={formData.tour_id} onValueChange={v => setFormData({...formData, tour_id: v})}>
+                  <SelectTrigger><SelectValue placeholder="Elegir Tour" /></SelectTrigger>
+                  <SelectContent>{availableTours.map(t => <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>)}</SelectContent>
+                </Select>
 
                 {selectedTour && (
-                  <div className="pt-6 border-t">
-                    <Label className="text-lg font-bold mb-4 flex items-center gap-2"><Armchair className="text-rosa-mexicano h-5 w-5" /> Selección de Asientos</Label>
-                    <div className="max-w-3xl mx-auto">
-                      <TourSeatMap tourId={selectedTour.id} busCapacity={selectedTour.bus_capacity} courtesies={selectedTour.courtesies} seatLayoutJson={currentBus?.seat_layout_json || null} onSeatsSelected={setClientSelectedSeats} initialSelectedSeats={clientSelectedSeats} currentClientId={clientIdFromParams} />
-                    </div>
+                  <div className="pt-4 border-t">
+                    <TourSeatMap tourId={selectedTour.id} busCapacity={selectedTour.bus_capacity} courtesies={selectedTour.courtesies} seatLayoutJson={currentBus?.seat_layout_json} onSeatsSelected={setClientSelectedSeats} initialSelectedSeats={clientSelectedSeats} />
                   </div>
                 )}
               </CardContent>
             </Card>
 
-            {clientSelectedSeats.length > 0 && (
-              <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                <div className="lg:col-span-2 space-y-8">
-                  <Card className="shadow-lg">
-                    <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Users className="h-5 w-5 text-rosa-mexicano" /> Datos del Contratante</CardTitle></CardHeader>
-                    <CardContent className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      <div className="space-y-1"><Label>Nombre(s)</Label><Input value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} required /></div>
-                      <div className="space-y-1"><Label>Apellido(s)</Label><Input value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} required /></div>
-                      <div className="space-y-1"><Label>Email</Label><Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required /></div>
-                      <div className="space-y-1"><Label>Edad</Label><Input type="number" value={formData.contractor_age || ''} onChange={e => setFormData({...formData, contractor_age: parseInt(e.target.value) || null})} /></div>
-                      <div className="md:col-span-2 space-y-1"><Label>Domicilio</Label><Textarea value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} /></div>
-                    </CardContent>
-                  </Card>
-
-                  {formData.companions.length > 0 && (
-                    <Card className="shadow-lg">
-                      <CardHeader><CardTitle className="text-lg">Pasajeros Acompañantes</CardTitle></CardHeader>
-                      <CardContent className="space-y-4">
-                        {formData.companions.map((c, idx) => (
-                          <div key={c.id} className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-gray-50 p-4 rounded-xl items-end">
-                            <div className="md:col-span-2 space-y-1"><Label className="text-[10px] uppercase font-bold text-gray-400">Pasajero {idx + 2}</Label><Input value={c.name} onChange={e => setFormData({...formData, companions: formData.companions.map(x => x.id === c.id ? {...x, name: e.target.value} : x)})} /></div>
-                            <div className="space-y-1"><Label className="text-[10px] uppercase font-bold text-gray-400">Edad</Label><Input type="number" value={c.age || ''} onChange={e => setFormData({...formData, companions: formData.companions.map(x => x.id === c.id ? {...x, age: parseInt(e.target.value) || null} : x)})} /></div>
-                          </div>
-                        ))}
-                      </CardContent>
-                    </Card>
-                  )}
-                </div>
-
-                <div className="space-y-8">
-                  {/* BREAKDOWN CARD */}
-                  <Card className="shadow-lg border-l-4 border-blue-500">
-                    <CardHeader className="pb-2"><CardTitle className="text-sm font-black uppercase text-gray-400 flex items-center gap-2"><List className="h-4 w-4" /> Desglose de Precios</CardTitle></CardHeader>
-                    <CardContent className="space-y-3 text-sm">
-                       <div className="flex justify-between"><span>Pax Adultos ({counts.adults}):</span><div className="text-right font-bold">
-                          {formData.room_details.double_rooms > 0 && <div>{formData.room_details.double_rooms} Dbl x ${(selectedTour?.selling_price_double_occupancy! * 2).toLocaleString()}</div>}
-                          {formData.room_details.triple_rooms > 0 && <div>{formData.room_details.triple_rooms} Trp x ${(selectedTour?.selling_price_triple_occupancy! * 3).toLocaleString()}</div>}
-                          {formData.room_details.quad_rooms > 0 && <div>{formData.room_details.quad_rooms} Cua x ${(selectedTour?.selling_price_quad_occupancy! * 4).toLocaleString()}</div>}
-                       </div></div>
-                       {counts.children > 0 && <div className="flex justify-between"><span>Pax Niños ({counts.children}):</span><span className="font-bold">${(counts.children * selectedTour?.selling_price_child!).toLocaleString()}</span></div>}
-                       <div className="pt-2 border-t flex justify-between font-black text-rosa-mexicano text-lg"><span>TOTAL:</span><span>${formData.total_amount.toLocaleString()}</span></div>
-                    </CardContent>
-                  </Card>
-
-                  <Card className="bg-gray-900 text-white shadow-xl">
-                    <CardHeader><CardTitle className="text-white text-lg flex items-center gap-2"><DollarSign className="h-5 w-5 text-rosa-mexicano" /> Abonos</CardTitle></CardHeader>
-                    <CardContent className="space-y-6 pt-6">
-                      <div className="p-3 bg-white/5 rounded-xl border border-white/10">
-                        <Label className="text-xs uppercase text-gray-400 font-bold">Anticipo Sugerido</Label>
-                        <p className="text-2xl font-black text-yellow-400">${requiredAdvance.toLocaleString()}</p>
-                      </div>
-                      <div className="space-y-2">
-                        <Label className="text-white/80 font-bold flex items-center gap-2"><Wallet className="h-4 w-4" /> Registrar Abono Inicial ($)</Label>
-                        <Input type="number" value={formData.total_paid} onChange={e => setFormData({...formData, total_paid: parseFloat(e.target.value) || 0})} className="bg-white/10 border-white/20 h-12 text-xl font-bold" />
-                      </div>
-                      <div className="pt-4 border-t border-white/10 flex justify-between items-center">
-                        <span className="font-bold text-sm">ADEUDO:</span>
-                        <span className="text-3xl font-black text-red-500">${(formData.total_amount - formData.total_paid).toLocaleString()}</span>
-                      </div>
-                    </CardContent>
-                  </Card>
-
-                  <div className="flex flex-col gap-3">
-                    <Button type="submit" disabled={isSubmitting} className="bg-rosa-mexicano h-14 text-lg font-black shadow-xl">
-                      {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
-                      Guardar Reserva
-                    </Button>
+            <div className="space-y-6">
+              <Card className="bg-gray-900 text-white shadow-xl">
+                <CardHeader><CardTitle className="text-white flex items-center gap-2"><Hotel className="h-5 w-5 text-rosa-mexicano" /> Alojamiento</CardTitle></CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="flex justify-between items-center bg-white/5 p-4 rounded-xl border border-white/10">
+                    <span className="text-xs uppercase font-bold text-gray-400">Habitaciones</span>
+                    <span className="text-2xl font-black text-rosa-mexicano">{roomsCount}</span>
                   </div>
-                </div>
-              </div>
-            )}
+                  <div className="pt-4 border-t border-white/10 flex justify-between font-black text-xl">
+                    <span>Total:</span>
+                    <span className="text-yellow-400">${formData.total_amount.toLocaleString()}</span>
+                  </div>
+                </CardContent>
+              </Card>
+              <Button type="submit" disabled={isSubmitting} className="w-full bg-rosa-mexicano h-14 text-lg font-black shadow-xl">Confirmar</Button>
+            </div>
           </form>
         </main>
       </div>
