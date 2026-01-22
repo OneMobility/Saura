@@ -47,16 +47,13 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     const totalPax = selectedSeats.length;
     if (totalPax === 0) return;
 
-    // 1. Una habitación cada 4 personas (1-4 = 1 hab, 5-8 = 2 habs, etc)
     const neededRooms = Math.ceil(totalPax / 4);
     setRoomsCount(neededRooms);
 
-    // 2. Clasificar por edad (<= 12 es niño)
     let adultsCount = (formData.contractor_age === null || formData.contractor_age > 12) ? 1 : 0;
     let childrenCount = (formData.contractor_age !== null && formData.contractor_age <= 12) ? 1 : 0;
     formData.companions.forEach(c => { (c.age === null || c.age > 12) ? adultsCount++ : childrenCount++; });
 
-    // 3. Motor de Cálculo por Ocupación
     let tempAdults = adultsCount;
     let tempChildren = childrenCount;
     let calculatedTotal = 0;
@@ -67,25 +64,25 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
       const adultsInRoom = Math.min(paxInRoom, tempAdults);
       const childrenInRoom = paxInRoom - adultsInRoom;
 
-      // REGLA: 1 Adulto + 1 Niño = 2 Adultos en Doble (Niños no aplican en dobles)
-      if (paxInRoom === 2 && adultsInRoom === 1 && childrenInRoom === 1) {
+      // REGLA: 1 Adulto Solo
+      if (paxInRoom === 1 && adultsInRoom === 1) {
+        calculatedTotal += tourSellingPrices.double;
+        details.push(`Hab. ${i+1}: 1 Adulto Solo (paga tarifa Doble)`);
+      }
+      // REGLA: 1 Adulto + 1 Niño
+      else if (paxInRoom === 2 && adultsInRoom === 1 && childrenInRoom === 1) {
         calculatedTotal += (2 * tourSellingPrices.double);
-        details.push(`Hab. ${i+1}: 1 Adulto + 1 Niño (Cobrados como 2 Adultos en Doble)`);
-      } 
-      // REGLA: Ocupación Triple
-      else if (paxInRoom === 3) {
-        calculatedTotal += (adultsInRoom * tourSellingPrices.triple) + (childrenInRoom * tourSellingPrices.child);
-        details.push(`Hab. ${i+1}: ${adultsInRoom} Adulto(s) en Triple + ${childrenInRoom} Niño(s)`);
+        details.push(`Hab. ${i+1}: 1 Adulto + 1 Niño (como 2 Adultos en Doble)`);
       }
-      // REGLA: Ocupación Cuádruple
-      else if (paxInRoom === 4) {
-        calculatedTotal += (adultsInRoom * tourSellingPrices.quad) + (childrenInRoom * tourSellingPrices.child);
-        details.push(`Hab. ${i+1}: ${adultsInRoom} Adulto(s) en Cuádruple + ${childrenInRoom} Niño(s)`);
-      }
-      // REGLA: Ocupación Doble (2 adultos) o Sencilla (usamos doble como base)
+      // REGLA: Ocupación Triple/Cuádruple Estándar
       else {
-        calculatedTotal += (adultsInRoom * tourSellingPrices.double) + (childrenInRoom * tourSellingPrices.child);
-        details.push(`Hab. ${i+1}: ${adultsInRoom} Adulto(s) en Doble/Sencilla`);
+        let occPrice = tourSellingPrices.quad;
+        let label = "Cuádruple";
+        if (paxInRoom === 3) { occPrice = tourSellingPrices.triple; label = "Triple"; }
+        else if (paxInRoom === 2) { occPrice = tourSellingPrices.double; label = "Doble"; }
+
+        calculatedTotal += (adultsInRoom * occPrice) + (childrenInRoom * tourSellingPrices.child);
+        details.push(`Hab. ${i+1}: ${adultsInRoom} Ad. (${label}) + ${childrenInRoom} Niñ.`);
       }
 
       tempAdults -= adultsInRoom;
@@ -95,7 +92,6 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     setTotalAmount(calculatedTotal);
     setBreakdown({ adults: adultsCount, children: childrenCount, details });
 
-    // Sincronizar campos de acompañantes
     const neededComps = totalPax - 1;
     if (neededComps !== formData.companions.length && neededComps >= 0) {
       setFormData(p => {
@@ -127,7 +123,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
       room_details: { rooms_count: roomsCount }
     });
 
-    toast.success("¡Reserva enviada exitosamente!");
+    toast.success("¡Reserva enviada!");
     onClose();
     setIsSubmitting(false);
   };
@@ -147,7 +143,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
           <div className="bg-gray-900 text-white p-6 rounded-2xl shadow-xl">
              <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2 text-rosa-mexicano font-black uppercase text-xs tracking-widest">
-                  <Hotel className="h-4 w-4" /> Resumen de Alojamiento
+                  <Hotel className="h-4 w-4" /> Distribución
                 </div>
                 <Badge className="bg-rosa-mexicano">{roomsCount} {roomsCount === 1 ? 'Habitación' : 'Habitaciones'}</Badge>
              </div>
@@ -164,7 +160,6 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
                   <span className="text-gray-400">TOTAL:</span>
                   <span className="text-yellow-400">${totalAmount.toLocaleString()}</span>
                 </div>
-                <p className="text-[10px] text-gray-500">* Nota: En habitaciones compartidas por solo 1 adulto y 1 niño, el menor se cobra como adulto para cubrir la tarifa de habitación doble.</p>
              </div>
           </div>
 
