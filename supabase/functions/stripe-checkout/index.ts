@@ -26,11 +26,12 @@ serve(async (req) => {
       : Deno.env.get('stripe');
 
     if (!STRIPE_SECRET_KEY) {
-      throw new Error(`No se encontró el secreto de Stripe para el modo ${isProduction ? 'PRODUCCIÓN (stripe live)' : 'PRUEBA (stripe)'}.`);
+      throw new Error(`No se encontró el secreto de Stripe para el modo ${isProduction ? 'PRODUCCIÓN' : 'PRUEBA'}.`);
     }
 
     const stripe = new Stripe(STRIPE_SECRET_KEY, {
       apiVersion: '2022-11-15',
+      // @ts-ignore
       httpClient: Stripe.createFetchHttpClient(),
     });
 
@@ -52,7 +53,7 @@ serve(async (req) => {
         quantity: 1,
       }],
       mode: 'payment',
-      success_url: `${req.headers.get("origin")}/payment-success?contract=${contractNumber}`,
+      success_url: `${req.headers.get("origin")}/payment-success?contract=${contractNumber}&amount=${amount}`,
       cancel_url: `${req.headers.get("origin")}/payment-failure`,
       client_reference_id: clientId,
     });

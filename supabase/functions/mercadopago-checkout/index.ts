@@ -48,7 +48,7 @@ serve(async (req) => {
         }],
         external_reference: clientId,
         back_urls: {
-          success: `${req.headers.get("origin")}/payment-success?contract=${contractNumber}`,
+          success: `${req.headers.get("origin")}/payment-success?contract=${contractNumber}&amount=${amount}`,
           failure: `${req.headers.get("origin")}/payment-failure`,
         },
         auto_return: "approved",

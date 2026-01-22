@@ -15,6 +15,8 @@ const PaymentSuccessPage = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const contractNumber = searchParams.get('contract');
+  const paidAmount = searchParams.get('amount'); // Capturar el monto base pagado
+  
   const [details, setDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [confirmingPayment, setConfirmingPayment] = useState(true);
@@ -28,12 +30,16 @@ const PaymentSuccessPage = () => {
       }
 
       try {
-        // 1. Confirmar y abonar el pago en la BD
+        // 1. Confirmar y abonar el monto exacto en la BD
         await supabase.functions.invoke('confirm-payment', {
-          body: { contractNumber: contractNumber.trim(), method: 'online' },
+          body: { 
+            contractNumber: contractNumber.trim(), 
+            method: 'online',
+            amount: paidAmount 
+          },
         });
         
-        // 2. Obtener detalles actualizados
+        // 2. Obtener detalles actualizados para mostrar al cliente
         const { data, error } = await supabase.functions.invoke('get-public-contract-details', {
           body: { contractNumber: contractNumber.trim() },
         });
@@ -41,17 +47,16 @@ const PaymentSuccessPage = () => {
         if (!error) setDetails(data.contractDetails);
       } catch (err) {
         console.error(err);
-        toast.error("Hubo un problema al actualizar tu saldo, pero tu reserva está registrada.");
+        toast.error("Tu pago fue procesado. Si el saldo no se ve reflejado en unos minutos, contacta a soporte.");
       } finally {
         setLoading(false);
         setConfirmingPayment(false);
       }
     };
     processSuccess();
-  }, [contractNumber]);
+  }, [contractNumber, paidAmount]);
 
   const handleGoToInquiry = () => {
-    // Navegar a la home con el parámetro de contrato
     if (contractNumber) {
       navigate(`/?contract=${contractNumber.trim()}#consultar`);
     } else {
@@ -79,7 +84,7 @@ const PaymentSuccessPage = () => {
             <CheckCircle2 className="h-16 w-16 text-green-600" />
           </div>
           <h1 className="text-4xl font-black text-gray-900 mb-2">¡Pago Confirmado!</h1>
-          <p className="text-xl text-gray-600">Tu lugar está asegurado. Hemos registrado tu abono exitosamente.</p>
+          <p className="text-xl text-gray-600">Hemos registrado tu abono exitosamente en tu reserva.</p>
         </div>
 
         {details && (
@@ -88,7 +93,7 @@ const PaymentSuccessPage = () => {
               <CardHeader className="bg-gray-900 text-white p-8">
                 <div className="flex flex-wrap justify-between items-center gap-6">
                   <div>
-                    <Badge className="bg-rosa-mexicano text-white mb-2 border-none uppercase font-bold">Reserva Confirmada</Badge>
+                    <Badge className="bg-rosa-mexicano text-white mb-2 border-none uppercase font-bold">Reserva Actualizada</Badge>
                     <CardTitle className="text-3xl font-black">{details.tour_title}</CardTitle>
                     <CardDescription className="text-gray-400 mt-1 flex items-center gap-2">
                       <MapPin className="h-4 w-4" /> {details.tour_description}
@@ -104,7 +109,7 @@ const PaymentSuccessPage = () => {
                 <div className="bg-blue-50 border border-blue-100 p-6 rounded-2xl mb-8 flex gap-4 items-start">
                   <Info className="h-6 w-6 text-blue-600 shrink-0 mt-1" />
                   <div className="text-blue-900 text-sm">
-                    <p className="font-bold text-base mb-1">Tu abono ha sido aplicado.</p>
+                    <p className="font-bold text-base mb-1">Tu abono de ${parseFloat(paidAmount || '0').toLocaleString()} ha sido aplicado.</p>
                     <p>Puedes consultar tu estado de cuenta completo en la sección de consulta usando tu folio.</p>
                   </div>
                 </div>
@@ -122,7 +127,7 @@ const PaymentSuccessPage = () => {
                       <Calendar className="h-3 w-3" /> Estado de Pago
                     </h3>
                     <p className="text-3xl font-black text-green-600">${details.total_paid.toLocaleString()}</p>
-                    <p className="text-xs text-gray-500">Total Abonado hasta hoy</p>
+                    <p className="text-xs text-gray-500">Total Abonado (Acumulado)</p>
                   </div>
                 </div>
 

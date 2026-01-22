@@ -10,31 +10,33 @@ serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const { contractNumber, method } = await req.json();
+    const { contractNumber, method, amount } = await req.json();
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. Buscar al cliente y su estado actual
+    // 1. Buscar al cliente
     const { data: client, error: clientError } = await supabaseAdmin
       .from('clients')
-      .select('id, total_amount, total_paid, advance_payment, status')
+      .select('id, total_amount, total_paid, advance_payment')
       .ilike('contract_number', contractNumber)
       .single();
 
     if (clientError || !client) throw new Error('Contrato no encontrado');
 
-    // 2. Determinar el monto a abonar
-    // Si no tiene pagos (total_paid === 0), abonamos el advance_payment configurado en la reserva
-    // Si ya tiene pagos, asumimos que es un abono del saldo restante (en un flujo real esto vendría de la pasarela)
-    const amountToCredit = client.total_paid === 0 
-      ? (client.advance_payment || 0) 
-      : (client.total_amount - client.total_paid);
+    // 2. Determinar el monto exacto a abonar
+    // Priorizamos el monto enviado desde la URL de éxito
+    let amountToCredit = parseFloat(amount);
+
+    if (isNaN(amountToCredit) || amountToCredit <= 0) {
+      // Fallback: Si no hay monto en la URL (flujo antiguo), usamos lógica de respaldo segura
+      amountToCredit = client.total_paid === 0 ? (client.advance_payment || 0) : 0;
+    }
 
     if (amountToCredit <= 0) {
-      return new Response(JSON.stringify({ message: 'El contrato ya está liquidado o no requiere abono.' }), {
+      return new Response(JSON.stringify({ message: 'No se especificó un monto válido para abonar.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
@@ -45,14 +47,14 @@ serve(async (req) => {
       .insert({
         client_id: client.id,
         amount: amountToCredit,
-        payment_method: method,
+        payment_method: method || 'online',
         payment_date: new Date().toISOString().split('T')[0]
       });
 
     if (paymentError) throw paymentError;
 
-    // 4. Actualizar el total pagado y estado del cliente
-    const newTotalPaid = client.total_paid + amountToCredit;
+    // 4. Actualizar el total pagado
+    const newTotalPaid = (client.total_paid || 0) + amountToCredit;
     const newStatus = newTotalPaid >= client.total_amount ? 'confirmed' : 'pending';
 
     const { error: updateError } = await supabaseAdmin
@@ -68,7 +70,7 @@ serve(async (req) => {
 
     return new Response(JSON.stringify({ 
       success: true, 
-      message: 'Pago acreditado correctamente',
+      message: 'Abono registrado correctamente',
       credited: amountToCredit 
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
