@@ -69,24 +69,22 @@ const AdminHotelsPage = () => {
     setLoading(false);
   };
 
-  const { cheapestByMonth, absoluteCheapestId } = useMemo(() => {
-    const monthlyMins: Record<string, number> = {};
-    let absMin = Infinity;
-    let absId = '';
+  // Lógica de recomendación: Mejor opción por Mes Y por Noches
+  const cheapestStats = useMemo(() => {
+    const minsByMonthAndNights: Record<string, number> = {};
 
     hotels.forEach(h => {
       if (!h.quoted_date) return;
       const monthKey = format(parseISO(h.quoted_date), 'yyyy-MM');
-      if (!monthlyMins[monthKey] || h.total_quote_cost < monthlyMins[monthKey]) {
-        monthlyMins[monthKey] = h.total_quote_cost;
-      }
-      if (h.total_quote_cost < absMin) {
-        absMin = h.total_quote_cost;
-        absId = h.id;
+      const nights = h.num_nights_quoted || 1;
+      const key = `${monthKey}-${nights}`;
+      
+      if (!minsByMonthAndNights[key] || h.total_quote_cost < minsByMonthAndNights[key]) {
+        minsByMonthAndNights[key] = h.total_quote_cost;
       }
     });
 
-    return { cheapestByMonth: monthlyMins, absoluteCheapestId: absId };
+    return { minsByMonthAndNights };
   }, [hotels]);
 
   const groupedHotels = useMemo(() => {
@@ -182,7 +180,6 @@ const AdminHotelsPage = () => {
                         <TableRow>
                           <TableHead>Fecha Inicio</TableHead>
                           <TableHead>Noches</TableHead>
-                          <TableHead>Hotel</TableHead>
                           <TableHead>Costo Total</TableHead>
                           <TableHead>Estado Pago</TableHead>
                           <TableHead className="text-right">Acciones</TableHead>
@@ -191,29 +188,26 @@ const AdminHotelsPage = () => {
                       <TableBody>
                         {quotes.sort((a, b) => (a.quoted_date || '').localeCompare(b.quoted_date || '')).map((q) => {
                           const monthKey = q.quoted_date ? format(parseISO(q.quoted_date), 'yyyy-MM') : '';
-                          const isMonthlyCheapest = cheapestByMonth[monthKey] === q.total_quote_cost;
-                          const isRecommended = q.id === absoluteCheapestId;
+                          const nights = q.num_nights_quoted || 1;
+                          const key = `${monthKey}-${nights}`;
+                          const isBestForDuration = cheapestStats.minsByMonthAndNights[key] === q.total_quote_cost;
 
                           return (
-                            <TableRow key={q.id} className={cn(isMonthlyCheapest && "bg-green-50/50")}>
+                            <TableRow key={q.id} className={cn(isBestForDuration && "bg-green-50/50")}>
                               <TableCell className="font-medium flex items-center gap-2">
                                 <Calendar className="h-3 w-3 text-gray-400" />
                                 {q.quoted_date ? format(parseISO(q.quoted_date), 'dd/MMM/yy', { locale: es }) : 'N/A'}
                               </TableCell>
-                              <TableCell>{q.num_nights_quoted} noches</TableCell>
-                              <TableCell className="text-gray-600">{q.name}</TableCell>
+                              <TableCell>{nights} noches</TableCell>
                               <TableCell>
                                 <div className="flex items-center gap-2">
-                                  <span className={cn("font-bold text-lg", isMonthlyCheapest ? "text-green-600" : "text-gray-900")}>
+                                  <span className={cn("font-bold text-lg", isBestForDuration ? "text-green-600" : "text-gray-900")}>
                                     ${q.total_quote_cost.toLocaleString()}
                                   </span>
-                                  {isRecommended && (
-                                    <Badge className="bg-yellow-400 text-yellow-900 hover:bg-yellow-400 border-none flex gap-1">
-                                      <Star className="h-3 w-3 fill-yellow-900" /> Recomendado
+                                  {isBestForDuration && (
+                                    <Badge className="bg-yellow-400 text-yellow-900 hover:bg-yellow-400 border-none flex gap-1 text-[10px]">
+                                      <Star className="h-3 w-3 fill-yellow-900" /> MEJOR OPCIÓN ({nights} N)
                                     </Badge>
-                                  )}
-                                  {isMonthlyCheapest && !isRecommended && (
-                                    <Badge variant="outline" className="text-green-600 border-green-200 bg-green-50">Mejor del mes</Badge>
                                   )}
                                 </div>
                               </TableCell>
