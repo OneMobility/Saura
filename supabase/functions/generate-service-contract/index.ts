@@ -34,11 +34,11 @@ const generateServiceContractHtml = (data: any) => {
   // Acompañantes
   let companionsHtml = '<p style="color: #666; font-style: italic;">Sin acompañantes registrados.</p>';
   if (client.companions && client.companions.length > 0) {
-    companionsHtml = `<ol style="margin-top: 5px; padding-left: 15px; color: #444;">${client.companions.map((c: any) => `<li>${c.name} ${c.age ? `(${c.age} años)` : ''}</li>`).join('')}</ol>`;
+    companionsHtml = `<ol style="margin-top: 5px; padding-left: 20px; color: #444;">${client.companions.map((c: any) => `<li>${c.name} ${c.age ? `(${c.age} años)` : ''}</li>`).join('')}</ol>`;
   } else if (!isTour && busPassengers && busPassengers.length > 1) {
     const others = busPassengers.filter((p: any) => !p.is_contractor);
     if (others.length > 0) {
-      companionsHtml = `<ol style="margin-top: 5px; padding-left: 15px; color: #444;">${others.map((c: any) => `<li>${c.first_name} ${c.last_name} (Asiento: ${c.seat_number})</li>`).join('')}</ol>`;
+      companionsHtml = `<ol style="margin-top: 5px; padding-left: 20px; color: #444;">${others.map((c: any) => `<li>${c.first_name} ${c.last_name} (Asiento: ${c.seat_number})</li>`).join('')}</ol>`;
     }
   }
 
@@ -51,44 +51,64 @@ const generateServiceContractHtml = (data: any) => {
         <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700;800&display=swap" rel="stylesheet">
         <style>
             :root { --primary: #91045A; --bg-soft: #f8fafc; --text-main: #1e293b; --text-muted: #64748b; }
-            body { font-family: 'Poppins', sans-serif; line-height: 1.4; color: var(--text-main); margin: 0; padding: 0; font-size: 8.5pt; background: #e2e8f0; }
-            .page { width: 215.9mm; min-height: 279.4mm; margin: 20px auto; padding: 15mm; box-sizing: border-box; background: white; box-shadow: 0 10px 25px rgba(0,0,0,0.1); border-radius: 4px; }
+            
+            /* Especificaciones de tamaño y fuente */
+            @page { size: letter; margin: 10mm; }
+            
+            body { 
+                font-family: 'Poppins', sans-serif; 
+                line-height: 1.4; 
+                color: var(--text-main); 
+                margin: 0; 
+                padding: 0; 
+                font-size: 12px; /* Requerido: 12px */
+                background: #e2e8f0; 
+            }
+            
+            .page { 
+                width: 215.9mm; /* Tamaño Carta */
+                min-height: 279.4mm; 
+                margin: 20px auto; 
+                padding: 15mm; 
+                box-sizing: border-box; 
+                background: white; 
+                box-shadow: 0 10px 25px rgba(0,0,0,0.1); 
+                border-radius: 4px; 
+            }
             
             .header-container { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid var(--primary); padding-bottom: 15px; margin-bottom: 20px; }
             .agency-info { text-align: right; }
-            .agency-info h1 { margin: 0; color: var(--primary); font-size: 16pt; font-weight: 800; text-transform: uppercase; }
-            .agency-info p { margin: 2px 0; color: var(--text-muted); font-size: 7.5pt; }
-            .logo { max-width: 120px; height: auto; }
+            .agency-info h1 { margin: 0; color: var(--primary); font-size: 20px; font-weight: 800; text-transform: uppercase; }
+            .agency-info p { margin: 2px 0; color: var(--text-muted); font-size: 11px; }
+            .logo { max-width: 100px; height: auto; }
 
-            .contract-badge { display: flex; justify-content: space-between; align-items: center; background: var(--bg-soft); padding: 10px 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
-            .badge-title { font-weight: 800; color: var(--text-main); font-size: 10pt; text-transform: uppercase; }
-            .badge-number { color: var(--primary); font-weight: 800; font-size: 11pt; }
+            .contract-badge { display: flex; justify-content: space-between; align-items: center; background: var(--bg-soft); padding: 12px 18px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #e2e8f0; }
+            .badge-title { font-weight: 800; color: var(--text-main); font-size: 14px; text-transform: uppercase; }
+            .badge-number { color: var(--primary); font-weight: 800; font-size: 16px; }
 
-            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 15px; }
-            .card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 12px; }
-            .card-title { font-weight: 700; font-size: 8.5pt; color: var(--primary); text-transform: uppercase; border-bottom: 1px solid #f1f5f9; padding-bottom: 5px; margin-bottom: 8px; display: flex; align-items: center; gap: 5px; }
+            .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+            .card { background: white; border: 1px solid #e2e8f0; border-radius: 10px; padding: 15px; }
+            .card-title { font-weight: 700; font-size: 12px; color: var(--primary); text-transform: uppercase; border-bottom: 1px solid #f1f5f9; padding-bottom: 8px; margin-bottom: 12px; }
             
-            .data-row { display: flex; margin-bottom: 4px; border-bottom: 1px solid #f8fafc; padding-bottom: 2px; }
-            .data-label { font-weight: 600; color: var(--text-muted); width: 35%; font-size: 8pt; }
-            .data-value { font-weight: 500; color: var(--text-main); width: 65%; }
+            .data-row { display: flex; margin-bottom: 6px; }
+            .data-label { font-weight: 600; color: var(--text-muted); width: 40%; }
+            .data-value { font-weight: 500; color: var(--text-main); width: 60%; }
 
-            .seats-highlight { background: var(--primary); color: white; padding: 8px 12px; border-radius: 6px; margin-top: 10px; display: inline-block; }
-            .seats-label { font-size: 7pt; font-weight: 600; text-transform: uppercase; display: block; opacity: 0.9; }
-            .seats-numbers { font-size: 12pt; font-weight: 800; letter-spacing: 1px; }
+            .seats-box { background: var(--primary); color: white; padding: 10px 15px; border-radius: 8px; margin-top: 10px; }
+            .seats-label { font-size: 10px; font-weight: 600; text-transform: uppercase; display: block; margin-bottom: 2px; }
+            .seats-numbers { font-size: 14px; font-weight: 800; }
 
             .financial-card { background: #fff1f2; border: 1px solid #fecdd3; }
-            .amount-total { font-size: 11pt; font-weight: 800; color: var(--text-main); }
-            .amount-paid { font-size: 11pt; font-weight: 800; color: #059669; }
-            .amount-pending { font-size: 14pt; font-weight: 900; color: #dc2626; }
+            .amount-pending { font-size: 18px; font-weight: 900; color: #dc2626; }
 
-            .clauses-container { margin-top: 15px; padding: 12px; background: var(--bg-soft); border-radius: 8px; border: 1px solid #e2e8f0; }
-            .clause { text-align: justify; margin-bottom: 5px; font-size: 7.2pt; color: #475569; line-height: 1.3; }
+            .clauses-container { margin-top: 15px; padding: 15px; background: var(--bg-soft); border-radius: 8px; border: 1px solid #e2e8f0; }
+            .clause { text-align: justify; margin-bottom: 8px; font-size: 10.5px; color: #475569; line-height: 1.3; }
             .clause-num { font-weight: 800; color: var(--primary); }
 
-            .signatures { display: flex; justify-content: space-around; margin-top: 30px; }
+            .signatures { display: flex; justify-content: space-around; margin-top: 40px; }
             .sig-box { width: 40%; text-align: center; }
-            .sig-line { border-top: 1.5px solid var(--text-main); margin-bottom: 5px; }
-            .sig-name { font-weight: 700; font-size: 8pt; text-transform: uppercase; }
+            .sig-line { border-top: 1.5px solid var(--text-main); margin-bottom: 8px; }
+            .sig-name { font-weight: 700; font-size: 12px; text-transform: uppercase; }
 
             @media print { 
                 body { background: white; }
@@ -115,18 +135,18 @@ const generateServiceContractHtml = (data: any) => {
             <div class="grid">
                 <div class="card">
                     <div class="card-title">Datos del Cliente</div>
-                    <div class="data-row"><span class="data-label">Titular:</span><span class="data-value bold">${clientFullName}</span></div>
-                    <div class="data-row"><span class="data-label">Identificación:</span><span class="data-value">${client.identification_number || 'No proporcionada'}</span></div>
+                    <div class="data-row"><span class="data-label">Titular:</span><span class="data-value" style="font-weight: 700;">${clientFullName}</span></div>
+                    <div class="data-row"><span class="data-label">Identificación:</span><span class="data-value">${client.identification_number || 'N/A'}</span></div>
                     <div class="data-row"><span class="data-label">Edad:</span><span class="data-value">${client.contractor_age ? `${client.contractor_age} años` : 'N/A'}</span></div>
                     <div class="data-row"><span class="data-label">Domicilio:</span><span class="data-value">${client.address || 'N/A'}</span></div>
                 </div>
                 <div class="card">
-                    <div class="card-title">Detalles del Destino</div>
-                    <div class="data-row"><span class="data-label">Servicio:</span><span class="data-value bold">${title}</span></div>
+                    <div class="card-title">Detalles del Viaje</div>
+                    <div class="data-row"><span class="data-label">Servicio:</span><span class="data-value" style="font-weight: 700; color: var(--primary);">${title}</span></div>
                     <div class="data-row"><span class="data-label">Salida:</span><span class="data-value">${departureDate} - ${departureTime}</span></div>
                     <div class="data-row"><span class="data-label">Regreso:</span><span class="data-value">${returnDate} - ${returnTime}</span></div>
-                    <div class="seats-highlight">
-                        <span class="seats-label">Asientos Seleccionados</span>
+                    <div class="seats-box">
+                        <span class="seats-label">Números de asientos seleccionados</span>
                         <span class="seats-numbers">${seatNumbers}</span>
                     </div>
                 </div>
@@ -134,22 +154,22 @@ const generateServiceContractHtml = (data: any) => {
 
             <div class="grid" style="grid-template-columns: 1.2fr 0.8fr;">
                 <div class="card">
-                    <div class="card-title">Acompañantes Registrados</div>
-                    <div style="font-size: 7.5pt;">${companionsHtml}</div>
+                    <div class="card-title">Acompañantes</div>
+                    <div style="font-size: 11px;">${companionsHtml}</div>
                 </div>
                 <div class="card financial-card">
-                    <div class="card-title">Resumen de Cuenta</div>
-                    <div class="data-row"><span class="data-label">Total:</span><span class="data-value amount-total">$${client.total_amount.toLocaleString()}</span></div>
-                    <div class="data-row"><span class="data-label">Abonado:</span><span class="data-value amount-paid">$${client.total_paid.toLocaleString()}</span></div>
-                    <div style="margin-top: 10px; border-top: 1px dashed #fca5a5; padding-top: 5px; text-align: right;">
-                        <span class="data-label" style="width: 100%; display: block; text-align: right;">Saldo Pendiente</span>
+                    <div class="card-title">Estado de Cuenta</div>
+                    <div class="data-row"><span class="data-label">Total:</span><span class="data-value" style="font-weight: 700;">$${client.total_amount.toLocaleString()}</span></div>
+                    <div class="data-row"><span class="data-label">Abonado:</span><span class="data-value" style="color: #059669; font-weight: 700;">$${client.total_paid.toLocaleString()}</span></div>
+                    <div style="margin-top: 12px; border-top: 1px dashed #fca5a5; padding-top: 8px; text-align: right;">
+                        <span style="font-size: 10px; color: var(--text-muted); font-weight: 600; display: block; text-transform: uppercase;">Saldo Pendiente</span>
                         <span class="amount-pending">$${(client.total_amount - client.total_paid).toLocaleString()} MXN</span>
                     </div>
                 </div>
             </div>
 
             <div class="clauses-container">
-                <div class="card-title" style="border: none;">Cláusulas del Contrato</div>
+                <div class="card-title" style="border: none; margin-bottom: 8px;">Cláusulas del Contrato</div>
                 <p class="clause"><span class="clause-num">1. OBJETO:</span> LA AGENCIA se obliga a prestar a EL CLIENTE los servicios turísticos descritos en la carátula de este contrato.</p>
                 <p class="clause"><span class="clause-num">2. ANTICIPO:</span> EL CLIENTE se obliga a cubrir el anticipo pactado para garantizar su lugar. Sin anticipo, la reservación no tiene validez legal.</p>
                 <p class="clause"><span class="clause-num">3. LIQUIDACIÓN:</span> El saldo total deberá ser cubierto por EL CLIENTE a más tardar 15 días antes de la fecha programada de salida.</p>
@@ -170,17 +190,17 @@ const generateServiceContractHtml = (data: any) => {
                 <div class="sig-box">
                     <div class="sig-line"></div>
                     <span class="sig-name">Representante Legal</span><br>
-                    <span style="font-size: 7pt; color: var(--text-muted);">SAURA TOURS</span>
+                    <span style="font-size: 10px; color: var(--text-muted);">SAURA TOURS</span>
                 </div>
                 <div class="sig-box">
                     <div class="sig-line"></div>
                     <span class="sig-name">${clientFullName}</span><br>
-                    <span style="font-size: 7pt; color: var(--text-muted);">EL CLIENTE</span>
+                    <span style="font-size: 10px; color: var(--text-muted);">EL CLIENTE</span>
                 </div>
             </div>
 
-            <div style="margin-top: 15px; text-align: center; font-size: 7pt; color: var(--text-muted); border-top: 1px solid #f1f5f9; padding-top: 10px;">
-                Emitido el ${contractDate} | Documento Oficial de Saura Tours | www.sauratours.com
+            <div style="margin-top: 20px; text-align: center; font-size: 10px; color: var(--text-muted); border-top: 1px solid #f1f5f9; padding-top: 10px;">
+                Contrato emitido el ${contractDate} | Documento Oficial de Saura Tours
             </div>
         </div>
     </body>
