@@ -5,8 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Edit, Trash2, Loader2, DollarSign, FileText, FileSignature, ChevronDown, ChevronRight, Package, AlertCircle, Download } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
+import { Eye, Trash2, Loader2, DollarSign, FileText, FileSignature, ChevronDown, ChevronRight, Package, AlertCircle } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -41,8 +40,6 @@ const ClientsTable: React.FC<{ refreshKey: number; onRegisterPayment: (client: C
   const [loading, setLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState<string | null>(null);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
-  
-  // Estados para cancelación
   const [cancelDialog, setCancelDialog] = useState<{ isOpen: boolean; clientId: string; reason: string }>({ isOpen: false, clientId: '', reason: '' });
 
   useEffect(() => { fetchClients(); }, [refreshKey]);
@@ -69,7 +66,6 @@ const ClientsTable: React.FC<{ refreshKey: number; onRegisterPayment: (client: C
         body: { contractNumber: client.contract_number }
       });
       if (error) throw error;
-      
       const newWindow = window.open('', '_blank');
       if (newWindow) {
         newWindow.document.write(data);
@@ -84,17 +80,10 @@ const ClientsTable: React.FC<{ refreshKey: number; onRegisterPayment: (client: C
   };
 
   const handleDeleteClient = async (id: string) => {
-    if (!window.confirm('¿Estás seguro de que quieres eliminar este registro por completo? Esta acción es irreversible y eliminará abonos y asientos asignados.')) {
-      return;
-    }
+    if (!window.confirm('¿Eliminar este registro? Se borrarán abonos y asientos.')) return;
     setLoading(true);
     const { error } = await supabase.from('clients').delete().eq('id', id);
-    if (error) {
-      toast.error('Error al eliminar el cliente.');
-    } else {
-      toast.success('Cliente eliminado con éxito.');
-      fetchClients();
-    }
+    if (!error) { toast.success('Cliente eliminado.'); fetchClients(); }
     setLoading(false);
   };
 
@@ -103,23 +92,15 @@ const ClientsTable: React.FC<{ refreshKey: number; onRegisterPayment: (client: C
       setCancelDialog({ isOpen: true, clientId: client.id, reason: '' });
       return;
     }
-
     const { error } = await supabase.from('clients').update({ status: newStatus }).eq('id', client.id);
-    if (!error) {
-      toast.success('Estado actualizado.');
-      fetchClients();
-    }
+    if (!error) { toast.success('Estado actualizado.'); fetchClients(); }
   };
 
   const confirmCancellation = async () => {
-    if (!cancelDialog.reason.trim()) return toast.error("Debes ingresar un motivo.");
-    
-    const { error } = await supabase.from('clients')
-      .update({ status: 'cancelled', cancel_reason: cancelDialog.reason })
-      .eq('id', cancelDialog.clientId);
-
+    if (!cancelDialog.reason.trim()) return toast.error("Ingresa un motivo.");
+    const { error } = await supabase.from('clients').update({ status: 'cancelled', cancel_reason: cancelDialog.reason }).eq('id', cancelDialog.clientId);
     if (!error) {
-      toast.success('Contrato cancelado.');
+      toast.success('Cancelado.');
       setCancelDialog({ isOpen: false, clientId: '', reason: '' });
       fetchClients();
     }
@@ -152,27 +133,25 @@ const ClientsTable: React.FC<{ refreshKey: number; onRegisterPayment: (client: C
               <Table>
                 <TableHeader className="bg-gray-50">
                   <TableRow>
-                    <TableHead>Contrato</TableHead>
+                    <TableHead>Folio</TableHead>
                     <TableHead>Titular</TableHead>
-                    <TableHead>Total</TableHead>
+                    <TableHead>Saldo Pendiente</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {group.map((client) => (
-                    <TableRow key={client.id} className={cn(client.status === 'cancelled' && "opacity-60 grayscale bg-gray-50")}>
+                    <TableRow key={client.id} className={cn(client.status === 'cancelled' && "opacity-60 bg-gray-50")}>
                       <TableCell className="font-mono text-xs font-bold text-rosa-mexicano">{client.contract_number}</TableCell>
                       <TableCell>
                         <div className="font-bold">{client.first_name} {client.last_name}</div>
-                        {client.status === 'cancelled' && client.cancel_reason && (
-                          <p className="text-[10px] text-red-500 font-bold italic flex items-center gap-1"><AlertCircle className="h-3 w-3" /> {client.cancel_reason}</p>
-                        )}
+                        {client.status === 'cancelled' && <p className="text-[10px] text-red-500 font-bold italic line-clamp-1">{client.cancel_reason}</p>}
                       </TableCell>
-                      <TableCell className="font-bold">${client.total_amount.toLocaleString()}</TableCell>
+                      <TableCell className="font-bold text-red-600">${client.remaining_payment.toLocaleString()}</TableCell>
                       <TableCell>
                         <Select value={client.status} onValueChange={(val) => handleStatusChange(client, val)}>
-                          <SelectTrigger className={cn("h-8 w-[130px] text-xs font-bold border-none shadow-none", statusOptions.find(o => o.value === client.status)?.color)}>
+                          <SelectTrigger className={cn("h-8 w-[130px] text-xs font-bold border-none", statusOptions.find(o => o.value === client.status)?.color)}>
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>{statusOptions.map(opt => <SelectItem key={opt.value} value={opt.value} className="text-xs font-bold">{opt.label}</SelectItem>)}</SelectContent>
@@ -180,53 +159,11 @@ const ClientsTable: React.FC<{ refreshKey: number; onRegisterPayment: (client: C
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="flex justify-end gap-1">
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            title="Ver/Editar Ficha"
-                            onClick={() => onEditClient(client)} 
-                            className="text-blue-600"
-                          >
-                            <Edit className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            title="Registrar Abono"
-                            onClick={() => onRegisterPayment(client)} 
-                            className="text-green-600"
-                          >
-                            <DollarSign className="h-4 w-4" />
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            title="Descargar Contrato"
-                            onClick={() => handleDownloadDoc(client, 'generate-service-contract', 'Contrato')} 
-                            className="text-rosa-mexicano"
-                            disabled={!!isDownloading}
-                          >
-                            {isDownloading === `${client.id}-generate-service-contract` ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSignature className="h-4 w-4" />}
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            title="Hoja de Reservación"
-                            onClick={() => handleDownloadDoc(client, 'generate-booking-sheet', 'Hoja de Reserva')} 
-                            className="text-blue-400"
-                            disabled={!!isDownloading}
-                          >
-                            {isDownloading === `${client.id}-generate-booking-sheet` ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
-                          </Button>
-                          <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            title="Eliminar Registro"
-                            onClick={() => handleDeleteClient(client.id)} 
-                            className="text-red-400 hover:text-red-600"
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <Button variant="ghost" size="icon" title="Ver Detalles" onClick={() => onEditClient(client)} className="text-blue-600"><Eye className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" title="Abonar" onClick={() => onRegisterPayment(client)} className="text-green-600"><DollarSign className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDownloadDoc(client, 'generate-service-contract', 'Contrato')} className="text-rosa-mexicano" disabled={!!isDownloading}><FileSignature className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDownloadDoc(client, 'generate-booking-sheet', 'Hoja')} className="text-blue-400" disabled={!!isDownloading}><FileText className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteClient(client.id)} className="text-red-400"><Trash2 className="h-4 w-4" /></Button>
                         </div>
                       </TableCell>
                     </TableRow>
@@ -240,9 +177,9 @@ const ClientsTable: React.FC<{ refreshKey: number; onRegisterPayment: (client: C
 
       <Dialog open={cancelDialog.isOpen} onOpenChange={(o) => !o && setCancelDialog(p => ({...p, isOpen: false}))}>
         <DialogContent>
-          <DialogHeader><DialogTitle>Cancelar Contrato</DialogTitle><DialogDescription>Indica el motivo de la cancelación. Este será visible para el cliente.</DialogDescription></DialogHeader>
-          <Textarea placeholder="Ej: El cliente solicitó reembolso parcial, no se presentó, etc." value={cancelDialog.reason} onChange={e => setCancelDialog(p => ({...p, reason: e.target.value}))} />
-          <DialogFooter><Button variant="outline" onClick={() => setCancelDialog(p => ({...p, isOpen: false}))}>Ignorar</Button><Button variant="destructive" onClick={confirmCancellation}>Confirmar Cancelación</Button></DialogFooter>
+          <DialogHeader><DialogTitle>Cancelar Contrato</DialogTitle></DialogHeader>
+          <Textarea placeholder="Motivo..." value={cancelDialog.reason} onChange={e => setCancelDialog(p => ({...p, reason: e.target.value}))} />
+          <DialogFooter><Button variant="outline" onClick={() => setCancelDialog(p => ({...p, isOpen: false}))}>Cerrar</Button><Button variant="destructive" onClick={confirmCancellation}>Confirmar</Button></DialogFooter>
         </DialogContent>
       </Dialog>
     </div>
