@@ -15,95 +15,91 @@ serve(async (req) => {
     const { data: client } = await supabaseAdmin.from('clients').select('*, tours(*)').ilike('contract_number', contractNumber).single();
     const { data: seats } = await supabaseAdmin.from('tour_seat_assignments').select('seat_number').eq('client_id', client.id);
     const { data: payments } = await supabaseAdmin.from('client_payments').select('*').eq('client_id', client.id).order('payment_date', { ascending: true });
+    const { data: agency } = await supabaseAdmin.from('agency_settings').select('*').single();
 
     const seatNumbers = seats?.map(s => s.seat_number).sort((a, b) => a - b).join(', ') || 'N/A';
-    const totalPax = client.number_of_people;
-    const roomsCount = Math.ceil(totalPax / 4);
+    const primaryColor = agency?.primary_color || '#91045A';
 
     const html = `
       <!DOCTYPE html>
-      <html>
+      <html lang="es">
       <head>
+          <meta charset="UTF-8">
+          <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;700;900&display=swap" rel="stylesheet">
           <style>
-              body { font-family: 'Courier New', Courier, monospace; padding: 20px; font-size: 13px; color: #000; }
-              .header { text-align: center; border-bottom: 4px double #000; margin-bottom: 20px; padding-bottom: 10px; }
-              .box { border: 2px solid #000; padding: 15px; margin-bottom: 20px; }
-              .title { font-weight: bold; text-decoration: underline; margin-bottom: 10px; display: block; font-size: 16px; }
-              .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-              .stat-box { border: 1px solid #000; padding: 10px; text-align: center; background: #eee; }
-              .stat-val { font-size: 24px; font-weight: bold; }
-              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
-              th, td { border: 1px solid #000; padding: 8px; text-align: left; }
-              th { background: #f0f0f0; }
-              .footer { margin-top: 40px; text-align: center; font-style: italic; }
+              body { font-family: 'Montserrat', sans-serif; padding: 30px; font-size: 11px; color: #333; background: #fff; }
+              .header { border-bottom: 4px solid #1a1a1a; padding-bottom: 10px; margin-bottom: 25px; display: flex; justify-content: space-between; align-items: flex-end; }
+              .header h1 { margin: 0; font-size: 24px; font-weight: 900; color: #1a1a1a; text-transform: uppercase; }
+              
+              .audit-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 15px; margin-bottom: 25px; }
+              .audit-card { border: 1px solid #ddd; padding: 12px; border-radius: 8px; }
+              .audit-card h3 { margin: 0 0 8px 0; font-size: 9px; color: #888; text-transform: uppercase; letter-spacing: 1px; }
+              .audit-card p { margin: 0; font-size: 13px; font-weight: bold; }
+              
+              .section-title { background: #1a1a1a; color: white; padding: 6px 12px; border-radius: 4px; font-weight: 900; margin: 20px 0 10px; text-transform: uppercase; font-size: 10px; }
+              
+              table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+              th { text-align: left; padding: 10px; background: #f4f4f4; border-bottom: 2px solid #ddd; text-transform: uppercase; font-size: 9px; }
+              td { padding: 10px; border-bottom: 1px solid #eee; }
+              
+              .financial-summary { margin-top: 30px; float: right; width: 300px; }
+              .fin-row { display: flex; justify-content: space-between; padding: 8px 0; border-bottom: 1px solid #eee; }
+              .fin-total { border-bottom: none; font-size: 16px; font-weight: 900; color: ${primaryColor}; padding-top: 15px; }
+              
+              .footer-stamp { margin-top: 100px; text-align: center; border: 2px dashed #ddd; padding: 20px; border-radius: 10px; color: #aaa; }
           </style>
       </head>
       <body>
           <div class="header">
-              <h1>HOJA DE CONTROL INTERNO - SAURA TOURS</h1>
-              <p>AUDITORÍA DE RESERVA: ${client.contract_number}</p>
-          </div>
-
-          <div class="grid">
-              <div class="box">
-                  <span class="title">DATOS DEL CLIENTE</span>
-                  <p><strong>NOMBRE:</strong> ${client.first_name} ${client.last_name}</p>
-                  <p><strong>TELÉFONO:</strong> ${client.phone || 'N/A'}</p>
-                  <p><strong>EMAIL:</strong> ${client.email}</p>
-                  <p><strong>IDENTIFICACIÓN:</strong> ${client.identification_number || 'N/A'}</p>
+              <div>
+                  <h1>Hoja de Auditoría</h1>
+                  <p>Control Interno Administrativo</p>
               </div>
-              <div class="box">
-                  <span class="title">DETALLES DEL VIAJE</span>
-                  <p><strong>TOUR:</strong> ${client.tours?.title}</p>
-                  <p><strong>ASIENTOS:</strong> [ ${seatNumbers} ]</p>
-                  <p><strong>STATUS:</strong> ${client.status.toUpperCase()}</p>
+              <div style="text-align: right;">
+                  <p style="font-weight: bold; font-size: 16px; color: ${primaryColor}">FOLIO: ${client.contract_number}</p>
+                  <p>${new Date().toLocaleString()}</p>
               </div>
           </div>
 
-          <div class="grid">
-              <div class="stat-box">
-                  <span>TOTAL PASAJEROS</span><br>
-                  <span class="stat-val">${totalPax}</span>
-              </div>
-              <div class="stat-box">
-                  <span>HABITACIONES ESTIMADAS</span><br>
-                  <span class="stat-val">${roomsCount}</span>
-              </div>
+          <div class="audit-grid">
+              <div class="audit-card"><h3>Titular</h3><p>${client.first_name} ${client.last_name}</p></div>
+              <div class="audit-card"><h3>Tour / Destino</h3><p>${client.tours?.title}</p></div>
+              <div class="audit-card"><h3>Asientos Asignados</h3><p>[ ${seatNumbers} ]</p></div>
           </div>
 
-          <span class="title" style="margin-top: 30px;">ESTADO DE CUENTA Y PAGOS</span>
+          <div class="section-title">Historial de Transacciones</div>
           <table>
               <thead>
                   <tr>
-                      <th>Fecha</th>
+                      <th>Fecha de Pago</th>
                       <th>Método</th>
-                      <th>Referencia</th>
-                      <th align="right">Monto</th>
+                      <th>ID Referencia</th>
+                      <th style="text-align: right;">Monto</th>
                   </tr>
               </thead>
               <tbody>
                   ${payments?.map(p => `
                       <tr>
-                          <td>${new Date(p.payment_date).toLocaleDateString()}</td>
-                          <td>${p.payment_method}</td>
-                          <td style="font-size: 10px;">${p.id}</td>
-                          <td align="right">$${p.amount.toLocaleString()}</td>
+                          <td>${new Date(p.payment_date).toLocaleDateString('es-MX', { day: '2-digit', month: '2-digit', year: 'numeric' })}</td>
+                          <td style="text-transform: capitalize;">${p.payment_method}</td>
+                          <td style="font-family: monospace; color: #888;">${p.id.substring(0, 18)}...</td>
+                          <td style="text-align: right; font-weight: bold;">$${p.amount.toLocaleString()}</td>
                       </tr>
                   `).join('')}
-                  <tr style="background: #f0f0f0; font-weight: bold;">
-                      <td colspan="3" align="right">TOTAL ABONADO:</td>
-                      <td align="right">$${client.total_paid.toLocaleString()}</td>
-                  </tr>
-                  <tr style="background: #000; color: #fff; font-size: 18px;">
-                      <td colspan="3" align="right">SALDO PENDIENTE:</td>
-                      <td align="right">$${(client.total_amount - client.total_paid).toLocaleString()} MXN</td>
-                  </tr>
               </tbody>
           </table>
 
-          <div class="footer">
-              <p>Este documento es para uso exclusivo de control interno y auditoría de Saura Tours.</p>
-              <p>Impreso el: ${new Date().toLocaleString()}</p>
+          <div class="financial-summary">
+              <div class="fin-row"><span>Monto Contractual:</span> <span>$${client.total_amount.toLocaleString()}</span></div>
+              <div class="fin-row"><span>Total Abonado:</span> <span style="color: green;">$${client.total_paid.toLocaleString()}</span></div>
+              <div class="fin-row fin-total"><span>SALDO PENDIENTE:</span> <span>$${(client.total_amount - client.total_paid).toLocaleString()}</span></div>
+          </div>
+
+          <div style="clear: both;"></div>
+
+          <div class="footer-stamp">
+              Sello y Firma de Recepción de Caja<br>
+              <span style="font-size: 8px;">Documento generado por el sistema de gestión Saura Tours. Reservados todos los derechos.</span>
           </div>
       </body>
       </html>
