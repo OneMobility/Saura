@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, CreditCard, Landmark, Info, PlusCircle, MinusCircle, Save, CheckCircle2, UserCheck } from 'lucide-react';
+import { Loader2, CreditCard, Landmark, Info, Save, CheckCircle2, UserCheck, MapPin } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Textarea } from '@/components/ui/textarea';
 import TourSeatMap from '@/components/TourSeatMap';
@@ -119,8 +119,8 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
   }, [formData, tourSellingPrices]);
 
   const handlePayment = async (method: 'mercadopago' | 'stripe' | 'transferencia' | 'manual') => {
-    if (!formData.first_name || !formData.last_name || !formData.email) {
-      toast.error('Nombre, Apellido y Email son obligatorios.');
+    if (!formData.first_name || !formData.last_name || !formData.email || !formData.address) {
+      toast.error('Nombre, Apellido, Email y Domicilio son obligatorios.');
       return;
     }
     if (selectedSeats.length === 0) {
@@ -169,7 +169,12 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
         window.location.href = data.init_point;
       } else if (method === 'stripe') {
         const { data, error } = await supabase.functions.invoke('stripe-checkout', {
-          body: { clientId: newClient.id, amount: advance, description: `Anticipo Tour: ${tourTitle}` }
+          body: { 
+            clientId: newClient.id, 
+            amount: advance, 
+            description: `Anticipo Tour: ${tourTitle}`,
+            contractNumber: contractNum // Enviamos el número para la redirección
+          }
         });
 
         if (error) {
@@ -225,6 +230,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
               <div className="space-y-1"><Label>WhatsApp</Label><Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="8441234567" /></div>
               <div className="space-y-1"><Label>Identificación</Label><Input value={formData.identification_number} onChange={e => setFormData({...formData, identification_number: e.target.value})} placeholder="INE / Pasaporte" /></div>
               <div className="space-y-1"><Label>Edad</Label><Input type="number" value={formData.contractor_age || ''} onChange={e => setFormData({...formData, contractor_age: parseInt(e.target.value) || null})} placeholder="Años" /></div>
+              <div className="md:col-span-2 space-y-1"><Label>Domicilio Completo</Label><Textarea value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} placeholder="Calle, Número, Colonia, Ciudad y Estado" /></div>
             </div>
 
             {formData.companions.length > 0 && (

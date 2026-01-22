@@ -8,41 +8,25 @@ const corsHeaders = {
 };
 
 serve(async (req) => {
-  console.log("[stripe-checkout] Función invocada");
-
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
-    const { clientId, amount, description } = await req.json();
+    const { clientId, amount, description, contractNumber } = await req.json();
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    const { data: settings, error: settingsError } = await supabaseAdmin
-      .from('agency_settings')
-      .select('*')
-      .single();
-
-    if (settingsError || !settings) {
-      throw new Error("No se pudo cargar la configuración de la agencia.");
-    }
-
-    const isTestMode = settings.payment_mode === 'test';
+    const { data: settings } = await supabaseAdmin.from('agency_settings').select('*').single();
+    const isTestMode = settings?.payment_mode === 'test';
     
-    // Buscar la llave secreta
     const STRIPE_SECRET_KEY = isTestMode
       ? (Deno.env.get('STRIPE_TEST_SECRET_KEY') || Deno.env.get('stripe'))
       : (Deno.env.get('STRIPE_SECRET_KEY') || Deno.env.get('stripe'));
 
-    if (!STRIPE_SECRET_KEY) {
-      throw new Error(`Configuración incompleta: No se encontró la llave de Stripe en los secretos de Supabase.`);
-    }
-
-    // VALIDACIÓN CRÍTICA: Verificar si la llave es pública en lugar de secreta
-    if (STRIPE_SECRET_KEY.startsWith('pk_')) {
-      throw new Error(`Error de Configuración: Estás usando una 'Publishable Key' (pk_...) en los secretos de Supabase. Para pagos desde el servidor, DEBES usar una 'Secret Key' (sk_...). Por favor, cámbiala en el panel de Supabase.`);
+    if (!STRIPE_SECRET_KEY || STRIPE_SECRET_KEY.startsWith('pk_')) {
+      throw new Error("Configuración de Stripe inválida. Se requiere una Secret Key (sk_...).");
     }
 
     const stripe = new Stripe(STRIPE_SECRET_KEY, {
@@ -50,32 +34,27 @@ serve(async (req) => {
       httpClient: Stripe.createFetchHttpClient(),
     });
 
-    const percentage = (settings.stripe_commission_percentage || 4.0) / 100;
-    const fixed = settings.stripe_fixed_fee || 5.0;
+    const percentage = (settings?.stripe_commission_percentage || 4.0) / 100;
+    const fixed = settings?.stripe_fixed_fee || 5.0;
     const taxFactor = 1.16; 
     
     const totalToPay = (amount + fixed) / (1 - (percentage * taxFactor));
     const roundedTotalCentavos = Math.ceil(totalToPay * 100);
-
-    if (roundedTotalCentavos < 1000) {
-      throw new Error("El monto es demasiado bajo para procesar con tarjeta. Debe ser mayor a $10.00 MXN.");
-    }
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
       line_items: [{
         price_data: {
           currency: 'mxn',
-          product_data: { 
-            name: description || "Anticipo de Reserva",
-          },
+          product_data: { name: description || "Anticipo de Reserva" },
           unit_amount: roundedTotalCentavos,
         },
         quantity: 1,
       }],
       mode: 'payment',
-      success_url: `${req.headers.get("origin")}/bus-tickets/confirmation/SUCCESS`,
-      cancel_url: `${req.headers.get("origin")}/payment-failure`,
+      // Redirección dinámica al número de contrato
+      success_url: `${req.headers.get("origin")}/bus-tickets/confirmation/${contractNumber}`,
+      cancel_url: `${req.headers.get("origin")}/tours`,
       client_reference_id: clientId,
     });
 
@@ -84,7 +63,6 @@ serve(async (req) => {
     });
 
   } catch (error: any) {
-    console.error("[stripe-checkout] Error:", error.message);
     return new Response(JSON.stringify({ error: error.message }), {
       status: 400,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
