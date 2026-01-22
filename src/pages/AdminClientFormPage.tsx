@@ -32,7 +32,7 @@ const AdminClientFormPage = () => {
   const [isSaving, setIsSaving] = useState(false);
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false);
   
-  const [formData, setFormData] = useState<any>( Episcopal{
+  const [formData, setFormData] = useState<any>({
     first_name: '', last_name: '', email: '', phone: '', address: '',
     identification_number: '', contract_number: '', tour_id: null,
     companions: [], total_amount: 0, total_paid: 0, status: 'confirmed',
