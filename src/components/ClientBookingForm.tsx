@@ -32,6 +32,12 @@ interface AgencySettings {
   advance_payment_amount: number;
 }
 
+interface Companion {
+  id: string;
+  name: string;
+  age: number | null;
+}
+
 interface ClientBookingFormProps {
   isOpen: boolean;
   onClose: () => void;
@@ -64,8 +70,8 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
 }) => {
   const [formData, setFormData] = useState({
     first_name: '', last_name: '', email: '', phone: '', address: '',
-    identification_number: null as string | null, contractor_age: null as number | null,
-    companions: [] as any[], extra_services: [] as TourProviderService[],
+    identification_number: '' as string, contractor_age: null as number | null,
+    companions: [] as Companion[], extra_services: [] as TourProviderService[],
   });
   const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
   const [totalAmount, setTotalAmount] = useState(0);
@@ -89,27 +95,62 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
                   formData.extra_services.reduce((s, x) => s + (x.selling_price_per_unit_snapshot * x.quantity), 0);
     
     setTotalAmount(total);
-  }, [formData, tourSellingPrices, selectedSeats.length]);
+  }, [formData, tourSellingPrices]);
+
+  const handleCompanionChange = (id: string, field: keyof Companion, value: string | number | null) => {
+    setFormData(prev => ({
+      ...prev,
+      companions: prev.companions.map(c => c.id === id ? { ...c, [field]: value } : c)
+    }));
+  };
+
+  const addCompanion = () => setFormData(p => ({ ...p, companions: [...p.companions, { id: uuidv4(), name: '', age: null }] }));
+  const removeCompanion = (id: string) => setFormData(p => ({ ...p, companions: p.companions.filter(c => c.id !== id) }));
+
+  const handleExtraServiceChange = (id: string, field: 'provider_id' | 'quantity', value: string | number) => {
+    setFormData(prev => {
+      const newServices = [...prev.extra_services];
+      const idx = newServices.findIndex(s => s.id === id);
+      if (idx !== -1) {
+        if (field === 'provider_id') {
+          const provider = tourAvailableExtraServices.find(p => p.provider_id === value);
+          if (provider) newServices[idx] = { ...newServices[idx], ...provider, provider_id: value as string };
+        } else {
+          newServices[idx].quantity = typeof value === 'string' ? parseFloat(value) || 0 : value;
+        }
+      }
+      return { ...prev, extra_services: newServices };
+    });
+  };
+
+  const addExtraService = () => setFormData(p => ({
+    ...p,
+    extra_services: [...p.extra_services, { id: uuidv4(), provider_id: '', quantity: 1, selling_price_per_unit_snapshot: 0, cost_per_unit_snapshot: 0, name_snapshot: '', service_type_snapshot: '', unit_type_snapshot: 'person' }]
+  }));
+
+  const removeExtraService = (id: string) => setFormData(p => ({ ...p, extra_services: p.extra_services.filter(s => s.id !== id) }));
 
   const handlePayment = async (method: 'mercadopago' | 'stripe' | 'transferencia' | 'manual') => {
     if (!formData.first_name || !formData.last_name || !formData.email) return toast.error('Rellena los campos obligatorios.');
-    if (selectedSeats.length !== (1 + formData.companions.length)) return toast.error(`Selecciona ${1 + formData.companions.length} asientos.`);
+    const totalPeople = 1 + formData.companions.length;
+    if (selectedSeats.length !== totalPeople) return toast.error(`Selecciona exactamente ${totalPeople} asientos.`);
 
     setIsSubmitting(true);
     try {
       const contractNum = uuidv4().substring(0, 8).toUpperCase();
       const advance = selectedSeats.length * advancePaymentPerPerson;
 
-      const { data: newClient } = await supabase.from('clients').insert({
+      const { data: newClient, error: clientErr } = await supabase.from('clients').insert({
         first_name: formData.first_name, last_name: formData.last_name,
         email: formData.email, phone: formData.phone, address: formData.address,
-        contract_number: contractNum, tour_id: tourId, number_of_people: selectedSeats.length,
+        identification_number: formData.identification_number,
+        contract_number: contractNum, tour_id: tourId, number_of_people: totalPeople,
         companions: formData.companions, extra_services: formData.extra_services,
         total_amount: totalAmount, advance_payment: advance, status: 'pending',
         contractor_age: formData.contractor_age, room_details: roomDetails
       }).select('id').single();
 
-      if (!newClient) throw new Error("Error al crear cliente");
+      if (clientErr || !newClient) throw new Error("Error al crear cliente");
 
       await supabase.from('tour_seat_assignments').insert(selectedSeats.map(s => ({
         tour_id: tourId, seat_number: s, status: 'booked', client_id: newClient.id
@@ -160,16 +201,60 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
 
         {!showBankInfo ? (
           <form className="grid gap-6 py-4">
-            <h3 className="text-lg font-bold border-b pb-2">Tus Datos</h3>
+            <h3 className="text-lg font-bold border-b pb-2">Tus Datos (Contratante)</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-1"><Label>Nombre</Label><Input value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} required /></div>
               <div className="space-y-1"><Label>Apellido</Label><Input value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} required /></div>
               <div className="space-y-1"><Label>Email</Label><Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required /></div>
               <div className="space-y-1"><Label>Teléfono</Label><Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
+              <div className="space-y-1"><Label>Identificación (INE/Pasaporte)</Label><Input value={formData.identification_number} onChange={e => setFormData({...formData, identification_number: e.target.value})} /></div>
+              <div className="space-y-1"><Label>Edad</Label><Input type="number" value={formData.contractor_age || ''} onChange={e => setFormData({...formData, contractor_age: parseInt(e.target.value) || null})} /></div>
+              <div className="md:col-span-2 space-y-1"><Label>Dirección Completa</Label><Textarea value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} placeholder="Calle, Número, Colonia, Ciudad..." /></div>
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold border-b pb-2 flex justify-between items-center">
+                Acompañantes
+                <Button type="button" variant="outline" size="sm" onClick={addCompanion}><PlusCircle className="h-4 w-4 mr-2" /> Añadir</Button>
+              </h3>
+              {formData.companions.map((c, idx) => (
+                <div key={c.id} className="grid grid-cols-1 md:grid-cols-3 gap-2 bg-gray-50 p-2 rounded-lg items-end">
+                  <div className="md:col-span-2 space-y-1"><Label className="text-xs">Nombre Completo</Label><Input value={c.name} onChange={e => handleCompanionChange(c.id, 'name', e.target.value)} /></div>
+                  <div className="flex gap-2">
+                    <div className="space-y-1 flex-grow"><Label className="text-xs">Edad</Label><Input type="number" value={c.age || ''} onChange={e => handleCompanionChange(c.id, 'age', parseInt(e.target.value) || null)} /></div>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeCompanion(c.id)} className="text-red-500"><MinusCircle className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="space-y-4">
+              <h3 className="text-lg font-bold border-b pb-2 flex justify-between items-center">
+                Servicios Adicionales
+                <Button type="button" variant="outline" size="sm" onClick={addExtraService}><PlusCircle className="h-4 w-4 mr-2" /> Añadir</Button>
+              </h3>
+              {formData.extra_services.map((s) => (
+                <div key={s.id} className="grid grid-cols-1 md:grid-cols-3 gap-2 bg-blue-50/50 p-2 rounded-lg items-end">
+                  <div className="md:col-span-1 space-y-1">
+                    <Label className="text-xs">Servicio</Label>
+                    <Select value={s.provider_id} onValueChange={val => handleExtraServiceChange(s.id, 'provider_id', val)}>
+                      <SelectTrigger><SelectValue placeholder="Elegir..." /></SelectTrigger>
+                      <SelectContent>
+                        {tourAvailableExtraServices.map(p => <SelectItem key={p.provider_id} value={p.provider_id}>{p.name_snapshot}</SelectItem>)}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-1"><Label className="text-xs">Cantidad</Label><Input type="number" value={s.quantity} onChange={e => handleExtraServiceChange(s.id, 'quantity', e.target.value)} /></div>
+                  <div className="flex gap-2 items-center">
+                    <div className="flex-grow text-xs font-bold text-gray-500">Total: ${(s.selling_price_per_unit_snapshot * s.quantity).toLocaleString()}</div>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeExtraService(s.id)} className="text-red-500"><MinusCircle className="h-4 w-4" /></Button>
+                  </div>
+                </div>
+              ))}
             </div>
 
             <div className="pt-4">
-              <h3 className="text-lg font-bold border-b pb-2 mb-4">Selección de Asientos</h3>
+              <h3 className="text-lg font-bold border-b pb-2 mb-4">Selección de Asientos ({selectedSeats.length} de {1 + formData.companions.length})</h3>
               <TourSeatMap tourId={tourId} busCapacity={busDetails.bus_capacity} courtesies={busDetails.courtesies} seatLayoutJson={busDetails.seat_layout_json} onSeatsSelected={setSelectedSeats} />
             </div>
 
