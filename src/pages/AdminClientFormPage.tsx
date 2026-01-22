@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, MapPin, Hotel, User, Mail, Phone, IdentificationCard, Users, BusFront, ArrowLeft } from 'lucide-react';
+import { Loader2, Save, MapPin, Hotel, User, Users, BusFront, ArrowLeft } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
@@ -75,64 +75,57 @@ const AdminClientFormPage = () => {
     if (!selectedTour) return;
     
     const totalPax = clientSelectedSeats.length;
-    if (totalPax === 0) {
-      setTotalAmount(0);
-      setRoomsCount(0);
-      setBreakdownDetails([]);
-      return;
-    }
+    let newTotal = 0;
+    let newRooms = 0;
+    let newDetails: string[] = [];
 
-    if (formData.is_transport_only) {
-      // MODO: SOLO TRASLADO
-      const price = selectedTour.transport_only_price || 0;
-      const total = totalPax * price;
-      setTotalAmount(total);
-      setRoomsCount(0);
-      setBreakdownDetails([`${totalPax} Pasajero(s) en Modalidad Solo Traslado ($${price} p/p)`]);
-    } else {
-      // MODO: ALOJAMIENTO INCLUIDO
-      const neededRooms = Math.ceil(totalPax / 4);
-      setRoomsCount(neededRooms);
+    if (totalPax > 0) {
+      if (formData.is_transport_only) {
+        const price = selectedTour.transport_only_price || 0;
+        newTotal = totalPax * price;
+        newRooms = 0;
+        newDetails = [`${totalPax} Pasajero(s) en Modalidad Solo Traslado ($${price} p/p)`];
+      } else {
+        newRooms = Math.ceil(totalPax / 4);
 
-      let adults = (formData.contractor_age === null || formData.contractor_age > 12) ? 1 : 0;
-      let children = (formData.contractor_age !== null && formData.contractor_age <= 12) ? 1 : 0;
-      formData.companions.forEach((c: any) => { 
-        (c.age === null || c.age > 12) ? adults++ : children++; 
-      });
+        let adults = (formData.contractor_age === null || formData.contractor_age > 12) ? 1 : 0;
+        let children = (formData.contractor_age !== null && formData.contractor_age <= 12) ? 1 : 0;
+        formData.companions.forEach((c: any) => { 
+          (c.age === null || c.age > 12) ? adults++ : children++; 
+        });
 
-      let tempAdults = adults;
-      let tempChildren = children;
-      let calculatedTotal = 0;
-      let details: string[] = [];
+        let tempAdults = adults;
+        let tempChildren = children;
 
-      for (let i = 0; i < neededRooms; i++) {
-        const paxInRoom = Math.min(4, tempAdults + tempChildren);
-        const adultsInRoom = Math.min(paxInRoom, tempAdults);
-        const childrenInRoom = paxInRoom - adultsInRoom;
+        for (let i = 0; i < newRooms; i++) {
+          const paxInRoom = Math.min(4, tempAdults + tempChildren);
+          const adultsInRoom = Math.min(paxInRoom, tempAdults);
+          const childrenInRoom = paxInRoom - adultsInRoom;
 
-        // REGLA: 1 Adulto Solo o 1 Adulto + 1 Niño pagan como 2 Adultos en Doble
-        if ((paxInRoom === 1 && adultsInRoom === 1) || (paxInRoom === 2 && adultsInRoom === 1 && childrenInRoom === 1)) {
-          calculatedTotal += (2 * selectedTour.selling_price_double_occupancy);
-          details.push(`Hab. ${i+1}: Cargo base de Habitación Doble (2 pax)`);
-        } else {
-          let occPrice = selectedTour.selling_price_quad_occupancy;
-          let label = "Cuádruple";
-          if (paxInRoom === 3) { occPrice = selectedTour.selling_price_triple_occupancy; label = "Triple"; }
-          else if (paxInRoom === 2) { occPrice = selectedTour.selling_price_double_occupancy; label = "Doble"; }
+          if ((paxInRoom === 1 && adultsInRoom === 1) || (paxInRoom === 2 && adultsInRoom === 1 && childrenInRoom === 1)) {
+            newTotal += (2 * selectedTour.selling_price_double_occupancy);
+            newDetails.push(`Hab. ${i+1}: Cargo base de Habitación Doble (2 pax)`);
+          } else {
+            let occPrice = selectedTour.selling_price_quad_occupancy;
+            let label = "Cuádruple";
+            if (paxInRoom === 3) { occPrice = selectedTour.selling_price_triple_occupancy; label = "Triple"; }
+            else if (paxInRoom === 2) { occPrice = selectedTour.selling_price_double_occupancy; label = "Doble"; }
 
-          calculatedTotal += (adultsInRoom * occPrice) + (childrenInRoom * selectedTour.selling_price_child);
-          details.push(`Hab. ${i+1}: ${adultsInRoom} Ad. (${label}) + ${childrenInRoom} Niñ.`);
+            newTotal += (adultsInRoom * occPrice) + (childrenInRoom * selectedTour.selling_price_child);
+            newDetails.push(`Hab. ${i+1}: ${adultsInRoom} Ad. (${label}) + ${childrenInRoom} Niñ.`);
+          }
+
+          tempAdults -= adultsInRoom;
+          tempChildren -= childrenInRoom;
         }
-
-        tempAdults -= adultsInRoom;
-        tempChildren -= childrenInRoom;
       }
-
-      setTotalAmount(calculatedTotal);
-      setBreakdownDetails(details);
     }
 
-    // Gestionar lista de acompañantes según asientos (total - 1 contratante)
+    setRoomsCount(newRooms);
+    setBreakdownDetails(newDetails);
+    setFormData((prev: any) => ({ ...prev, total_amount: newTotal }));
+
+    // Gestionar lista de acompañantes según asientos
     const neededComps = totalPax - 1;
     if (neededComps !== formData.companions.length && neededComps >= 0) {
       setFormData((p: any) => {
@@ -146,7 +139,7 @@ const AdminClientFormPage = () => {
         return { ...p, companions: newComps };
       });
     }
-  }, [clientSelectedSeats.length, formData.contractor_age, formData.companions.length, formData.is_transport_only, selectedTour]);
+  }, [clientSelectedSeats.length, formData.contractor_age, formData.is_transport_only, selectedTour]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -194,8 +187,6 @@ const AdminClientFormPage = () => {
 
         <main className="flex-grow container mx-auto px-4 py-8 max-w-6xl">
           <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            
-            {/* Columna Izquierda: Datos y Selección */}
             <div className="lg:col-span-2 space-y-6">
               <Card className="shadow-lg border-none">
                 <CardHeader className="bg-gray-50 border-b">
@@ -310,11 +301,10 @@ const AdminClientFormPage = () => {
               )}
             </div>
 
-            {/* Columna Derecha: Resumen Financiero */}
             <div className="space-y-6">
               <Card className="bg-gray-900 text-white shadow-xl sticky top-8">
                 <CardHeader className="border-b border-white/10">
-                  <CardTitle className="text-white flex items-center gap-2"><Hotel className="h-5 w-5 text-rosa-mexicano" /> Resumen de Liquidación</CardTitle>
+                  <CardTitle className="text-white flex items-center gap-2">Resumen de Liquidación</CardTitle>
                 </CardHeader>
                 <CardContent className="pt-6 space-y-6">
                   {!formData.is_transport_only ? (
@@ -356,12 +346,8 @@ const AdminClientFormPage = () => {
                 </CardContent>
               </Card>
             </div>
-
           </form>
         </main>
-        <footer className="bg-gray-800 text-white py-4 text-center text-sm">
-          <p>&copy; {new Date().getFullYear()} Saura Tours Admin. Todos los derechos reservados.</p>
-        </footer>
       </div>
     </div>
   );
