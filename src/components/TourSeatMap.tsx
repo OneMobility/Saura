@@ -39,7 +39,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
   currentClientId = null,
   initialSelectedSeats = [],
 }) => {
-  const { isAdmin } = useSession();
+  const { isAdmin, isLoading: sessionLoading } = useSession(); // Añadido sessionLoading
   const [seats, setSeats] = useState<Seat[]>([]);
   const [loading, setLoading] = useState(true);
   const [isUpdatingSeats, setIsUpdatingSeats] = useState(false);
@@ -53,9 +53,12 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
     
     let fetchedAssignments: any[] = [];
     if (isValidUUID(tourId)) {
+      // SOLO traer los nombres de los clientes si es admin
+      const selectQuery = isAdmin ? '*, clients(first_name, last_name)' : '*';
+      
       const { data, error } = await supabase
         .from('tour_seat_assignments')
-        .select('*, clients(first_name, last_name)')
+        .select(selectQuery)
         .eq('tour_id', tourId);
       
       if (!error) fetchedAssignments = data || [];
@@ -76,7 +79,11 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
 
     const baseSeats = seatNumbers.map(num => {
       const dbEntry = fetchedAssignments.find(s => s.seat_number === num);
-      const clientName = dbEntry?.clients ? `${dbEntry.clients.first_name} ${dbEntry.clients.last_name}` : undefined;
+      
+      // Solo construir el nombre si los datos están disponibles (será null para público)
+      const clientName = (isAdmin && dbEntry?.clients) 
+        ? `${dbEntry.clients.first_name || ''} ${dbEntry.clients.last_name || ''}`.trim() 
+        : undefined;
       
       return {
         seat_number: num,
@@ -98,28 +105,27 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
 
     setSeats(finalSeats);
     setLoading(false);
-  }, [tourId, seatLayoutJson, courtesies]);
+  }, [tourId, seatLayoutJson, courtesies, isAdmin]); // isAdmin es ahora dependencia
 
   useEffect(() => {
-    fetchSeats();
-  }, [fetchSeats]);
+    if (!sessionLoading) {
+      fetchSeats();
+    }
+  }, [fetchSeats, sessionLoading]);
 
   const handleSeatClick = async (seatNumber: number, currentStatus: Seat['status'], assignedClientId: string | null, clientName?: string) => {
     if (readOnly || !onSeatsSelected) return;
 
-    // Lógica para asientos ya reservados
     if (currentStatus === 'booked') {
-      // SOLO MOSTRAR NOMBRE SI ES ADMIN
+      // Solo mostrar nombre si el usuario es Admin y el nombre existe
       if (isAdmin && clientName) {
         toast.info(`Asiento ${seatNumber}: ${clientName}`, {
           icon: <User className="h-4 w-4 text-blue-500" />,
         });
       } else if (assignedClientId === currentClientId && assignedClientId !== null) {
-        // Permitir deselección al mismo cliente durante su proceso de reserva
         const newSelection = initialSelectedSeats.filter(s => s !== seatNumber);
         onSeatsSelected(newSelection);
       } else {
-        // Mensaje genérico para el público
         toast.info(`Asiento ${seatNumber} ya reservado.`);
       }
       return;
@@ -177,7 +183,7 @@ const TourSeatMap: React.FC<TourSeatMapProps> = ({
     return cn(base, "bg-gray-100 text-gray-700 hover:bg-gray-200 cursor-pointer border border-gray-200");
   };
 
-  if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-rosa-mexicano" /></div>;
+  if (loading || sessionLoading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-rosa-mexicano" /></div>;
 
   const currentLayout = seatLayoutJson || [];
   const maxCols = currentLayout.reduce((max, row) => Math.max(max, row.length), 0);
