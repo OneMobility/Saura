@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, FileText, Info, Users, Handshake } from 'lucide-react';
+import { Loader2, Save, PlusCircle, MinusCircle, FileText, Info, Users, Handshake, Armchair } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
@@ -16,19 +16,8 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
 import TourSeatMap from '@/components/TourSeatMap';
 import { TourProviderService, AvailableProvider, SeatLayout } from '@/types/shared';
+import { Badge } from '@/components/ui/badge';
 import ClientPaymentHistoryTable from '@/components/admin/clients/ClientPaymentHistoryTable';
-
-interface BusPassenger {
-  id: string;
-  first_name: string;
-  last_name: string;
-  age: number | null;
-  identification_number: string | null;
-  is_contractor: boolean;
-  seat_number: number;
-  email: string | null;
-  phone: string | null;
-}
 
 interface Companion {
   id: string;
@@ -55,7 +44,6 @@ interface Client {
   bus_route_id: string | null;
   number_of_people: number;
   companions: Companion[];
-  bus_passengers: BusPassenger[];
   extra_services: TourProviderService[];
   total_amount: number;
   advance_payment: number;
@@ -63,9 +51,6 @@ interface Client {
   status: string;
   contractor_age: number | null;
   room_details: RoomDetails;
-  remaining_payment?: number;
-  bus_capacity?: number;
-  courtesies?: number;
 }
 
 interface Tour {
@@ -80,22 +65,11 @@ interface Tour {
   bus_capacity: number;
 }
 
-interface BusRoute {
-  id: string;
-  name: string;
-  bus_id: string | null;
-}
-
 interface Bus {
   id: string;
   name: string;
-  rental_cost: number;
   total_capacity: number;
   seat_layout_json: SeatLayout | null;
-}
-
-interface AgencySettings {
-  advance_payment_amount: number;
 }
 
 const allocateRoomsForPeople = (totalPeople: number): RoomDetails => {
@@ -118,10 +92,9 @@ const AdminClientFormPage = () => {
     first_name: '', last_name: '', email: '', phone: '', address: '',
     contract_number: uuidv4().substring(0, 8).toUpperCase(),
     identification_number: null, tour_id: null, bus_route_id: null,
-    number_of_people: 1, companions: [], bus_passengers: [], extra_services: [],
+    number_of_people: 1, companions: [], extra_services: [],
     total_amount: 0, advance_payment: 0, total_paid: 0, status: 'pending',
-    contractor_age: null, room_details: { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 },
-    bus_capacity: 0, courtesies: 0
+    contractor_age: null, room_details: { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 }
   });
   
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -129,73 +102,59 @@ const AdminClientFormPage = () => {
   const [availableTours, setAvailableTours] = useState<Tour[]>([]);
   const [availableBuses, setAvailableBuses] = useState<Bus[]>([]);
   const [availableProviders, setAvailableProviders] = useState<AvailableProvider[]>([]);
-  const [selectedTourPrices, setSelectedTourPrices] = useState<Tour | null>(null);
+  const [selectedTour, setSelectedTour] = useState<Tour | null>(null);
   const [clientSelectedSeats, setClientSelectedSeats] = useState<number[]>([]);
   const [roomDetails, setRoomDetails] = useState<RoomDetails>({ double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
-  const [agencySettings, setAgencySettings] = useState<AgencySettings | null>(null);
-  const [calculatedMinAdvance, setCalculatedMinAdvance] = useState(0);
 
   useEffect(() => {
-    const fetchData = async () => {
-      const [toursRes, settingsRes, providersRes, busesRes] = await Promise.all([
+    const fetchDependencies = async () => {
+      const [toursRes, providersRes, busesRes] = await Promise.all([
         supabase.from('tours').select('*').order('title', { ascending: true }),
-        supabase.from('agency_settings').select('advance_payment_amount').single(),
         supabase.from('providers').select('*').eq('is_active', true).order('name', { ascending: true }),
         supabase.from('buses').select('*').order('name', { ascending: true })
       ]);
 
       if (toursRes.data) setAvailableTours(toursRes.data);
-      if (settingsRes.data) setAgencySettings(settingsRes.data);
       if (providersRes.data) setAvailableProviders(providersRes.data);
       if (busesRes.data) setAvailableBuses(busesRes.data);
     };
-    fetchData();
+    fetchDependencies();
   }, []);
 
-  const refreshClientData = useCallback(async () => {
-    if (clientIdFromParams) {
-      setLoadingInitialData(true);
-      const { data: clientData } = await supabase.from('clients').select('*').eq('id', clientIdFromParams).single();
-      if (clientData) {
-        let assignedSeats = [];
-        if (clientData.tour_id) {
-          const { data: seats } = await supabase.from('tour_seat_assignments').select('seat_number').eq('client_id', clientData.id);
-          assignedSeats = seats?.map(s => s.seat_number) || [];
-          
-          const { data: tourData } = await supabase.from('tours').select('bus_capacity, courtesies').eq('id', clientData.tour_id).single();
-          if (tourData) setFormData(p => ({ ...p, bus_capacity: tourData.bus_capacity, courtesies: tourData.courtesies }));
-        }
-        
-        setFormData(prev => ({ 
-          ...prev, 
-          ...clientData, 
-          companions: clientData.companions || [],
-          extra_services: clientData.extra_services || []
-        }));
-        setRoomDetails(clientData.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
-        setClientSelectedSeats(assignedSeats);
-      }
-      setLoadingInitialData(false);
-    } else {
-      setLoadingInitialData(false);
-    }
-  }, [clientIdFromParams]);
+  useEffect(() => {
+    const fetchClientData = async () => {
+      if (clientIdFromParams) {
+        setLoadingInitialData(true);
+        const { data: clientData } = await supabase.from('clients').select('*').eq('id', clientIdFromParams).single();
+        if (clientData) {
+          setFormData({
+            ...clientData,
+            companions: clientData.companions || [],
+            extra_services: clientData.extra_services || []
+          });
+          setRoomDetails(clientData.room_details || { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
 
-  useEffect(() => { if (!sessionLoading) refreshClientData(); }, [sessionLoading, refreshClientData]);
+          // Fetch assigned seats
+          const { data: seats } = await supabase.from('tour_seat_assignments').select('seat_number').eq('client_id', clientData.id);
+          setClientSelectedSeats(seats?.map(s => s.seat_number) || []);
+        }
+        setLoadingInitialData(false);
+      } else {
+        setLoadingInitialData(false);
+      }
+    };
+
+    if (!sessionLoading) fetchClientData();
+  }, [clientIdFromParams, sessionLoading]);
 
   useEffect(() => {
     if (formData.tour_id) {
       const tour = availableTours.find(t => t.id === formData.tour_id);
-      setSelectedTourPrices(tour || null);
-      if (tour && agencySettings) {
-        const minPrice = Math.min(tour.selling_price_double_occupancy, tour.selling_price_triple_occupancy, tour.selling_price_quad_occupancy, tour.selling_price_child);
-        const fixed = agencySettings.advance_payment_amount || 500;
-        const percent = minPrice * 0.10;
-        setCalculatedMinAdvance(Math.max(fixed, percent));
-        setFormData(prev => ({ ...prev, bus_capacity: tour.bus_capacity, courtesies: tour.courtesies }));
-      }
+      setSelectedTour(tour || null);
+    } else {
+      setSelectedTour(null);
     }
-  }, [formData.tour_id, availableTours, agencySettings]);
+  }, [formData.tour_id, availableTours]);
 
   useEffect(() => {
     let adults = (formData.contractor_age === null || formData.contractor_age >= 12) ? 1 : 0;
@@ -203,12 +162,12 @@ const AdminClientFormPage = () => {
     formData.companions.forEach(c => { (c.age === null || c.age >= 12) ? adults++ : children++; });
 
     let calculatedTotalAmount = 0;
-    if (formData.tour_id && selectedTourPrices) {
+    if (selectedTour) {
       const rd = allocateRoomsForPeople(adults);
-      calculatedTotalAmount = (rd.double_rooms * selectedTourPrices.selling_price_double_occupancy * 2) +
-                              (rd.triple_rooms * selectedTourPrices.selling_price_triple_occupancy * 3) +
-                              (rd.quad_rooms * selectedTourPrices.selling_price_quad_occupancy * 4) +
-                              (children * selectedTourPrices.selling_price_child);
+      calculatedTotalAmount = (rd.double_rooms * selectedTour.selling_price_double_occupancy * 2) +
+                              (rd.triple_rooms * selectedTour.selling_price_triple_occupancy * 3) +
+                              (rd.quad_rooms * selectedTour.selling_price_quad_occupancy * 4) +
+                              (children * selectedTour.selling_price_child);
       setRoomDetails(rd);
     }
 
@@ -220,7 +179,7 @@ const AdminClientFormPage = () => {
       number_of_people: adults + children,
       total_amount: calculatedTotalAmount,
     }));
-  }, [formData.companions, formData.contractor_age, formData.extra_services, selectedTourPrices]);
+  }, [formData.companions, formData.contractor_age, formData.extra_services, selectedTour]);
 
   const handleCompanionChange = (id: string, field: keyof Companion, value: string | number | null) => {
     setFormData(prev => ({
@@ -292,14 +251,14 @@ const AdminClientFormPage = () => {
       await supabase.from('tour_seat_assignments').insert(clientSelectedSeats.map(s => ({ tour_id: formData.tour_id, seat_number: s, status: 'booked', client_id: savedId })));
     }
 
-    toast.success('Cambios guardados con éxito.');
+    toast.success('Cliente guardado con éxito.');
     navigate('/admin/clients');
     setIsSubmitting(false);
   };
 
   if (loadingInitialData) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-rosa-mexicano" /></div>;
 
-  const currentBus = selectedTourPrices?.bus_id ? availableBuses.find(b => b.id === selectedTourPrices.bus_id) : null;
+  const currentBus = selectedTour?.bus_id ? availableBuses.find(b => b.id === selectedTour.bus_id) : null;
 
   return (
     <div className="flex min-h-screen bg-gray-100">
@@ -310,8 +269,8 @@ const AdminClientFormPage = () => {
           <div className="bg-white rounded-xl shadow-lg p-8">
             <form onSubmit={handleSubmit} className="space-y-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="space-y-2"><Label>Nombre</Label><Input id="first_name" value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} required /></div>
-                <div className="space-y-2"><Label>Apellido</Label><Input id="last_name" value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} required /></div>
+                <div className="space-y-2"><Label>Nombre</Label><Input value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} required /></div>
+                <div className="space-y-2"><Label>Apellido</Label><Input value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} required /></div>
                 <div className="space-y-2"><Label>Email</Label><Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required /></div>
                 <div className="space-y-2"><Label>Teléfono</Label><Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
                 <div className="space-y-2"><Label>Identificación</Label><Input value={formData.identification_number || ''} onChange={e => setFormData({...formData, identification_number: e.target.value})} /></div>
@@ -354,7 +313,6 @@ const AdminClientFormPage = () => {
 
               <div className="p-4 bg-muted rounded-xl border-l-4 border-rosa-mexicano grid grid-cols-1 md:grid-cols-3 gap-6">
                 <div><Label className="text-xs text-gray-400 uppercase">Monto Total</Label><p className="text-2xl font-black text-rosa-mexicano">${formData.total_amount.toLocaleString()}</p></div>
-                <div className="space-y-2"><Label className="font-bold">Anticipo Pactado ($)</Label><Input type="number" value={formData.advance_payment} onChange={e => setFormData({...formData, advance_payment: parseFloat(e.target.value) || 0})} className="bg-white" /></div>
                 <div className="space-y-2">
                   <Label>Tour Asociado</Label>
                   <Select value={formData.tour_id || 'none'} onValueChange={v => setFormData({...formData, tour_id: v === 'none' ? null : v})}>
@@ -362,16 +320,51 @@ const AdminClientFormPage = () => {
                     <SelectContent><SelectItem value="none">Ninguno</SelectItem>{availableTours.map(t => <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
+                <div className="space-y-2">
+                  <Label>Estado de la Reserva</Label>
+                  <Select value={formData.status} onValueChange={v => setFormData({...formData, status: v})}>
+                    <SelectTrigger><SelectValue placeholder="Estado..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="pending">Pendiente</SelectItem>
+                      <SelectItem value="confirmed">Confirmada</SelectItem>
+                      <SelectItem value="cancelled">Cancelada</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
-              {formData.tour_id && (
-                <div className="pt-6 border-t"><Label className="text-lg font-bold block mb-4">Selección de Asientos</Label><TourSeatMap tourId={formData.tour_id} busCapacity={formData.bus_capacity || 0} courtesies={formData.courtesies || 0} seatLayoutJson={currentBus?.seat_layout_json || null} onSeatsSelected={setClientSelectedSeats} initialSelectedSeats={clientSelectedSeats} currentClientId={formData.id} /></div>
+              {selectedTour && (
+                <div className="pt-6 border-t">
+                  <h3 className="text-lg font-bold mb-4 flex items-center gap-2"><Armchair className="h-5 w-5 text-rosa-mexicano" /> Selección de Asientos</h3>
+                  <div className="bg-blue-50 p-4 rounded-xl mb-4 text-xs text-blue-800 border border-blue-100">
+                    Selecciona los <strong>{formData.number_of_people}</strong> asientos correspondientes a esta reserva.
+                  </div>
+                  <TourSeatMap 
+                    tourId={selectedTour.id} 
+                    busCapacity={selectedTour.bus_capacity} 
+                    courtesies={selectedTour.courtesies} 
+                    seatLayoutJson={currentBus?.seat_layout_json || null} 
+                    onSeatsSelected={setClientSelectedSeats} 
+                    initialSelectedSeats={clientSelectedSeats} 
+                    currentClientId={clientIdFromParams} 
+                  />
+                  {clientSelectedSeats.length > 0 && (
+                    <div className="mt-4 p-4 bg-gray-50 rounded-lg flex items-center gap-2">
+                      <span className="font-bold text-sm">Asientos elegidos:</span>
+                      <div className="flex gap-1">
+                        {clientSelectedSeats.sort((a,b) => a-b).map(s => (
+                          <Badge key={s} className="bg-rosa-mexicano">{s}</Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
               )}
 
               <div className="flex justify-end pt-8"><Button type="submit" disabled={isSubmitting} className="bg-rosa-mexicano px-12 h-12 text-lg font-bold">{isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />} Guardar Cliente</Button></div>
             </form>
           </div>
-          {formData.id && <div className="mt-8"><ClientPaymentHistoryTable clientId={formData.id} onPaymentsUpdated={refreshClientData} /></div>}
+          {clientIdFromParams && <div className="mt-8"><ClientPaymentHistoryTable clientId={clientIdFromParams} onPaymentsUpdated={() => {}} /></div>}
         </main>
       </div>
     </div>
