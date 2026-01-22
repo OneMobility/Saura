@@ -119,8 +119,14 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
   }, [formData, tourSellingPrices]);
 
   const handlePayment = async (method: 'mercadopago' | 'stripe' | 'transferencia' | 'manual') => {
-    if (!formData.first_name || !formData.last_name || !formData.email) return toast.error('Rellena los campos obligatorios.');
-    if (selectedSeats.length === 0) return toast.error('Selecciona al menos un asiento.');
+    if (!formData.first_name || !formData.last_name || !formData.email) {
+      toast.error('Nombre, Apellido y Email son obligatorios.');
+      return;
+    }
+    if (selectedSeats.length === 0) {
+      toast.error('Por favor, selecciona tus asientos.');
+      return;
+    }
 
     setIsSubmitting(true);
     try {
@@ -137,34 +143,36 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
         contractor_age: formData.contractor_age, room_details: roomDetails
       }).select('id').single();
 
-      if (clientErr || !newClient) throw new Error("Error al crear registro de cliente.");
+      if (clientErr || !newClient) throw new Error("No se pudo crear el registro de cliente.");
 
-      await supabase.from('tour_seat_assignments').insert(selectedSeats.map(s => ({
+      const { error: seatErr } = await supabase.from('tour_seat_assignments').insert(selectedSeats.map(s => ({
         tour_id: tourId, seat_number: s, status: 'booked', client_id: newClient.id
       })));
+
+      if (seatErr) throw new Error("Error al asignar asientos.");
 
       if (method === 'mercadopago') {
         const { data, error } = await supabase.functions.invoke('mercadopago-checkout', {
           body: { clientId: newClient.id, amount: advance, description: `Anticipo Tour: ${tourTitle}` }
         });
-        if (error) throw error;
+        if (error || !data.init_point) throw new Error(data?.error || "Error al conectar con Mercado Pago.");
         window.location.href = data.init_point;
       } else if (method === 'stripe') {
         const { data, error } = await supabase.functions.invoke('stripe-checkout', {
           body: { clientId: newClient.id, amount: advance, description: `Anticipo Tour: ${tourTitle}` }
         });
-        if (error) throw error;
+        if (error || !data.url) throw new Error(data?.error || "Error al conectar con Stripe.");
         window.location.href = data.url;
       } else if (method === 'transferencia') {
         setShowBankInfo(true);
-        toast.success(`Reserva ${contractNum} registrada.`);
+        toast.success(`Reserva ${contractNum} registrada correctamente.`);
       } else {
-        toast.success(`Reserva exitosa: ${contractNum}`);
+        toast.success(`¡Felicidades! Reserva ${contractNum} creada con éxito.`);
         onClose();
       }
     } catch (e: any) {
       console.error(e);
-      toast.error('Error al procesar el pago o la reserva: ' + (e.message || 'Error desconocido'));
+      toast.error(e.message || 'Ocurrió un error inesperado al procesar tu reserva.');
     } finally {
       setIsSubmitting(false);
     }
@@ -178,15 +186,15 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Finalizar Reserva: {tourTitle}</DialogTitle>
-          {agencySettings?.payment_mode === 'test' && <Badge className="bg-yellow-400 text-black w-fit">Modo Sandbox (Pruebas)</Badge>}
+          {agencySettings?.payment_mode === 'test' && <Badge className="bg-yellow-400 text-black w-fit">Ambiente de Pruebas Activo</Badge>}
         </DialogHeader>
 
         {!showBankInfo ? (
           <div className="space-y-8 py-4">
             <div className="p-4 bg-muted/50 rounded-xl border-l-4 border-rosa-mexicano flex items-center justify-between">
               <div>
-                <h3 className="font-bold flex items-center gap-2"><Info className="h-4 w-4" /> Resumen</h3>
-                <p className="text-sm">Asientos: <strong>{selectedSeats.join(', ')}</strong> ({selectedSeats.length} pax)</p>
+                <h3 className="font-bold flex items-center gap-2"><Info className="h-4 w-4" /> Resumen de Reserva</h3>
+                <p className="text-sm">Asientos seleccionados: <strong>{selectedSeats.join(', ')}</strong></p>
               </div>
               <div className="text-right">
                 <p className="text-xs uppercase opacity-60">Anticipo Total</p>
@@ -195,12 +203,12 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="space-y-1"><Label>Nombre(s)</Label><Input value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} /></div>
-              <div className="space-y-1"><Label>Apellido(s)</Label><Input value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} /></div>
-              <div className="space-y-1"><Label>Email</Label><Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} /></div>
-              <div className="space-y-1"><Label>WhatsApp (10 dígitos)</Label><Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
-              <div className="space-y-1"><Label>Identificación (INE/Pasaporte)</Label><Input value={formData.identification_number} onChange={e => setFormData({...formData, identification_number: e.target.value})} placeholder="Opcional" /></div>
-              <div className="space-y-1"><Label>Edad del Titular</Label><Input type="number" value={formData.contractor_age || ''} onChange={e => setFormData({...formData, contractor_age: parseInt(e.target.value) || null})} /></div>
+              <div className="space-y-1"><Label>Nombre(s)</Label><Input value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} placeholder="Ej: Juan" /></div>
+              <div className="space-y-1"><Label>Apellido(s)</Label><Input value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} placeholder="Ej: Pérez" /></div>
+              <div className="space-y-1"><Label>Email</Label><Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} placeholder="ejemplo@correo.com" /></div>
+              <div className="space-y-1"><Label>WhatsApp (10 dígitos)</Label><Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} placeholder="8441234567" /></div>
+              <div className="space-y-1"><Label>Identificación (INE/Pasaporte)</Label><Input value={formData.identification_number} onChange={e => setFormData({...formData, identification_number: e.target.value})} placeholder="Número de documento" /></div>
+              <div className="space-y-1"><Label>Edad del Titular</Label><Input type="number" value={formData.contractor_age || ''} onChange={e => setFormData({...formData, contractor_age: parseInt(e.target.value) || null})} placeholder="Años" /></div>
             </div>
 
             {formData.companions.length > 0 && (
@@ -218,22 +226,22 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
             )}
 
             <div className="space-y-4 pt-4 border-t">
-              <h3 className="font-bold">Ajustar Asientos</h3>
+              <h3 className="font-bold">Verificar Asientos</h3>
               <TourSeatMap tourId={tourId} busCapacity={busDetails.bus_capacity} courtesies={busDetails.courtesies} seatLayoutJson={busDetails.seat_layout_json} onSeatsSelected={setSelectedSeats} initialSelectedSeats={selectedSeats} />
             </div>
 
             <div className="p-6 bg-gray-900 text-white rounded-2xl shadow-xl flex justify-between items-center border-b-4 border-rosa-mexicano">
-              <div><p className="text-xs uppercase font-bold opacity-60">Total de la Reserva</p><h3 className="text-4xl font-black">${totalAmount.toLocaleString()}</h3></div>
-              <div className="text-right"><p className="text-xs uppercase font-bold opacity-60">Anticipo Requerido</p><h3 className="text-4xl font-black text-yellow-400">${(selectedSeats.length * advancePaymentPerPerson).toLocaleString()}</h3></div>
+              <div><p className="text-xs uppercase font-bold opacity-60">Total a Pagar</p><h3 className="text-4xl font-black">${totalAmount.toLocaleString()}</h3></div>
+              <div className="text-right"><p className="text-xs uppercase font-bold opacity-60">Paga Hoy (Anticipo)</p><h3 className="text-4xl font-black text-yellow-400">${(selectedSeats.length * advancePaymentPerPerson).toLocaleString()}</h3></div>
             </div>
 
             <div className="space-y-3">
-              <Label className="text-center block font-bold text-gray-500 uppercase text-xs tracking-widest">Selecciona tu método de pago para el anticipo</Label>
+              <Label className="text-center block font-bold text-gray-500 uppercase text-xs tracking-widest">Elige tu método de pago</Label>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                {hasOnlineMP && <Button onClick={() => handlePayment('mercadopago')} disabled={isSubmitting} className="bg-[#009EE3] hover:bg-[#0086c3] h-14 font-bold rounded-xl text-white shadow-lg"><CreditCard className="mr-2 h-5 w-5" /> Pagar con Mercado Pago</Button>}
-                {hasOnlineStripe && <Button onClick={() => handlePayment('stripe')} disabled={isSubmitting} className="bg-[#635BFF] hover:bg-[#5249d3] h-14 font-bold rounded-xl text-white shadow-lg"><CreditCard className="mr-2 h-5 w-5" /> Pagar con Tarjeta (Stripe)</Button>}
-                {agencySettings?.bank_accounts.length ? <Button onClick={() => handlePayment('transferencia')} disabled={isSubmitting} variant="outline" className="border-green-600 text-green-700 h-14 font-bold rounded-xl hover:bg-green-50"><Landmark className="mr-2 h-5 w-5" /> Pago por Transferencia</Button> : null}
-                <Button onClick={() => handlePayment('manual')} disabled={isSubmitting} variant="outline" className="h-14 font-bold rounded-xl hover:bg-gray-100 text-gray-700 border-gray-300">Reservar sin pago online</Button>
+                {hasOnlineMP && <Button onClick={() => handlePayment('mercadopago')} disabled={isSubmitting} className="bg-[#009EE3] hover:bg-[#0086c3] h-14 font-bold rounded-xl text-white shadow-lg"><CreditCard className="mr-2 h-5 w-5" /> Mercado Pago</Button>}
+                {hasOnlineStripe && <Button onClick={() => handlePayment('stripe')} disabled={isSubmitting} className="bg-[#635BFF] hover:bg-[#5249d3] h-14 font-bold rounded-xl text-white shadow-lg"><CreditCard className="mr-2 h-5 w-5" /> Pagar con Tarjeta</Button>}
+                {agencySettings?.bank_accounts.length ? <Button onClick={() => handlePayment('transferencia')} disabled={isSubmitting} variant="outline" className="border-green-600 text-green-700 h-14 font-bold rounded-xl hover:bg-green-50"><Landmark className="mr-2 h-5 w-5" /> Transferencia Bancaria</Button> : null}
+                <Button onClick={() => handlePayment('manual')} disabled={isSubmitting} variant="outline" className="h-14 font-bold rounded-xl hover:bg-gray-100 text-gray-700 border-gray-300">Reservar y pagar después</Button>
               </div>
             </div>
           </div>
@@ -243,12 +251,12 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
               <CheckCircle2 className="h-12 w-12 text-green-600" />
             </div>
             <div>
-              <h2 className="text-3xl font-black text-gray-900">¡Reserva Registrada!</h2>
-              <p className="text-gray-500 mt-2">Tu número de contrato es: <span className="font-bold text-rosa-mexicano">{formData.contract_number}</span></p>
+              <h2 className="text-3xl font-black text-gray-900">¡Listo! Reserva creada</h2>
+              <p className="text-gray-500 mt-2">Tu contrato es el: <span className="font-bold text-rosa-mexicano">{formData.contract_number}</span></p>
             </div>
             
             <div className="bg-muted/30 p-6 rounded-3xl border-2 border-dashed border-gray-200">
-              <p className="font-bold mb-4 text-sm uppercase tracking-widest text-gray-400">Datos para Transferencia</p>
+              <p className="font-bold mb-4 text-sm uppercase tracking-widest text-gray-400">Datos Bancarios para Pago</p>
               <div className="grid gap-4">
                 {agencySettings?.bank_accounts.map(bank => (
                   <div key={bank.id} className="p-4 bg-white rounded-2xl shadow-sm border border-gray-100 text-left">
@@ -264,10 +272,10 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
             </div>
             
             <div className="flex flex-col gap-3">
-              <Button onClick={() => window.open(`https://wa.me/528444041469?text=Hola, acabo de reservar el tour ${tourTitle} con el contrato ${formData.contract_number}. Adjunto mi comprobante.`, '_blank')} className="bg-green-600 h-14 text-lg font-bold rounded-2xl">
-                Enviar Comprobante por WhatsApp
+              <Button onClick={() => window.open(`https://wa.me/528444041469?text=Hola, acabo de reservar el tour ${tourTitle} con el contrato ${formData.contract_number}. ¿Me podrían confirmar?`, '_blank')} className="bg-green-600 h-14 text-lg font-bold rounded-2xl">
+                Confirmar por WhatsApp
               </Button>
-              <Button onClick={onClose} variant="ghost" className="text-gray-400">Cerrar ventana</Button>
+              <Button onClick={onClose} variant="ghost" className="text-gray-400">Cerrar</Button>
             </div>
           </div>
         )}
