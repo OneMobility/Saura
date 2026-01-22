@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, MapPin, User, Users, BusFront, ArrowLeft, CreditCard } from 'lucide-react';
+import { Loader2, Save, MapPin, User, Users, BusFront, ArrowLeft, CreditCard, AlertTriangle, MessageSquare } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
@@ -26,57 +26,24 @@ const AdminClientFormPage = () => {
   const { user, isAdmin, isLoading: sessionLoading } = useSession();
 
   const [formData, setFormData] = useState<any>({
-    first_name: '',
-    last_name: '',
-    email: '',
-    phone: '',
-    address: '',
-    identification_number: '',
-    contract_number: '',
-    tour_id: null,
-    companions: [],
-    total_amount: 0,
-    total_paid: 0,
-    status: 'confirmed',
-    contractor_age: null,
-    is_transport_only: false
+    first_name: '', last_name: '', email: '', phone: '', address: '',
+    identification_number: '', contract_number: '', tour_id: null,
+    companions: [], total_amount: 0, total_paid: 0, status: 'confirmed',
+    contractor_age: null, is_transport_only: false, cancel_reason: ''
   });
   
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(true);
-  const [refreshHistoryKey, setRefreshHistoryKey] = useState(0); // Para refrescar tabla tras cambios
+  const [refreshHistoryKey, setRefreshHistoryKey] = useState(0);
   const [availableTours, setAvailableTours] = useState<any[]>([]);
   const [availableBuses, setAvailableBuses] = useState<any[]>([]);
   const [clientSelectedSeats, setClientSelectedSeats] = useState<number[]>([]);
-  const [roomsCount, setRoomsCount] = useState(0);
-  const [breakdownDetails, setBreakdownDetails] = useState<string[]>([]);
 
   const fetchClientData = async () => {
     if (!clientIdFromParams) return;
-    const { data: client, error } = await supabase
-      .from('clients')
-      .select('*')
-      .eq('id', clientIdFromParams)
-      .single();
-
-    if (error) {
-      toast.error("Error al cargar los datos del cliente.");
-      navigate('/admin/clients');
-      return;
-    }
-
+    const { data: client, error } = await supabase.from('clients').select('*').eq('id', clientIdFromParams).single();
     if (client) {
-      setFormData({
-        ...client,
-        companions: client.companions || [],
-        is_transport_only: client.is_transport_only || false
-      });
-
-      const { data: seats } = await supabase
-        .from('tour_seat_assignments')
-        .select('seat_number')
-        .eq('client_id', clientIdFromParams);
-      
+      setFormData(client);
+      const { data: seats } = await supabase.from('tour_seat_assignments').select('seat_number').eq('client_id', clientIdFromParams);
       if (seats) setClientSelectedSeats(seats.map(s => s.seat_number));
     }
   };
@@ -88,156 +55,22 @@ const AdminClientFormPage = () => {
         supabase.from('tours').select('*').order('title', { ascending: true }),
         supabase.from('buses').select('*')
       ]);
-      
       if (toursRes.data) setAvailableTours(toursRes.data);
       if (busesRes.data) setAvailableBuses(busesRes.data);
-
-      if (clientIdFromParams) {
-        await fetchClientData();
-      } else {
-        setFormData((prev: any) => ({
-          ...prev,
-          contract_number: uuidv4().substring(0, 8).toUpperCase()
-        }));
-      }
+      if (clientIdFromParams) await fetchClientData();
+      else setFormData((p:any) => ({...p, contract_number: uuidv4().substring(0, 8).toUpperCase()}));
       setIsLoadingData(false);
     };
     fetchData();
-  }, [clientIdFromParams, navigate]);
+  }, [clientIdFromParams]);
 
-  const selectedTour = useMemo(() => 
-    availableTours.find(t => t.id === formData.tour_id), 
-    [formData.tour_id, availableTours]
-  );
-
-  const currentBus = useMemo(() => 
-    selectedTour?.bus_id ? availableBuses.find(b => b.id === selectedTour.bus_id) : null, 
-    [selectedTour, availableBuses]
-  );
-
-  useEffect(() => {
-    if (!selectedTour || isLoadingData) return;
-    
-    const totalPax = clientSelectedSeats.length;
-    let newTotal = 0;
-    let newRooms = 0;
-    let newDetails: string[] = [];
-
-    if (totalPax > 0) {
-      if (formData.is_transport_only) {
-        const price = selectedTour.transport_only_price || 0;
-        newTotal = totalPax * price;
-        newRooms = 0;
-        newDetails = [`${totalPax} Pax en Solo Traslado ($${price} c/u)`];
-      } else {
-        newRooms = Math.ceil(totalPax / 4);
-        let adultsCount = (formData.contractor_age === null || formData.contractor_age > 12) ? 1 : 0;
-        let childrenCount = (formData.contractor_age !== null && formData.contractor_age <= 12) ? 1 : 0;
-        
-        formData.companions.forEach((c: any) => { 
-          if (c.age !== null && c.age <= 12) childrenCount++;
-          else adultsCount++;
-        });
-
-        let tempAdults = adultsCount;
-        let tempChildren = childrenCount;
-
-        for (let i = 0; i < newRooms; i++) {
-          const paxInRoom = Math.min(4, tempAdults + tempChildren);
-          const adultsInRoom = Math.min(paxInRoom, tempAdults);
-          const childrenInRoom = paxInRoom - adultsInRoom;
-
-          if ((paxInRoom === 1 && adultsInRoom === 1) || (paxInRoom === 2 && adultsInRoom === 1 && childrenInRoom === 1)) {
-            const price = selectedTour.selling_price_double_occupancy;
-            newTotal += (2 * price);
-            newDetails.push(`Hab. ${i+1}: Cargo Doble ($${price} c/u)`);
-          } else {
-            let occPrice = selectedTour.selling_price_quad_occupancy;
-            let label = "Cuádruple";
-            if (paxInRoom === 3) { occPrice = selectedTour.selling_price_triple_occupancy; label = "Triple"; }
-            else if (paxInRoom === 2) { occPrice = selectedTour.selling_price_double_occupancy; label = "Doble"; }
-
-            if (adultsInRoom > 0) {
-              newTotal += (adultsInRoom * occPrice);
-              newDetails.push(`Hab. ${i+1}: ${adultsInRoom} Adulto(s) en ${label} ($${occPrice} c/u)`);
-            }
-            if (childrenInRoom > 0) {
-              newTotal += (childrenInRoom * selectedTour.selling_price_child);
-              newDetails.push(`Hab. ${i+1}: ${childrenInRoom} Niño(s) ($${selectedTour.selling_price_child} c/u)`);
-            }
-          }
-          tempAdults -= adultsInRoom;
-          tempChildren -= childrenInRoom;
-        }
-      }
-    }
-
-    setRoomsCount(newRooms);
-    setBreakdownDetails(newDetails);
-    setFormData((prev: any) => ({ ...prev, total_amount: newTotal }));
-
-    const neededComps = Math.max(0, totalPax - 1);
-    if (neededComps !== formData.companions.length) {
-      setFormData((p: any) => {
-        let newComps = [...p.companions];
-        if (neededComps > newComps.length) {
-          const toAdd = neededComps - newComps.length;
-          newComps = [...newComps, ...Array.from({ length: toAdd }, () => ({ id: uuidv4(), name: '', age: null }))];
-        } else {
-          newComps = newComps.slice(0, neededComps);
-        }
-        return { ...p, companions: newComps };
-      });
-    }
-  }, [clientSelectedSeats.length, formData.contractor_age, formData.companions, formData.is_transport_only, selectedTour, isLoadingData]);
+  const selectedTour = useMemo(() => availableTours.find(t => t.id === formData.tour_id), [formData.tour_id, availableTours]);
+  const currentBus = useMemo(() => selectedTour?.bus_id ? availableBuses.find(b => b.id === selectedTour.bus_id) : null, [selectedTour, availableBuses]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.tour_id) return toast.error("Selecciona un tour.");
-    if (clientSelectedSeats.length === 0) return toast.error("Selecciona asientos.");
-
-    setIsSubmitting(true);
-    try {
-      const dataToSave = { 
-        ...formData, 
-        number_of_people: clientSelectedSeats.length,
-        room_details: formData.is_transport_only ? { transport_only: true } : { rooms_count: roomsCount },
-        updated_at: new Date().toISOString()
-      };
-
-      let currentId = clientIdFromParams;
-
-      if (clientIdFromParams) {
-        const { error } = await supabase.from('clients').update(dataToSave).eq('id', clientIdFromParams);
-        if (error) throw error;
-      } else {
-        const { data, error } = await supabase.from('clients').insert(dataToSave).select('id').single();
-        if (error) throw error;
-        currentId = data.id;
-      }
-
-      if (currentId) {
-        await supabase.from('tour_seat_assignments').delete().eq('client_id', currentId);
-        await supabase.from('tour_seat_assignments').insert(clientSelectedSeats.map(s => ({ 
-          tour_id: formData.tour_id, 
-          seat_number: s, 
-          status: 'booked', 
-          client_id: currentId 
-        })));
-      }
-
-      toast.success(clientIdFromParams ? "Cliente actualizado." : "Reserva creada con éxito.");
-      navigate('/admin/clients');
-    } catch (err: any) {
-      toast.error(`Error: ${err.message}`);
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  const handlePaymentsUpdated = () => {
-    setRefreshHistoryKey(p => p + 1);
-    fetchClientData(); // Recargar datos del cliente para ver el total_paid actualizado
+    const { error } = await supabase.from('clients').update(formData).eq('id', clientIdFromParams);
+    if (!error) toast.success("Cambios guardados.");
   };
 
   if (sessionLoading || isLoadingData) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-rosa-mexicano h-12 w-12" /></div>;
@@ -246,118 +79,82 @@ const AdminClientFormPage = () => {
     <div className="flex min-h-screen bg-gray-100">
       <AdminSidebar />
       <div className="flex flex-col flex-grow">
-        <AdminHeader pageTitle={clientIdFromParams ? "Editar Cliente" : "Registro Manual de Cliente"}>
-           <Button variant="outline" asChild><Link to="/admin/clients"><ArrowLeft className="h-4 w-4 mr-2" /> Volver</Link></Button>
+        <AdminHeader pageTitle={clientIdFromParams ? "Ficha de Cliente" : "Nuevo Cliente"}>
+           <Button variant="outline" asChild><Link to="/admin/clients"><ArrowLeft className="h-4 w-4 mr-2" /> Volver al Listado</Link></Button>
         </AdminHeader>
 
         <main className="flex-grow container mx-auto px-4 py-8 max-w-6xl">
-          <form onSubmit={handleSubmit} className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-6">
-              <Card className="shadow-lg border-none">
-                <CardHeader className="bg-gray-50 border-b">
-                  <CardTitle className="text-lg flex items-center gap-2"><User className="h-5 w-5 text-rosa-mexicano" /> Datos del Contratante</CardTitle>
-                </CardHeader>
-                <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label>Nombre(s)</Label><Input value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} required /></div>
-                  <div className="space-y-2"><Label>Apellido(s)</Label><Input value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} required /></div>
-                  <div className="space-y-2"><Label>Email</Label><Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required /></div>
-                  <div className="space-y-2"><Label>WhatsApp</Label><Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
-                  <div className="space-y-2"><Label>Edad</Label><Input type="number" value={formData.contractor_age || ''} onChange={e => setFormData({...formData, contractor_age: parseInt(e.target.value) || null})} /></div>
-                  <div className="space-y-2"><Label>Identificación</Label><Input value={formData.identification_number} onChange={e => setFormData({...formData, identification_number: e.target.value})} /></div>
-                  <div className="md:col-span-2 space-y-2"><Label>Dirección</Label><Textarea value={formData.address} onChange={e => setFormData({...formData, address: e.target.value})} rows={2} /></div>
-                </CardContent>
-              </Card>
-
-              <Card className="shadow-lg border-none">
-                <CardHeader className="bg-gray-50 border-b">
-                  <CardTitle className="text-lg flex items-center gap-2"><MapPin className="h-5 w-5 text-rosa-mexicano" /> Selección de Viaje y Asientos</CardTitle>
+              {formData.status === 'cancelled' && (
+                <AlertCircle className="absolute -left-12 h-10 w-10 text-red-600" />
+              )}
+              
+              <Card className={cn("shadow-lg border-none", formData.status === 'cancelled' && "border-l-8 border-red-600")}>
+                <CardHeader className="bg-gray-50 border-b flex flex-row justify-between items-center">
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <User className="h-5 w-5 text-rosa-mexicano" /> Datos del Contrato #{formData.contract_number}
+                  </CardTitle>
+                  <Badge className={cn(
+                    formData.status === 'completed' ? "bg-blue-600" : 
+                    formData.status === 'confirmed' ? "bg-green-600" : 
+                    formData.status === 'cancelled' ? "bg-red-600" : "bg-yellow-500"
+                  )}>
+                    {formData.status.toUpperCase()}
+                  </Badge>
                 </CardHeader>
                 <CardContent className="pt-6 space-y-6">
-                  <div className="space-y-2">
-                    <Label>Destino / Tour</Label>
-                    <Select value={formData.tour_id} onValueChange={v => setFormData({...formData, tour_id: v})}>
-                      <SelectTrigger className="h-12"><SelectValue placeholder="Selecciona un tour" /></SelectTrigger>
-                      <SelectContent>{availableTours.map(t => <SelectItem key={t.id} value={t.id}>{t.title}</SelectItem>)}</SelectContent>
-                    </Select>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1"><Label>Titular</Label><p className="font-bold text-lg">{formData.first_name} {formData.last_name}</p></div>
+                    <div className="space-y-1"><Label>WhatsApp</Label><p className="font-bold">{formData.phone}</p></div>
                   </div>
-
-                  {selectedTour && (
-                    <div className="space-y-6">
-                      <div className="flex items-center justify-between p-4 bg-rosa-mexicano/5 rounded-xl border border-rosa-mexicano/10">
-                        <div className="space-y-1">
-                          <Label className="text-base font-bold flex items-center gap-2"><BusFront className="h-5 w-5 text-rosa-mexicano" /> Solo Traslado</Label>
-                          <p className="text-xs text-muted-foreground">Activa si no requiere hotel.</p>
-                        </div>
-                        <Switch checked={formData.is_transport_only} onCheckedChange={val => setFormData({...formData, is_transport_only: val})} />
-                      </div>
-                      <div className="pt-4 border-t">
-                        <Label className="mb-4 block font-bold">Mapa de Asientos ({clientSelectedSeats.length} pax)</Label>
-                        <TourSeatMap 
-                          tourId={selectedTour.id} 
-                          busCapacity={selectedTour.bus_capacity} 
-                          courtesies={selectedTour.courtesies} 
-                          seatLayoutJson={currentBus?.seat_layout_json} 
-                          onSeatsSelected={setClientSelectedSeats} 
-                          initialSelectedSeats={clientSelectedSeats}
-                          currentClientId={clientIdFromParams}
-                        />
-                      </div>
+                  
+                  {formData.status === 'cancelled' && (
+                    <div className="bg-red-50 p-4 rounded-xl border border-red-100">
+                      <Label className="text-red-900 font-black uppercase text-[10px] tracking-widest flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" /> Notas / Motivo de Cancelación
+                      </Label>
+                      <Textarea 
+                        className="mt-2 bg-white border-red-200" 
+                        value={formData.cancel_reason} 
+                        onChange={e => setFormData({...formData, cancel_reason: e.target.value})}
+                        placeholder="Escribe el motivo aquí..."
+                      />
+                      <Button onClick={handleSubmit} size="sm" className="mt-2 bg-red-600">Guardar Nota</Button>
                     </div>
                   )}
+
+                  <div className="pt-4 border-t">
+                    <Label className="font-bold mb-4 block">Asignación de Asientos</Label>
+                    <TourSeatMap 
+                      tourId={formData.tour_id} busCapacity={selectedTour?.bus_capacity} courtesies={selectedTour?.courtesies} 
+                      seatLayoutJson={currentBus?.seat_layout_json} onSeatsSelected={() => {}} 
+                      initialSelectedSeats={clientSelectedSeats} readOnly 
+                    />
+                  </div>
                 </CardContent>
               </Card>
 
-              {clientIdFromParams && (
-                <ClientPaymentHistoryTable 
-                  clientId={clientIdFromParams} 
-                  key={refreshHistoryKey} 
-                  onPaymentsUpdated={handlePaymentsUpdated} 
-                />
-              )}
+              <ClientPaymentHistoryTable clientId={clientIdFromParams!} onPaymentsUpdated={fetchClientData} />
             </div>
 
             <div className="space-y-6">
               <Card className="bg-gray-900 text-white shadow-xl sticky top-8">
                 <CardHeader className="border-b border-white/10">
-                  <CardTitle className="text-white flex items-center gap-2"><CreditCard className="h-5 w-5 text-rosa-mexicano" /> Resumen de Contrato</CardTitle>
+                  <CardTitle className="text-white flex items-center gap-2"><CreditCard className="h-5 w-5 text-rosa-mexicano" /> Estado de Cuenta</CardTitle>
                 </CardHeader>
-                <CardContent className="pt-6 space-y-6">
-                  <div className="flex justify-between items-center bg-white/5 p-4 rounded-xl">
-                    <span className="text-xs font-bold text-gray-400">HABITACIONES</span>
-                    <span className="text-3xl font-black text-rosa-mexicano">{roomsCount}</span>
+                <CardContent className="pt-6 space-y-4">
+                  <div className="flex justify-between"><span>Costo Total:</span><span className="font-bold">${formData.total_amount.toLocaleString()}</span></div>
+                  <div className="flex justify-between text-green-400"><span>Abonado Real:</span><span className="font-bold">${formData.total_paid.toLocaleString()}</span></div>
+                  <div className="pt-4 border-t border-white/10 flex justify-between items-center">
+                    <span className="text-xs uppercase font-bold text-gray-400">Pendiente:</span>
+                    <span className="text-3xl font-black text-yellow-400">${(formData.total_amount - formData.total_paid).toLocaleString()}</span>
                   </div>
-                  <div className="space-y-2">
-                    {breakdownDetails.map((d, i) => (
-                      <div key={i} className="text-[11px] opacity-80 flex items-start gap-2">
-                        <div className="w-1.5 h-1.5 rounded-full bg-rosa-mexicano mt-1 shrink-0" />
-                        <span>{d}</span>
-                      </div>
-                    ))}
-                  </div>
-                  
-                  <div className="space-y-3 pt-4 border-t border-white/10">
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-gray-400">TOTAL CONTRATO:</span>
-                      <span className="text-white">${formData.total_amount.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between text-xs font-bold">
-                      <span className="text-gray-400">TOTAL ABONADO:</span>
-                      <span className="text-green-400">${formData.total_paid.toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between items-end pt-2">
-                      <span className="text-xs font-bold text-gray-400 uppercase">PENDIENTE:</span>
-                      <span className="text-4xl font-black text-yellow-400">${(formData.total_amount - formData.total_paid).toLocaleString()}</span>
-                    </div>
-                  </div>
-
-                  <Button type="submit" disabled={isSubmitting || !selectedTour} className="w-full bg-rosa-mexicano hover:bg-rosa-mexicano/90 h-14 text-lg font-black rounded-xl">
-                    {isSubmitting ? <Loader2 className="animate-spin mr-2" /> : <Save className="mr-2" />}
-                    {clientIdFromParams ? "Actualizar Contrato" : "Confirmar Contrato"}
-                  </Button>
+                  <Button variant="outline" className="w-full mt-4 text-gray-900 font-bold" onClick={() => window.print()}>Imprimir Ficha</Button>
                 </CardContent>
               </Card>
             </div>
-          </form>
+          </div>
         </main>
       </div>
     </div>

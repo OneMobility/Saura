@@ -17,7 +17,6 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // 1. Buscar al cliente
     const { data: client, error: clientError } = await supabaseAdmin
       .from('clients')
       .select('id, total_amount, total_paid, advance_payment')
@@ -26,20 +25,17 @@ serve(async (req) => {
 
     if (clientError || !client) throw new Error('Contrato no encontrado');
 
-    // 2. Determinar el monto exacto a abonar
     let amountToCredit = parseFloat(amount);
-
     if (isNaN(amountToCredit) || amountToCredit <= 0) {
       amountToCredit = client.total_paid === 0 ? (client.advance_payment || 0) : 0;
     }
 
     if (amountToCredit <= 0) {
-      return new Response(JSON.stringify({ message: 'No se especificó un monto válido para abonar.' }), {
+      return new Response(JSON.stringify({ message: 'Sin monto para abonar.' }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // 3. Registrar el pago en el historial
     const { error: paymentError } = await supabaseAdmin
       .from('client_payments')
       .insert({
@@ -51,9 +47,12 @@ serve(async (req) => {
 
     if (paymentError) throw paymentError;
 
-    // 4. Actualizar el total pagado y cambiar estado a 'confirmed'
     const newTotalPaid = (client.total_paid || 0) + amountToCredit;
-    const newStatus = newTotalPaid > 0 ? 'confirmed' : 'pending';
+    
+    // Lógica de estados automática
+    let newStatus = 'confirmed';
+    if (newTotalPaid >= client.total_amount) newStatus = 'completed';
+    else if (newTotalPaid <= 0) newStatus = 'pending';
 
     const { error: updateError } = await supabaseAdmin
       .from('clients')
@@ -66,11 +65,7 @@ serve(async (req) => {
 
     if (updateError) throw updateError;
 
-    return new Response(JSON.stringify({ 
-      success: true, 
-      message: 'Abono registrado correctamente',
-      credited: amountToCredit 
-    }), {
+    return new Response(JSON.stringify({ success: true, credited: amountToCredit }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
