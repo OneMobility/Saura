@@ -59,7 +59,7 @@ const generateServiceContractHtml = (data: any) => {
             .section-title { font-weight: 700; text-transform: uppercase; font-size: 9pt; color: #91045A; margin-top: 10px; border-bottom: 1px solid #eee; padding-bottom: 2px; margin-bottom: 6px; }
             .details-table { width: 100%; border-collapse: collapse; margin-bottom: 8px; }
             .details-table td { padding: 3px 6px; border: 1px solid #eee; font-size: 8.5pt; vertical-align: top; }
-            .details-table .label { font-weight: 600; background-color: #fcfcfc; width: 20%; color: #666; }
+            .details-table .label { font-weight: 600; background-color: #fcfcfc; width: 25%; color: #666; }
             .clauses-container { margin-top: 10px; }
             .clause { text-align: justify; margin-bottom: 4px; font-size: 7.5pt; color: #444; }
             .clause-title { font-weight: 700; color: #333; }
@@ -97,7 +97,7 @@ const generateServiceContractHtml = (data: any) => {
                     <td class="label">Regreso:</td><td>${returnDate} - ${returnTime}</td>
                 </tr>
                 <tr>
-                    <td class="label">Asientos:</td><td class="bold" style="color: #91045A;">${seatNumbers}</td>
+                    <td class="label">Números de asientos seleccionados:</td><td class="bold" style="color: #91045A;">${seatNumbers}</td>
                     <td class="label">Total Pax:</td><td>${client.number_of_people} Persona(s)</td>
                 </tr>
             </table>
