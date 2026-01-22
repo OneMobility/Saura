@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Edit, Trash2, Loader2, DollarSign, FileText, FileSignature, ChevronDown, ChevronRight, Package, UserGroup, MapPin } from 'lucide-react';
+import { Edit, Trash2, Loader2, DollarSign, FileText, FileSignature, ChevronDown, ChevronRight, Package } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
 import { Badge } from '@/components/ui/badge';
@@ -38,9 +38,9 @@ interface ClientsTableProps {
 const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayment, onEditClient }) => {
   const [clients, setClients] = useState<Client[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isDownloading, setIsDownloading] = useState<string | null>(null); // 'contract-ID' or 'sheet-ID'
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
-  const { session } = useSession();
 
   useEffect(() => {
     fetchClients();
@@ -67,7 +67,6 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
       }));
       setClients(processed);
       
-      // Expandir grupos por defecto
       const initialOpen: Record<string, boolean> = {};
       processed.forEach(c => { initialOpen[c.tour_title!] = true; });
       setOpenGroups(initialOpen);
@@ -83,6 +82,29 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
       return acc;
     }, {} as Record<string, Client[]>);
   }, [clients]);
+
+  const downloadDocument = async (client: Client, type: 'contract' | 'sheet') => {
+    const loadingKey = `${type}-${client.id}`;
+    setIsDownloading(loadingKey);
+    try {
+      const functionName = type === 'contract' ? 'generate-service-contract' : 'generate-booking-sheet';
+      const { data, error } = await supabase.functions.invoke(functionName, {
+        body: { contractNumber: client.contract_number },
+      });
+      if (error) throw error;
+      
+      const newWindow = window.open('', '_blank');
+      if (newWindow) {
+        newWindow.document.write(data);
+        newWindow.document.close();
+        newWindow.focus();
+      }
+    } catch (err) {
+      toast.error('No se pudo generar el documento.');
+    } finally {
+      setIsDownloading(null);
+    }
+  };
 
   const handleDeleteClient = async (id: string) => {
     if (!window.confirm('¿Eliminar este contrato? Se liberarán los asientos.')) return;
@@ -120,7 +142,7 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
           <div key={tourTitle} className="bg-white rounded-xl shadow-md border overflow-hidden">
             <div 
               className="bg-gray-900 text-white p-4 flex items-center justify-between cursor-pointer"
-              onClick={() => setOpenGroups(p => ({ ...p, [tourTitle]: !p[openGroups[tourTitle]] }))}
+              onClick={() => setOpenGroups(p => ({ ...p, [tourTitle]: !p[tourTitle] }))}
             >
               <div className="flex items-center gap-3">
                 {openGroups[tourTitle] ? <ChevronDown className="text-rosa-mexicano" /> : <ChevronRight className="text-rosa-mexicano" />}
@@ -159,7 +181,6 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                       <TableHead>Total</TableHead>
                       <TableHead>Abonado</TableHead>
                       <TableHead>Pendiente</TableHead>
-                      <TableHead>Estado</TableHead>
                       <TableHead className="text-right">Acciones</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -179,18 +200,29 @@ const ClientsTable: React.FC<ClientsTableProps> = ({ refreshKey, onRegisterPayme
                             ${client.remaining_payment.toLocaleString()}
                           </span>
                         </TableCell>
-                        <TableCell>
-                          <Badge className={cn(
-                            client.status === 'confirmed' ? "bg-green-500" : "bg-yellow-500"
-                          )}>
-                            {client.status.toUpperCase()}
-                          </Badge>
-                        </TableCell>
                         <TableCell className="text-right">
                           <div className="flex justify-end gap-1">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => downloadDocument(client, 'contract')} 
+                              className="text-gray-600 hover:bg-gray-100" 
+                              title="Ver Contrato"
+                            >
+                              {isDownloading === `contract-${client.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileSignature className="h-4 w-4" />}
+                            </Button>
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              onClick={() => downloadDocument(client, 'sheet')} 
+                              className="text-gray-600 hover:bg-gray-100" 
+                              title="Hoja de Reserva"
+                            >
+                              {isDownloading === `sheet-${client.id}` ? <Loader2 className="h-4 w-4 animate-spin" /> : <FileText className="h-4 w-4" />}
+                            </Button>
                             <Button variant="ghost" size="icon" onClick={() => onEditClient(client)} className="text-blue-600 hover:bg-blue-50" title="Editar"><Edit className="h-4 w-4" /></Button>
                             <Button variant="ghost" size="icon" onClick={() => onRegisterPayment(client)} className="text-green-600 hover:bg-green-50" title="Registrar Pago"><DollarSign className="h-4 w-4" /></Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteClient(client.id)} className="text-red-400 hover:bg-red-50 hover:text-red-600" title="Eliminar"><Trash2 className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="text-red-400 hover:bg-red-50 hover:text-red-600" onClick={() => handleDeleteClient(client.id)} title="Eliminar"><Trash2 className="h-4 w-4" /></Button>
                           </div>
                         </TableCell>
                       </TableRow>
