@@ -7,45 +7,28 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, CreditCard, MessageSquare, CheckCircle2, Landmark, Info, PlusCircle, MinusCircle, Save } from 'lucide-react';
+import { Loader2, CreditCard, MessageSquare, CheckCircle2, Landmark, Info, PlusCircle, MinusCircle, Save, Copy } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Textarea } from '@/components/ui/textarea';
 import TourSeatMap from '@/components/TourSeatMap';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TourProviderService, AvailableProvider, SeatLayout } from '@/types/shared'; // Import shared SeatLayout
+import { TourProviderService, SeatLayout } from '@/types/shared';
+import { Badge } from '@/components/ui/badge';
 
-interface Companion {
+interface BankAccount {
   id: string;
-  name: string;
-  age: number | null;
-}
-
-interface RoomDetails {
-  double_rooms: number;
-  triple_rooms: number;
-  quad_rooms: number;
-}
-
-interface TourSellingPrices {
-  double: number;
-  triple: number;
-  quad: number;
-  child: number;
-}
-
-interface BusDetails {
-  bus_id: string | null;
-  bus_capacity: number;
-  courtesies: number;
-  seat_layout_json: SeatLayout | null;
+  bank_name: string;
+  bank_clabe: string;
+  bank_holder: string;
 }
 
 interface AgencySettings {
+  payment_mode: 'test' | 'production';
   mp_public_key: string | null;
+  mp_test_public_key: string | null;
   stripe_public_key: string | null;
-  bank_name: string | null;
-  bank_clabe: string | null;
-  bank_holder: string | null;
+  stripe_test_public_key: string | null;
+  bank_accounts: BankAccount[];
   advance_payment_amount: number;
 }
 
@@ -56,586 +39,211 @@ interface ClientBookingFormProps {
   tourTitle: string;
   tourImage: string;
   tourDescription: string;
-  tourSellingPrices: TourSellingPrices;
-  busDetails: BusDetails;
+  tourSellingPrices: { double: number; triple: number; quad: number; child: number };
+  busDetails: { bus_id: string | null; bus_capacity: number; courtesies: number; seat_layout_json: SeatLayout | null };
   tourAvailableExtraServices: TourProviderService[];
-  advancePaymentPerPerson: number; // NEW: Anticipo por persona calculado
-  agencySettings: AgencySettings | null; // NEW: Configuración de la agencia
+  advancePaymentPerPerson: number;
+  agencySettings: AgencySettings | null;
 }
 
-const allocateRoomsForPeople = (totalPeople: number): RoomDetails => {
-  let double = 0;
-  let triple = 0;
-  let quad = 0;
-  let remaining = totalPeople;
-
+const allocateRoomsForPeople = (totalPeople: number) => {
+  let double = 0, triple = 0, quad = 0, remaining = totalPeople;
   if (remaining <= 0) return { double_rooms: 0, triple_rooms: 0, quad_rooms: 0 };
-
   quad = Math.floor(remaining / 4);
   remaining %= 4;
-
-  if (remaining === 3) {
-    triple++;
-  } else if (remaining === 2) {
-    double++;
-  } else if (remaining === 1) {
-    if (quad > 0) {
-      quad--;
-      triple++;
-      double++;
-    } else {
-      double++;
-    }
-  }
-
+  if (remaining === 3) triple++;
+  else if (remaining === 2) double++;
+  else if (remaining === 1) { if (quad > 0) { quad--; triple++; double++; } else { double++; } }
   return { double_rooms: double, triple_rooms: triple, quad_rooms: quad };
 };
 
 const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
-  isOpen,
-  onClose,
-  tourId,
-  tourTitle,
-  tourImage,
-  tourDescription,
-  tourSellingPrices,
-  busDetails,
-  tourAvailableExtraServices,
-  advancePaymentPerPerson, // NEW
-  agencySettings, // NEW
+  isOpen, onClose, tourId, tourTitle, tourImage, tourDescription,
+  tourSellingPrices, busDetails, tourAvailableExtraServices,
+  advancePaymentPerPerson, agencySettings
 }) => {
   const [formData, setFormData] = useState({
-    first_name: '',
-    last_name: '',
-    email: '',
-    phone: '',
-    address: '',
-    identification_number: null as string | null,
-    contractor_age: null as number | null,
-    companions: [] as Companion[],
-    extra_services: [] as TourProviderService[],
+    first_name: '', last_name: '', email: '', phone: '', address: '',
+    identification_number: null as string | null, contractor_age: null as number | null,
+    companions: [] as any[], extra_services: [] as TourProviderService[],
   });
   const [selectedSeats, setSelectedSeats] = useState<number[]>([]);
   const [totalAmount, setTotalAmount] = useState(0);
-  const [roomDetails, setRoomDetails] = useState<RoomDetails>({ double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
+  const [roomDetails, setRoomDetails] = useState({ double_rooms: 0, triple_rooms: 0, quad_rooms: 0 });
   const [isSubmitting, setIsSubmitting] = useState(false);
-
-  const [numAdults, setNumAdults] = useState(0);
-  const [numChildren, setNumChildren] = useState(0);
-  const [extraServicesTotal, setExtraServicesTotal] = useState(0);
-  const [totalAdvancePayment, setTotalAdvancePayment] = useState(0); // NEW: Total anticipo
+  const [showBankInfo, setShowBankInfo] = useState(false);
 
   useEffect(() => {
-    let currentNumAdults = 0;
-    let currentNumChildren = 0;
-
-    if (formData.contractor_age !== null) {
-      if (formData.contractor_age >= 12) {
-        currentNumAdults++;
-      } else {
-        currentNumChildren++;
-      }
-    } else {
-      currentNumAdults++;
-    }
-
-    formData.companions.forEach(c => {
-      if (c.age !== null) {
-        if (c.age >= 12) {
-          currentNumAdults++;
-        } else {
-          currentNumChildren++;
-        }
-      } else {
-        currentNumAdults++;
-      }
-    });
-
-    setNumAdults(currentNumAdults);
-    setNumChildren(currentNumChildren);
-
-    const totalPeople = currentNumAdults + currentNumChildren;
-
-    // Calculate room details based on adults
-    const calculatedRoomDetails = allocateRoomsForPeople(currentNumAdults);
-    setRoomDetails(calculatedRoomDetails);
-
-    let calculatedTotalAmount = 0;
+    let adults = (formData.contractor_age === null || formData.contractor_age >= 12) ? 1 : 0;
+    let children = (formData.contractor_age !== null && formData.contractor_age < 12) ? 1 : 0;
     
-    calculatedTotalAmount += calculatedRoomDetails.double_rooms * ((tourSellingPrices.double || 0) * 2);
-    calculatedTotalAmount += calculatedRoomDetails.triple_rooms * ((tourSellingPrices.triple || 0) * 3);
-    calculatedTotalAmount += calculatedRoomDetails.quad_rooms * ((tourSellingPrices.quad || 0) * 4);
+    formData.companions.forEach(c => { (c.age === null || c.age >= 12) ? adults++ : children++; });
     
-    calculatedTotalAmount += currentNumChildren * (tourSellingPrices.child || 0);
+    const rd = allocateRoomsForPeople(adults);
+    setRoomDetails(rd);
 
-    const currentExtraServicesTotal = formData.extra_services.reduce((sum, service) => {
-      return sum + (service.selling_price_per_unit_snapshot * service.quantity);
-    }, 0);
-    setExtraServicesTotal(currentExtraServicesTotal);
-    calculatedTotalAmount += currentExtraServicesTotal;
+    const total = (rd.double_rooms * tourSellingPrices.double * 2) +
+                  (rd.triple_rooms * tourSellingPrices.triple * 3) +
+                  (rd.quad_rooms * tourSellingPrices.quad * 4) +
+                  (children * tourSellingPrices.child) +
+                  formData.extra_services.reduce((s, x) => s + (x.selling_price_per_unit_snapshot * x.quantity), 0);
+    
+    setTotalAmount(total);
+  }, [formData, tourSellingPrices, selectedSeats.length]);
 
-    setTotalAmount(calculatedTotalAmount);
+  const handlePayment = async (method: 'mercadopago' | 'stripe' | 'transferencia' | 'manual') => {
+    if (!formData.first_name || !formData.last_name || !formData.email) return toast.error('Rellena los campos obligatorios.');
+    if (selectedSeats.length !== (1 + formData.companions.length)) return toast.error(`Selecciona ${1 + formData.companions.length} asientos.`);
 
-    // NEW: Calculate total advance payment based on selected seats
-    setTotalAdvancePayment(selectedSeats.length * advancePaymentPerPerson);
-
-  }, [formData.contractor_age, formData.companions, tourSellingPrices, formData.extra_services, selectedSeats.length, advancePaymentPerPerson]);
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { id, value } = e.target;
-    setFormData((prev) => ({ ...prev, [id]: value }));
-  };
-
-  const handleNumberChange = (id: 'contractor_age', value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      [id]: parseFloat(value) || null,
-    }));
-  };
-
-  const handleCompanionChange = (id: string, field: 'name' | 'age', value: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      companions: prev.companions.map(c => c.id === id ? { ...c, [field]: field === 'age' ? (parseFloat(value) || null) : value } : c),
-    }));
-  };
-
-  const addCompanion = () => {
-    setFormData((prev) => ({
-      ...prev,
-      companions: [...prev.companions, { id: uuidv4(), name: '', age: null }],
-    }));
-  };
-
-  const removeCompanion = (id: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      companions: prev.companions.filter(c => c.id !== id),
-    }));
-  };
-
-  const handleClientExtraServiceChange = (id: string, field: 'provider_id' | 'quantity', value: string | number) => {
-    setFormData((prev) => {
-      const newExtraServices = [...prev.extra_services];
-      const index = newExtraServices.findIndex(es => es.id === id);
-
-      if (index !== -1) {
-        if (field === 'provider_id') {
-          const selectedProviderService = tourAvailableExtraServices.find(p => p.provider_id === value);
-          if (selectedProviderService) {
-            newExtraServices[index] = {
-              ...newExtraServices[index],
-              provider_id: value as string,
-              selling_price_per_unit_snapshot: selectedProviderService.selling_price_per_unit_snapshot,
-              name_snapshot: selectedProviderService.name_snapshot,
-              service_type_snapshot: selectedProviderService.service_type_snapshot,
-              unit_type_snapshot: selectedProviderService.unit_type_snapshot,
-              cost_per_unit_snapshot: selectedProviderService.cost_per_unit_snapshot,
-            };
-          }
-        } else if (field === 'quantity') {
-          newExtraServices[index] = { ...newExtraServices[index], quantity: parseFloat(value as string) || 0 };
-        }
-      }
-      return { ...prev, extra_services: newExtraServices };
-    });
-  };
-
-  const addClientExtraService = () => {
-    setFormData((prev) => ({
-      ...prev,
-      extra_services: [...prev.extra_services, {
-        id: uuidv4(),
-        provider_id: '',
-        quantity: 1,
-        selling_price_per_unit_snapshot: 0,
-        name_snapshot: '',
-        service_type_snapshot: '',
-        unit_type_snapshot: 'person',
-        cost_per_unit_snapshot: 0,
-      }],
-    }));
-  };
-
-  const removeClientExtraService = (idToRemove: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      extra_services: prev.extra_services.filter((service) => service.id !== idToRemove),
-    }));
-  };
-
-  const handleSeatsSelected = useCallback((seats: number[]) => {
-    setSelectedSeats(seats);
-  }, []);
-
-  const handlePayment = async (paymentMethod: 'mercadopago' | 'stripe' | 'transferencia' | 'manual') => {
     setIsSubmitting(true);
-
-    const totalPeople = 1 + formData.companions.length;
-
-    if (!formData.first_name || !formData.last_name || !formData.email) {
-      toast.error('Por favor, rellena los campos obligatorios (Nombre, Apellido, Email).');
-      setIsSubmitting(false);
-      return;
-    }
-
-    if (selectedSeats.length !== totalPeople) {
-      toast.error(`Debes seleccionar ${totalPeople} asientos para este contrato.`);
-      setIsSubmitting(false);
-      return;
-    }
-
     try {
-      const contract_number = uuidv4().substring(0, 8).toUpperCase();
+      const contractNum = uuidv4().substring(0, 8).toUpperCase();
+      const advance = selectedSeats.length * advancePaymentPerPerson;
 
-      const clientDataToSave = {
-        first_name: formData.first_name,
-        last_name: formData.last_name,
-        email: formData.email,
-        phone: formData.phone || null,
-        address: formData.address || null,
-        identification_number: formData.identification_number || null,
-        contract_number: contract_number,
-        tour_id: tourId,
-        number_of_people: totalPeople,
-        companions: formData.companions,
-        extra_services: formData.extra_services,
-        total_amount: totalAmount,
-        advance_payment: totalAdvancePayment, // Save calculated advance payment
-        total_paid: 0,
-        status: 'pending',
-        contractor_age: formData.contractor_age,
-        room_details: roomDetails,
-      };
+      const { data: newClient } = await supabase.from('clients').insert({
+        first_name: formData.first_name, last_name: formData.last_name,
+        email: formData.email, phone: formData.phone, address: formData.address,
+        contract_number: contractNum, tour_id: tourId, number_of_people: selectedSeats.length,
+        companions: formData.companions, extra_services: formData.extra_services,
+        total_amount: totalAmount, advance_payment: advance, status: 'pending',
+        contractor_age: formData.contractor_age, room_details: roomDetails
+      }).select('id').single();
 
-      const { data: newClientData, error: clientError } = await supabase
-        .from('clients')
-        .insert(clientDataToSave)
-        .select('id')
-        .single();
+      if (!newClient) throw new Error("Error al crear cliente");
 
-      if (clientError) {
-        console.error('Error creating client:', clientError);
-        toast.error('Error al registrar tu reserva. Intenta de nuevo.');
-        setIsSubmitting(false);
-        return;
-      }
+      await supabase.from('tour_seat_assignments').insert(selectedSeats.map(s => ({
+        tour_id: tourId, seat_number: s, status: 'booked', client_id: newClient.id
+      })));
 
-      const newSeatAssignments = selectedSeats.map(seatNumber => ({
-        tour_id: tourId,
-        seat_number: seatNumber,
-        status: 'booked',
-        client_id: newClientData.id,
-      }));
-
-      if (newSeatAssignments.length > 0) {
-        const { error: seatsError } = await supabase
-          .from('tour_seat_assignments')
-          .insert(newSeatAssignments);
-
-        if (seatsError) {
-          console.error('Error inserting new seat assignments:', seatsError);
-          toast.error('Error al asignar los asientos. Contacta a soporte.');
-          setIsSubmitting(false);
-          return;
-        }
-      }
-
-      // Handle payment redirection
-      if (paymentMethod === 'mercadopago' && totalAdvancePayment > 0) {
-        const { data: mpData, error: mpError } = await supabase.functions.invoke('mercadopago-checkout', {
-          body: { clientId: newClientData.id, amount: totalAdvancePayment, description: `Anticipo Tour: ${tourTitle}` }
+      if (method === 'mercadopago') {
+        const { data } = await supabase.functions.invoke('mercadopago-checkout', {
+          body: { clientId: newClient.id, amount: advance, description: `Anticipo Tour: ${tourTitle}` }
         });
-        if (mpError) throw mpError;
-        window.location.href = mpData.init_point;
-      } else if (paymentMethod === 'stripe' && totalAdvancePayment > 0) {
-        const { data: sData, error: sError } = await supabase.functions.invoke('stripe-checkout', {
-          body: { clientId: newClientData.id, amount: totalAdvancePayment, description: `Anticipo Tour: ${tourTitle}` }
+        window.location.href = data.init_point;
+      } else if (method === 'stripe') {
+        const { data } = await supabase.functions.invoke('stripe-checkout', {
+          body: { clientId: newClient.id, amount: advance, description: `Anticipo Tour: ${tourTitle}` }
         });
-        if (sError) throw sError;
-        window.location.href = sData.url;
+        window.location.href = data.url;
+      } else if (method === 'transferencia') {
+        setShowBankInfo(true);
+        toast.success(`Reserva guardada con el número: ${contractNum}. Procede con la transferencia.`);
       } else {
-        // Manual or Transferencia
-        toast.success(`¡Reserva exitosa! Tu número de contrato es: ${contract_number}.`);
-        // Optionally redirect to a confirmation page or show transfer details
+        toast.success(`¡Reserva exitosa! Número: ${contractNum}.`);
         onClose();
       }
-
-    } catch (error) {
-      console.error('Unexpected error during booking:', error);
-      toast.error('Ocurrió un error inesperado al procesar tu reserva.');
+    } catch (e) {
+      toast.error('Error procesando reserva.');
     } finally {
       setIsSubmitting(false);
     }
   };
 
-  const roomDetailsDisplay = `${roomDetails.quad_rooms > 0 ? `${roomDetails.quad_rooms} Cuádruple(s), ` : ''}` +
-                             `${roomDetails.triple_rooms > 0 ? `${roomDetails.triple_rooms} Triple(s), ` : ''}` +
-                             `${roomDetails.double_rooms > 0 ? `${roomDetails.double_rooms} Doble(s)` : ''}`;
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast.success(`${label} copiado al portapapeles.`);
+  };
 
-  // NEW: Payment visibility checks
-  const hasMercadoPago = !!agencySettings?.mp_public_key;
-  const hasStripe = !!agencySettings?.stripe_public_key;
-  const hasBankInfo = !!agencySettings?.bank_name && !!agencySettings?.bank_clabe;
-  const requiresAdvancePayment = totalAdvancePayment > 0;
+  const hasOnlineMP = !!(agencySettings?.payment_mode === 'test' ? agencySettings?.mp_test_public_key : agencySettings?.mp_public_key);
+  const hasOnlineStripe = !!(agencySettings?.payment_mode === 'test' ? agencySettings?.stripe_test_public_key : agencySettings?.stripe_public_key);
+  const hasBanks = agencySettings?.bank_accounts && agencySettings.bank_accounts.length > 0;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Reservar Tour: {tourTitle}</DialogTitle>
-          <DialogDescription>
-            Rellena tus datos y selecciona tus asientos para completar la reserva.
-          </DialogDescription>
+          {agencySettings?.payment_mode === 'test' && (
+            <Badge className="bg-yellow-400 text-black border-none w-fit">Modo de Pruebas Activo</Badge>
+          )}
         </DialogHeader>
-        <form onSubmit={(e) => { e.preventDefault(); handlePayment('manual'); }} className="grid gap-6 py-4">
-          {/* Client Basic Info */}
-          <h3 className="text-lg font-semibold mt-4">Tus Datos</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="first_name">Nombre</Label>
-              <Input id="first_name" value={formData.first_name} onChange={handleChange} required />
-            </div>
-            <div>
-              <Label htmlFor="last_name">Apellido</Label>
-              <Input id="last_name" value={formData.last_name} onChange={handleChange} required />
-            </div>
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="email">Email</Label>
-              <Input id="email" type="email" value={formData.email} onChange={handleChange} required />
-            </div>
-            <div>
-              <Label htmlFor="phone">Teléfono</Label>
-              <Input id="phone" value={formData.phone} onChange={handleChange} />
-            </div>
-          </div>
-          <div>
-            <Label htmlFor="address">Dirección</Label>
-            <Textarea id="address" value={formData.address} onChange={handleChange} rows={2} />
-          </div>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label htmlFor="contractor_age">Edad del Contratante</Label>
-              <Input 
-                id="contractor_age" 
-                type="text"
-                pattern="[0-9]*"
-                value={formData.contractor_age || ''} 
-                onChange={(e) => handleNumberChange('contractor_age', e.target.value)} 
-                required 
-              />
-            </div>
-            <div>
-              <Label htmlFor="identification_number">Número de Identificación</Label>
-              <Input id="identification_number" value={formData.identification_number || ''} onChange={handleChange} placeholder="Ej: INE, Pasaporte, etc." />
-            </div>
-          </div>
 
-          {/* Occupancy and Companions */}
-          <h3 className="text-lg font-semibold mt-4">Acompañantes y Ocupación</h3>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <Label>Número Total de Personas</Label>
-              <Input value={1 + formData.companions.length} readOnly className="bg-gray-100 cursor-not-allowed" />
+        {!showBankInfo ? (
+          <form className="grid gap-6 py-4">
+            <h3 className="text-lg font-bold border-b pb-2">Tus Datos</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-1"><Label>Nombre</Label><Input value={formData.first_name} onChange={e => setFormData({...formData, first_name: e.target.value})} required /></div>
+              <div className="space-y-1"><Label>Apellido</Label><Input value={formData.last_name} onChange={e => setFormData({...formData, last_name: e.target.value})} required /></div>
+              <div className="space-y-1"><Label>Email</Label><Input type="email" value={formData.email} onChange={e => setFormData({...formData, email: e.target.value})} required /></div>
+              <div className="space-y-1"><Label>Teléfono</Label><Input value={formData.phone} onChange={e => setFormData({...formData, phone: e.target.value})} /></div>
             </div>
-            <div>
-              <Label>Distribución de Habitaciones</Label>
-              <Input value={roomDetailsDisplay.replace(/,\s*$/, '') || 'N/A'} readOnly className="bg-gray-100 cursor-not-allowed" />
-            </div>
-          </div>
 
-          <div className="space-y-2 mt-4">
-            <Label className="font-semibold">Acompañantes</Label>
-            {formData.companions.map((companion) => (
-              <div key={companion.id} className="flex flex-col md:flex-row items-center gap-2">
-                <Input
-                  value={companion.name}
-                  onChange={(e) => handleCompanionChange(companion.id, 'name', e.target.value)}
-                  placeholder="Nombre del acompañante"
-                  className="w-full md:w-2/3"
-                />
-                <Input
-                  type="text"
-                  pattern="[0-9]*"
-                  value={companion.age || ''}
-                  onChange={(e) => handleCompanionChange(companion.id, 'age', e.target.value)}
-                  placeholder="Edad"
-                  className="w-full md:w-1/3"
-                />
-                <Button type="button" variant="destructive" size="icon" onClick={() => removeCompanion(companion.id)}>
-                  <MinusCircle className="h-4 w-4" />
-                </Button>
+            <div className="pt-4">
+              <h3 className="text-lg font-bold border-b pb-2 mb-4">Selección de Asientos</h3>
+              <TourSeatMap tourId={tourId} busCapacity={busDetails.bus_capacity} courtesies={busDetails.courtesies} seatLayoutJson={busDetails.seat_layout_json} onSeatsSelected={setSelectedSeats} />
+            </div>
+
+            <div className="p-4 bg-rosa-mexicano text-white rounded-2xl flex justify-between items-center shadow-xl">
+              <div>
+                <p className="text-xs opacity-80 uppercase font-black">Total del Viaje</p>
+                <h3 className="text-3xl font-black">${totalAmount.toLocaleString()}</h3>
               </div>
-            ))}
-            <Button type="button" variant="outline" onClick={addCompanion}>
-              <PlusCircle className="mr-2 h-4 w-4" /> Añadir Acompañante
-            </Button>
-          </div>
+              <div className="text-right">
+                <p className="text-xs opacity-80 uppercase font-black">Anticipo Necesario</p>
+                <h3 className="text-3xl font-black text-yellow-400">${(selectedSeats.length * advancePaymentPerPerson).toLocaleString()}</h3>
+              </div>
+            </div>
 
-          {/* Extra Services for Client */}
-          <div className="space-y-2 col-span-full mt-6">
-            <Label className="text-lg font-semibold">Servicios Adicionales</Label>
-            {tourAvailableExtraServices.length === 0 ? (
-              <p className="text-gray-600">No hay servicios adicionales disponibles para este tour.</p>
-            ) : (
-              <>
-                {formData.extra_services.map((clientService) => {
-                  const selectedProviderService = tourAvailableExtraServices.find(p => p.provider_id === clientService.provider_id);
-                  const providerDisplay = selectedProviderService
-                    ? `${selectedProviderService.name_snapshot} (${selectedProviderService.service_type_snapshot} - ${clientService.unit_type_snapshot})`
-                    : 'Seleccionar Servicio';
-                  const totalSellingPrice = clientService.selling_price_per_unit_snapshot * clientService.quantity;
+            <div className="space-y-3">
+              <Label className="font-black text-gray-500 uppercase text-[10px] tracking-widest">Opciones de Pago</Label>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+                {hasOnlineMP && (
+                  <Button type="button" onClick={() => handlePayment('mercadopago')} disabled={isSubmitting} className="bg-blue-600 h-14 font-bold rounded-xl"><CreditCard className="mr-2 h-4 w-4" /> Mercado Pago</Button>
+                )}
+                {hasOnlineStripe && (
+                  <Button type="button" onClick={() => handlePayment('stripe')} disabled={isSubmitting} className="bg-indigo-600 h-14 font-bold rounded-xl"><CreditCard className="mr-2 h-4 w-4" /> Stripe</Button>
+                )}
+                {hasBanks && (
+                  <Button type="button" onClick={() => handlePayment('transferencia')} disabled={isSubmitting} className="border-2 border-green-600 text-green-700 h-14 font-bold rounded-xl hover:bg-green-50"><Landmark className="mr-2 h-4 w-4" /> Transferencia</Button>
+                )}
+                <Button type="button" onClick={() => handlePayment('manual')} disabled={isSubmitting} className="border-2 border-gray-300 text-gray-600 h-14 font-bold rounded-xl hover:bg-gray-50">Pago Manual</Button>
+              </div>
+            </div>
+          </form>
+        ) : (
+          <div className="py-8 space-y-6">
+            <div className="text-center space-y-2">
+              <div className="bg-green-100 text-green-700 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <CheckCircle2 className="h-10 w-10" />
+              </div>
+              <h2 className="text-2xl font-black">Reserva Registrada</h2>
+              <p className="text-muted-foreground">Por favor, realiza tu transferencia a cualquiera de las siguientes cuentas:</p>
+            </div>
 
-                  return (
-                    <div key={clientService.id} className="flex flex-col md:flex-row items-center gap-2 border p-2 rounded-md">
-                      <Select
-                        value={clientService.provider_id}
-                        onValueChange={(value) => handleClientExtraServiceChange(clientService.id, 'provider_id', value)}
-                      >
-                        <SelectTrigger className="w-full md:w-1/2">
-                          <SelectValue placeholder={providerDisplay} />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {tourAvailableExtraServices.map((providerService) => (
-                            <SelectItem key={providerService.id} value={providerService.provider_id}>
-                              {`${providerService.name_snapshot} (${providerService.service_type_snapshot} - ${providerService.unit_type_snapshot})`}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <Input
-                        type="text"
-                        pattern="[0-9]*"
-                        value={clientService.quantity}
-                        onChange={(e) => handleClientExtraServiceChange(clientService.id, 'quantity', e.target.value)}
-                        placeholder="Cantidad"
-                        className="w-full md:w-1/6"
-                        required
-                      />
-                      <span className="text-sm text-gray-600 md:w-1/4 text-center md:text-left">
-                        Precio Venta Total: ${totalSellingPrice.toFixed(2)}
-                      </span>
-                      <Button type="button" variant="destructive" size="icon" onClick={() => removeClientExtraService(clientService.id)}>
-                        <MinusCircle className="h-4 w-4" />
-                      </Button>
+            <div className="grid grid-cols-1 gap-4">
+              {agencySettings?.bank_accounts.map(bank => (
+                <div key={bank.id} className="p-6 border-2 border-dashed border-gray-200 rounded-2xl bg-gray-50 space-y-4">
+                  <div className="flex justify-between items-center">
+                    <h4 className="text-xl font-black text-rosa-mexicano uppercase">{bank.bank_name}</h4>
+                    <Badge variant="outline">Cuenta CLABE</Badge>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-black uppercase text-gray-400">Titular</Label>
+                      <p className="font-bold">{bank.bank_holder}</p>
                     </div>
-                  );
-                })}
-                <Button type="button" variant="outline" onClick={addClientExtraService}>
-                  <PlusCircle className="mr-2 h-4 w-4" /> Añadir Servicio Adicional
-                </Button>
-              </>
-            )}
-          </div>
-
-          {/* Seat Selection */}
-          {busDetails.bus_capacity > 0 && (
-            <div className="col-span-full mt-6">
-              <h3 className="text-lg font-semibold mb-4">Selección de Asientos</h3>
-              <TourSeatMap
-                tourId={tourId}
-                busCapacity={busDetails.bus_capacity}
-                courtesies={busDetails.courtesies}
-                seatLayoutJson={busDetails.seat_layout_json}
-                onSeatsSelected={handleSeatsSelected}
-                readOnly={false}
-                adminMode={false}
-              />
-              {selectedSeats.length > 0 && (
-                <p className="text-sm text-gray-600 mt-2">
-                  Asientos seleccionados: {selectedSeats.join(', ')}
-                </p>
-              )}
+                    <div className="space-y-1">
+                      <Label className="text-[10px] font-black uppercase text-gray-400">CLABE</Label>
+                      <div className="flex items-center gap-2">
+                        <code className="bg-white px-3 py-1 rounded border font-mono text-lg">{bank.bank_clabe}</code>
+                        <Button variant="ghost" size="icon" onClick={() => copyToClipboard(bank.bank_clabe, 'CLABE')}><Copy className="h-4 w-4" /></Button>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
-          )}
 
-          {/* Price Breakdown */}
-          <div className="col-span-full mt-6 p-4 bg-gray-100 rounded-md">
-            <h4 className="font-semibold text-lg mb-2">Desglose del Cálculo:</h4>
-            <p className="text-sm text-gray-700">Adultos: <span className="font-medium">{numAdults}</span></p>
-            <p className="text-sm text-gray-700">Niños (-12 años): <span className="font-medium">{numChildren}</span></p>
-            {roomDetails.double_rooms > 0 && (
-              <p className="text-sm text-gray-700">
-                Habitaciones Dobles: <span className="font-medium">{roomDetails.double_rooms}</span> x ${tourSellingPrices.double.toFixed(2)}/persona x 2 = <span className="font-medium">${(roomDetails.double_rooms * tourSellingPrices.double * 2).toFixed(2)}</span>
+            <div className="bg-yellow-50 p-6 rounded-2xl border border-yellow-200 flex gap-4">
+              <Info className="h-6 w-6 text-yellow-600 shrink-0" />
+              <p className="text-sm text-yellow-800">
+                Una vez realizada la transferencia, envía el comprobante por WhatsApp al <strong>844 404 1469</strong> junto con tu número de contrato para confirmar tu pago.
               </p>
-            )}
-            {roomDetails.triple_rooms > 0 && (
-              <p className="text-sm text-gray-700">
-                Habitaciones Triples: <span className="font-medium">{roomDetails.triple_rooms}</span> x ${tourSellingPrices.triple.toFixed(2)}/persona x 3 = <span className="font-medium">${(roomDetails.triple_rooms * tourSellingPrices.triple * 3).toFixed(2)}</span>
-              </p>
-            )}
-            {roomDetails.quad_rooms > 0 && (
-              <p className="text-sm text-gray-700">
-                Habitaciones Cuádruples: <span className="font-medium">{roomDetails.quad_rooms}</span> x ${tourSellingPrices.quad.toFixed(2)}/persona x 4 = <span className="font-medium">${(roomDetails.quad_rooms * tourSellingPrices.quad * 4).toFixed(2)}</span>
-              </p>
-            )}
-            {numChildren > 0 && (
-              <p className="text-sm text-gray-700">
-                Costo Niños: <span className="font-medium">{numChildren}</span> x ${tourSellingPrices.child.toFixed(2)}/niño = <span className="font-medium">${(numChildren * tourSellingPrices.child).toFixed(2)}</span>
-              </p>
-            )}
-            {extraServicesTotal > 0 && (
-              <p className="text-sm text-gray-700">
-                Servicios Adicionales: <span className="font-medium">${extraServicesTotal.toFixed(2)}</span>
-              </p>
-            )}
-            <p className="font-bold mt-2 text-gray-800">Total Calculado: <span className="text-xl">${totalAmount.toFixed(2)}</span></p>
-          </div>
-
-          {/* Payment Section */}
-          <div className="col-span-full mt-6 p-4 bg-rosa-mexicano text-white rounded-md flex justify-between items-center">
-            <h3 className="text-xl font-bold">Monto Total a Pagar:</h3>
-            <span className="text-2xl font-bold">${totalAmount.toFixed(2)}</span>
-          </div>
-
-          {requiresAdvancePayment && (
-            <div className="col-span-full p-4 bg-yellow-50 border border-yellow-200 rounded-md">
-              <h4 className="text-lg font-bold text-yellow-800 mb-3">Anticipo Requerido: ${totalAdvancePayment.toFixed(2)} MXN</h4>
-              <p className="text-sm text-yellow-700 mb-4">
-                Se requiere un anticipo de ${advancePaymentPerPerson.toFixed(2)} MXN por persona ({selectedSeats.length} personas) para confirmar la reserva.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-                {hasMercadoPago && (
-                  <Button type="button" onClick={() => handlePayment('mercadopago')} disabled={isSubmitting} className="bg-blue-600 hover:bg-blue-700 py-6 text-base">
-                    <CreditCard className="mr-2 h-4 w-4" /> Mercado Pago
-                  </Button>
-                )}
-                
-                {hasStripe && (
-                  <Button type="button" onClick={() => handlePayment('stripe')} disabled={isSubmitting} className="bg-indigo-600 hover:bg-indigo-700 py-6 text-base">
-                    <CreditCard className="mr-2 h-4 w-4" /> Stripe
-                  </Button>
-                )}
-                
-                {hasBankInfo && (
-                  <Button type="button" onClick={() => handlePayment('transferencia')} disabled={isSubmitting} className="py-6 border-green-600 text-green-700 hover:bg-green-50 border-2">
-                    <Landmark className="mr-2 h-4 w-4" /> Transferencia
-                  </Button>
-                )}
-                
-                {!hasMercadoPago && !hasStripe && !hasBankInfo && (
-                  <Button type="button" onClick={() => handlePayment('manual')} disabled={isSubmitting} className="py-6 text-rosa-mexicano hover:text-rosa-mexicano hover:bg-rosa-mexicano/10 border-2 border-rosa-mexicano/50">
-                    <MessageSquare className="mr-2 h-4 w-4" /> Contactar para Pago
-                  </Button>
-                )}
-              </div>
             </div>
-          )}
 
-          <DialogFooter>
-            <Button type="button" onClick={onClose} variant="outline">
-              Cancelar
-            </Button>
-            {!requiresAdvancePayment && (
-              <Button type="submit" disabled={isSubmitting} className="bg-rosa-mexicano hover:bg-rosa-mexicano/90 text-white">
-                {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-                Confirmar Reserva (Sin Anticipo)
-              </Button>
-            )}
-          </DialogFooter>
-        </form>
+            <Button onClick={onClose} className="w-full h-14 bg-gray-900 text-white font-bold rounded-xl">Entendido, cerrar</Button>
+          </div>
+        )}
       </DialogContent>
     </Dialog>
   );

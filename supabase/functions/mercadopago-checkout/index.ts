@@ -17,20 +17,23 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Obtener configuración de comisiones
+    // Obtener modo de pago (test/production)
     const { data: settings } = await supabaseAdmin.from('agency_settings').select('*').single();
+    const isTestMode = settings?.payment_mode === 'test';
     
-    // Cálculo de comisión para que el negocio reciba el 'amount' neto
-    // Fórmula: Total = (Neto + Fijo) / (1 - %Comisión * 1.16)
+    // Selección de token según el modo
+    const MP_ACCESS_TOKEN = isTestMode 
+      ? Deno.env.get('MP_TEST_ACCESS_TOKEN') 
+      : Deno.env.get('MP_ACCESS_TOKEN');
+
+    if (!MP_ACCESS_TOKEN) throw new Error(`Token de Mercado Pago (${isTestMode ? 'Prueba' : 'Producción'}) no configurado`);
+
     const percentage = (settings?.mp_commission_percentage || 3.99) / 100;
     const fixed = settings?.mp_fixed_fee || 4.0;
-    const taxFactor = 1.16; // IVA en México
+    const taxFactor = 1.16;
     
     const totalToPay = (amount + fixed) / (1 - (percentage * taxFactor));
     const roundedTotal = Math.ceil(totalToPay * 100) / 100;
-
-    const MP_ACCESS_TOKEN = Deno.env.get('MP_ACCESS_TOKEN');
-    if (!MP_ACCESS_TOKEN) throw new Error("Mercado Pago Access Token no configurado");
 
     const response = await fetch("https://api.mercadopago.com/checkout/preferences", {
       method: "POST",
@@ -39,14 +42,12 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        items: [
-          {
-            title: description || "Anticipo de Reserva",
-            unit_price: roundedTotal,
-            quantity: 1,
-            currency_id: "MXN",
-          }
-        ],
+        items: [{
+          title: description || "Anticipo de Reserva",
+          unit_price: roundedTotal,
+          quantity: 1,
+          currency_id: "MXN",
+        }],
         external_reference: clientId,
         back_urls: {
           success: `${req.headers.get("origin")}/payment-success`,
@@ -61,8 +62,7 @@ serve(async (req) => {
     return new Response(JSON.stringify({ 
       id: preference.id, 
       init_point: preference.init_point,
-      total: roundedTotal,
-      fee: roundedTotal - amount
+      total: roundedTotal
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

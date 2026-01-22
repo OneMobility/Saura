@@ -18,40 +18,37 @@ serve(async (req) => {
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
     );
 
-    // Obtener configuración de comisiones de la base de datos
     const { data: settings } = await supabaseAdmin.from('agency_settings').select('*').single();
+    const isTestMode = settings?.payment_mode === 'test';
 
-    const STRIPE_SECRET_KEY = Deno.env.get('STRIPE_SECRET_KEY');
-    if (!STRIPE_SECRET_KEY) throw new Error("Stripe Secret Key no configurada");
+    const STRIPE_SECRET_KEY = isTestMode
+      ? Deno.env.get('STRIPE_TEST_SECRET_KEY')
+      : Deno.env.get('STRIPE_SECRET_KEY');
+
+    if (!STRIPE_SECRET_KEY) throw new Error(`Llave secreta de Stripe (${isTestMode ? 'Prueba' : 'Producción'}) no configurada`);
 
     const stripe = new Stripe(STRIPE_SECRET_KEY, {
       apiVersion: '2022-11-15',
       httpClient: Stripe.createFetchHttpClient(),
     });
 
-    // Cálculo dinámico de comisión para Stripe
     const percentage = (settings?.stripe_commission_percentage || 4.0) / 100;
     const fixed = settings?.stripe_fixed_fee || 5.0;
-    const taxFactor = 1.16; // IVA en México
+    const taxFactor = 1.16;
     
-    // Total = (Neto + Fijo) / (1 - %Comisión * 1.16)
     const totalToPay = (amount + fixed) / (1 - (percentage * taxFactor));
     const roundedTotalCentavos = Math.ceil(totalToPay * 100);
 
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ['card'],
-      line_items: [
-        {
-          price_data: {
-            currency: 'mxn',
-            product_data: {
-              name: description || "Anticipo de Reserva",
-            },
-            unit_amount: roundedTotalCentavos,
-          },
-          quantity: 1,
+      line_items: [{
+        price_data: {
+          currency: 'mxn',
+          product_data: { name: description || "Anticipo de Reserva" },
+          unit_amount: roundedTotalCentavos,
         },
-      ],
+        quantity: 1,
+      }],
       mode: 'payment',
       success_url: `${req.headers.get("origin")}/payment-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${req.headers.get("origin")}/payment-failure`,

@@ -7,34 +7,46 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Save, Loader2, CreditCard, Landmark } from 'lucide-react';
+import { Save, Loader2, CreditCard, Landmark, Plus, Trash2, ShieldAlert, Zap } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
+import { Badge } from '@/components/ui/badge';
+import { v4 as uuidv4 } from 'uuid';
+
+interface BankAccount {
+  id: string;
+  bank_name: string;
+  bank_clabe: string;
+  bank_holder: string;
+}
 
 interface PaymentSetting {
   id?: string;
+  payment_mode: 'test' | 'production';
   mp_public_key: string | null;
+  mp_test_public_key: string | null;
+  stripe_public_key: string | null;
+  stripe_test_public_key: string | null;
   advance_payment_amount: number;
   mp_commission_percentage: number;
   mp_fixed_fee: number;
-  stripe_public_key: string | null;
   stripe_commission_percentage: number;
   stripe_fixed_fee: number;
-  bank_name: string | null;
-  bank_clabe: string | null;
-  bank_holder: string | null;
+  bank_accounts: BankAccount[];
 }
 
 const PaymentSettings = () => {
   const [paymentInfo, setPaymentInfo] = useState<PaymentSetting>({
+    payment_mode: 'test',
     mp_public_key: '',
+    mp_test_public_key: '',
+    stripe_public_key: '',
+    stripe_test_public_key: '',
     advance_payment_amount: 0,
     mp_commission_percentage: 3.99,
     mp_fixed_fee: 4.0,
-    stripe_public_key: '',
     stripe_commission_percentage: 4.0,
     stripe_fixed_fee: 5.0,
-    bank_name: '',
-    bank_clabe: '',
-    bank_holder: '',
+    bank_accounts: [],
   });
   
   const [loading, setLoading] = useState(true);
@@ -51,13 +63,11 @@ const PaymentSettings = () => {
       .select('*')
       .single();
 
-    if (error && error.code !== 'PGRST116') {
-      console.error('Error fetching settings:', error);
-    } else if (data) {
+    if (data) {
       setPaymentInfo({
         ...data,
-        stripe_commission_percentage: data.stripe_commission_percentage || 4.0,
-        stripe_fixed_fee: data.stripe_fixed_fee || 5.0,
+        payment_mode: data.payment_mode || 'test',
+        bank_accounts: Array.isArray(data.bank_accounts) ? data.bank_accounts : [],
       });
     }
     setLoading(false);
@@ -65,11 +75,28 @@ const PaymentSettings = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { id, value } = e.target;
-    setPaymentInfo((prev) => ({ 
-      ...prev, 
-      [id]: ['advance_payment_amount', 'mp_commission_percentage', 'mp_fixed_fee', 'stripe_commission_percentage', 'stripe_fixed_fee'].includes(id) 
-        ? parseFloat(value) || 0 
-        : value 
+    const isNumeric = ['advance_payment_amount', 'mp_commission_percentage', 'mp_fixed_fee', 'stripe_commission_percentage', 'stripe_fixed_fee'].includes(id);
+    setPaymentInfo(prev => ({ ...prev, [id]: isNumeric ? parseFloat(value) || 0 : value }));
+  };
+
+  const handleAddBank = () => {
+    setPaymentInfo(prev => ({
+      ...prev,
+      bank_accounts: [...prev.bank_accounts, { id: uuidv4(), bank_name: '', bank_clabe: '', bank_holder: '' }]
+    }));
+  };
+
+  const handleRemoveBank = (id: string) => {
+    setPaymentInfo(prev => ({
+      ...prev,
+      bank_accounts: prev.bank_accounts.filter(b => b.id !== id)
+    }));
+  };
+
+  const handleBankChange = (id: string, field: keyof BankAccount, value: string) => {
+    setPaymentInfo(prev => ({
+      ...prev,
+      bank_accounts: prev.bank_accounts.map(b => b.id === id ? { ...b, [field]: value } : b)
     }));
   };
 
@@ -80,21 +107,22 @@ const PaymentSettings = () => {
     const { error } = await supabase
       .from('agency_settings')
       .update({
+        payment_mode: paymentInfo.payment_mode,
         mp_public_key: paymentInfo.mp_public_key,
+        mp_test_public_key: paymentInfo.mp_test_public_key,
+        stripe_public_key: paymentInfo.stripe_public_key,
+        stripe_test_public_key: paymentInfo.stripe_test_public_key,
         advance_payment_amount: paymentInfo.advance_payment_amount,
         mp_commission_percentage: paymentInfo.mp_commission_percentage,
         mp_fixed_fee: paymentInfo.mp_fixed_fee,
-        stripe_public_key: paymentInfo.stripe_public_key,
         stripe_commission_percentage: paymentInfo.stripe_commission_percentage,
         stripe_fixed_fee: paymentInfo.stripe_fixed_fee,
-        bank_name: paymentInfo.bank_name,
-        bank_clabe: paymentInfo.bank_clabe,
-        bank_holder: paymentInfo.bank_holder,
+        bank_accounts: paymentInfo.bank_accounts,
         updated_at: new Date().toISOString(),
       })
       .eq('id', paymentInfo.id);
 
-    if (error) toast.error('Error al guardar la configuración de pagos.');
+    if (error) toast.error('Error al guardar.');
     else toast.success('Configuración de pagos actualizada.');
     
     setIsSubmitting(false);
@@ -103,90 +131,134 @@ const PaymentSettings = () => {
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="h-8 w-8 animate-spin text-rosa-mexicano" /></div>;
 
   return (
-    <Card className="p-6">
-      <CardHeader>
-        <CardTitle>Configuración de Pasarelas de Pago</CardTitle>
-        <CardDescription>Gestiona las llaves de pago y los datos para transferencia bancaria.</CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleSubmit} className="space-y-8">
-          <div className="p-4 bg-muted rounded-lg mb-6 border-l-4 border-rosa-mexicano">
-            <Label htmlFor="advance_payment_amount" className="text-lg font-bold">Monto del Anticipo por Persona ($)</Label>
-            <Input id="advance_payment_amount" type="number" value={paymentInfo.advance_payment_amount} onChange={handleChange} className="mt-2 bg-white" />
-            <p className="text-xs text-muted-foreground mt-1">Monto neto que el cliente paga para asegurar su lugar.</p>
-          </div>
-
-          <div className="border-t pt-6">
-            <h3 className="text-lg font-bold flex items-center gap-2 mb-4 text-green-600">
-              <Landmark className="h-5 w-5" /> Transferencia Bancaria
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="bank_name">Banco</Label>
-                <Input id="bank_name" value={paymentInfo.bank_name || ''} onChange={handleChange} placeholder="Ej: BBVA, Banamex..." />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="bank_clabe">CLABE Interbancaria</Label>
-                <Input id="bank_clabe" value={paymentInfo.bank_clabe || ''} onChange={handleChange} placeholder="18 dígitos" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="bank_holder">Titular de la Cuenta</Label>
-                <Input id="bank_holder" value={paymentInfo.bank_holder || ''} onChange={handleChange} placeholder="Nombre completo" />
-              </div>
+    <div className="space-y-6">
+      {/* Selector de Modo */}
+      <Card className={cn(
+        "border-2",
+        paymentInfo.payment_mode === 'test' ? "border-yellow-400 bg-yellow-50/30" : "border-green-500 bg-green-50/30"
+      )}>
+        <CardContent className="pt-6">
+          <div className="flex items-center justify-between">
+            <div className="space-y-1">
+              <h3 className="text-xl font-black flex items-center gap-2">
+                {paymentInfo.payment_mode === 'test' ? <Zap className="text-yellow-600" /> : <ShieldAlert className="text-green-600" />}
+                Modo de Operación: {paymentInfo.payment_mode === 'test' ? 'SANDBOX (Pruebas)' : 'PRODUCCIÓN (En Vivo)'}
+              </h3>
+              <p className="text-sm text-muted-foreground">Define si los cobros se realizan con dinero real o en ambiente de prueba.</p>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="font-bold text-xs uppercase tracking-tighter">Pasar a Producción</span>
+              <Switch 
+                checked={paymentInfo.payment_mode === 'production'} 
+                onCheckedChange={(val) => setPaymentInfo(p => ({...p, payment_mode: val ? 'production' : 'test'}))}
+              />
             </div>
           </div>
+        </CardContent>
+      </Card>
 
-          <div className="border-t pt-6">
-            <h3 className="text-lg font-bold flex items-center gap-2 mb-4 text-blue-600">
-              <CreditCard className="h-5 w-5" /> Mercado Pago
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Bancos */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2"><Landmark className="text-rosa-mexicano" /> Cuentas para Transferencia</CardTitle>
+            <CardDescription>Agrega las cuentas bancarias que los clientes verán para pagar vía transferencia.</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {paymentInfo.bank_accounts.map((bank, index) => (
+              <div key={bank.id} className="p-4 border rounded-xl bg-gray-50 relative group">
+                <Button 
+                  variant="ghost" 
+                  size="icon" 
+                  className="absolute right-2 top-2 text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onClick={() => handleRemoveBank(bank.id)}
+                >
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase font-bold text-gray-400">Banco</Label>
+                    <Input value={bank.bank_name} onChange={e => handleBankChange(bank.id, 'bank_name', e.target.value)} placeholder="Ej: BBVA" />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase font-bold text-gray-400">CLABE (18 dígitos)</Label>
+                    <Input value={bank.bank_clabe} onChange={e => handleBankChange(bank.id, 'bank_clabe', e.target.value)} placeholder="0123..." />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-[10px] uppercase font-bold text-gray-400">Titular</Label>
+                    <Input value={bank.bank_holder} onChange={e => handleBankChange(bank.id, 'bank_holder', e.target.value)} placeholder="Nombre del titular" />
+                  </div>
+                </div>
+              </div>
+            ))}
+            <Button type="button" variant="outline" onClick={handleAddBank} className="w-full border-dashed">
+              <Plus className="h-4 w-4 mr-2" /> Agregar Cuenta Bancaria
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Mercado Pago */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2"><CreditCard className="text-blue-600" /> Mercado Pago</CardTitle>
+              <CardDescription>Configuración de credenciales de la pasarela.</CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Input id="mp_commission_percentage" type="number" step="0.01" value={paymentInfo.mp_commission_percentage} onChange={handleChange} className="w-20" />
+              <span className="self-center font-bold text-xs">% + $</span>
+              <Input id="mp_fixed_fee" type="number" step="0.01" value={paymentInfo.mp_fixed_fee} onChange={handleChange} className="w-16" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="mp_public_key">Public Key</Label>
+                <Label className="flex items-center gap-2">Public Key <Badge variant="secondary">PRODUCCIÓN</Badge></Label>
                 <Input id="mp_public_key" value={paymentInfo.mp_public_key || ''} onChange={handleChange} placeholder="APP_USR-..." />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="mp_commission_percentage">Comisión (%)</Label>
-                  <Input id="mp_commission_percentage" type="number" step="0.01" value={paymentInfo.mp_commission_percentage} onChange={handleChange} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="mp_fixed_fee">Cargo Fijo ($)</Label>
-                  <Input id="mp_fixed_fee" type="number" step="0.01" value={paymentInfo.mp_fixed_fee} onChange={handleChange} />
-                </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">Public Key <Badge className="bg-yellow-400 text-black">PRUEBAS (Sandbox)</Badge></Label>
+                <Input id="mp_test_public_key" value={paymentInfo.mp_test_public_key || ''} onChange={handleChange} placeholder="TEST-..." />
               </div>
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          <div className="border-t pt-6">
-            <h3 className="text-lg font-bold flex items-center gap-2 mb-4 text-indigo-600">
-              <CreditCard className="h-5 w-5" /> Stripe
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {/* Stripe */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2"><CreditCard className="text-indigo-600" /> Stripe</CardTitle>
+              <CardDescription>Configuración de credenciales de la pasarela.</CardDescription>
+            </div>
+            <div className="flex gap-2">
+              <Input id="stripe_commission_percentage" type="number" step="0.01" value={paymentInfo.stripe_commission_percentage} onChange={handleChange} className="w-20" />
+              <span className="self-center font-bold text-xs">% + $</span>
+              <Input id="stripe_fixed_fee" type="number" step="0.01" value={paymentInfo.stripe_fixed_fee} onChange={handleChange} className="w-16" />
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="stripe_public_key">Public Key (pk_...)</Label>
+                <Label className="flex items-center gap-2">Public Key <Badge variant="secondary">PRODUCCIÓN</Badge></Label>
                 <Input id="stripe_public_key" value={paymentInfo.stripe_public_key || ''} onChange={handleChange} placeholder="pk_live_..." />
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="stripe_commission_percentage">Comisión (%)</Label>
-                  <Input id="stripe_commission_percentage" type="number" step="0.01" value={paymentInfo.stripe_commission_percentage} onChange={handleChange} />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="stripe_fixed_fee">Cargo Fijo ($)</Label>
-                  <Input id="stripe_fixed_fee" type="number" step="0.01" value={paymentInfo.stripe_fixed_fee} onChange={handleChange} />
-                </div>
+              <div className="space-y-2">
+                <Label className="flex items-center gap-2">Public Key <Badge className="bg-yellow-400 text-black">PRUEBAS (Sandbox)</Badge></Label>
+                <Input id="stripe_test_public_key" value={paymentInfo.stripe_test_public_key || ''} onChange={handleChange} placeholder="pk_test_..." />
               </div>
             </div>
-          </div>
+          </CardContent>
+        </Card>
 
-          <Button type="submit" disabled={isSubmitting} className="bg-rosa-mexicano w-full">
-            {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
-            Guardar Configuración de Pagos
+        <div className="fixed bottom-6 right-6">
+          <Button type="submit" disabled={isSubmitting} className="bg-rosa-mexicano shadow-2xl h-14 px-10 text-lg font-bold rounded-2xl">
+            {isSubmitting ? <Loader2 className="mr-2 h-5 w-5 animate-spin" /> : <Save className="mr-2 h-5 w-5" />}
+            Guardar Configuración Maestra
           </Button>
-        </form>
-      </CardContent>
-    </Card>
+        </div>
+      </form>
+    </div>
   );
 };
 
