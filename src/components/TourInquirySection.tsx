@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -10,7 +11,6 @@ import { Loader2, MessageSquare, CreditCard, FileText, FileSignature, Calendar, 
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 
 interface AgencySettings {
@@ -19,12 +19,28 @@ interface AgencySettings {
 }
 
 const TourInquirySection = () => {
+  const [searchParams] = useSearchParams();
   const [contractNumber, setContractNumber] = useState('');
   const [contractDetails, setContractDetails] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [isPaying, setIsPaying] = useState(false);
   const [isDownloading, setIsDownloading] = useState<string | null>(null);
   const [agencySettings, setAgencySettings] = useState<AgencySettings | null>(null);
+  const sectionRef = useRef<HTMLDivElement>(null);
+
+  // Efecto para detectar contrato en la URL y auto-consultar
+  useEffect(() => {
+    const contractFromUrl = searchParams.get('contract');
+    if (contractFromUrl) {
+      setContractNumber(contractFromUrl.toUpperCase());
+      // Pequeño delay para asegurar que el estado se actualice antes de disparar la consulta
+      setTimeout(() => {
+        handleInquiry(contractFromUrl.toUpperCase());
+        // Scroll suave a la sección
+        sectionRef.current?.scrollIntoView({ behavior: 'smooth' });
+      }, 500);
+    }
+  }, [searchParams]);
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -37,12 +53,14 @@ const TourInquirySection = () => {
     fetchSettings();
   }, []);
 
-  const handleInquiry = async () => {
-    if (!contractNumber.trim()) return;
+  const handleInquiry = async (customNumber?: string) => {
+    const numberToQuery = customNumber || contractNumber;
+    if (!numberToQuery.trim()) return;
+    
     setLoading(true);
     try {
       const { data, error } = await supabase.functions.invoke('get-public-contract-details', {
-        body: { contractNumber: contractNumber.trim() },
+        body: { contractNumber: numberToQuery.trim() },
       });
       if (error) throw error;
       setContractDetails(data.contractDetails);
@@ -107,7 +125,7 @@ const TourInquirySection = () => {
   const hasStripe = !!agencySettings?.stripe_public_key;
 
   return (
-    <section className="py-16 px-4 md:px-8 lg:px-16 bg-rosa-mexicano text-white">
+    <section id="consultar" ref={sectionRef} className="py-16 px-4 md:px-8 lg:px-16 bg-rosa-mexicano text-white scroll-mt-20">
       <div className="max-w-4xl mx-auto text-center">
         <h2 className="text-3xl md:text-4xl font-black mb-6 uppercase tracking-tight">Consulta tu Contrato</h2>
         <p className="mb-8 opacity-90 text-lg">Ingresa tu número de reserva para ver detalles, descargar tus documentos o realizar pagos periódicos.</p>
@@ -120,7 +138,7 @@ const TourInquirySection = () => {
             onChange={e => setContractNumber(e.target.value.toUpperCase())}
             onKeyDown={e => e.key === 'Enter' && handleInquiry()}
           />
-          <Button onClick={handleInquiry} disabled={loading} className="bg-white text-rosa-mexicano hover:bg-gray-100 h-12 px-8 rounded-xl font-bold">
+          <Button onClick={() => handleInquiry()} disabled={loading} className="bg-white text-rosa-mexicano hover:bg-gray-100 h-12 px-8 rounded-xl font-bold">
             {loading ? <Loader2 className="animate-spin" /> : 'Consultar'}
           </Button>
         </div>

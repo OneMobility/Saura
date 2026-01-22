@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useState } from 'react';
-import { useSearchParams, Link } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { CheckCircle2, Loader2, Calendar, User, MapPin, Printer, Home, Search, Info } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -9,39 +9,58 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import Navbar from '@/components/Navbar';
 import Footer from '@/components/Footer';
+import { toast } from 'sonner';
 
 const PaymentSuccessPage = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const contractNumber = searchParams.get('contract');
   const [details, setDetails] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [confirmingPayment, setConfirmingPayment] = useState(true);
 
   useEffect(() => {
-    const fetchDetails = async () => {
+    const processSuccess = async () => {
       if (!contractNumber) {
         setLoading(false);
+        setConfirmingPayment(false);
         return;
       }
+
       try {
+        // 1. Confirmar y abonar el pago en la BD
+        await supabase.functions.invoke('confirm-payment', {
+          body: { contractNumber: contractNumber.trim(), method: 'online' },
+        });
+        setConfirmingPayment(false);
+
+        // 2. Obtener detalles actualizados
         const { data, error } = await supabase.functions.invoke('get-public-contract-details', {
           body: { contractNumber: contractNumber.trim() },
         });
         if (!error) setDetails(data.contractDetails);
       } catch (err) {
         console.error(err);
+        toast.error("Hubo un problema al actualizar tu saldo, pero tu pago fue recibido.");
       } finally {
         setLoading(false);
+        setConfirmingPayment(false);
       }
     };
-    fetchDetails();
+    processSuccess();
   }, [contractNumber]);
 
-  if (loading) {
+  const handleGoToInquiry = () => {
+    // Redirigir a la home con el parámetro de contrato y el ancla a la sección
+    navigate(`/?contract=${contractNumber}#consultar`);
+  };
+
+  if (loading || confirmingPayment) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
         <div className="text-center">
           <Loader2 className="h-12 w-12 animate-spin text-rosa-mexicano mx-auto mb-4" />
-          <p className="text-gray-600 font-bold">Validando tu pago...</p>
+          <p className="text-gray-600 font-bold">Acreditando tu pago y generando contrato...</p>
         </div>
       </div>
     );
@@ -115,9 +134,9 @@ const PaymentSuccessPage = () => {
                       <Printer className="mr-2 h-4 w-4" /> Imprimir
                     </Button>
                     <Button asChild className="h-12 bg-rosa-mexicano hover:bg-rosa-mexicano/90 rounded-xl">
-                      <Link to="/">
-                        Ir al Inicio <Home className="ml-2 h-4 w-4" />
-                      </Link>
+                      <button onClick={() => navigate('/')}>
+                        Ir al Inicio
+                      </button>
                     </Button>
                   </div>
                 </div>
@@ -130,10 +149,10 @@ const PaymentSuccessPage = () => {
               </div>
               <div className="text-center md:text-left flex-grow">
                 <h4 className="text-xl font-black text-gray-900">¿Quieres revisar tu avance?</h4>
-                <p className="text-gray-600">Puedes consultar tu contrato, detalles y realizar nuevos abonos usando tu número de reserva <strong>#{details.contract_number}</strong> en la sección "Consulta tu Contrato" de nuestra página principal.</p>
+                <p className="text-gray-600">Haz clic en el botón para ver tu contrato completo y realizar nuevos abonos para tu viaje <strong>#{details.contract_number}</strong>.</p>
               </div>
-              <Button asChild variant="secondary" className="bg-gray-100 hover:bg-gray-200 text-gray-900 font-bold px-8">
-                <Link to="/">Ir a Consultar</Link>
+              <Button onClick={handleGoToInquiry} variant="secondary" className="bg-gray-900 hover:bg-black text-white h-14 font-bold px-8 rounded-2xl shadow-lg">
+                Consultar Mi Reserva <Search className="ml-2 h-4 w-4" />
               </Button>
             </div>
           </div>
