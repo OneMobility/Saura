@@ -19,14 +19,17 @@ serve(async (req) => {
     );
 
     const { data: settings } = await supabaseAdmin.from('agency_settings').select('*').single();
-    const isTestMode = settings?.payment_mode === 'test';
+    const isProduction = settings?.payment_mode === 'production';
     
-    const STRIPE_SECRET_KEY = isTestMode
-      ? (Deno.env.get('STRIPE_TEST_SECRET_KEY') || Deno.env.get('stripe'))
-      : (Deno.env.get('STRIPE_SECRET_KEY') || Deno.env.get('stripe'));
+    // Lógica de selección de llave: 
+    // Si es producción, busca STRIPE_SECRET_KEY, luego el genérico 'stripe'.
+    // Si es test, busca STRIPE_TEST_SECRET_KEY, luego el genérico 'stripe'.
+    const STRIPE_SECRET_KEY = isProduction
+      ? (Deno.env.get('STRIPE_SECRET_KEY') || Deno.env.get('stripe'))
+      : (Deno.env.get('STRIPE_TEST_SECRET_KEY') || Deno.env.get('stripe'));
 
     if (!STRIPE_SECRET_KEY || STRIPE_SECRET_KEY.startsWith('pk_')) {
-      throw new Error("Configuración de Stripe inválida. Se requiere una Secret Key (sk_...).");
+      throw new Error(`Configuración de Stripe inválida para modo ${isProduction ? 'PRODUCCIÓN' : 'PRUEBA'}. Se requiere una Secret Key (sk_...).`);
     }
 
     const stripe = new Stripe(STRIPE_SECRET_KEY, {
@@ -52,7 +55,6 @@ serve(async (req) => {
         quantity: 1,
       }],
       mode: 'payment',
-      // Redirección dinámica al número de contrato
       success_url: `${req.headers.get("origin")}/bus-tickets/confirmation/${contractNumber}`,
       cancel_url: `${req.headers.get("origin")}/tours`,
       client_reference_id: clientId,
