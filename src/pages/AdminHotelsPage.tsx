@@ -69,24 +69,6 @@ const AdminHotelsPage = () => {
     setLoading(false);
   };
 
-  // Lógica de recomendación: Mejor opción por Mes Y por Noches
-  const cheapestStats = useMemo(() => {
-    const minsByMonthAndNights: Record<string, number> = {};
-
-    hotels.forEach(h => {
-      if (!h.quoted_date) return;
-      const monthKey = format(parseISO(h.quoted_date), 'yyyy-MM');
-      const nights = h.num_nights_quoted || 1;
-      const key = `${monthKey}-${nights}`;
-      
-      if (!minsByMonthAndNights[key] || h.total_quote_cost < minsByMonthAndNights[key]) {
-        minsByMonthAndNights[key] = h.total_quote_cost;
-      }
-    });
-
-    return { minsByMonthAndNights };
-  }, [hotels]);
-
   const groupedHotels = useMemo(() => {
     return hotels.reduce((acc, h) => {
       if (!acc[h.name]) acc[h.name] = [];
@@ -94,12 +76,6 @@ const AdminHotelsPage = () => {
       return acc;
     }, {} as Record<string, Hotel[]>);
   }, [hotels]);
-
-  const sortedGroupEntries = Object.entries(groupedHotels).sort((a, b) => {
-    const minA = Math.min(...a[1].map(h => h.total_quote_cost));
-    const minB = Math.min(...b[1].map(h => h.total_quote_cost));
-    return minA - minB;
-  });
 
   const handleDeleteHotel = async (id: string) => {
     if (!window.confirm('¿Eliminar esta cotización?')) return;
@@ -122,10 +98,6 @@ const AdminHotelsPage = () => {
     setLoading(false);
   };
 
-  const handleCloneHotel = (id: string) => {
-    navigate(`/admin/hotels/new?cloneFrom=${id}`);
-  };
-
   if (sessionLoading || loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
 
   return (
@@ -139,7 +111,7 @@ const AdminHotelsPage = () => {
         </AdminHeader>
         <main className="flex-grow container mx-auto px-4 py-8">
           <div className="space-y-6">
-            {sortedGroupEntries.map(([name, quotes]) => (
+            {Object.entries(groupedHotels).map(([name, quotes]) => (
               <div key={name} className="bg-white rounded-xl shadow-sm border overflow-hidden">
                 <div 
                   className="bg-gray-50 p-4 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors"
@@ -150,14 +122,11 @@ const AdminHotelsPage = () => {
                     <div>
                       <h3 className="text-xl font-bold text-gray-800">{name}</h3>
                       <p className="text-xs text-gray-500 uppercase tracking-widest font-bold">
-                        {quotes[0].location} • {quotes.length} Fechas cotizadas
+                        {quotes[0].location} • {quotes.length} Cotizaciones
                       </p>
                     </div>
                   </div>
-                  <div className="flex items-center gap-4">
-                    <Badge variant="secondary" className="bg-white border text-gray-600">
-                      Desde ${Math.min(...quotes.map(q => q.total_quote_cost)).toLocaleString()}
-                    </Badge>
+                  <div className="flex items-center gap-2">
                     <Button 
                       variant="ghost" 
                       size="icon" 
@@ -178,7 +147,7 @@ const AdminHotelsPage = () => {
                     <Table>
                       <TableHeader className="bg-white">
                         <TableRow>
-                          <TableHead>Fecha Inicio</TableHead>
+                          <TableHead>Fecha</TableHead>
                           <TableHead>Noches</TableHead>
                           <TableHead>Costo Total</TableHead>
                           <TableHead>Estado Pago</TableHead>
@@ -186,52 +155,24 @@ const AdminHotelsPage = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {quotes.sort((a, b) => (a.quoted_date || '').localeCompare(b.quoted_date || '')).map((q) => {
-                          const monthKey = q.quoted_date ? format(parseISO(q.quoted_date), 'yyyy-MM') : '';
-                          const nights = q.num_nights_quoted || 1;
-                          const key = `${monthKey}-${nights}`;
-                          const isBestForDuration = cheapestStats.minsByMonthAndNights[key] === q.total_quote_cost;
-
-                          return (
-                            <TableRow key={q.id} className={cn(isBestForDuration && "bg-green-50/50")}>
-                              <TableCell className="font-medium flex items-center gap-2">
-                                <Calendar className="h-3 w-3 text-gray-400" />
-                                {q.quoted_date ? format(parseISO(q.quoted_date), 'dd/MMM/yy', { locale: es }) : 'N/A'}
-                              </TableCell>
-                              <TableCell>{nights} noches</TableCell>
-                              <TableCell>
-                                <div className="flex items-center gap-2">
-                                  <span className={cn("font-bold text-lg", isBestForDuration ? "text-green-600" : "text-gray-900")}>
-                                    ${q.total_quote_cost.toLocaleString()}
-                                  </span>
-                                  {isBestForDuration && (
-                                    <Badge className="bg-yellow-400 text-yellow-900 hover:bg-yellow-400 border-none flex gap-1 text-[10px]">
-                                      <Star className="h-3 w-3 fill-yellow-900" /> MEJOR OPCIÓN ({nights} N)
-                                    </Badge>
-                                  )}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                <Badge className={cn(q.remaining_payment <= 0 ? "bg-green-500" : "bg-red-500")}>
-                                  {q.remaining_payment <= 0 ? "Pagado" : `Pendiente: $${q.remaining_payment.toLocaleString()}`}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right flex justify-end gap-2">
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  onClick={() => handleCloneHotel(q.id)} 
-                                  className="text-gray-500 hover:text-rosa-mexicano"
-                                  title="Duplicar cotización"
-                                >
-                                  <Copy className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" onClick={() => navigate(`/admin/hotels/edit/${q.id}`)} className="hover:text-blue-600" title="Editar"><Edit className="h-4 w-4" /></Button>
-                                <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-50" onClick={() => handleDeleteHotel(q.id)} title="Eliminar"><Trash2 className="h-4 w-4" /></Button>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
+                        {quotes.map((q) => (
+                          <TableRow key={q.id}>
+                            <TableCell className="font-medium">
+                              {q.quoted_date ? format(parseISO(q.quoted_date), 'dd/MMM/yy', { locale: es }) : 'N/A'}
+                            </TableCell>
+                            <TableCell>{q.num_nights_quoted} noches</TableCell>
+                            <TableCell className="font-bold">${q.total_quote_cost.toLocaleString()}</TableCell>
+                            <TableCell>
+                              <Badge className={cn(q.remaining_payment <= 0 ? "bg-green-500" : "bg-red-500")}>
+                                {q.remaining_payment <= 0 ? "Pagado" : `Pendiente: $${q.remaining_payment.toLocaleString()}`}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right flex justify-end gap-1">
+                              <Button variant="ghost" size="icon" onClick={() => navigate(`/admin/hotels/edit/${q.id}`)} className="hover:text-blue-600"><Edit className="h-4 w-4" /></Button>
+                              <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-50" onClick={() => handleDeleteHotel(q.id)}><Trash2 className="h-4 w-4" /></Button>
+                            </TableCell>
+                          </TableRow>
+                        ))}
                       </TableBody>
                     </Table>
                   </div>

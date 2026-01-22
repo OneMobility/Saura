@@ -41,6 +41,7 @@ const AdminDashboard = () => {
   const fetchDashboardData = async () => {
     setLoadingData(true);
     try {
+      // Calculamos el límite de 24 horas atrás
       const yesterday = subHours(new Date(), 24).toISOString();
 
       const [
@@ -65,7 +66,7 @@ const AdminDashboard = () => {
           .eq('status', 'pending')
           .eq('total_paid', 0)
           .lt('created_at', yesterday)
-          .limit(5)
+          .limit(5) // Solo mostramos las 5 más urgentes
       ]);
 
       setTotalTours(toursCount.count || 0);
@@ -97,17 +98,18 @@ const AdminDashboard = () => {
       setMonthlyRevenueData(sortedMonthlyRevenue);
 
     } catch (error: any) {
-      toast.error(`Error: ${error.message}`);
+      toast.error(`Error al cargar datos: ${error.message}`);
     } finally {
       setLoadingData(false);
     }
   };
 
   const deleteClient = async (id: string) => {
-    if (!window.confirm('¿Eliminar esta reserva caducada? Se liberarán los asientos.')) return;
+    if (!window.confirm('¿Estás seguro de que quieres eliminar esta reserva caducada? Los asientos se liberarán automáticamente.')) return;
     const { error } = await supabase.from('clients').delete().eq('id', id);
-    if (!error) {
-      toast.success('Reserva eliminada.');
+    if (error) toast.error("No se pudo eliminar.");
+    else {
+      toast.success('Reserva caducada eliminada.');
       fetchDashboardData();
     }
   };
@@ -123,7 +125,7 @@ const AdminDashboard = () => {
         <AdminHeader pageTitle="Panel de Control" />
         <main className="flex-grow container mx-auto px-4 py-8">
           
-          {/* NOTIFICACIONES DE RESERVAS CADUCADAS */}
+          {/* SECCIÓN DE NOTIFICACIONES URGENTES */}
           {expiredClients.length > 0 && (
             <div className="mb-8 space-y-4">
               <h2 className="text-lg font-black uppercase text-red-600 flex items-center gap-2">
@@ -159,11 +161,11 @@ const AdminDashboard = () => {
           )}
 
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5 mb-8">
-            <DashboardSummaryCard title="Tours" value={totalTours} icon={Package} />
-            <DashboardSummaryCard title="Clientes" value={totalClients} icon={Users} />
-            <DashboardSummaryCard title="Ingresos" value={`$${totalRevenue.toFixed(0)}`} icon={DollarSign} />
-            <DashboardSummaryCard title="Buses" value={totalBuses} icon={Bus} />
-            <DashboardSummaryCard title="Hoteles" value={totalHotels} icon={Hotel} />
+            <DashboardSummaryCard title="Tours Activos" value={totalTours} icon={Package} />
+            <DashboardSummaryCard title="Clientes Totales" value={totalClients} icon={Users} />
+            <DashboardSummaryCard title="Ingresos Totales" value={`$${totalRevenue.toLocaleString()}`} icon={DollarSign} />
+            <DashboardSummaryCard title="Flota Buses" value={totalBuses} icon={Bus} />
+            <DashboardSummaryCard title="Hoteles Convenio" value={totalHotels} icon={Hotel} />
           </div>
 
           <div className="grid gap-8 lg:grid-cols-2">
