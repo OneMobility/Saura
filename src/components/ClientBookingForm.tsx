@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Hotel, BusFront, CreditCard, Save } from 'lucide-react';
+import { Loader2, Hotel, BusFront, CreditCard, Save, Info, CheckCircle2 } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
@@ -49,7 +49,6 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     if (isOpen) setSelectedSeats(initialSelectedSeats);
   }, [isOpen, initialSelectedSeats]);
 
-  // LÓGICA DE CÁLCULO DINÁMICO (FIX: Ahora detecta cambios en las edades de acompañantes)
   useEffect(() => {
     const totalPax = selectedSeats.length;
     if (totalPax === 0) return;
@@ -63,7 +62,6 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
       const neededRooms = Math.ceil(totalPax / 4);
       setRoomsCount(neededRooms);
 
-      // Contar adultos y niños basado en edades (Umbral: 12 años)
       let adultsCount = (formData.contractor_age === null || formData.contractor_age > 12) ? 1 : 0;
       let childrenCount = (formData.contractor_age !== null && formData.contractor_age <= 12) ? 1 : 0;
       
@@ -111,7 +109,6 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
       setBreakdown({ adults: adultsCount, children: childrenCount, details });
     }
 
-    // Ajustar número de campos de acompañantes según asientos
     const neededComps = totalPax - 1;
     if (neededComps !== formData.companions.length && neededComps >= 0) {
       setFormData(p => {
@@ -126,7 +123,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
   }, [
     selectedSeats.length, 
     formData.contractor_age, 
-    formData.companions, // FIX: Dependencia completa de la lista de acompañantes (incluyendo edades)
+    formData.companions,
     formData.is_transport_only, 
     tourSellingPrices, 
     transportOnlyPrice
@@ -273,9 +270,17 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
         ) : (
           <div className="space-y-8 py-4">
             <div className="text-center space-y-2">
-              <p className="text-gray-600">Tu número de contrato es:</p>
+              <p className="text-gray-600 font-bold">Tu número de contrato es:</p>
               <h4 className="text-4xl font-black text-rosa-mexicano tracking-tighter">{contractNumber}</h4>
               <p className="text-sm opacity-70">Hemos guardado tu lugar. Para confirmar tu reserva, realiza el pago de tu anticipo:</p>
+            </div>
+
+            <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl flex gap-3 items-start">
+              <Info className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" />
+              <div className="text-sm text-blue-900">
+                <p className="font-bold">Recordatorio importante:</p>
+                <p>Puedes abonar de forma <strong>semanal o quincenal</strong>. El viaje debe estar liquidado al 100% antes de abordar. ¡Le daremos seguimiento a tu aventura!</p>
+              </div>
             </div>
 
             <div className="bg-rosa-mexicano/5 p-6 rounded-3xl border-2 border-dashed border-rosa-mexicano/20 text-center">

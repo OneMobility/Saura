@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, MessageSquare, CreditCard, FileText, FileSignature, Calendar, User, MapPin, Armchair, ChevronRight } from 'lucide-react';
+import { Loader2, MessageSquare, CreditCard, FileText, FileSignature, Calendar, User, MapPin, Armchair, Info, CheckCircle2 } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
@@ -110,7 +110,7 @@ const TourInquirySection = () => {
     <section className="py-16 px-4 md:px-8 lg:px-16 bg-rosa-mexicano text-white">
       <div className="max-w-4xl mx-auto text-center">
         <h2 className="text-3xl md:text-4xl font-black mb-6 uppercase tracking-tight">Consulta tu Contrato</h2>
-        <p className="mb-8 opacity-90 text-lg">Ingresa tu número de reserva para ver detalles, descargar tus documentos o realizar pagos.</p>
+        <p className="mb-8 opacity-90 text-lg">Ingresa tu número de reserva para ver detalles, descargar tus documentos o realizar pagos periódicos.</p>
         
         <div className="flex gap-2 max-w-md mx-auto mb-12 bg-white/10 p-2 rounded-2xl backdrop-blur-md border border-white/20">
           <Input 
@@ -167,13 +167,13 @@ const TourInquirySection = () => {
                 </div>
 
                 <div className="pt-4 space-y-3">
-                  <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1">Documentación</h4>
+                  <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-1 text-rosa-mexicano">Documentación Oficial</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <Button 
                       variant="outline" 
                       onClick={() => downloadDocument('contract')}
                       disabled={!!isDownloading}
-                      className="border-rosa-mexicano text-rosa-mexicano hover:bg-rosa-mexicano/5 h-12"
+                      className="border-rosa-mexicano text-rosa-mexicano hover:bg-rosa-mexicano/5 h-12 font-bold"
                     >
                       {isDownloading === 'contract' ? <Loader2 className="animate-spin mr-2" /> : <FileSignature className="mr-2 h-4 w-4" />}
                       Ver Contrato
@@ -182,7 +182,7 @@ const TourInquirySection = () => {
                       variant="outline" 
                       onClick={() => downloadDocument('sheet')}
                       disabled={!!isDownloading}
-                      className="border-rosa-mexicano text-rosa-mexicano hover:bg-rosa-mexicano/5 h-12"
+                      className="border-rosa-mexicano text-rosa-mexicano hover:bg-rosa-mexicano/5 h-12 font-bold"
                     >
                       {isDownloading === 'sheet' ? <Loader2 className="animate-spin mr-2" /> : <FileText className="mr-2 h-4 w-4" />}
                       Hoja Reserva
@@ -193,7 +193,15 @@ const TourInquirySection = () => {
 
               <div className="space-y-8 bg-gray-50 p-6 rounded-3xl border border-gray-100">
                 <div>
-                  <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-6">Estado de Cuenta</h4>
+                  <h4 className="text-xs font-black text-gray-400 uppercase tracking-widest mb-4">Estado de Cuenta</h4>
+                  
+                  <div className="bg-blue-50 border border-blue-100 p-4 rounded-xl mb-6 flex gap-3 items-start">
+                    <Info className="h-4 w-4 text-blue-600 shrink-0 mt-1" />
+                    <p className="text-[11px] text-blue-900 leading-tight">
+                      <strong>POLÍTICA DE PAGO:</strong> Puedes abonar semanal o quincenalmente. El total <span className="font-bold underline">DEBE ESTAR LIQUIDADO</span> antes de abordar.
+                    </p>
+                  </div>
+
                   <div className="space-y-4">
                     <div className="flex justify-between text-sm">
                       <span className="text-gray-500">Monto Total:</span>
@@ -213,7 +221,7 @@ const TourInquirySection = () => {
                 </div>
 
                 <div className="space-y-3">
-                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Opciones de Pago Online</p>
+                  <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Opciones de Pago Seguro</p>
                   
                   {remainingPayment > 0 ? (
                     <>
@@ -230,7 +238,7 @@ const TourInquirySection = () => {
                         </Button>
                       )}
                       <Button variant="outline" onClick={() => window.open(`https://wa.me/528444041469`, '_blank')} className="w-full border-green-600 text-green-600 hover:bg-green-50 h-12">
-                        <MessageSquare className="mr-2 h-4 w-4" /> Ayuda por WhatsApp
+                        <MessageSquare className="mr-2 h-4 w-4" /> Hablar con Asesor
                       </Button>
                     </>
                   ) : (
@@ -264,7 +272,7 @@ const TourInquirySection = () => {
                           <TableCell className="font-bold text-green-600">${p.amount.toLocaleString()}</TableCell>
                           <TableCell className="capitalize text-xs text-gray-500 font-bold tracking-wider">{p.payment_method}</TableCell>
                           <TableCell className="text-right">
-                            <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-100">Aplicado</Badge>
+                            <Badge variant="secondary" className="bg-green-100 text-green-700 hover:bg-green-100 border-none font-bold">Aplicado</Badge>
                           </TableCell>
                         </TableRow>
                       ))}
