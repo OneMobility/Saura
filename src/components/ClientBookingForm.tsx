@@ -133,6 +133,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
       const contractNum = uuidv4().substring(0, 8).toUpperCase();
       const advance = selectedSeats.length * advancePaymentPerPerson;
 
+      // 1. Crear el cliente
       const { data: newClient, error: clientErr } = await supabase.from('clients').insert({
         first_name: formData.first_name, last_name: formData.last_name,
         email: formData.email, phone: formData.phone, address: formData.address,
@@ -145,12 +146,20 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
 
       if (clientErr || !newClient) throw new Error("No se pudo crear el registro de cliente.");
 
-      const { error: seatErr } = await supabase.from('tour_seat_assignments').insert(selectedSeats.map(s => ({
-        tour_id: tourId, seat_number: s, status: 'booked', client_id: newClient.id
-      })));
+      // 2. Asignar asientos usando UPSERT para evitar error 409 (Conflict)
+      const { error: seatErr } = await supabase.from('tour_seat_assignments').upsert(
+        selectedSeats.map(s => ({
+          tour_id: tourId,
+          seat_number: s,
+          status: 'booked',
+          client_id: newClient.id
+        })),
+        { onConflict: 'tour_id,seat_number' }
+      );
 
-      if (seatErr) throw new Error("Error al asignar asientos.");
+      if (seatErr) throw new Error("Error al asignar asientos: " + seatErr.message);
 
+      // 3. Procesar Pago
       if (method === 'mercadopago') {
         const { data, error } = await supabase.functions.invoke('mercadopago-checkout', {
           body: { clientId: newClient.id, amount: advance, description: `Anticipo Tour: ${tourTitle}` }
@@ -186,7 +195,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
       <DialogContent className="sm:max-w-[800px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>Finalizar Reserva: {tourTitle}</DialogTitle>
-          {agencySettings?.payment_mode === 'test' && <Badge className="bg-yellow-400 text-black w-fit">Ambiente de Pruebas Activo</Badge>}
+          {agencySettings?.payment_mode === 'test' && <Badge className="bg-yellow-400 text-black w-fit">Modo Sandbox (Pruebas)</Badge>}
         </DialogHeader>
 
         {!showBankInfo ? (
