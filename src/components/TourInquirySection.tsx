@@ -1,13 +1,13 @@
 "use client";
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { useSearchParams } from 'react-router-dom';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, MessageSquare, CreditCard, FileText, FileSignature, Calendar, User, MapPin, Armchair, Info, CheckCircle2, DollarSign, XCircle, AlertCircle, Printer, Download } from 'lucide-react';
+import { Loader2, MessageSquare, CreditCard, FileText, FileSignature, Calendar, User, MapPin, Armchair, Info, CheckCircle2, DollarSign, XCircle, AlertCircle, Printer, Download, Landmark } from 'lucide-react';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
@@ -15,6 +15,7 @@ import { cn } from '@/lib/utils';
 
 const TourInquirySection = () => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
   const [contractNumber, setContractNumber] = useState('');
   const [contractDetails, setContractDetails] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -70,7 +71,6 @@ const TourInquirySection = () => {
       if (newWindow) {
         newWindow.document.write(data);
         newWindow.document.close();
-        // Esperar un momento a que carguen las fuentes/estilos antes de imprimir
         setTimeout(() => newWindow.print(), 500);
       }
     } catch (err) {
@@ -94,6 +94,26 @@ const TourInquirySection = () => {
       window.location.href = method === 'mercadopago' ? data.init_point : data.url;
     } catch (error) { toast.error('Error al iniciar pago.'); } finally { setIsPaying(false); }
   };
+
+  const handleTransferPayment = () => {
+    if (!contractDetails) return;
+    const phone = agencySettings?.agency_phone?.replace(/\D/g, '') || '528444041469';
+    const text = encodeURIComponent(
+      `Hola Saura Tours, voy a realizar un abono.\n\n` +
+      `📌 *Folio:* ${contractDetails.contract_number}\n` +
+      `👤 *Cliente:* ${contractDetails.first_name} ${contractDetails.last_name}\n` +
+      `💰 *Monto a abonar:* $${parseFloat(paymentAmount).toLocaleString()}\n\n` +
+      `Solicito confirmar recepción de transferencia al enviar mi comprobante.`
+    );
+    
+    window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
+    navigate(`/tour-confirmation/${contractDetails.contract_number}`);
+  };
+
+  const isProduction = agencySettings?.payment_mode === 'production';
+  const hasMP = isProduction ? !!agencySettings?.mp_public_key : !!agencySettings?.mp_test_public_key;
+  const hasStripe = isProduction ? !!agencySettings?.stripe_public_key : !!agencySettings?.stripe_test_public_key;
+  const hasOnline = hasMP || hasStripe;
 
   if (loading) return <div className="py-20 text-center"><Loader2 className="animate-spin mx-auto h-12 w-12 text-white" /></div>;
 
@@ -242,15 +262,27 @@ const TourInquirySection = () => {
                             placeholder="Monto" 
                           />
                         </div>
-                        <Button 
-                          onClick={() => handleOnlinePayment('mercadopago')} 
-                          className="w-full h-14 bg-blue-600 hover:bg-blue-700 font-black rounded-2xl shadow-lg shadow-blue-200 text-lg gap-3"
-                          disabled={isPaying}
-                        >
-                          {isPaying ? <Loader2 className="animate-spin" /> : <CreditCard />}
-                          Abonar con Tarjeta
-                        </Button>
-                        <p className="text-[9px] text-center text-gray-400 font-bold uppercase tracking-tighter">PAGO SEGURO VÍA MERCADO PAGO</p>
+                        
+                        {hasOnline ? (
+                          <Button 
+                            onClick={() => handleOnlinePayment('mercadopago')} 
+                            className="w-full h-14 bg-blue-600 hover:bg-blue-700 font-black rounded-2xl shadow-lg shadow-blue-200 text-lg gap-3"
+                            disabled={isPaying}
+                          >
+                            {isPaying ? <Loader2 className="animate-spin" /> : <CreditCard />}
+                            Abonar con Tarjeta
+                          </Button>
+                        ) : (
+                          <Button 
+                            onClick={handleTransferPayment} 
+                            className="w-full h-14 bg-emerald-600 hover:bg-emerald-700 font-black rounded-2xl shadow-lg shadow-emerald-200 text-lg gap-3"
+                          >
+                            <Landmark /> Pagar vía Transferencia
+                          </Button>
+                        )}
+                        <p className="text-[9px] text-center text-gray-400 font-bold uppercase tracking-tighter">
+                          {hasOnline ? "PAGO SEGURO VÍA MERCADO PAGO" : "VÍA TRANSFERENCIA ELECTRÓNICA"}
+                        </p>
                       </div>
                     )}
 
