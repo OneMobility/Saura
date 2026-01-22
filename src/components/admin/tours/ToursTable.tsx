@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { Edit, Trash2, Loader2, Users } from 'lucide-react';
-import TourPaxListDialog from './TourPaxListDialog';
+import { useNavigate } from 'react-router-dom';
 
 interface Tour {
   id: string;
@@ -40,7 +40,7 @@ interface ToursTableProps {
 const ToursTable: React.FC<ToursTableProps> = ({ onEditTour, onTourDeleted }) => {
   const [tours, setTours] = useState<Tour[]>([]);
   const [loading, setLoading] = useState(true);
-  const [selectedTourForPax, setSelectedTourForPax] = useState<{id: string, title: string} | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchTours();
@@ -115,7 +115,7 @@ const ToursTable: React.FC<ToursTableProps> = ({ onEditTour, onTourDeleted }) =>
                     <Button 
                       variant="outline" 
                       size="sm" 
-                      onClick={() => setSelectedTourForPax({id: tour.id, title: tour.title})}
+                      onClick={() => window.open(`/admin/tours/${tour.id}/passengers`, '_blank')}
                       className="text-rosa-mexicano border-rosa-mexicano hover:bg-rosa-mexicano hover:text-white"
                     >
                       <Users className="h-4 w-4 mr-2" /> Pasajeros
@@ -129,13 +129,6 @@ const ToursTable: React.FC<ToursTableProps> = ({ onEditTour, onTourDeleted }) =>
           </TableBody>
         </Table>
       </div>
-
-      <TourPaxListDialog 
-        isOpen={!!selectedTourForPax}
-        onClose={() => setSelectedTourForPax(null)}
-        tourId={selectedTourForPax?.id || ''}
-        tourTitle={selectedTourForPax?.title || ''}
-      />
     </div>
   );
 };

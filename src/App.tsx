@@ -40,6 +40,7 @@ import AdminBusPassengersPage from "./pages/AdminBusPassengersPage";
 import AdminBusTicketValidationPage from "./pages/AdminBusTicketValidationPage";
 import AdminContactMessagesPage from "./pages/AdminContactMessagesPage";
 import AdminContactMessageDetailsPage from "./pages/AdminContactMessageDetailsPage";
+import AdminTourPaxPage from "./pages/AdminTourPaxPage";
 
 // Bus Tickets Subdomain Pages
 import DestinationsPage from "./pages/bus-tickets/DestinationsPage";
@@ -294,6 +295,14 @@ const App = () => {
                 element={
                   <ProtectedRoute adminOnly>
                     <AdminTourFormPage />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/admin/tours/:id/passengers"
+                element={
+                  <ProtectedRoute adminOnly>
+                    <AdminTourPaxPage />
                   </ProtectedRoute>
                 }
               />
