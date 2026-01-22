@@ -5,7 +5,7 @@ import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, PlusCircle, Edit, Trash2, ChevronDown, ChevronRight, Star, Calendar } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, ChevronDown, ChevronRight, Star, Calendar, Copy } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
@@ -69,7 +69,6 @@ const AdminHotelsPage = () => {
     setLoading(false);
   };
 
-  // Lógica para encontrar los precios más bajos por mes y la mejor recomendación global
   const { cheapestByMonth, absoluteCheapestId } = useMemo(() => {
     const monthlyMins: Record<string, number> = {};
     let absMin = Infinity;
@@ -110,6 +109,25 @@ const AdminHotelsPage = () => {
     if (!error) { toast.success('Eliminada.'); setRefreshKey(k => k + 1); }
   };
 
+  const handleDeleteGroup = async (hotelName: string) => {
+    if (!window.confirm(`¿Estás seguro de que quieres eliminar TODAS las cotizaciones del hotel "${hotelName}"? Esta acción no se puede deshacer.`)) return;
+    
+    setLoading(true);
+    const { error } = await supabase.from('hotels').delete().eq('name', hotelName);
+    
+    if (error) {
+      toast.error('Error al eliminar el grupo de cotizaciones.');
+    } else {
+      toast.success(`Se eliminaron todas las cotizaciones de ${hotelName}.`);
+      setRefreshKey(k => k + 1);
+    }
+    setLoading(false);
+  };
+
+  const handleCloneHotel = (id: string) => {
+    navigate(`/admin/hotels/new?cloneFrom=${id}`);
+  };
+
   if (sessionLoading || loading) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin" /></div>;
 
   return (
@@ -138,9 +156,23 @@ const AdminHotelsPage = () => {
                       </p>
                     </div>
                   </div>
-                  <Badge variant="secondary" className="bg-white border text-gray-600">
-                    Desde ${Math.min(...quotes.map(q => q.total_quote_cost)).toLocaleString()}
-                  </Badge>
+                  <div className="flex items-center gap-4">
+                    <Badge variant="secondary" className="bg-white border text-gray-600">
+                      Desde ${Math.min(...quotes.map(q => q.total_quote_cost)).toLocaleString()}
+                    </Badge>
+                    <Button 
+                      variant="ghost" 
+                      size="icon" 
+                      className="text-red-500 hover:bg-red-50"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDeleteGroup(name);
+                      }}
+                      title="Eliminar todo el grupo"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                    </Button>
+                  </div>
                 </div>
                 
                 {openGroups[name] && (
@@ -191,8 +223,17 @@ const AdminHotelsPage = () => {
                                 </Badge>
                               </TableCell>
                               <TableCell className="text-right flex justify-end gap-2">
-                                <Button variant="ghost" size="icon" onClick={() => navigate(`/admin/hotels/edit/${q.id}`)} className="hover:text-blue-600"><Edit className="h-4 w-4" /></Button>
-                                <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-50" onClick={() => handleDeleteHotel(q.id)}><Trash2 className="h-4 w-4" /></Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={() => handleCloneHotel(q.id)} 
+                                  className="text-gray-500 hover:text-rosa-mexicano"
+                                  title="Duplicar cotización"
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => navigate(`/admin/hotels/edit/${q.id}`)} className="hover:text-blue-600" title="Editar"><Edit className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-50" onClick={() => handleDeleteHotel(q.id)} title="Eliminar"><Trash2 className="h-4 w-4" /></Button>
                               </TableCell>
                             </TableRow>
                           );
