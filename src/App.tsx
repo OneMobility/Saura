@@ -16,6 +16,7 @@ import ContactPage from "./pages/ContactPage";
 import BusTicketsPage from "./pages/BusTicketsPage";
 import PaymentSuccessPage from "./pages/PaymentSuccessPage";
 import PaymentFailurePage from "./pages/PaymentFailurePage";
+import TourConfirmationPage from "./pages/TourConfirmationPage"; // NEW
 
 // Admin Pages
 import AdminDashboard from "./pages/AdminDashboard";
@@ -60,7 +61,7 @@ import BusTicketConfirmationPage from "./pages/bus-tickets/BusTicketConfirmation
 
 import { SessionContextProvider } from "./components/SessionContextProvider";
 import ProtectedRoute from "./components/ProtectedRoute";
-import ScrollToTop from "./components/ScrollToTop";
+import ScrollToTop from "././components/ScrollToTop";
 import Login from "./pages/Login";
 import { supabase } from "@/integrations/supabase/client";
 
@@ -111,6 +112,7 @@ const App = () => {
               
               <Route path="/payment-success" element={<PaymentSuccessPage />} />
               <Route path="/payment-failure" element={<PaymentFailurePage />} />
+              <Route path="/tour-confirmation/:contractNumber" element={<TourConfirmationPage />} />
 
               <Route path="/bus-tickets" element={<BusTicketsPage />} />
               <Route path="/bus-tickets/destinations" element={<DestinationsPage />} />

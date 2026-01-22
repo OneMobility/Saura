@@ -12,6 +12,7 @@ import { v4 as uuidv4 } from 'uuid';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { Switch } from '@/components/ui/switch';
+import { useNavigate } from 'react-router-dom';
 
 interface ClientBookingFormProps {
   isOpen: boolean;
@@ -29,6 +30,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
   isOpen, onClose, tourId, tourTitle, tourSellingPrices, transportOnlyPrice = 0,
   advancePaymentPerPerson, agencySettings, initialSelectedSeats
 }) => {
+  const navigate = useNavigate();
   const [formData, setFormData] = useState({
     first_name: '', last_name: '', email: '', phone: '', address: '',
     identification_number: '', contractor_age: null as number | null,
@@ -222,7 +224,7 @@ const ClientBookingForm: React.FC<ClientBookingFormProps> = ({
     );
     
     window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
-    onClose();
+    navigate(`/tour-confirmation/${contractNumber}`);
   };
 
   const isProduction = agencySettings?.payment_mode === 'production';
