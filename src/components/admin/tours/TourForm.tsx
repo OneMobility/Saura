@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, ImageIcon, MapPin, Clock, Hotel, ListChecks, Armchair, Info, Upload, Crown, Star, DollarSign, BusFront, CheckCircle2 } from 'lucide-react';
+import { Loader2, Save, PlusCircle, MinusCircle, CalendarIcon, Calculator, TrendingUp, AlertCircle, ImageIcon, MapPin, Clock, Hotel, ListChecks, Armchair, Info, Upload, Crown, Star, DollarSign, BusFront, CheckCircle2, Wallet } from 'lucide-react';
 import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { v4 as uuidv4 } from 'uuid';
 import { format, parseISO, addDays } from 'date-fns';
@@ -33,7 +33,7 @@ interface HotelQuote {
   cost_per_night_triple: number;
   cost_per_night_quad: number;
   estimated_total_cost: number;
-  total_paid: number; // NEW
+  total_paid: number;
 }
 
 interface TourHotelDetail {
@@ -46,7 +46,7 @@ interface Bus {
   name: string;
   rental_cost: number;
   total_capacity: number;
-  total_paid: number; // NEW
+  total_paid: number;
   seat_layout_json: SeatLayout | null;
 }
 
@@ -76,6 +76,7 @@ interface Tour {
   return_date: string | null;
   departure_time: string | null;
   return_time: string | null;
+  clients?: any[];
 }
 
 interface TourFormProps {
@@ -144,38 +145,11 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
     fetchData();
   }, []);
 
-  const hotelStats = useMemo(() => {
-    const minsByMonthAndNights: Record<string, number> = {};
-    availableHotelQuotes.forEach(h => {
-      if (!h.quoted_date) return;
-      const monthKey = format(parseISO(h.quoted_date), 'yyyy-MM');
-      const nights = h.num_nights_quoted || 1;
-      const key = `${monthKey}-${nights}`;
-      if (!minsByMonthAndNights[key] || h.estimated_total_cost < minsByMonthAndNights[key]) {
-        minsByMonthAndNights[key] = h.estimated_total_cost;
-      }
-    });
-    return { minsByMonthAndNights };
-  }, [availableHotelQuotes]);
-
-  const groupedAndSortedQuotes = useMemo(() => {
-    const groups: Record<string, HotelQuote[]> = {};
-    availableHotelQuotes.forEach(quote => {
-      if (!groups[quote.name]) groups[quote.name] = [];
-      groups[quote.name].push(quote);
-    });
-    return Object.entries(groups).sort((a, b) => {
-      const minA = Math.min(...a[1].map(q => q.estimated_total_cost));
-      const minB = Math.min(...b[1].map(q => q.estimated_total_cost));
-      return minA - minB;
-    });
-  }, [availableHotelQuotes]);
-
   useEffect(() => {
     const fetchTourData = async () => {
       if (tourId && tourId !== 'new') {
         setLoadingInitialData(true);
-        const { data } = await supabase.from('tours').select('*').eq('id', tourId).single();
+        const { data } = await supabase.from('tours').select('*, clients(total_amount, total_paid, status)').eq('id', tourId).single();
         if (data) {
           setFormData({
             ...data,
@@ -208,6 +182,10 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
       hotelPaid += (q?.total_paid || 0);
     });
 
+    const activeClients = (formData.clients || []).filter((c: any) => c.status !== 'cancelled');
+    const clientsTotalContracted = activeClients.reduce((sum: number, c: any) => sum + (c.total_amount || 0), 0);
+    const clientsActuallyPaid = activeClients.reduce((sum: number, c: any) => sum + (c.total_paid || 0), 0);
+
     const totalCost = busCost + providerCost + hotelCost;
     const totalPaidToSuppliers = busPaid + hotelPaid;
     const capacity = (formData.bus_capacity || bus?.total_capacity || 0) - formData.courtesies;
@@ -225,14 +203,12 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
 
     return {
       busCost, busPaid, hotelCost, hotelPaid, providerCost, totalCost, totalPaidToSuppliers, capacity, projectedProfit,
+      clientsTotalContracted, clientsActuallyPaid,
       beQuad: formData.selling_price_quad_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_quad_occupancy) : 0,
       beTriple: formData.selling_price_triple_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_triple_occupancy) : 0,
       beDouble: formData.selling_price_double_occupancy > 0 ? Math.ceil(totalCost / formData.selling_price_double_occupancy) : 0,
       recPrice: {
-        quad: avgRequiredPerPerson,
-        triple: avgRequiredPerPerson * 1.12,
-        double: avgRequiredPerPerson * 1.25,
-        child: avgRequiredPerPerson * 0.75
+        quad: avgRequiredPerPerson, triple: avgRequiredPerPerson * 1.12, double: avgRequiredPerPerson * 1.25, child: avgRequiredPerPerson * 0.75
       }
     };
   }, [formData, projectedSales, desiredProfitFixed, availableBuses, availableHotelQuotes]);
@@ -332,7 +308,6 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
         <CardHeader className="bg-gray-50/50">
           <CardTitle className="text-2xl font-bold flex items-center justify-between">
             <div className="flex items-center gap-2"><TrendingUp className="text-rosa-mexicano" /> Simulador y Seguimiento Financiero</div>
-            {tourId && <Badge variant="outline" className="bg-white border-rosa-mexicano text-rosa-mexicano uppercase font-black tracking-tighter">Ficha Activa</Badge>}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-8 pt-6">
@@ -347,26 +322,27 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
               </div>
             </div>
 
-            {/* SECCIÓN NUEVA: SEGUIMIENTO DE PAGOS A PROVEEDORES */}
             <div className="p-5 bg-amber-50/60 rounded-2xl border border-amber-200">
               <h3 className="text-[10px] font-black uppercase text-amber-700 mb-4 flex items-center gap-1 tracking-widest"><DollarSign className="h-3 w-3" /> Liquidación Real</h3>
               <div className="space-y-3">
-                <div className="flex justify-between text-xs"><span>Abonado a Bus:</span> <span className="font-bold text-amber-900">${financialSummary.busPaid.toLocaleString()}</span></div>
-                <div className="flex justify-between text-xs"><span>Abonado a Hoteles:</span> <span className="font-bold text-amber-900">${financialSummary.hotelPaid.toLocaleString()}</span></div>
+                <div className="flex justify-between text-xs"><span>Pagado a Bus:</span> <span className="font-bold text-amber-900">${financialSummary.busPaid.toLocaleString()}</span></div>
+                <div className="flex justify-between text-xs"><span>Pagado a Hoteles:</span> <span className="font-bold text-amber-900">${financialSummary.hotelPaid.toLocaleString()}</span></div>
                 <div className="pt-3 mt-2 border-t border-amber-200">
-                   <div className="text-[9px] uppercase font-black text-amber-600 mb-1">Restan para liquidar tour:</div>
+                   <div className="text-[9px] uppercase font-black text-amber-600 mb-1">Faltan para liquidar costos:</div>
                    <div className="text-2xl font-black text-amber-900">${(financialSummary.totalCost - financialSummary.totalPaidToSuppliers).toLocaleString()}</div>
                 </div>
               </div>
             </div>
 
-            <div className="p-5 bg-blue-50/60 rounded-2xl border border-blue-100">
-              <h3 className="text-[10px] font-black uppercase text-blue-600 mb-4 flex items-center gap-1 tracking-widest"><AlertCircle className="h-3 w-3" /> Equilibrio (Punto Cero)</h3>
+            <div className="p-5 bg-rosa-mexicano/5 rounded-2xl border border-rosa-mexicano/20">
+              <h3 className="text-[10px] font-black uppercase text-rosa-mexicano mb-4 flex items-center gap-1 tracking-widest"><Wallet className="h-3 w-3" /> Cobranza Clientes</h3>
               <div className="space-y-3">
-                <p className="text-[10px] leading-tight text-blue-800 font-medium">Pax necesarios para no perder:</p>
-                <div className="flex justify-between text-sm"><span>En Cuádruple:</span> <span className="font-bold">{financialSummary.beQuad} pax</span></div>
-                <div className="flex justify-between text-sm"><span>En Triple:</span> <span className="font-bold">{financialSummary.beTriple} pax</span></div>
-                <div className="flex justify-between text-sm"><span>En Doble:</span> <span className="font-bold">{financialSummary.beDouble} pax</span></div>
+                <div className="flex justify-between text-xs"><span>Meta de Cobro:</span> <span className="font-bold text-gray-900">${financialSummary.clientsTotalContracted.toLocaleString()}</span></div>
+                <div className="flex justify-between text-xs"><span>Abonado Real:</span> <span className="font-bold text-green-600">${financialSummary.clientsActuallyPaid.toLocaleString()}</span></div>
+                <div className="pt-3 mt-2 border-t border-rosa-mexicano/10">
+                   <div className="text-[9px] uppercase font-black text-gray-400 mb-1">Pendiente por cobrar:</div>
+                   <div className="text-2xl font-black text-rosa-mexicano">${(financialSummary.clientsTotalContracted - financialSummary.clientsActuallyPaid).toLocaleString()}</div>
+                </div>
               </div>
             </div>
 
@@ -383,29 +359,6 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
                   <div>DBL: ${financialSummary.recPrice.double.toFixed(0)}</div>
                   <div>NIÑO: ${financialSummary.recPrice.child.toFixed(0)}</div>
                 </div>
-              </div>
-            </div>
-          </div>
-          
-          <div className="p-6 bg-gray-900 rounded-3xl text-white shadow-2xl">
-            <h3 className="text-lg font-bold mb-6">Proyección de Utilidad de Ventas</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              {['double', 'triple', 'quad', 'child'].map((type) => (
-                <div key={type} className="space-y-2">
-                  <Label className="capitalize text-xs font-bold text-gray-400">Ventas {type}</Label>
-                  <Input type="number" value={projectedSales[type as keyof typeof projectedSales]} onChange={e => setProjectedSales({...projectedSales, [type]: parseInt(e.target.value) || 0})} className="bg-white/10 border-white/20 text-white font-bold h-12 text-xl" />
-                </div>
-              ))}
-            </div>
-            <div className="mt-8 flex flex-wrap items-center justify-between gap-6 pt-6 border-t border-white/10">
-              <div className="flex items-center gap-3">
-                <span className="text-xs text-gray-400 font-bold uppercase">Ocupación:</span>
-                <span className={cn("text-4xl font-black", (projectedSales.double + projectedSales.triple + projectedSales.quad + projectedSales.child) > financialSummary.capacity ? "text-red-500" : "text-rosa-mexicano")}>{projectedSales.double + projectedSales.triple + projectedSales.quad + projectedSales.child}</span>
-                <span className="text-xl text-gray-500">/ {financialSummary.capacity} pax</span>
-              </div>
-              <div className="text-right">
-                <span className="text-xs text-gray-400 font-bold block mb-1">Utilidad Proyectada</span>
-                <span className={cn("text-5xl font-black", financialSummary.projectedProfit >= 0 ? "text-green-400" : "text-red-500")}>${financialSummary.projectedProfit.toLocaleString()}</span>
               </div>
             </div>
           </div>
@@ -429,35 +382,6 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
                   </div>
                   <div className="space-y-2"><Label>Duración</Label><Input id="duration" value={formData.duration} onChange={handleChange} placeholder="Ej: 3 días, 2 noches" /></div>
                 </div>
-                <div className="grid grid-cols-2 gap-4 pt-4 border-t">
-                  <div className="space-y-2"><Label>Coordinadores</Label><Input type="number" id="courtesies" value={formData.courtesies} onChange={handleChange} /></div>
-                  <div className="space-y-2"><Label>Otros Ingresos ($)</Label><Input type="number" id="other_income" value={formData.other_income} onChange={handleChange} /></div>
-                </div>
-                <div className="space-y-3 pt-4 border-t">
-                  <Label className="flex items-center gap-2"><Hotel className="h-4 w-4" /> Hoteles Asociados</Label>
-                  {formData.hotel_details.map((detail, index) => (
-                    <div key={detail.id} className="flex gap-2">
-                      <Select value={detail.hotel_quote_id} onValueChange={val => {
-                        const newH = [...formData.hotel_details]; newH[index].hotel_quote_id = val;
-                        setFormData({...formData, hotel_details: newH});
-                      }}><SelectTrigger className="flex-grow"><SelectValue placeholder="Elegir Cotización" /></SelectTrigger>
-                        <SelectContent>{groupedAndSortedQuotes.map(([name, quotes]) => (
-                            <SelectGroup key={name}><SelectLabel className="bg-muted py-1 px-2 text-rosa-mexicano font-bold">{name}</SelectLabel>
-                              {quotes.map(q => {
-                                const monthKey = q.quoted_date ? format(parseISO(q.quoted_date), 'yyyy-MM') : '';
-                                const nights = q.num_nights_quoted || 1;
-                                const key = `${monthKey}-${nights}`;
-                                const isBestOptionForDuration = hotelStats.minsByMonthAndNights[key] === q.estimated_total_cost;
-                                return (<SelectItem key={q.id} value={q.id} className="cursor-pointer"><div className="flex flex-col"><div className="flex items-center gap-2"><span className={cn(isBestOptionForDuration ? "text-green-600 font-bold" : "text-foreground")}>${q.estimated_total_cost.toLocaleString()}</span>{isBestOptionForDuration && (<span className="bg-yellow-400 text-yellow-900 text-[9px] font-black px-1.5 py-0.5 rounded flex items-center gap-0.5"><Star className="h-2.5 w-2.5 fill-yellow-900" /> MEJOR OPCIÓN ({nights} N)</span>)}</div><span className="text-[10px] text-muted-foreground">{nights} noches • {q.quoted_date ? format(parseISO(q.quoted_date), 'dd/MM/yy') : 'Sin fecha'}</span></div></SelectItem>);
-                              })}
-                            </SelectGroup>
-                          ))}
-                        </SelectContent></Select>
-                      <Button variant="ghost" size="icon" onClick={() => setFormData({...formData, hotel_details: formData.hotel_details.filter(d => d.id !== detail.id)})}><MinusCircle className="h-4 w-4 text-red-400" /></Button>
-                    </div>
-                  ))}
-                  <Button type="button" variant="outline" className="w-full border-dashed" onClick={() => setFormData({...formData, hotel_details: [...formData.hotel_details, { id: uuidv4(), hotel_quote_id: '' }]})}><PlusCircle className="mr-2 h-4 w-4" /> Añadir Hotel</Button>
-                </div>
               </CardContent>
             </Card>
 
@@ -468,24 +392,6 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
                 <div className="space-y-2"><Label>Triple (p/p)</Label><Input type="number" id="selling_price_triple_occupancy" value={formData.selling_price_triple_occupancy} onChange={handleChange} className="font-bold" /></div>
                 <div className="space-y-2"><Label>Cuádruple (p/p)</Label><Input type="number" id="selling_price_quad_occupancy" value={formData.selling_price_quad_occupancy} onChange={handleChange} className="font-bold" /></div>
                 <div className="space-y-2"><Label>Niño</Label><Input type="number" id="selling_price_child" value={formData.selling_price_child} onChange={handleChange} className="font-bold" /></div>
-                <div className="space-y-2 col-span-2 border-t pt-4">
-                  <Label className="flex items-center gap-2 font-black text-rosa-mexicano"><BusFront className="h-4 w-4" /> Precio Solo Transporte (p/p)</Label>
-                  <Input type="number" id="transport_only_price" value={formData.transport_only_price} onChange={handleChange} className="font-black border-rosa-mexicano/50 bg-rosa-mexicano/5" />
-                  <p className="text-[10px] text-muted-foreground mt-1">Tarifa directa por asiento sin considerar hospedaje.</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            <Card>
-              <CardHeader><CardTitle className="text-lg flex items-center gap-2"><ListChecks className="h-5 w-5 text-rosa-mexicano" /> ¿Qué Incluye?</CardTitle></CardHeader>
-              <CardContent className="space-y-3">
-                {formData.includes.map((item, idx) => (
-                  <div key={idx} className="flex gap-2">
-                    <Input value={item} onChange={e => updateInclude(idx, e.target.value)} placeholder="Ej: Desayunos" />
-                    <Button variant="ghost" size="icon" onClick={() => removeInclude(idx)}><MinusCircle className="h-4 w-4 text-red-400" /></Button>
-                  </div>
-                ))}
-                <Button type="button" variant="outline" className="w-full" onClick={addInclude}><PlusCircle className="mr-2 h-4 w-4" /> Añadir Inclusión</Button>
               </CardContent>
             </Card>
           </div>
@@ -494,25 +400,17 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave, costOptimizationMod
             <Card>
               <CardHeader><CardTitle className="text-lg flex items-center gap-2"><Clock className="h-5 w-5 text-rosa-mexicano" /> Tiempos y Foto</CardTitle></CardHeader>
               <CardContent className="space-y-6">
-                <div className="space-y-2"><Label>Imagen Principal</Label><div className="relative border-2 border-dashed rounded-xl h-48 flex items-center justify-center overflow-hidden bg-gray-50 hover:bg-gray-100 transition-colors group">{isUploadingImage ? (<div className="text-center"><Loader2 className="animate-spin mx-auto mb-2 text-rosa-mexicano" /><span className="text-xs font-bold text-rosa-mexicano">Subiendo...</span></div>) : imageUrlPreview ? (<div className="relative w-full h-full"><img src={imageUrlPreview} className="w-full h-full object-cover" alt="Preview" /><div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity"><p className="text-white text-xs font-bold flex items-center gap-1"><Upload className="h-3 w-3" /> Cambiar Imagen</p></div></div>) : (<div className="text-center text-gray-400"><ImageIcon className="mx-auto mb-2" /><span className="text-xs">Haz clic para seleccionar foto</span></div>)}<input type="file" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={handleFileChange} accept="image/*" disabled={isUploadingImage} /></div></div>
+                <div className="space-y-2"><Label>Imagen Principal</Label><div className="relative border-2 border-dashed rounded-xl h-48 flex items-center justify-center overflow-hidden bg-gray-50 hover:bg-gray-100 transition-colors group">{isUploadingImage ? (<div className="text-center"><Loader2 className="animate-spin mx-auto mb-2 text-rosa-mexicano" /><span className="text-xs font-bold text-rosa-mexicano">Subiendo...</span></div>) : imageUrlPreview ? (<div className="relative w-full h-full"><img src={imageUrlPreview} className="w-full h-full object-cover" alt="Preview" /></div>) : (<div className="text-center text-gray-400"><ImageIcon className="mx-auto mb-2" /><span className="text-xs">Haz clic para seleccionar foto</span></div>)}<input type="file" className="absolute inset-0 opacity-0 cursor-pointer w-full h-full" onChange={handleFileChange} accept="image/*" disabled={isUploadingImage} /></div></div>
                 <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label>Salida</Label><Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start gap-2"><CalendarIcon className="h-4 w-4" />{departureDate ? format(departureDate, 'dd/MM/yy') : 'Fecha'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={departureDate} onSelect={d => handleDateSelect('departure_date', d)} locale={es} /></PopoverContent></Popover><Input id="departure_time" value={formData.departure_time || ''} onChange={handleChange} placeholder="08:00 AM" /></div>
-                  <div className="space-y-2"><Label>Regreso</Label><Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start gap-2"><CalendarIcon className="h-4 w-4" />{returnDate ? format(returnDate, 'dd/MM/yy') : 'Fecha'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={returnDate} onSelect={d => handleDateSelect('return_date', d)} locale={es} /></PopoverContent></Popover><Input id="return_time" value={formData.return_time || ''} onChange={handleChange} placeholder="06:00 PM" /></div>
+                  <div className="space-y-2"><Label>Salida</Label><Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start gap-2"><CalendarIcon className="h-4 w-4" />{departureDate ? format(departureDate, 'dd/MM/yy') : 'Fecha'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={departureDate} onSelect={d => handleDateSelect('departure_date', d)} locale={es} /></PopoverContent></Popover></div>
+                  <div className="space-y-2"><Label>Regreso</Label><Popover><PopoverTrigger asChild><Button variant="outline" className="w-full justify-start gap-2"><CalendarIcon className="h-4 w-4" />{returnDate ? format(returnDate, 'dd/MM/yy') : 'Fecha'}</Button></PopoverTrigger><PopoverContent className="w-auto p-0"><Calendar mode="single" selected={returnDate} onSelect={d => handleDateSelect('return_date', d)} locale={es} /></PopoverContent></Popover></div>
                 </div>
               </CardContent>
             </Card>
-
-            <Card><CardHeader><CardTitle className="text-lg">Descripción de Venta (Corta)</CardTitle></CardHeader><CardContent><Textarea id="description" value={formData.description} onChange={handleChange} placeholder="Escribe un resumen atractivo para las tarjetas de venta." className="min-h-[120px]" /></CardContent></Card>
           </div>
         </div>
 
-        {formData.bus_id && (<Card className="border-2 border-rosa-mexicano/20 shadow-lg"><CardHeader className="bg-rosa-mexicano/5"><CardTitle className="text-xl flex items-center gap-2"><Armchair className="text-rosa-mexicano" /> Gestión de Asientos</CardTitle></CardHeader><CardContent className="pt-6"><div className="bg-blue-50 p-4 rounded-xl mb-6 flex gap-4 items-start border border-blue-100"><Info className="h-5 w-5 text-blue-600 shrink-0 mt-0.5" /><div className="text-sm text-blue-800"><p className="font-bold mb-1">Instrucciones:</p><ul className="list-disc list-inside space-y-1 opacity-90"><li>Haz clic en un asiento disponible para <strong>bloquearlo</strong>.</li><li>Los asientos <strong>Ocupados</strong> (rojos) son reservas de clientes.</li></ul></div></div><div className="max-w-3xl mx-auto"><TourSeatMap tourId={tourId || 'new-tour'} busCapacity={formData.bus_capacity} courtesies={formData.courtesies} seatLayoutJson={selectedBusLayout} adminMode={true} readOnly={false} /></div></CardContent></Card>)}
-
-        <Card><CardHeader><CardTitle className="text-lg">Itinerario Detallado</CardTitle></CardHeader><CardContent className="space-y-4">{formData.itinerary.map((item, idx) => (<div key={idx} className="flex gap-2 items-start bg-gray-50 p-3 rounded-lg border"><div className="bg-rosa-mexicano text-white rounded-full h-6 w-6 flex-shrink-0 flex items-center justify-center text-xs font-bold mt-2">{item.day}</div><Textarea value={item.activity} onChange={e => { const newI = [...formData.itinerary]; newI[idx].activity = e.target.value; setFormData({...formData, itinerary: newI}); }} className="bg-white" /><Button variant="ghost" size="icon" onClick={() => setFormData({...formData, itinerary: formData.itinerary.filter((_, i) => i !== idx)})}><MinusCircle className="h-4 w-4 text-red-400" /></Button></div>))}<Button type="button" variant="outline" className="w-full" onClick={() => setFormData({...formData, itinerary: [...formData.itinerary, { day: formData.itinerary.length + 1, activity: '' }]})}><PlusCircle className="mr-2 h-4 w-4" /> Añadir Día</Button></CardContent></Card>
-
-        <Card><CardHeader><CardTitle className="text-lg">Información Adicional</CardTitle></CardHeader><CardContent><RichTextEditor value={formData.full_content} onChange={val => handleRichTextChange('full_content', val)} placeholder={generateDefaultDescription(true)} className="min-h-[300px]" /></CardContent></Card>
-
-        <div className="fixed bottom-6 right-6 flex gap-4 z-50"><Button type="button" variant="outline" onClick={() => navigate('/admin/tours')} className="bg-white shadow-lg px-6 h-12">Cancelar</Button><Button type="submit" disabled={isSubmitting || isUploadingImage} className="bg-rosa-mexicano text-white shadow-lg px-10 h-12 text-lg font-bold rounded-xl">{isSubmitting || isUploadingImage ? (<><Loader2 className="animate-spin mr-2" /> Guardando...</>) : (<><Save className="mr-2" /> Guardar Tour</>)}</Button></div>
+        <div className="fixed bottom-6 right-6 flex gap-4 z-50"><Button type="button" variant="outline" onClick={() => navigate('/admin/tours')} className="bg-white shadow-lg px-6 h-12">Cancelar</Button><Button type="submit" disabled={isSubmitting || isUploadingImage} className="bg-rosa-mexicano text-white shadow-lg px-10 h-12 text-lg font-bold rounded-xl">{isSubmitting ? (<><Loader2 className="animate-spin mr-2" /> Guardando...</>) : (<><Save className="mr-2" /> Guardar Tour</>)}</Button></div>
       </form>
     </div>
   );
