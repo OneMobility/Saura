@@ -11,42 +11,101 @@ serve(async (req) => {
   try {
     const { contractNumber } = await req.json();
     const supabaseAdmin = createClient(Deno.env.get('SUPABASE_URL') ?? '', Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '');
-    const { data: client } = await supabaseAdmin.from('clients').select('*, tours(*)').ilike('contract_number', contractNumber).single();
     
+    const { data: client } = await supabaseAdmin.from('clients').select('*, tours(*)').ilike('contract_number', contractNumber).single();
+    const { data: seats } = await supabaseAdmin.from('tour_seat_assignments').select('seat_number').eq('client_id', client.id);
+    const { data: payments } = await supabaseAdmin.from('client_payments').select('*').eq('client_id', client.id).order('payment_date', { ascending: true });
+
+    const seatNumbers = seats?.map(s => s.seat_number).sort((a, b) => a - b).join(', ') || 'N/A';
     const totalPax = client.number_of_people;
     const roomsCount = Math.ceil(totalPax / 4);
 
     const html = `
+      <!DOCTYPE html>
       <html>
-        <body style="font-family: sans-serif; padding: 30px;">
-          <h1 style="border-bottom: 5px solid #91045A; color: #91045A;">HOJA DE CONTROL INTERNO</h1>
-          <div style="background: #f1f1f1; padding: 20px; border-radius: 15px;">
-            <h2 style="margin:0;">Contrato: ${client.contract_number}</h2>
-            <p><strong>Titular:</strong> ${client.first_name} ${client.last_name}</p>
-            <p><strong>WhatsApp:</strong> ${client.phone || 'N/A'}</p>
+      <head>
+          <style>
+              body { font-family: 'Courier New', Courier, monospace; padding: 20px; font-size: 13px; color: #000; }
+              .header { text-align: center; border-bottom: 4px double #000; margin-bottom: 20px; padding-bottom: 10px; }
+              .box { border: 2px solid #000; padding: 15px; margin-bottom: 20px; }
+              .title { font-weight: bold; text-decoration: underline; margin-bottom: 10px; display: block; font-size: 16px; }
+              .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+              .stat-box { border: 1px solid #000; padding: 10px; text-align: center; background: #eee; }
+              .stat-val { font-size: 24px; font-weight: bold; }
+              table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+              th, td { border: 1px solid #000; padding: 8px; text-align: left; }
+              th { background: #f0f0f0; }
+              .footer { margin-top: 40px; text-align: center; font-style: italic; }
+          </style>
+      </head>
+      <body>
+          <div class="header">
+              <h1>HOJA DE CONTROL INTERNO - SAURA TOURS</h1>
+              <p>AUDITORÍA DE RESERVA: ${client.contract_number}</p>
           </div>
 
-          <div style="margin-top: 20px; display: flex; gap: 20px;">
-            <div style="flex:1; border: 2px solid #91045A; padding: 15px; border-radius: 10px; text-align: center;">
-              <span style="font-size: 12px; font-weight: bold; color: #999;">HABITACIONES</span><br>
-              <span style="font-size: 40px; font-weight: 900;">${roomsCount}</span>
-            </div>
-            <div style="flex:1; border: 2px solid #333; padding: 15px; border-radius: 10px; text-align: center;">
-              <span style="font-size: 12px; font-weight: bold; color: #999;">PASAJEROS</span><br>
-              <span style="font-size: 40px; font-weight: 900;">${totalPax}</span>
-            </div>
+          <div class="grid">
+              <div class="box">
+                  <span class="title">DATOS DEL CLIENTE</span>
+                  <p><strong>NOMBRE:</strong> ${client.first_name} ${client.last_name}</p>
+                  <p><strong>TELÉFONO:</strong> ${client.phone || 'N/A'}</p>
+                  <p><strong>EMAIL:</strong> ${client.email}</p>
+                  <p><strong>IDENTIFICACIÓN:</strong> ${client.identification_number || 'N/A'}</p>
+              </div>
+              <div class="box">
+                  <span class="title">DETALLES DEL VIAJE</span>
+                  <p><strong>TOUR:</strong> ${client.tours?.title}</p>
+                  <p><strong>ASIENTOS:</strong> [ ${seatNumbers} ]</p>
+                  <p><strong>STATUS:</strong> ${client.status.toUpperCase()}</p>
+              </div>
           </div>
 
-          <table style="width: 100%; border-collapse: collapse; margin-top: 30px;">
-            <tr style="background: #91045A; color: white;">
-              <th style="padding: 15px; text-align: left;">Resumen Financiero</th>
-              <th style="padding: 15px; text-align: right;">Monto</th>
-            </tr>
-            <tr><td style="padding: 15px; border-bottom: 1px solid #eee;">Valor Total del Contrato</td><td style="padding: 15px; text-align: right; border-bottom: 1px solid #eee;">$${client.total_amount.toLocaleString()}</td></tr>
-            <tr><td style="padding: 15px; border-bottom: 1px solid #eee;">Total Recibido (Abonado)</td><td style="padding: 15px; text-align: right; border-bottom: 1px solid #eee; color: green; font-weight: bold;">$${client.total_paid.toLocaleString()}</td></tr>
-            <tr style="font-size: 20px; font-weight: 900;"><td style="padding: 15px;">SALDO PENDIENTE</td><td style="padding: 15px; text-align: right; color: red;">$${(client.total_amount - client.total_paid).toLocaleString()} MXN</td></tr>
+          <div class="grid">
+              <div class="stat-box">
+                  <span>TOTAL PASAJEROS</span><br>
+                  <span class="stat-val">${totalPax}</span>
+              </div>
+              <div class="stat-box">
+                  <span>HABITACIONES ESTIMADAS</span><br>
+                  <span class="stat-val">${roomsCount}</span>
+              </div>
+          </div>
+
+          <span class="title" style="margin-top: 30px;">ESTADO DE CUENTA Y PAGOS</span>
+          <table>
+              <thead>
+                  <tr>
+                      <th>Fecha</th>
+                      <th>Método</th>
+                      <th>Referencia</th>
+                      <th align="right">Monto</th>
+                  </tr>
+              </thead>
+              <tbody>
+                  ${payments?.map(p => `
+                      <tr>
+                          <td>${new Date(p.payment_date).toLocaleDateString()}</td>
+                          <td>${p.payment_method}</td>
+                          <td style="font-size: 10px;">${p.id}</td>
+                          <td align="right">$${p.amount.toLocaleString()}</td>
+                      </tr>
+                  `).join('')}
+                  <tr style="background: #f0f0f0; font-weight: bold;">
+                      <td colspan="3" align="right">TOTAL ABONADO:</td>
+                      <td align="right">$${client.total_paid.toLocaleString()}</td>
+                  </tr>
+                  <tr style="background: #000; color: #fff; font-size: 18px;">
+                      <td colspan="3" align="right">SALDO PENDIENTE:</td>
+                      <td align="right">$${(client.total_amount - client.total_paid).toLocaleString()} MXN</td>
+                  </tr>
+              </tbody>
           </table>
-        </body>
+
+          <div class="footer">
+              <p>Este documento es para uso exclusivo de control interno y auditoría de Saura Tours.</p>
+              <p>Impreso el: ${new Date().toLocaleString()}</p>
+          </div>
+      </body>
       </html>
     `;
     return new Response(html, { headers: { ...corsHeaders, 'Content-Type': 'text/html' } });
