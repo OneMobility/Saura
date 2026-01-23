@@ -118,7 +118,7 @@ const AdminHotelsPage = () => {
         <main className="flex-grow container mx-auto px-4 py-8">
           <div className="space-y-6">
             {Object.entries(groupedHotels).map(([name, quotes]) => (
-              <div key={name} className="bg-white rounded-xl shadow-sm border overflow-hidden">
+              <div key={name} className="bg-white rounded-xl shadow-md border overflow-hidden">
                 <div 
                   className="bg-gray-50 p-4 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors"
                   onClick={() => setOpenGroups(p => ({ ...p, [name]: !p[name] }))}
@@ -178,6 +178,15 @@ const AdminHotelsPage = () => {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right flex justify-end gap-1">
+                              <Button 
+                                variant="ghost" 
+                                size="icon" 
+                                onClick={() => navigate(`/admin/hotels/new?cloneFrom=${q.id}`)} 
+                                className="hover:text-green-600"
+                                title="Clonar Cotización"
+                              >
+                                <Copy className="h-4 w-4" />
+                              </Button>
                               <Button variant="ghost" size="icon" onClick={() => navigate(`/admin/hotels/edit/${q.id}`)} className="hover:text-blue-600"><Edit className="h-4 w-4" /></Button>
                               <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-50" onClick={() => handleDeleteHotel(q.id)}><Trash2 className="h-4 w-4" /></Button>
                             </TableCell>

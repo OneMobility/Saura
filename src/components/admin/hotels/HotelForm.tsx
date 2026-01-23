@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useRef } from 'react'; 
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'; 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -102,6 +102,20 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
     formData.num_nights_quoted,
     formData.total_paid,
     formData.num_courtesy_rooms
+  ]);
+
+  // NEW: Calculate minimum cost for highlighting
+  const minCost = useMemo(() => {
+    const costs = [
+      formData.cost_per_night_double,
+      formData.cost_per_night_triple,
+      formData.cost_per_night_quad,
+    ].filter(c => c > 0);
+    return costs.length > 0 ? Math.min(...costs) : null;
+  }, [
+    formData.cost_per_night_double,
+    formData.cost_per_night_triple,
+    formData.cost_per_night_quad,
   ]);
 
   useEffect(() => {
@@ -302,15 +316,39 @@ const HotelForm: React.FC<HotelFormProps> = ({ hotelId, onSave, onHotelDataLoade
           <h3 className="col-span-4 text-lg font-semibold mt-4">Costos por Noche</h3>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="cost_per_night_double" className="text-right">Costo Doble</Label>
-            <Input id="cost_per_night_double" type="text" pattern="[0-9]*\.?[0-9]*" value={formData.cost_per_night_double} onChange={handleChange} className="col-span-3" required />
+            <Input 
+              id="cost_per_night_double" 
+              type="text" 
+              pattern="[0-9]*\.?[0-9]*" 
+              value={formData.cost_per_night_double} 
+              onChange={handleChange} 
+              className={cn("col-span-3", formData.cost_per_night_double === minCost && "border-4 border-green-500 ring-4 ring-green-200")}
+              required 
+            />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="cost_per_night_triple" className="text-right">Costo Triple</Label>
-            <Input id="cost_per_night_triple" type="text" pattern="[0-9]*\.?[0-9]*" value={formData.cost_per_night_triple} onChange={handleChange} className="col-span-3" required />
+            <Input 
+              id="cost_per_night_triple" 
+              type="text" 
+              pattern="[0-9]*\.?[0-9]*" 
+              value={formData.cost_per_night_triple} 
+              onChange={handleChange} 
+              className={cn("col-span-3", formData.cost_per_night_triple === minCost && "border-4 border-green-500 ring-4 ring-green-200")}
+              required 
+            />
           </div>
           <div className="grid grid-cols-4 items-center gap-4">
             <Label htmlFor="cost_per_night_quad" className="text-right">Costo Cuádruple</Label>
-            <Input id="cost_per_night_quad" type="text" pattern="[0-9]*\.?[0-9]*" value={formData.cost_per_night_quad} onChange={handleChange} className="col-span-3" required />
+            <Input 
+              id="cost_per_night_quad" 
+              type="text" 
+              pattern="[0-9]*\.?[0-9]*" 
+              value={formData.cost_per_night_quad} 
+              onChange={handleChange} 
+              className={cn("col-span-3", formData.cost_per_night_quad === minCost && "border-4 border-green-500 ring-4 ring-green-200")}
+              required 
+            />
           </div>
 
           <h3 className="col-span-4 text-lg font-semibold mt-4">Habitaciones Contratadas</h3>
