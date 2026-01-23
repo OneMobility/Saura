@@ -5,7 +5,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Edit, Trash2, Loader2, Users, AlertCircle, CheckCircle2, Calendar, Handshake, CornerDownLeft } from 'lucide-react';
+import { Edit, Trash2, Loader2, Users, AlertCircle, CheckCircle2, Calendar, Handshake, CornerDownLeft, Hotel } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
@@ -24,15 +24,26 @@ interface Tour {
   created_at: string;
   other_income: number;
   bus_id: string | null;
-  hotel_details: any[];
+  hotel_details: { id: string; hotel_quote_id: string }[]; // Ensure this is typed correctly
   departure_date: string | null;
   return_date: string | null;
+  departure_time: string | null;
+  return_time: string | null;
   clients: Array<{ total_amount: number; total_paid: number; status: string }> | null;
+}
+
+interface HotelQuoteSummary {
+  id: string;
+  name: string;
+  estimated_total_cost: number;
+  num_nights_quoted: number;
+  quoted_date: string | null;
 }
 
 const ToursTable: React.FC<{ onEditTour: (tour: any) => void; onTourDeleted: () => void }> = ({ onEditTour, onTourDeleted }) => {
   const [tours, setTours] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  const [hotelQuotesMap, setHotelQuotesMap] = useState<Map<string, HotelQuoteSummary>>(new Map());
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -44,20 +55,48 @@ const ToursTable: React.FC<{ onEditTour: (tour: any) => void; onTourDeleted: () 
     const [toursRes, busesRes, hotelsRes] = await Promise.all([
       supabase.from('tours').select(`*, clients ( total_amount, total_paid, status )`).order('created_at', { ascending: false }),
       supabase.from('buses').select('id, total_paid'),
-      supabase.from('hotels').select('id, total_paid')
+      supabase.from('hotels').select('id, name, total_paid, num_nights_quoted, quoted_date, cost_per_night_double, cost_per_night_triple, cost_per_night_quad, num_double_rooms, num_triple_rooms, num_quad_rooms, num_courtesy_rooms, num_nights_quoted'),
     ]);
 
     if (toursRes.error) {
       toast.error('Error al cargar los tours.');
     } else {
       const busesMap = new Map((busesRes.data || []).map(b => [b.id, b.total_paid || 0]));
-      const hotelsMap = new Map((hotelsRes.data || []).map(h => [h.id, h.total_paid || 0]));
+      
+      const quotesMap = new Map<string, HotelQuoteSummary>();
+      (hotelsRes.data || []).forEach(h => {
+        const total = (((h.num_double_rooms || 0) * h.cost_per_night_double) +
+                      ((h.num_triple_rooms || 0) * h.cost_per_night_triple) +
+                      ((h.num_quad_rooms || 0) * h.cost_per_night_quad) -
+                      ((h.num_courtesy_rooms || 0) * (h.cost_per_night_quad || 0))) * (h.num_nights_quoted || 1);
+        quotesMap.set(h.id, {
+          id: h.id,
+          name: h.name,
+          estimated_total_cost: total,
+          num_nights_quoted: h.num_nights_quoted || 0,
+          quoted_date: h.quoted_date || null,
+        });
+      });
+      setHotelQuotesMap(quotesMap);
 
       const processed = (toursRes.data || []).map(tour => {
         const activeClients = (tour.clients || []).filter((c: any) => c.status !== 'cancelled');
         const clientsRevenue = activeClients.reduce((sum: number, c: any) => sum + (c.total_amount || 0), 0);
         const clientsPaid = activeClients.reduce((sum: number, c: any) => sum + (c.total_paid || 0), 0);
         
+        // Calculate Hotel Cost Summary
+        let totalHotelCost = 0;
+        let totalNights = 0;
+        let hotelNames: string[] = [];
+        (tour.hotel_details || []).forEach((d: any) => {
+          const quote = quotesMap.get(d.hotel_quote_id);
+          if (quote) {
+            totalHotelCost += quote.estimated_total_cost;
+            totalNights = Math.max(totalNights, quote.num_nights_quoted); // Assuming max nights if multiple quotes
+            hotelNames.push(quote.name);
+          }
+        });
+
         // Métrica C-V (Costo vs Venta Total proyectada)
         const totalVenta = clientsRevenue + (tour.other_income || 0);
         const balanceCV = (tour.total_base_cost || 0) - totalVenta;
@@ -66,17 +105,17 @@ const ToursTable: React.FC<{ onEditTour: (tour: any) => void; onTourDeleted: () 
         const balanceAbonoCliente = (tour.total_base_cost || 0) - clientsPaid;
 
         const busPaid = busesMap.get(tour.bus_id) || 0;
-        const hotelsPaid = (tour.hotel_details || []).reduce((sum: number, h: any) => sum + (hotelsMap.get(h.hotel_quote_id) || 0), 0);
-        const totalProvPaid = busPaid + hotelsPaid;
+        const totalProvPaid = busPaid + (tour.hotel_details || []).reduce((sum: number, d: any) => sum + (quotesMap.get(d.hotel_quote_id)?.total_paid || 0), 0);
 
-        const nightsMatch = tour.duration?.match(/(\d+)\s*noche/i);
         return {
           ...tour,
-          nights: nightsMatch ? nightsMatch[1] : '0',
           total_collected: clientsPaid,
           balance_cv: balanceCV,
           balance_abono: balanceAbonoCliente,
-          total_prov_paid: totalProvPaid
+          total_prov_paid: totalProvPaid,
+          total_hotel_cost: totalHotelCost,
+          total_nights: totalNights,
+          hotel_names: hotelNames.join(', ')
         };
       });
       setTours(processed);
@@ -101,8 +140,8 @@ const ToursTable: React.FC<{ onEditTour: (tour: any) => void; onTourDeleted: () 
           <TableRow className="bg-gray-50/50">
             <TableHead className="font-bold">Nombre</TableHead>
             <TableHead className="font-bold">Salida / Regreso</TableHead>
-            <TableHead className="font-bold text-center">Noches</TableHead>
-            <TableHead className="font-bold">Costo</TableHead>
+            <TableHead className="font-bold">Hotelería</TableHead>
+            <TableHead className="font-bold">Costo Total</TableHead>
             <TableHead className="font-bold">C-V</TableHead>
             <TableHead className="font-bold">Pagado Prov</TableHead>
             <TableHead className="font-bold">Abonos Clientes</TableHead>
@@ -120,7 +159,13 @@ const ToursTable: React.FC<{ onEditTour: (tour: any) => void; onTourDeleted: () 
                    <div className="flex items-center gap-1 font-bold text-blue-600"><CornerDownLeft className="h-3 w-3" /> {tour.return_date ? format(parseISO(tour.return_date), 'dd/MM/yy') : 'N/A'}</div>
                 </div>
               </TableCell>
-              <TableCell className="text-center"><Badge variant="outline" className="font-black border-gray-300">{tour.nights}</Badge></TableCell>
+              <TableCell>
+                <div className="text-[10px] space-y-0.5">
+                  <div className="flex items-center gap-1 font-bold text-gray-600"><Hotel className="h-3 w-3" /> {tour.hotel_names || 'N/A'}</div>
+                  <div className="flex items-center gap-1 text-gray-500">({tour.total_nights} Noches)</div>
+                  <div className="font-bold text-xs text-gray-600">${tour.total_hotel_cost.toLocaleString()}</div>
+                </div>
+              </TableCell>
               <TableCell className="font-bold text-gray-600 text-xs">${tour.total_base_cost?.toLocaleString()}</TableCell>
               <TableCell>
                 <div className={cn("font-black text-xs", tour.balance_cv > 0 ? "text-red-500" : "text-green-600")}>
