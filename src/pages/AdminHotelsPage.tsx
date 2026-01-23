@@ -97,19 +97,37 @@ const AdminHotelsPage = () => {
   };
 
   const groupedByLocationAndName = useMemo(() => {
-    return hotels.reduce((acc, h) => {
+    const groups: Record<string, Record<string, Hotel[]>> = {};
+
+    hotels.forEach(h => {
       const locationKey = h.location || 'Sin Ubicación';
       const hotelNameKey = h.name || 'Sin Nombre';
 
-      if (!acc[locationKey]) {
-        acc[locationKey] = {};
+      if (!groups[locationKey]) {
+        groups[locationKey] = {};
       }
-      if (!acc[locationKey][hotelNameKey]) {
-        acc[locationKey][hotelNameKey] = [];
+      if (!groups[locationKey][hotelNameKey]) {
+        groups[locationKey][hotelNameKey] = [];
       }
-      acc[locationKey][hotelNameKey].push(h);
-      return acc;
-    }, {} as Record<string, Record<string, Hotel[]>>);
+      groups[locationKey][hotelNameKey].push(h);
+    });
+
+    // Sort quotes within each hotel group
+    Object.keys(groups).forEach(locationKey => {
+      Object.keys(groups[locationKey]).forEach(hotelNameKey => {
+        groups[locationKey][hotelNameKey].sort((a, b) => {
+          // 1. Sort by quoted_date (ascending: older first)
+          const dateA = a.quoted_date ? parseISO(a.quoted_date).getTime() : 0;
+          const dateB = b.quoted_date ? parseISO(b.quoted_date).getTime() : 0;
+          if (dateA !== dateB) return dateA - dateB;
+
+          // 2. Sort by num_nights_quoted (ascending: fewer nights first)
+          return (a.num_nights_quoted || 0) - (b.num_nights_quoted || 0);
+        });
+      });
+    });
+
+    return groups;
   }, [hotels]);
 
   const handleDeleteHotel = async (id: string) => {
