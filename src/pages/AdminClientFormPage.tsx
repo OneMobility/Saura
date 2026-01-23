@@ -36,13 +36,15 @@ const AdminClientFormPage = () => {
     first_name: '', last_name: '', email: '', phone: '', address: '',
     identification_number: '', contract_number: '', tour_id: null,
     companions: [], total_amount: 0, total_paid: 0, status: 'confirmed',
-    contractor_age: null, is_transport_only: false
+    contractor_age: null, is_transport_only: false,
+    discount_amount: 0, // NEW: Discount field
   });
   
   const [availableTours, setAvailableTours] = useState<any[]>([]);
   const [availableBuses, setAvailableBuses] = useState<any[]>([]);
   const [clientSelectedSeats, setClientSelectedSeats] = useState<number[]>([]);
   const [calculationDetails, setCalculationDetails] = useState<string[]>([]);
+  const [baseCalculatedAmount, setBaseCalculatedAmount] = useState(0); // NEW: Store calculated amount before discount
 
   const fetchData = async () => {
     setIsLoadingData(true);
@@ -72,17 +74,19 @@ const AdminClientFormPage = () => {
   const selectedTour = useMemo(() => availableTours.find(t => t.id === formData.tour_id), [formData.tour_id, availableTours]);
   const currentBus = useMemo(() => selectedTour?.bus_id ? availableBuses.find(b => b.id === selectedTour.bus_id) : null, [selectedTour, availableBuses]);
 
-  useEffect(() => {
-    if (!selectedTour || !isEditMode) return;
+  const calculateBaseAmount = useCallback(() => {
+    if (!selectedTour) return 0;
 
     const totalPax = 1 + formData.companions.length;
-    if (totalPax === 0) return;
+    if (totalPax === 0) return 0;
+
+    let calculatedTotal = 0;
+    let details: string[] = [];
 
     if (formData.is_transport_only) {
       const price = selectedTour.transport_only_price || 0;
-      const total = totalPax * price;
-      setFormData((p: any) => ({ ...p, total_amount: total }));
-      setCalculationDetails([`${totalPax} Pax en Solo Traslado ($${price} c/u)`]);
+      calculatedTotal = totalPax * price;
+      details.push(`${totalPax} Pax en Solo Traslado ($${price} c/u)`);
     } else {
       let adultsCount = (formData.contractor_age === null || formData.contractor_age > 12) ? 1 : 0;
       let childrenCount = (formData.contractor_age !== null && formData.contractor_age <= 12) ? 1 : 0;
@@ -95,8 +99,6 @@ const AdminClientFormPage = () => {
       const neededRooms = Math.ceil(adultsCount / 4) || (adultsCount === 0 && childrenCount > 0 ? 1 : 0);
       let tempAdults = adultsCount;
       let tempChildren = childrenCount;
-      let calculatedTotal = 0;
-      let details: string[] = [];
 
       for (let i = 0; i < neededRooms; i++) {
         const paxInRoom = Math.min(4, tempAdults + tempChildren);
@@ -125,10 +127,19 @@ const AdminClientFormPage = () => {
         tempAdults -= adultsInRoom;
         tempChildren -= childrenInRoom;
       }
-      setFormData((p: any) => ({ ...p, total_amount: calculatedTotal }));
-      setCalculationDetails(details);
     }
-  }, [formData.tour_id, formData.companions, formData.contractor_age, formData.is_transport_only, selectedTour, isEditMode]);
+    setCalculationDetails(details);
+    setBaseCalculatedAmount(calculatedTotal);
+    return calculatedTotal;
+  }, [formData.companions, formData.contractor_age, formData.is_transport_only, selectedTour]);
+
+  useEffect(() => {
+    if (isEditMode && selectedTour) {
+      const baseAmount = calculateBaseAmount();
+      const finalAmount = Math.max(0, baseAmount - (formData.discount_amount || 0));
+      setFormData((p: any) => ({ ...p, total_amount: finalAmount }));
+    }
+  }, [isEditMode, selectedTour, formData.companions, formData.contractor_age, formData.is_transport_only, formData.discount_amount, calculateBaseAmount]);
 
   const handleSave = async () => {
     const totalPax = 1 + formData.companions.length;
@@ -265,16 +276,37 @@ const AdminClientFormPage = () => {
                   
                   {isEditMode && calculationDetails.length > 0 && (
                     <div className="p-3 bg-white/5 rounded-xl border border-white/10 space-y-1 mb-4">
-                      <p className="text-[10px] font-black text-rosa-mexicano uppercase tracking-widest mb-2 flex items-center gap-1"><Calculator className="h-3 w-3" /> Desglose sugerido</p>
-                      {calculationDetails.map((d, i) => (
+                      <p className="text-[10px] font-black text-rosa-mexicano uppercase tracking-widest mb-2 flex items-center gap-1"><Calculator className="h-3 w-3" /> Desglose base</p>
+                      {calculationDetails.map((d: string, i: number) => (
                         <p key={i} className="text-[10px] opacity-70 italic">• {d}</p>
                       ))}
+                      <div className="pt-2 border-t border-white/10 text-xs font-bold flex justify-between">
+                        <span>Costo Base Calculado:</span>
+                        <span>${baseCalculatedAmount.toLocaleString()}</span>
+                      </div>
                     </div>
                   )}
 
                   <div className="space-y-2">
-                    <Label className="text-gray-400">Inversión Total ($)</Label>
-                    <Input type="number" value={formData.total_amount} disabled={!isEditMode} onChange={e => setFormData({...formData, total_amount: parseFloat(e.target.value)||0})} className="bg-white/10 border-white/20 text-white text-xl font-bold" />
+                    <Label className="text-gray-400">Monto de Descuento ($)</Label>
+                    <Input 
+                      type="number" 
+                      value={formData.discount_amount} 
+                      disabled={!isEditMode} 
+                      onChange={e => setFormData({...formData, discount_amount: parseFloat(e.target.value)||0})} 
+                      className="bg-white/10 border-white/20 text-white text-xl font-bold" 
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label className="text-gray-400">Inversión Total (Final)</Label>
+                    <Input 
+                      type="number" 
+                      value={formData.total_amount} 
+                      disabled={!isEditMode} 
+                      onChange={e => setFormData({...formData, total_amount: parseFloat(e.target.value)||0})} 
+                      className="bg-white/10 border-white/20 text-white text-xl font-bold" 
+                    />
                   </div>
 
                   <div className="flex justify-between text-green-400"><span>Abonado Real:</span><span className="font-bold">${formData.total_paid.toLocaleString()}</span></div>
