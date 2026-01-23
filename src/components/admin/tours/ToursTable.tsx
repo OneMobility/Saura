@@ -39,14 +39,14 @@ interface Tour {
   total_hotel_cost: number;
   total_nights: number;
   hotel_names: string;
-  primary_hotel_name: string; // New field for grouping
+  primary_hotel_name: string; // Kept for calculation consistency, but not used for grouping
 }
 
 interface HotelQuoteSummary {
   id: string;
   name: string;
   estimated_total_cost: number;
-  total_paid: number; // Added total_paid for calculation
+  total_paid: number;
   num_nights_quoted: number;
   quoted_date: string | null;
 }
@@ -55,7 +55,6 @@ const ToursTable: React.FC<{ onEditTour: (tour: any) => void; onTourDeleted: () 
   const [tours, setTours] = useState<Tour[]>([]);
   const [loading, setLoading] = useState(true);
   const [hotelQuotesMap, setHotelQuotesMap] = useState<Map<string, HotelQuoteSummary>>(new Map());
-  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -153,100 +152,67 @@ const ToursTable: React.FC<{ onEditTour: (tour: any) => void; onTourDeleted: () 
     setLoading(false);
   };
 
-  const groupedTours = useMemo(() => {
-    return tours.reduce((acc, tour) => {
-      const key = tour.primary_hotel_name;
-      if (!acc[key]) acc[key] = [];
-      acc[key].push(tour);
-      return acc;
-    }, {} as Record<string, Tour[]>);
-  }, [tours]);
-
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-rosa-mexicano" /></div>;
 
   return (
     <div className="bg-white rounded-xl shadow-lg p-6 border-none overflow-x-auto">
       <h2 className="text-xl font-semibold mb-4">Tours Existentes</h2>
-      <div className="space-y-6">
-        {Object.entries(groupedTours).map(([hotelName, toursInGroup]) => (
-          <div key={hotelName} className="bg-white rounded-xl shadow-sm border overflow-hidden">
-            <div 
-              className="bg-gray-50 p-4 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors"
-              onClick={() => setOpenGroups(p => ({ ...p, [hotelName]: !p[hotelName] }))}
-            >
-              <div className="flex items-center gap-3">
-                {openGroups[hotelName] ? <ChevronDown className="text-gray-400" /> : <ChevronRight className="text-gray-400" />}
-                <div>
-                  <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                    <Hotel className="h-5 w-5 text-rosa-mexicano" /> {hotelName}
-                  </h3>
-                  <p className="text-xs text-gray-500 uppercase tracking-widest font-bold">
-                    {toursInGroup.length} Tours vinculados
-                  </p>
-                </div>
-              </div>
-            </div>
-            
-            {openGroups[hotelName] && (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow className="bg-gray-50/50">
-                      <TableHead className="font-bold">Nombre del Tour</TableHead>
-                      <TableHead className="font-bold">Salida / Regreso</TableHead>
-                      <TableHead className="font-bold">Hotelería (Costo/Noches)</TableHead>
-                      <TableHead className="font-bold">Costo Total</TableHead>
-                      <TableHead className="font-bold">C-V</TableHead>
-                      <TableHead className="font-bold">Pagado Prov</TableHead>
-                      <TableHead className="font-bold">Abonos Clientes</TableHead>
-                      <TableHead className="font-bold">C-Abono</TableHead>
-                      <TableHead className="text-right font-bold">Acciones</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {toursInGroup.map((tour) => (
-                      <TableRow key={tour.id} className="hover:bg-gray-50/50">
-                        <TableCell className="font-bold text-gray-900">{tour.title}</TableCell>
-                        <TableCell>
-                          <div className="text-[10px] space-y-0.5">
-                            <div className="flex items-center gap-1 font-bold text-green-600"><Calendar className="h-3 w-3" /> {tour.departure_date ? format(parseISO(tour.departure_date), 'dd/MM/yy') : 'N/A'}</div>
-                            <div className="flex items-center gap-1 font-bold text-blue-600"><CornerDownLeft className="h-3 w-3" /> {tour.return_date ? format(parseISO(tour.return_date), 'dd/MM/yy') : 'N/A'}</div>
-                          </div>
-                        </TableCell>
-                        <TableCell>
-                          <div className="text-[10px] space-y-0.5">
-                            <div className="font-bold text-xs text-gray-600">${tour.total_hotel_cost.toLocaleString()}</div>
-                            <div className="flex items-center gap-1 text-gray-500">({tour.total_nights} Noches)</div>
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-bold text-gray-600 text-xs">${tour.total_base_cost?.toLocaleString()}</TableCell>
-                        <TableCell>
-                          <div className={cn("font-black text-xs", tour.balance_cv > 0 ? "text-red-500" : "text-green-600")}>
-                            ${Math.abs(tour.balance_cv).toLocaleString()}
-                          </div>
-                        </TableCell>
-                        <TableCell className="font-black text-xs text-blue-600">${tour.total_prov_paid.toLocaleString()}</TableCell>
-                        <TableCell className="font-black text-xs text-rosa-mexicano">${tour.total_collected?.toLocaleString()}</TableCell>
-                        <TableCell>
-                          <div className={cn("font-black text-xs", tour.balance_abono > 0 ? "text-red-500" : "text-green-600")}>
-                            ${Math.abs(tour.balance_abono).toLocaleString()}
-                          </div>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-1">
-                            <Button variant="outline" size="sm" onClick={() => navigate(`/admin/tours/${tour.id}/passengers`)} className="text-rosa-mexicano border-rosa-mexicano h-8 text-[10px] font-black uppercase">Pax</Button>
-                            <Button variant="ghost" size="icon" onClick={() => onEditTour(tour)} className="text-blue-600"><Edit className="h-4 w-4" /></Button>
-                            <Button variant="ghost" size="icon" onClick={() => handleDeleteTour(tour.id)} className="text-red-500"><Trash2 className="h-4 w-4" /></Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </div>
-        ))}
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow className="bg-gray-50/50">
+              <TableHead className="font-bold">Nombre del Tour</TableHead>
+              <TableHead className="font-bold">Salida / Regreso</TableHead>
+              <TableHead className="font-bold">Hotelería (Costo/Noches)</TableHead>
+              <TableHead className="font-bold">Costo Total</TableHead>
+              <TableHead className="font-bold">C-V</TableHead>
+              <TableHead className="font-bold">Pagado Prov</TableHead>
+              <TableHead className="font-bold">Abonos Clientes</TableHead>
+              <TableHead className="font-bold">C-Abono</TableHead>
+              <TableHead className="text-right font-bold">Acciones</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {tours.map((tour) => (
+              <TableRow key={tour.id} className="hover:bg-gray-50/50">
+                <TableCell className="font-bold text-gray-900">{tour.title}</TableCell>
+                <TableCell>
+                  <div className="text-[10px] space-y-0.5">
+                    <div className="flex items-center gap-1 font-bold text-green-600"><Calendar className="h-3 w-3" /> {tour.departure_date ? format(parseISO(tour.departure_date), 'dd/MM/yy') : 'N/A'}</div>
+                    <div className="flex items-center gap-1 font-bold text-blue-600"><CornerDownLeft className="h-3 w-3" /> {tour.return_date ? format(parseISO(tour.return_date), 'dd/MM/yy') : 'N/A'}</div>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="text-[10px] space-y-0.5">
+                    <div className="flex items-center gap-1 font-bold text-gray-600"><Hotel className="h-3 w-3" /> {tour.hotel_names || 'N/A'}</div>
+                    <div className="flex items-center gap-1 text-gray-500">({tour.total_nights} Noches)</div>
+                    <div className="font-bold text-xs text-gray-600">${tour.total_hotel_cost.toLocaleString()}</div>
+                  </div>
+                </TableCell>
+                <TableCell className="font-bold text-gray-600 text-xs">${tour.total_base_cost?.toLocaleString()}</TableCell>
+                <TableCell>
+                  <div className={cn("font-black text-xs", tour.balance_cv > 0 ? "text-red-500" : "text-green-600")}>
+                    ${Math.abs(tour.balance_cv).toLocaleString()}
+                  </div>
+                </TableCell>
+                <TableCell className="font-black text-xs text-blue-600">${tour.total_prov_paid.toLocaleString()}</TableCell>
+                <TableCell className="font-black text-xs text-rosa-mexicano">${tour.total_collected?.toLocaleString()}</TableCell>
+                <TableCell>
+                  <div className={cn("font-black text-xs", tour.balance_abono > 0 ? "text-red-500" : "text-green-600")}>
+                    ${Math.abs(tour.balance_abono).toLocaleString()}
+                  </div>
+                </TableCell>
+                <TableCell className="text-right">
+                  <div className="flex justify-end gap-1">
+                    <Button variant="outline" size="sm" onClick={() => navigate(`/admin/tours/${tour.id}/passengers`)} className="text-rosa-mexicano border-rosa-mexicano h-8 text-[10px] font-black uppercase">Pax</Button>
+                    <Button variant="ghost" size="icon" onClick={() => onEditTour(tour)} className="text-blue-600"><Edit className="h-4 w-4" /></Button>
+                    <Button variant="ghost" size="icon" onClick={() => handleDeleteTour(tour.id)} className="text-red-500"><Trash2 className="h-4 w-4" /></Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
       </div>
     </div>
   );
