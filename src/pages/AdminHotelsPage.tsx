@@ -14,6 +14,7 @@ import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface Hotel {
   id: string;
@@ -50,7 +51,7 @@ const AdminHotelsPage = () => {
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
-  const [bestPriceMap, setBestPriceMap] = useState<Map<string, number>>(new Map()); // NEW: State for best price map
+  const [bestPriceMap, setBestPriceMap] = useState<Map<string, number>>(new Map());
 
   useEffect(() => {
     if (!sessionLoading && (!user || !isAdmin)) {
@@ -97,9 +98,9 @@ const AdminHotelsPage = () => {
 
   const groupedHotels = useMemo(() => {
     return hotels.reduce((acc, h) => {
-      // Group by location
-      if (!acc[h.location]) acc[h.location] = [];
-      acc[h.location].push(h);
+      // Group by Hotel Name
+      if (!acc[h.name]) acc[h.name] = [];
+      acc[h.name].push(h);
       return acc;
     }, {} as Record<string, Hotel[]>);
   }, [hotels]);
@@ -110,16 +111,17 @@ const AdminHotelsPage = () => {
     if (!error) { toast.success('Eliminada.'); setRefreshKey(k => k + 1); }
   };
 
-  const handleDeleteGroup = async (hotelLocation: string) => {
-    if (!window.confirm(`¿Estás seguro de que quieres eliminar TODAS las cotizaciones en la ubicación "${hotelLocation}"? Esta acción no se puede rehacer.`)) return;
+  const handleDeleteGroup = async (hotelName: string) => {
+    if (!window.confirm(`¿Estás seguro de que quieres eliminar TODAS las cotizaciones para el hotel "${hotelName}"? Esta acción no se puede rehacer.`)) return;
     
     setLoading(true);
-    const { error } = await supabase.from('hotels').delete().eq('location', hotelLocation);
+    // Delete all quotes matching the hotel name
+    const { error } = await supabase.from('hotels').delete().eq('name', hotelName);
     
     if (error) {
       toast.error('Error al eliminar el grupo de cotizaciones.');
     } else {
-      toast.success(`Se eliminaron todas las cotizaciones en ${hotelLocation}.`);
+      toast.success(`Se eliminaron todas las cotizaciones para ${hotelName}.`);
       setRefreshKey(k => k + 1);
     }
     setLoading(false);
@@ -138,16 +140,16 @@ const AdminHotelsPage = () => {
         </AdminHeader>
         <main className="flex-grow container mx-auto px-4 py-8">
           <div className="space-y-6">
-            {Object.entries(groupedHotels).map(([location, quotes]) => (
-              <div key={location} className="bg-white rounded-xl shadow-md border overflow-hidden">
+            {Object.entries(groupedHotels).map(([hotelName, quotes]) => (
+              <div key={hotelName} className="bg-white rounded-xl shadow-md border overflow-hidden">
                 <div 
                   className="bg-gray-50 p-4 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => setOpenGroups(p => ({ ...p, [location]: !p[location] }))}
+                  onClick={() => setOpenGroups(p => ({ ...p, [hotelName]: !p[hotelName] }))}
                 >
                   <div className="flex items-center gap-3">
-                    {openGroups[location] ? <ChevronDown className="text-gray-400" /> : <ChevronRight className="text-gray-400" />}
+                    {openGroups[hotelName] ? <ChevronDown className="text-gray-400" /> : <ChevronRight className="text-gray-400" />}
                     <div>
-                      <h3 className="text-xl font-bold text-gray-800">{location}</h3>
+                      <h3 className="text-xl font-bold text-gray-800">{hotelName}</h3>
                       <p className="text-xs text-gray-500 uppercase tracking-widest font-bold">
                         {quotes.length} Cotizaciones
                       </p>
@@ -160,7 +162,7 @@ const AdminHotelsPage = () => {
                       className="text-red-500 hover:bg-red-50"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDeleteGroup(location);
+                        handleDeleteGroup(hotelName);
                       }}
                       title="Eliminar todo el grupo"
                     >
@@ -169,12 +171,12 @@ const AdminHotelsPage = () => {
                   </div>
                 </div>
                 
-                {openGroups[location] && (
+                {openGroups[hotelName] && (
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader className="bg-white">
                         <TableRow>
-                          <TableHead>Hotel</TableHead>
+                          <TableHead>Ubicación</TableHead>
                           <TableHead>Fecha Inicio</TableHead>
                           <TableHead>Noches</TableHead>
                           <TableHead>Costo Total</TableHead>
@@ -191,7 +193,7 @@ const AdminHotelsPage = () => {
                           return (
                             <TableRow key={q.id} className={cn(isBestPrice && "bg-green-50/50 hover:bg-green-100/50")}>
                               <TableCell className="font-medium flex items-center gap-2">
-                                {q.name}
+                                {q.location}
                                 {isBestPrice && <Badge className="bg-green-500 text-white h-5 text-[10px] font-bold"><Star className="h-3 w-3 mr-1" /> Mejor Precio</Badge>}
                               </TableCell>
                               <TableCell>
