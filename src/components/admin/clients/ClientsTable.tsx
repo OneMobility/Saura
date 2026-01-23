@@ -26,6 +26,7 @@ interface Client {
   cancel_reason?: string;
   tour_title?: string;
   remaining_payment: number;
+  discount_amount: number; // Added discount_amount
 }
 
 const statusOptions = [
@@ -46,15 +47,40 @@ const ClientsTable: React.FC<{ refreshKey: number; onRegisterPayment: (client: C
 
   const fetchClients = async () => {
     setLoading(true);
-    const { data } = await supabase.from('clients').select('*, tours(id, title), bus_routes(id, name)').order('created_at', { ascending: false });
-    if (data) {
-      const processed = data.map((c: any) => ({
-        ...c,
-        tour_title: c.tours?.title || c.bus_routes?.name || 'Sin Viaje',
-        remaining_payment: c.total_amount - c.total_paid
-      }));
+    const { data, error } = await supabase
+      .from('clients')
+      .select(`
+        *, 
+        tours(id, title), 
+        bus_routes(id, name)
+      `)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error("Error fetching clients:", error);
+      toast.error(`Error al cargar clientes: ${error.message}`);
+      setClients([]);
+    } else if (data) {
+      const processed = data.map((c: any) => {
+        const totalAmount = c.total_amount || 0;
+        const totalPaid = c.total_paid || 0;
+        return {
+          ...c,
+          tour_title: c.tours?.title || c.bus_routes?.name || 'Sin Viaje',
+          remaining_payment: totalAmount - totalPaid,
+          discount_amount: c.discount_amount || 0,
+        };
+      });
       setClients(processed);
-      processed.forEach(c => { if(openGroups[c.tour_title!] === undefined) setOpenGroups(p => ({...p, [c.tour_title!]: true})); });
+      // Initialize openGroups state
+      const initialOpenGroups: Record<string, boolean> = {};
+      processed.forEach(c => {
+        const key = c.tour_title || 'Sin Viaje';
+        if (initialOpenGroups[key] === undefined) {
+          initialOpenGroups[key] = true;
+        }
+      });
+      setOpenGroups(initialOpenGroups);
     }
     setLoading(false);
   };
@@ -163,6 +189,7 @@ const ClientsTable: React.FC<{ refreshKey: number; onRegisterPayment: (client: C
                   <TableRow>
                     <TableHead>Folio</TableHead>
                     <TableHead>Titular</TableHead>
+                    <TableHead>Descuento</TableHead>
                     <TableHead>Saldo Pendiente</TableHead>
                     <TableHead>Estado</TableHead>
                     <TableHead className="text-right">Acciones</TableHead>
@@ -176,6 +203,7 @@ const ClientsTable: React.FC<{ refreshKey: number; onRegisterPayment: (client: C
                         <div className="font-bold">{client.first_name} {client.last_name}</div>
                         {client.status === 'cancelled' && <p className="text-[10px] text-red-500 font-bold italic line-clamp-1">{client.cancel_reason}</p>}
                       </TableCell>
+                      <TableCell className="font-bold text-blue-600">${client.discount_amount.toLocaleString()}</TableCell>
                       <TableCell className="font-bold text-red-600">${client.remaining_payment.toLocaleString()}</TableCell>
                       <TableCell>
                         <Select value={client.status} onValueChange={(val) => handleStatusChange(client, val)}>

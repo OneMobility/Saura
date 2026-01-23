@@ -59,7 +59,10 @@ const AdminClientFormPage = () => {
     if (clientIdFromParams) {
       const { data: client } = await supabase.from('clients').select('*').eq('id', clientIdFromParams).single();
       if (client) {
-        setFormData(client);
+        setFormData({
+          ...client,
+          discount_amount: client.discount_amount || 0, // Ensure discount is initialized
+        });
         const { data: seats } = await supabase.from('tour_seat_assignments').select('seat_number').eq('client_id', clientIdFromParams);
         if (seats) setClientSelectedSeats(seats.map(s => s.seat_number));
       }
@@ -165,17 +168,23 @@ const AdminClientFormPage = () => {
       }
 
       if (finalClientId) {
+        // Delete existing assignments only if tour_id is the same, otherwise delete all for this client
         await supabase.from('tour_seat_assignments').delete().eq('client_id', finalClientId);
+        
         const assignments = clientSelectedSeats.map(s => ({
           tour_id: formData.tour_id, client_id: finalClientId, seat_number: s, status: 'booked'
         }));
-        await supabase.from('tour_seat_assignments').insert(assignments);
+        
+        if (assignments.length > 0) {
+          await supabase.from('tour_seat_assignments').insert(assignments);
+        }
       }
 
       toast.success("Reserva guardada con éxito.");
       if (!clientIdFromParams) navigate('/admin/clients');
       else { setIsEditMode(false); fetchData(); }
     } catch (err) {
+      console.error(err);
       toast.error("Error al procesar la reserva.");
     } finally {
       setIsSaving(false);
@@ -257,7 +266,7 @@ const AdminClientFormPage = () => {
                         const newC = [...formData.companions]; newC[idx].name = e.target.value; setFormData({...formData, companions: newC});
                       }} />
                       <div className="flex gap-2">
-                        <Input type="number" placeholder="Edad" value={comp.age || ''} disabled={!isEditMode} onChange={e => {
+                        <Input type="number" value={comp.age || ''} disabled={!isEditMode} onChange={e => {
                           const newC = [...formData.companions]; newC[idx].age = parseInt(e.target.value) || null; setFormData({...formData, companions: newC});
                         }} />
                         {isEditMode && <Button variant="ghost" size="icon" onClick={() => setFormData({...formData, companions: formData.companions.filter((_:any, i:number) => i !== idx)})} className="text-red-500"><MinusCircle className="h-4 w-4" /></Button>}
