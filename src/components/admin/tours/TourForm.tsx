@@ -165,6 +165,13 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+
+    if (!formData.title || !formData.slug || !formData.description || !formData.duration || !formData.image_url) {
+      toast.error('Por favor, rellena los campos obligatorios (Título, Slug, Descripción, Imagen, Duración).');
+      setIsSubmitting(false);
+      return;
+    }
+
     let finalImageUrl = formData.image_url;
     if (imageFile) {
       const fileName = `${uuidv4()}-${imageFile.name}`;
@@ -174,15 +181,25 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
         finalImageUrl = publicUrl;
       }
     }
+
+    // Destructure out non-column fields like 'clients' and 'id' (if present)
+    const { clients, id: tourIdInForm, ...restOfFormData } = formData; 
+
     const dataToSave = { 
-      ...formData, image_url: finalImageUrl, 
+      ...restOfFormData, 
+      image_url: finalImageUrl, 
       total_base_cost: financialSummary.totalCost, 
       paying_clients_count: financialSummary.capacity,
       cost_per_paying_person: financialSummary.capacity > 0 ? financialSummary.totalCost / financialSummary.capacity : 0,
       selling_price_per_person: formData.selling_price_double_occupancy 
     };
-    const { error } = tourId ? await supabase.from('tours').update(dataToSave).eq('id', tourId) : await supabase.from('tours').insert(dataToSave);
+    
+    const { error } = tourId 
+      ? await supabase.from('tours').update(dataToSave).eq('id', tourId) 
+      : await supabase.from('tours').insert(dataToSave);
+
     if (!error) { toast.success('Tour guardado.'); onSave(); }
+    else { toast.error('Error al guardar.'); }
     setIsSubmitting(false);
   };
 
@@ -287,13 +304,13 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             <CardContent className="pt-6 space-y-6">
               <div className="space-y-4">
                 <Label className="font-bold">Cotizaciones de Hotel</Label>
-                {formData.hotel_details.map((d, i) => (
+                {formData.hotel_details.map((d: any, i: number) => (
                   <div key={d.id} className="flex gap-2 items-center">
-                    <Select value={d.hotel_quote_id} onValueChange={v => setFormData({...formData, hotel_details: formData.hotel_details.map(hd => hd.id === d.id ? {...hd, hotel_quote_id: v} : hd)})}>
+                    <Select value={d.hotel_quote_id} onValueChange={v => setFormData({...formData, hotel_details: formData.hotel_details.map((hd: any) => hd.id === d.id ? {...hd, hotel_quote_id: v} : hd)})}>
                       <SelectTrigger className="flex-grow"><SelectValue placeholder="Elegir Cotización" /></SelectTrigger>
                       <SelectContent>{availableHotelQuotes.map(q => <SelectItem key={q.id} value={q.id}>{q.name} (${q.estimated_total_cost.toLocaleString()})</SelectItem>)}</SelectContent>
                     </Select>
-                    <Button variant="destructive" size="icon" onClick={() => setFormData({...formData, hotel_details: formData.hotel_details.filter(hd => hd.id !== d.id)})}><MinusCircle className="h-4 w-4" /></Button>
+                    <Button variant="destructive" size="icon" onClick={() => setFormData({...formData, hotel_details: formData.hotel_details.filter((hd: any) => hd.id !== d.id)})}><MinusCircle className="h-4 w-4" /></Button>
                   </div>
                 ))}
                 <Button variant="outline" onClick={() => setFormData({...formData, hotel_details: [...formData.hotel_details, {id: uuidv4(), hotel_quote_id: ''}]})} className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Vincular Hotel</Button>
@@ -301,14 +318,14 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
 
               <div className="space-y-4 border-t pt-4">
                 <Label className="font-bold">Servicios Extras de Proveedores</Label>
-                {formData.provider_details.map((pd) => (
+                {formData.provider_details.map((pd: TourProviderService) => (
                   <div key={pd.id} className="grid grid-cols-3 gap-2 border p-3 rounded-lg relative">
                     <Select value={pd.provider_id} onValueChange={v => {
                       const p = availableProviders.find(ap => ap.id === v);
-                      setFormData({...formData, provider_details: formData.provider_details.map(d => d.id === pd.id ? {...d, provider_id: v, cost_per_unit_snapshot: p?.cost_per_unit||0, selling_price_per_unit_snapshot: p?.selling_price_per_unit||0, name_snapshot: p?.name||'', service_type_snapshot: p?.service_type||'', unit_type_snapshot: p?.unit_type||'person'} : d)})
+                      setFormData({...formData, provider_details: formData.provider_details.map((d: TourProviderService) => d.id === pd.id ? {...d, provider_id: v, cost_per_unit_snapshot: p?.cost_per_unit||0, selling_price_per_unit_snapshot: p?.selling_price_per_unit||0, name_snapshot: p?.name||'', service_type_snapshot: p?.service_type||'', unit_type_snapshot: p?.unit_type||'person'} : d)})
                     }}><SelectTrigger className="col-span-2"><SelectValue placeholder="Elegir Proveedor" /></SelectTrigger><SelectContent>{availableProviders.map(p => <SelectItem key={p.id} value={p.id}>{p.name} ({p.service_type})</SelectItem>)}</SelectContent></Select>
-                    <Input type="number" placeholder="Cant" value={pd.quantity} onChange={e => setFormData({...formData, provider_details: formData.provider_details.map(d => d.id === pd.id ? {...d, quantity: parseFloat(e.target.value)||0} : d)})} />
-                    <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 text-red-500" onClick={() => setFormData({...formData, provider_details: formData.provider_details.filter(d => d.id !== pd.id)})}><MinusCircle className="h-4 w-4" /></Button>
+                    <Input type="number" placeholder="Cant" value={pd.quantity} onChange={e => setFormData({...formData, provider_details: formData.provider_details.map((d: TourProviderService) => d.id === pd.id ? {...d, quantity: parseFloat(e.target.value)||0} : d)})} />
+                    <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 text-red-500" onClick={() => setFormData({...formData, provider_details: formData.provider_details.filter((d: TourProviderService) => d.id !== pd.id)})}><MinusCircle className="h-4 w-4" /></Button>
                   </div>
                 ))}
                 <Button variant="outline" onClick={() => setFormData({...formData, provider_details: [...formData.provider_details, {id: uuidv4(), provider_id: '', quantity: 1, cost_per_unit_snapshot: 0, selling_price_per_unit_snapshot: 0, name_snapshot: '', service_type_snapshot: '', unit_type_snapshot: 'person'}]})} className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Añadir Gasto Extra</Button>
@@ -321,21 +338,21 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             <CardContent className="pt-6 space-y-8">
                <div className="space-y-4">
                   <Label className="font-bold">Qué Incluye</Label>
-                  {formData.includes.map((inc, i) => (
+                  {formData.includes.map((inc: string, i: number) => (
                     <div key={i} className="flex gap-2">
                       <Input value={inc} onChange={e => { const newI = [...formData.includes]; newI[i] = e.target.value; setFormData({...formData, includes: newI})}} />
-                      <Button variant="ghost" size="icon" onClick={() => setFormData({...formData, includes: formData.includes.filter((_, idx) => idx !== i)})}><MinusCircle className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => setFormData({...formData, includes: formData.includes.filter((_: string, idx: number) => idx !== i)})}><MinusCircle className="h-4 w-4" /></Button>
                     </div>
                   ))}
                   <Button variant="outline" size="sm" onClick={() => setFormData({...formData, includes: [...formData.includes, '']})}><PlusCircle className="mr-2 h-3 w-3" /> Añadir ítem</Button>
                </div>
                <div className="space-y-4 border-t pt-4">
                   <Label className="font-bold">Itinerario</Label>
-                  {formData.itinerary.map((it, i) => (
+                  {formData.itinerary.map((it: { day: number; activity: string }, i: number) => (
                     <div key={i} className="flex gap-2 items-start">
                       <Badge className="bg-rosa-mexicano shrink-0 mt-2">Día {it.day}</Badge>
                       <Textarea value={it.activity} onChange={e => { const newI = [...formData.itinerary]; newI[i].activity = e.target.value; setFormData({...formData, itinerary: newI})}} />
-                      <Button variant="ghost" size="icon" onClick={() => setFormData({...formData, itinerary: formData.itinerary.filter((_, idx) => idx !== i)})}><MinusCircle className="h-4 w-4" /></Button>
+                      <Button variant="ghost" size="icon" onClick={() => setFormData({...formData, itinerary: formData.itinerary.filter((_: any, idx: number) => idx !== i)})}><MinusCircle className="h-4 w-4" /></Button>
                     </div>
                   ))}
                   <Button variant="outline" size="sm" onClick={() => setFormData({...formData, itinerary: [...formData.itinerary, {day: formData.itinerary.length + 1, activity: ''}]})}><PlusCircle className="mr-2 h-3 w-3" /> Añadir día</Button>
