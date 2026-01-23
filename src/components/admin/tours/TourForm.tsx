@@ -29,6 +29,7 @@ interface HotelQuote {
   estimated_total_cost: number;
   total_paid: number;
   num_nights_quoted: number;
+  quoted_date: string | null; // Added quoted_date
 }
 
 interface Bus {
@@ -103,9 +104,17 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       ]);
 
       if (hotelsRes.data) {
-        setAvailableHotelQuotes(hotelsRes.data.map(q => ({
-          ...q, estimated_total_cost: (((q.num_double_rooms || 0) * q.cost_per_night_double + (q.num_triple_rooms || 0) * q.cost_per_night_triple + (q.num_quad_rooms || 0) * q.cost_per_night_quad) - ((q.num_courtesy_rooms || 0) * (q.cost_per_night_quad || 0))) * (q.num_nights_quoted || 1)
-        })));
+        setAvailableHotelQuotes(hotelsRes.data.map(q => {
+          const total = (((q.num_double_rooms || 0) * q.cost_per_night_double) +
+                        ((q.num_triple_rooms || 0) * q.cost_per_night_triple) +
+                        ((q.num_quad_rooms || 0) * q.cost_per_night_quad) -
+                        ((q.num_courtesy_rooms || 0) * (q.cost_per_night_quad || 0))) * (q.num_nights_quoted || 1);
+          return {
+            ...q, 
+            estimated_total_cost: total,
+            quoted_date: q.quoted_date || null,
+          }
+        }));
       }
       if (busesRes.data) setAvailableBuses(busesRes.data);
       if (providersRes.data) setAvailableProviders(providersRes.data);
@@ -304,15 +313,29 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             <CardContent className="pt-6 space-y-6">
               <div className="space-y-4">
                 <Label className="font-bold">Cotizaciones de Hotel</Label>
-                {formData.hotel_details.map((d: any, i: number) => (
-                  <div key={d.id} className="flex gap-2 items-center">
-                    <Select value={d.hotel_quote_id} onValueChange={v => setFormData({...formData, hotel_details: formData.hotel_details.map((hd: any) => hd.id === d.id ? {...hd, hotel_quote_id: v} : hd)})}>
-                      <SelectTrigger className="flex-grow"><SelectValue placeholder="Elegir Cotización" /></SelectTrigger>
-                      <SelectContent>{availableHotelQuotes.map(q => <SelectItem key={q.id} value={q.id}>{q.name} (${q.estimated_total_cost.toLocaleString()})</SelectItem>)}</SelectContent>
-                    </Select>
-                    <Button variant="destructive" size="icon" onClick={() => setFormData({...formData, hotel_details: formData.hotel_details.filter((hd: any) => hd.id !== d.id)})}><MinusCircle className="h-4 w-4" /></Button>
-                  </div>
-                ))}
+                {formData.hotel_details.map((d: any, i: number) => {
+                  const quote = availableHotelQuotes.find(q => q.id === d.hotel_quote_id);
+                  const quoteDisplay = quote 
+                    ? `${quote.name} ($${quote.estimated_total_cost.toLocaleString()} - ${quote.num_nights_quoted} Noches)`
+                    : 'Elegir Cotización';
+                  const quoteDate = quote?.quoted_date ? format(parseISO(quote.quoted_date), 'dd/MM/yy') : 'N/A';
+
+                  return (
+                    <div key={d.id} className="flex gap-2 items-center">
+                      <Select value={d.hotel_quote_id} onValueChange={v => setFormData({...formData, hotel_details: formData.hotel_details.map((hd: any) => hd.id === d.id ? {...hd, hotel_quote_id: v} : hd)})}>
+                        <SelectTrigger className="flex-grow"><SelectValue placeholder={quoteDisplay} /></SelectTrigger>
+                        <SelectContent>
+                          {availableHotelQuotes.map(q => (
+                            <SelectItem key={q.id} value={q.id}>
+                              {q.name} | ${q.estimated_total_cost.toLocaleString()} | {q.num_nights_quoted} Noches | {quoteDate}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <Button variant="destructive" size="icon" onClick={() => setFormData({...formData, hotel_details: formData.hotel_details.filter((hd: any) => hd.id !== d.id)})}><MinusCircle className="h-4 w-4" /></Button>
+                    </div>
+                  );
+                })}
                 <Button variant="outline" onClick={() => setFormData({...formData, hotel_details: [...formData.hotel_details, {id: uuidv4(), hotel_quote_id: ''}]})} className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Vincular Hotel</Button>
               </div>
 
