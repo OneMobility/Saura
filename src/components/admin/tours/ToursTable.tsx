@@ -5,12 +5,13 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
-import { Edit, Trash2, Loader2, Users, AlertCircle, CheckCircle2, Calendar, Handshake, CornerDownLeft, Hotel, ChevronDown, ChevronRight } from 'lucide-react';
+import { Edit, Trash2, Loader2, Users, AlertCircle, CheckCircle2, Calendar, Handshake, CornerDownLeft, Hotel, ChevronDown, ChevronRight, Package } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
 import { format, parseISO } from 'date-fns';
 import { es } from 'date-fns/locale';
 import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 
 interface Tour {
   id: string;
@@ -39,22 +40,32 @@ interface Tour {
   total_hotel_cost: number;
   total_nights: number;
   hotel_names: string;
-  primary_hotel_name: string; // Kept for calculation consistency, but not used for grouping
+  primary_hotel_name: string;
 }
 
 interface HotelQuoteSummary {
   id: string;
   name: string;
+  location: string; // Added location for grouping
   estimated_total_cost: number;
   total_paid: number;
   num_nights_quoted: number;
   quoted_date: string | null;
 }
 
+// Helper function to calculate total cost (copied from TourForm logic)
+const calculateTotalQuoteCost = (h: any) => {
+  return (((h.num_double_rooms || 0) * h.cost_per_night_double) +
+          ((h.num_triple_rooms || 0) * h.cost_per_night_triple) +
+          ((h.num_quad_rooms || 0) * h.cost_per_night_quad) -
+          ((h.num_courtesy_rooms || 0) * (h.cost_per_night_quad || 0))) * (h.num_nights_quoted || 1);
+};
+
 const ToursTable: React.FC<{ onEditTour: (tour: any) => void; onTourDeleted: () => void }> = ({ onEditTour, onTourDeleted }) => {
   const [tours, setTours] = useState<Tour[]>([]);
   const [loading, setLoading] = useState(true);
   const [hotelQuotesMap, setHotelQuotesMap] = useState<Map<string, HotelQuoteSummary>>(new Map());
+  const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({}); // State for collapsible groups
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -64,20 +75,18 @@ const ToursTable: React.FC<{ onEditTour: (tour: any) => void; onTourDeleted: () 
   const fetchHotelsAndBuses = async () => {
     const [busesRes, hotelsRes] = await Promise.all([
       supabase.from('buses').select('id, total_paid'),
-      supabase.from('hotels').select('id, name, total_paid, num_nights_quoted, quoted_date, cost_per_night_double, cost_per_night_triple, cost_per_night_quad, num_double_rooms, num_triple_rooms, num_quad_rooms, num_courtesy_rooms, num_nights_quoted'),
+      supabase.from('hotels').select('id, name, location, total_paid, num_nights_quoted, quoted_date, cost_per_night_double, cost_per_night_triple, cost_per_night_quad, num_double_rooms, num_triple_rooms, num_quad_rooms, num_courtesy_rooms, num_nights_quoted'),
     ]);
 
     const busesMap = new Map((busesRes.data || []).map(b => [b.id, b.total_paid || 0]));
     
     const quotesMap = new Map<string, HotelQuoteSummary>();
     (hotelsRes.data || []).forEach(h => {
-      const total = (((h.num_double_rooms || 0) * h.cost_per_night_double) +
-                    ((h.num_triple_rooms || 0) * h.cost_per_night_triple) +
-                    ((h.num_quad_rooms || 0) * h.cost_per_night_quad) -
-                    ((h.num_courtesy_rooms || 0) * (h.cost_per_night_quad || 0))) * (h.num_nights_quoted || 1);
+      const total = calculateTotalQuoteCost(h);
       quotesMap.set(h.id, {
         id: h.id,
         name: h.name,
+        location: h.location, // Include location
         estimated_total_cost: total,
         total_paid: h.total_paid || 0,
         num_nights_quoted: h.num_nights_quoted || 0,
@@ -108,6 +117,7 @@ const ToursTable: React.FC<{ onEditTour: (tour: any) => void; onTourDeleted: () 
       let totalHotelCost = 0;
       let totalNights = 0;
       let hotelNames: string[] = [];
+      let hotelLocations: string[] = [];
       let totalHotelPaid = 0;
       
       (tour.hotel_details || []).forEach((d: any) => {
@@ -116,6 +126,7 @@ const ToursTable: React.FC<{ onEditTour: (tour: any) => void; onTourDeleted: () 
           totalHotelCost += quote.estimated_total_cost;
           totalNights = Math.max(totalNights, quote.num_nights_quoted);
           hotelNames.push(quote.name);
+          hotelLocations.push(quote.location);
           totalHotelPaid += quote.total_paid;
         }
       });
@@ -124,8 +135,9 @@ const ToursTable: React.FC<{ onEditTour: (tour: any) => void; onTourDeleted: () 
       const totalProvPaid = busPaid + totalHotelPaid;
 
       const totalVenta = clientsRevenue + (tour.other_income || 0);
-      const balanceCV = (tour.total_base_cost || 0) - totalVenta;
-      const balanceAbonoCliente = (tour.total_base_cost || 0) - clientsPaid;
+      const totalBaseCost = tour.total_base_cost || 0;
+      const balanceCV = totalBaseCost - totalVenta;
+      const balanceAbonoCliente = totalBaseCost - clientsPaid;
 
       return {
         ...tour,
@@ -136,7 +148,7 @@ const ToursTable: React.FC<{ onEditTour: (tour: any) => void; onTourDeleted: () 
         total_hotel_cost: totalHotelCost,
         total_nights: totalNights,
         hotel_names: hotelNames.join(', '),
-        primary_hotel_name: hotelNames[0] || 'Sin Hotel Vinculado',
+        primary_hotel_name: hotelLocations[0] || 'Sin Destino', // Group by location
       } as Tour;
     });
     
@@ -152,68 +164,96 @@ const ToursTable: React.FC<{ onEditTour: (tour: any) => void; onTourDeleted: () 
     setLoading(false);
   };
 
+  const groupedTours = useMemo(() => {
+    return tours.reduce((acc, tour) => {
+      const key = tour.primary_hotel_name || 'Sin Destino';
+      if (!acc[key]) acc[key] = [];
+      acc[key].push(tour);
+      return acc;
+    }, {} as Record<string, Tour[]>);
+  }, [tours]);
+
   if (loading) return <div className="flex justify-center p-8"><Loader2 className="animate-spin text-rosa-mexicano" /></div>;
 
   return (
-    <div className="bg-white rounded-xl shadow-lg p-6 border-none overflow-x-auto">
+    <div className="bg-white rounded-xl shadow-lg p-6 border-none overflow-x-auto space-y-4">
       <h2 className="text-xl font-semibold mb-4">Tours Existentes</h2>
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-gray-50/50">
-              <TableHead className="font-bold">Nombre del Tour</TableHead>
-              <TableHead className="font-bold">Salida / Regreso</TableHead>
-              <TableHead className="font-bold">Hotelería (Costo/Noches)</TableHead>
-              <TableHead className="font-bold">Costo Total</TableHead>
-              <TableHead className="font-bold">C-V</TableHead>
-              <TableHead className="font-bold">Pagado Prov</TableHead>
-              <TableHead className="font-bold">Abonos Clientes</TableHead>
-              <TableHead className="font-bold">C-Abono</TableHead>
-              <TableHead className="text-right font-bold">Acciones</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {tours.map((tour) => (
-              <TableRow key={tour.id} className="hover:bg-gray-50/50">
-                <TableCell className="font-bold text-gray-900">{tour.title}</TableCell>
-                <TableCell>
-                  <div className="text-[10px] space-y-0.5">
-                    <div className="flex items-center gap-1 font-bold text-green-600"><Calendar className="h-3 w-3" /> {tour.departure_date ? format(parseISO(tour.departure_date), 'dd/MM/yy') : 'N/A'}</div>
-                    <div className="flex items-center gap-1 font-bold text-blue-600"><CornerDownLeft className="h-3 w-3" /> {tour.return_date ? format(parseISO(tour.return_date), 'dd/MM/yy') : 'N/A'}</div>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <div className="text-[10px] space-y-0.5">
-                    <div className="flex items-center gap-1 font-bold text-gray-600"><Hotel className="h-3 w-3" /> {tour.hotel_names || 'N/A'}</div>
-                    <div className="flex items-center gap-1 text-gray-500">({tour.total_nights} Noches)</div>
-                    <div className="font-bold text-xs text-gray-600">${tour.total_hotel_cost.toLocaleString()}</div>
-                  </div>
-                </TableCell>
-                <TableCell className="font-bold text-gray-600 text-xs">${tour.total_base_cost?.toLocaleString()}</TableCell>
-                <TableCell>
-                  <div className={cn("font-black text-xs", tour.balance_cv > 0 ? "text-red-500" : "text-green-600")}>
-                    ${Math.abs(tour.balance_cv).toLocaleString()}
-                  </div>
-                </TableCell>
-                <TableCell className="font-black text-xs text-blue-600">${tour.total_prov_paid.toLocaleString()}</TableCell>
-                <TableCell className="font-black text-xs text-rosa-mexicano">${tour.total_collected?.toLocaleString()}</TableCell>
-                <TableCell>
-                  <div className={cn("font-black text-xs", tour.balance_abono > 0 ? "text-red-500" : "text-green-600")}>
-                    ${Math.abs(tour.balance_abono).toLocaleString()}
-                  </div>
-                </TableCell>
-                <TableCell className="text-right">
-                  <div className="flex justify-end gap-1">
-                    <Button variant="outline" size="sm" onClick={() => navigate(`/admin/tours/${tour.id}/passengers`)} className="text-rosa-mexicano border-rosa-mexicano h-8 text-[10px] font-black uppercase">Pax</Button>
-                    <Button variant="ghost" size="icon" onClick={() => onEditTour(tour)} className="text-blue-600"><Edit className="h-4 w-4" /></Button>
-                    <Button variant="ghost" size="icon" onClick={() => handleDeleteTour(tour.id)} className="text-red-500"><Trash2 className="h-4 w-4" /></Button>
-                  </div>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+      
+      {Object.entries(groupedTours).map(([destination, toursInGroup]) => (
+        <Collapsible 
+          key={destination} 
+          open={openGroups[destination]} 
+          onOpenChange={(isOpen) => setOpenGroups(p => ({ ...p, [destination]: isOpen }))}
+        >
+          <CollapsibleTrigger asChild>
+            <div className="w-full flex justify-between items-center p-3 bg-gray-50 hover:bg-gray-100 rounded-lg cursor-pointer border">
+              <h3 className="text-lg font-black text-gray-800 flex items-center gap-2">
+                <Hotel className="h-5 w-5 text-rosa-mexicano" /> {destination} ({toursInGroup.length})
+              </h3>
+              {openGroups[destination] ? <ChevronDown className="h-5 w-5 text-gray-500" /> : <ChevronRight className="h-5 w-5 text-gray-500" />}
+            </div>
+          </CollapsibleTrigger>
+          <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+            <div className="overflow-x-auto pt-2">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-gray-50/50">
+                    <TableHead className="font-bold">Nombre del Tour</TableHead>
+                    <TableHead className="font-bold">Salida / Regreso</TableHead>
+                    <TableHead className="font-bold">Hotelería (Costo/Noches)</TableHead>
+                    <TableHead className="font-bold">Costo Total</TableHead>
+                    <TableHead className="font-bold">C-V</TableHead>
+                    <TableHead className="font-bold">Pagado Prov</TableHead>
+                    <TableHead className="font-bold">Abonos Clientes</TableHead>
+                    <TableHead className="font-bold">C-Abono</TableHead>
+                    <TableHead className="text-right font-bold">Acciones</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {toursInGroup.map((tour) => (
+                    <TableRow key={tour.id} className="hover:bg-gray-50/50">
+                      <TableCell className="font-bold text-gray-900">{tour.title}</TableCell>
+                      <TableCell>
+                        <div className="text-[10px] space-y-0.5">
+                          <div className="flex items-center gap-1 font-bold text-green-600"><Calendar className="h-3 w-3" /> {tour.departure_date ? format(parseISO(tour.departure_date), 'dd/MM/yy') : 'N/A'}</div>
+                          <div className="flex items-center gap-1 font-bold text-blue-600"><CornerDownLeft className="h-3 w-3" /> {tour.return_date ? format(parseISO(tour.return_date), 'dd/MM/yy') : 'N/A'}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell>
+                        <div className="text-[10px] space-y-0.5">
+                          <div className="flex items-center gap-1 font-bold text-gray-600"><Hotel className="h-3 w-3" /> {tour.hotel_names || 'N/A'}</div>
+                          <div className="flex items-center gap-1 text-gray-500">({tour.total_nights} Noches)</div>
+                          <div className="font-bold text-xs text-gray-600">${tour.total_hotel_cost.toLocaleString()}</div>
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-bold text-gray-600 text-xs">${tour.total_base_cost?.toLocaleString()}</TableCell>
+                      <TableCell>
+                        <div className={cn("font-black text-xs", tour.balance_cv > 0 ? "text-red-500" : "text-green-600")}>
+                          ${Math.abs(tour.balance_cv).toLocaleString()}
+                        </div>
+                      </TableCell>
+                      <TableCell className="font-black text-xs text-blue-600">${tour.total_prov_paid.toLocaleString()}</TableCell>
+                      <TableCell className="font-black text-xs text-rosa-mexicano">${tour.total_collected?.toLocaleString()}</TableCell>
+                      <TableCell>
+                        <div className={cn("font-black text-xs", tour.balance_abono > 0 ? "text-red-500" : "text-green-600")}>
+                          ${Math.abs(tour.balance_abono).toLocaleString()}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-right">
+                        <div className="flex justify-end gap-1">
+                          <Button variant="outline" size="sm" onClick={() => navigate(`/admin/tours/${tour.id}/passengers`)} className="text-rosa-mexicano border-rosa-mexicano h-8 text-[10px] font-black uppercase">Pax</Button>
+                          <Button variant="ghost" size="icon" onClick={() => onEditTour(tour)} className="text-blue-600"><Edit className="h-4 w-4" /></Button>
+                          <Button variant="ghost" size="icon" onClick={() => handleDeleteTour(tour.id)} className="text-red-500"><Trash2 className="h-4 w-4" /></Button>
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
+          </CollapsibleContent>
+        </Collapsible>
+      ))}
     </div>
   );
 };

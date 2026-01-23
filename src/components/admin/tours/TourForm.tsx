@@ -26,10 +26,22 @@ interface HotelQuote {
   id: string;
   name: string;
   location: string;
-  estimated_total_cost: number;
-  total_paid: number;
-  num_nights_quoted: number;
   quoted_date: string | null;
+  num_nights_quoted: number;
+  cost_per_night_double: number;
+  cost_per_night_triple: number;
+  cost_per_night_quad: number;
+  capacity_double: number;
+  capacity_triple: number;
+  capacity_quad: number;
+  num_double_rooms: number;
+  num_triple_rooms: number;
+  num_quad_rooms: number;
+  num_courtesy_rooms: number;
+  is_active: boolean;
+  total_paid: number;
+  estimated_total_cost: number; // Added to interface
+  quote_end_date: string | null;
 }
 
 interface Bus {
@@ -76,6 +88,14 @@ interface TourFormProps {
   costOptimizationMode?: boolean;
 }
 
+// Helper function to calculate total cost
+const calculateTotalQuoteCost = (h: any) => {
+  return (((h.num_double_rooms || 0) * h.cost_per_night_double) +
+          ((h.num_triple_rooms || 0) * h.cost_per_night_triple) +
+          ((h.num_quad_rooms || 0) * h.cost_per_night_quad) -
+          ((h.num_courtesy_rooms || 0) * (h.cost_per_night_quad || 0))) * (h.num_nights_quoted || 1);
+};
+
 const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const [formData, setFormData] = useState<Tour>({
     title: '', slug: '', description: '', full_content: '', duration: '', includes: [], itinerary: [],
@@ -94,7 +114,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const [availableHotelQuotes, setAvailableHotelQuotes] = useState<HotelQuote[]>([]);
   const [availableBuses, setAvailableBuses] = useState<Bus[]>([]);
   const [availableProviders, setAvailableProviders] = useState<AvailableProvider[]>([]);
-  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({}); // NEW: Validation state
+  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const fetchData = async () => {
@@ -106,15 +126,12 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
 
       if (hotelsRes.data) {
         setAvailableHotelQuotes(hotelsRes.data.map(q => {
-          const total = (((q.num_double_rooms || 0) * q.cost_per_night_double) +
-                        ((q.num_triple_rooms || 0) * q.cost_per_night_triple) +
-                        ((q.num_quad_rooms || 0) * q.cost_per_night_quad) -
-                        ((q.num_courtesy_rooms || 0) * (q.cost_per_night_quad || 0))) * (q.num_nights_quoted || 1);
+          const total = calculateTotalQuoteCost(q);
           return {
             ...q, 
             estimated_total_cost: total,
             quoted_date: q.quoted_date || null,
-          }
+          } as HotelQuote;
         }));
       }
       if (busesRes.data) setAvailableBuses(busesRes.data);
@@ -225,27 +242,35 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   // --- Lógica de Agrupación y Ordenación de Cotizaciones de Hotel ---
   const groupedAndSortedHotelQuotes = useMemo(() => {
     const groups: Record<string, HotelQuote[]> = {};
+    const bestPriceMap = new Map<string, number>(); // Key: `${location}-${num_nights_quoted}-${monthYear}`
+
     availableHotelQuotes.forEach(quote => {
-      if (!groups[quote.name]) {
-        groups[quote.name] = [];
+      if (quote.quoted_date) {
+        const monthYear = format(parseISO(quote.quoted_date), 'yyyy-MM');
+        const key = `${quote.location}-${quote.num_nights_quoted}-${monthYear}`;
+        const currentMin = bestPriceMap.get(key) ?? Infinity;
+        if (quote.estimated_total_cost < currentMin) {
+            bestPriceMap.set(key, quote.estimated_total_cost);
+        }
       }
-      groups[quote.name].push(quote);
+      
+      if (!groups[quote.location]) { // Group by location
+        groups[quote.location] = [];
+      }
+      groups[quote.location].push(quote);
     });
 
-    // Ordenar cada grupo por fecha (más reciente primero) y luego por costo (más bajo primero)
+    // Sort each group by quoted_date (newest first) and then by cost (lowest first)
     Object.keys(groups).forEach(name => {
       groups[name].sort((a, b) => {
-        // 1. Ordenar por fecha (quoted_date)
         const dateA = a.quoted_date ? parseISO(a.quoted_date).getTime() : 0;
         const dateB = b.quoted_date ? parseISO(b.quoted_date).getTime() : 0;
-        if (dateA !== dateB) return dateB - dateA; // Más reciente primero
-
-        // 2. Ordenar por costo
-        return a.estimated_total_cost - b.estimated_total_cost; // Más bajo primero
+        if (dateA !== dateB) return dateB - dateA;
+        return a.estimated_total_cost - b.estimated_total_cost;
       });
     });
 
-    return groups;
+    return { groups, bestPriceMap };
   }, [availableHotelQuotes]);
   // --- Fin Lógica de Agrupación y Ordenación ---
 
@@ -347,7 +372,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
                 />
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2"><Label>Autobús</Label><Select value={formData.bus_id || ''} onValueChange={v => setFormData({...formData, bus_id: v, bus_capacity: availableBuses.find(b => b.id === v)?.total_capacity || 0})}><SelectTrigger><SelectValue placeholder="Elegir Bus" /></SelectTrigger><SelectContent>{availableBuses.map(b => <SelectItem key={b.id} value={b.id}>{b.name} (${b.rental_cost.toLocaleString()})</SelectItem>)}</SelectContent></Select></div>
+                <div className="space-y-2"><Label>Autobús</Label><Select value={formData.bus_id || ''} onValueChange={v => setFormData({...formData, bus_id: v, bus_capacity: availableBuses.find(b => b.id === v)?.total_capacity || 0})}><SelectTrigger><SelectValue placeholder="Elegir Bus" /></SelectTrigger><SelectContent>{availableBuses.map(b => <SelectItem key={b.id} value={b.id}>{b.name} (Capacidad: {b.total_capacity})</SelectItem>)}</SelectContent></Select></div>
                 <div className="space-y-2">
                   <Label>Duración</Label>
                   <Input 
@@ -362,7 +387,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
               <div className="space-y-2">
                 <Label>Descripción Corta (Cards)</Label>
                 <Textarea 
-                  value={formData.description} 
+                  value={stripHtmlTags(formData.description)} 
                   onChange={e => setFormData({...formData, description: e.target.value})} 
                   className={cn(validationErrors.description && "border-red-500")}
                 />
@@ -387,25 +412,32 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
                       <Select value={d.hotel_quote_id} onValueChange={v => setFormData({...formData, hotel_details: formData.hotel_details.map((hd: any) => hd.id === d.id ? {...hd, hotel_quote_id: v} : hd)})}>
                         <SelectTrigger className="flex-grow"><SelectValue placeholder={quoteDisplay} /></SelectTrigger>
                         <SelectContent>
-                          {Object.entries(groupedAndSortedHotelQuotes).map(([hotelName, quotes]) => (
-                            <React.Fragment key={hotelName}>
+                          {Object.entries(groupedAndSortedHotelQuotes.groups).map(([location, quotes]) => (
+                            <React.Fragment key={location}>
                               <div className="px-2 py-1 text-xs font-bold uppercase text-gray-500 bg-gray-100 sticky top-0 z-10">
-                                {hotelName}
+                                {location}
                               </div>
-                              {quotes.map(q => (
-                                <SelectItem key={q.id} value={q.id}>
-                                  {q.quoted_date ? format(parseISO(q.quoted_date), 'dd/MM/yy', { locale: es }) : 'N/A'} | {q.num_nights_quoted} Noches | ${q.estimated_total_cost.toLocaleString()}
-                                </SelectItem>
-                              ))}
+                              {quotes.map(q => {
+                                const monthYear = q.quoted_date ? format(parseISO(q.quoted_date), 'yyyy-MM') : 'N/A';
+                                const key = `${q.location}-${q.num_nights_quoted}-${monthYear}`;
+                                const isBestPrice = q.estimated_total_cost === groupedAndSortedHotelQuotes.bestPriceMap.get(key);
+                                
+                                return (
+                                  <SelectItem key={q.id} value={q.id} className="flex items-center">
+                                    {q.name} | {q.num_nights_quoted} Noches | ${q.estimated_total_cost.toLocaleString()}
+                                    {isBestPrice && <Star className="h-3 w-3 ml-2 text-yellow-500 fill-yellow-500" title="Mejor Precio" />}
+                                  </SelectItem>
+                                );
+                              })}
                             </React.Fragment>
                           ))}
                         </SelectContent>
                       </Select>
-                      <Button variant="destructive" size="icon" onClick={() => setFormData({...formData, hotel_details: formData.hotel_details.filter((hd: any) => hd.id !== d.id)})}><MinusCircle className="h-4 w-4" /></Button>
+                      <Button type="button" variant="destructive" size="icon" onClick={() => setFormData({...formData, hotel_details: formData.hotel_details.filter((hd: any) => hd.id !== d.id)})}><MinusCircle className="h-4 w-4" /></Button>
                     </div>
                   );
                 })}
-                <Button variant="outline" onClick={() => setFormData({...formData, hotel_details: [...formData.hotel_details, {id: uuidv4(), hotel_quote_id: ''}]})} className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Vincular Hotel</Button>
+                <Button type="button" variant="outline" onClick={() => setFormData({...formData, hotel_details: [...formData.hotel_details, {id: uuidv4(), hotel_quote_id: ''}]})} className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Vincular Hotel</Button>
               </div>
 
               <div className="space-y-4 border-t pt-4">
@@ -420,7 +452,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
                     <Button variant="ghost" size="icon" className="absolute -top-2 -right-2 text-red-500" onClick={() => setFormData({...formData, provider_details: formData.provider_details.filter((d: TourProviderService) => d.id !== pd.id)})}><MinusCircle className="h-4 w-4" /></Button>
                   </div>
                 ))}
-                <Button variant="outline" onClick={() => setFormData({...formData, provider_details: [...formData.provider_details, {id: uuidv4(), provider_id: '', quantity: 1, cost_per_unit_snapshot: 0, selling_price_per_unit_snapshot: 0, name_snapshot: '', service_type_snapshot: '', unit_type_snapshot: 'person'}]})} className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Añadir Gasto Extra</Button>
+                <Button type="button" variant="outline" onClick={() => setFormData({...formData, provider_details: [...formData.provider_details, {id: uuidv4(), provider_id: '', quantity: 1, cost_per_unit_snapshot: 0, selling_price_per_unit_snapshot: 0, name_snapshot: '', service_type_snapshot: '', unit_type_snapshot: 'person'}]})} className="w-full"><PlusCircle className="mr-2 h-4 w-4" /> Añadir Gasto Extra</Button>
               </div>
             </CardContent>
           </Card>
@@ -436,7 +468,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
                       <Button variant="ghost" size="icon" onClick={() => setFormData({...formData, includes: formData.includes.filter((_: string, idx: number) => idx !== i)})}><MinusCircle className="h-4 w-4" /></Button>
                     </div>
                   ))}
-                  <Button variant="outline" size="sm" onClick={() => setFormData({...formData, includes: [...formData.includes, '']})}><PlusCircle className="mr-2 h-3 w-3" /> Añadir ítem</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setFormData({...formData, includes: [...formData.includes, '']})}><PlusCircle className="mr-2 h-3 w-3" /> Añadir ítem</Button>
                </div>
                <div className="space-y-4 border-t pt-4">
                   <Label className="font-bold">Itinerario</Label>
@@ -447,7 +479,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
                       <Button variant="ghost" size="icon" onClick={() => setFormData({...formData, itinerary: formData.itinerary.filter((_: any, idx: number) => idx !== i)})}><MinusCircle className="h-4 w-4" /></Button>
                     </div>
                   ))}
-                  <Button variant="outline" size="sm" onClick={() => setFormData({...formData, itinerary: [...formData.itinerary, {day: formData.itinerary.length + 1, activity: ''}]})}><PlusCircle className="mr-2 h-3 w-3" /> Añadir día</Button>
+                  <Button type="button" variant="outline" size="sm" onClick={() => setFormData({...formData, itinerary: [...formData.itinerary, {day: formData.itinerary.length + 1, activity: ''}]})}><PlusCircle className="mr-2 h-3 w-3" /> Añadir día</Button>
                </div>
             </CardContent>
           </Card>

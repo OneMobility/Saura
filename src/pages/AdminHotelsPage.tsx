@@ -35,6 +35,14 @@ interface Hotel {
   quote_end_date: string | null;
 }
 
+// Helper function to calculate total cost
+const calculateTotalQuoteCost = (h: any) => {
+  return (((h.num_double_rooms || 0) * h.cost_per_night_double) +
+          ((h.num_triple_rooms || 0) * h.cost_per_night_triple) +
+          ((h.num_quad_rooms || 0) * h.cost_per_night_quad) -
+          ((h.num_courtesy_rooms || 0) * (h.cost_per_night_quad || 0))) * (h.num_nights_quoted || 1);
+};
+
 const AdminHotelsPage = () => {
   const { user, isAdmin, isLoading: sessionLoading } = useSession();
   const navigate = useNavigate();
@@ -42,6 +50,7 @@ const AdminHotelsPage = () => {
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
   const [openGroups, setOpenGroups] = useState<Record<string, boolean>>({});
+  const [bestPriceMap, setBestPriceMap] = useState<Map<string, number>>(new Map()); // NEW: State for best price map
 
   useEffect(() => {
     if (!sessionLoading && (!user || !isAdmin)) {
@@ -59,10 +68,7 @@ const AdminHotelsPage = () => {
       toast.error('Error al cargar las cotizaciones.');
     } else {
       const processed = (data || []).map(h => {
-        const total = (((h.num_double_rooms || 0) * h.cost_per_night_double) +
-                      ((h.num_triple_rooms || 0) * h.cost_per_night_triple) +
-                      ((h.num_quad_rooms || 0) * h.cost_per_night_quad) -
-                      ((h.num_courtesy_rooms || 0) * (h.cost_per_night_quad || 0))) * (h.num_nights_quoted || 1);
+        const total = calculateTotalQuoteCost(h);
         return { 
           ...h, 
           total_quote_cost: total, 
@@ -70,6 +76,20 @@ const AdminHotelsPage = () => {
           quote_end_date: h.quote_end_date || null,
         } as Hotel;
       });
+      
+      // Calculate Best Price Map
+      const newBestPriceMap = new Map<string, number>(); // Key: `${location}-${num_nights_quoted}-${monthYear}`
+      processed.forEach(h => {
+          if (h.quoted_date) {
+              const monthYear = format(parseISO(h.quoted_date), 'yyyy-MM');
+              const key = `${h.location}-${h.num_nights_quoted}-${monthYear}`;
+              const currentMin = newBestPriceMap.get(key) ?? Infinity;
+              if (h.total_quote_cost < currentMin) {
+                  newBestPriceMap.set(key, h.total_quote_cost);
+              }
+          }
+      });
+      setBestPriceMap(newBestPriceMap);
       setHotels(processed);
     }
     setLoading(false);
@@ -77,8 +97,9 @@ const AdminHotelsPage = () => {
 
   const groupedHotels = useMemo(() => {
     return hotels.reduce((acc, h) => {
-      if (!acc[h.name]) acc[h.name] = [];
-      acc[h.name].push(h);
+      // Group by location
+      if (!acc[h.location]) acc[h.location] = [];
+      acc[h.location].push(h);
       return acc;
     }, {} as Record<string, Hotel[]>);
   }, [hotels]);
@@ -89,16 +110,16 @@ const AdminHotelsPage = () => {
     if (!error) { toast.success('Eliminada.'); setRefreshKey(k => k + 1); }
   };
 
-  const handleDeleteGroup = async (hotelName: string) => {
-    if (!window.confirm(`¿Estás seguro de que quieres eliminar TODAS las cotizaciones del hotel "${hotelName}"? Esta acción no se puede rehacer.`)) return;
+  const handleDeleteGroup = async (hotelLocation: string) => {
+    if (!window.confirm(`¿Estás seguro de que quieres eliminar TODAS las cotizaciones en la ubicación "${hotelLocation}"? Esta acción no se puede rehacer.`)) return;
     
     setLoading(true);
-    const { error } = await supabase.from('hotels').delete().eq('name', hotelName);
+    const { error } = await supabase.from('hotels').delete().eq('location', hotelLocation);
     
     if (error) {
       toast.error('Error al eliminar el grupo de cotizaciones.');
     } else {
-      toast.success(`Se eliminaron todas las cotizaciones de ${hotelName}.`);
+      toast.success(`Se eliminaron todas las cotizaciones en ${hotelLocation}.`);
       setRefreshKey(k => k + 1);
     }
     setLoading(false);
@@ -117,18 +138,18 @@ const AdminHotelsPage = () => {
         </AdminHeader>
         <main className="flex-grow container mx-auto px-4 py-8">
           <div className="space-y-6">
-            {Object.entries(groupedHotels).map(([name, quotes]) => (
-              <div key={name} className="bg-white rounded-xl shadow-md border overflow-hidden">
+            {Object.entries(groupedHotels).map(([location, quotes]) => (
+              <div key={location} className="bg-white rounded-xl shadow-md border overflow-hidden">
                 <div 
                   className="bg-gray-50 p-4 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => setOpenGroups(p => ({ ...p, [name]: !p[name] }))}
+                  onClick={() => setOpenGroups(p => ({ ...p, [location]: !p[location] }))}
                 >
                   <div className="flex items-center gap-3">
-                    {openGroups[name] ? <ChevronDown className="text-gray-400" /> : <ChevronRight className="text-gray-400" />}
+                    {openGroups[location] ? <ChevronDown className="text-gray-400" /> : <ChevronRight className="text-gray-400" />}
                     <div>
-                      <h3 className="text-xl font-bold text-gray-800">{name}</h3>
+                      <h3 className="text-xl font-bold text-gray-800">{location}</h3>
                       <p className="text-xs text-gray-500 uppercase tracking-widest font-bold">
-                        {quotes[0].location} • {quotes.length} Cotizaciones
+                        {quotes.length} Cotizaciones
                       </p>
                     </div>
                   </div>
@@ -139,7 +160,7 @@ const AdminHotelsPage = () => {
                       className="text-red-500 hover:bg-red-50"
                       onClick={(e) => {
                         e.stopPropagation();
-                        handleDeleteGroup(name);
+                        handleDeleteGroup(location);
                       }}
                       title="Eliminar todo el grupo"
                     >
@@ -148,13 +169,13 @@ const AdminHotelsPage = () => {
                   </div>
                 </div>
                 
-                {openGroups[name] && (
+                {openGroups[location] && (
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader className="bg-white">
                         <TableRow>
+                          <TableHead>Hotel</TableHead>
                           <TableHead>Fecha Inicio</TableHead>
-                          <TableHead>Fecha Fin</TableHead>
                           <TableHead>Noches</TableHead>
                           <TableHead>Costo Total</TableHead>
                           <TableHead>Estado Pago</TableHead>
@@ -162,36 +183,43 @@ const AdminHotelsPage = () => {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {quotes.map((q) => (
-                          <TableRow key={q.id}>
-                            <TableCell className="font-medium">
-                              {q.quoted_date ? format(parseISO(q.quoted_date), 'dd/MMM/yy', { locale: es }) : 'N/A'}
-                            </TableCell>
-                            <TableCell>
-                              {q.quote_end_date ? format(parseISO(q.quote_end_date), 'dd/MMM/yy', { locale: es }) : 'N/A'}
-                            </TableCell>
-                            <TableCell>{q.num_nights_quoted} noches</TableCell>
-                            <TableCell className="font-bold">${q.total_quote_cost.toLocaleString()}</TableCell>
-                            <TableCell>
-                              <Badge className={cn(q.remaining_payment <= 0 ? "bg-green-500" : "bg-red-500")}>
-                                {q.remaining_payment <= 0 ? "Pagado" : `Pendiente: $${q.remaining_payment.toLocaleString()}`}
-                              </Badge>
-                            </TableCell>
-                            <TableCell className="text-right flex justify-end gap-1">
-                              <Button 
-                                variant="ghost" 
-                                size="icon" 
-                                onClick={() => navigate(`/admin/hotels/new?cloneFrom=${q.id}`)} 
-                                className="hover:text-green-600"
-                                title="Clonar Cotización"
-                              >
-                                <Copy className="h-4 w-4" />
-                              </Button>
-                              <Button variant="ghost" size="icon" onClick={() => navigate(`/admin/hotels/edit/${q.id}`)} className="hover:text-blue-600"><Edit className="h-4 w-4" /></Button>
-                              <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-50" onClick={() => handleDeleteHotel(q.id)}><Trash2 className="h-4 w-4" /></Button>
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {quotes.map((q) => {
+                          const monthYear = q.quoted_date ? format(parseISO(q.quoted_date), 'yyyy-MM') : 'N/A';
+                          const key = `${q.location}-${q.num_nights_quoted}-${monthYear}`;
+                          const isBestPrice = q.total_quote_cost === bestPriceMap.get(key);
+
+                          return (
+                            <TableRow key={q.id} className={cn(isBestPrice && "bg-green-50/50 hover:bg-green-100/50")}>
+                              <TableCell className="font-medium flex items-center gap-2">
+                                {q.name}
+                                {isBestPrice && <Badge className="bg-green-500 text-white h-5 text-[10px] font-bold"><Star className="h-3 w-3 mr-1" /> Mejor Precio</Badge>}
+                              </TableCell>
+                              <TableCell>
+                                {q.quoted_date ? format(parseISO(q.quoted_date), 'dd/MMM/yy', { locale: es }) : 'N/A'}
+                              </TableCell>
+                              <TableCell>{q.num_nights_quoted} noches</TableCell>
+                              <TableCell className="font-bold">${q.total_quote_cost.toLocaleString()}</TableCell>
+                              <TableCell>
+                                <Badge className={cn(q.remaining_payment <= 0 ? "bg-green-500" : "bg-red-500")}>
+                                  {q.remaining_payment <= 0 ? "Pagado" : `Pendiente: $${q.remaining_payment.toLocaleString()}`}
+                                </Badge>
+                              </TableCell>
+                              <TableCell className="text-right flex justify-end gap-1">
+                                <Button 
+                                  variant="ghost" 
+                                  size="icon" 
+                                  onClick={() => navigate(`/admin/hotels/new?cloneFrom=${q.id}`)} 
+                                  className="hover:text-green-600"
+                                  title="Clonar Cotización"
+                                >
+                                  <Copy className="h-4 w-4" />
+                                </Button>
+                                <Button variant="ghost" size="icon" onClick={() => navigate(`/admin/hotels/edit/${q.id}`)} className="hover:text-blue-600"><Edit className="h-4 w-4" /></Button>
+                                <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-50" onClick={() => handleDeleteHotel(q.id)}><Trash2 className="h-4 w-4" /></Button>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </div>
