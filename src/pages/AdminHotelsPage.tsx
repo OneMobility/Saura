@@ -32,6 +32,7 @@ interface Hotel {
   total_paid: number;
   total_quote_cost: number;
   remaining_payment: number;
+  quote_end_date: string | null;
 }
 
 const AdminHotelsPage = () => {
@@ -61,8 +62,13 @@ const AdminHotelsPage = () => {
         const total = (((h.num_double_rooms || 0) * h.cost_per_night_double) +
                       ((h.num_triple_rooms || 0) * h.cost_per_night_triple) +
                       ((h.num_quad_rooms || 0) * h.cost_per_night_quad) -
-                      ((h.num_courtesy_rooms || 0) * h.cost_per_night_quad)) * (h.num_nights_quoted || 1);
-        return { ...h, total_quote_cost: total, remaining_payment: total - (h.total_paid || 0) };
+                      ((h.num_courtesy_rooms || 0) * (h.cost_per_night_quad || 0))) * (h.num_nights_quoted || 1);
+        return { 
+          ...h, 
+          total_quote_cost: total, 
+          remaining_payment: total - (h.total_paid || 0),
+          quote_end_date: h.quote_end_date || null,
+        } as Hotel;
       });
       setHotels(processed);
     }
@@ -84,7 +90,7 @@ const AdminHotelsPage = () => {
   };
 
   const handleDeleteGroup = async (hotelName: string) => {
-    if (!window.confirm(`¿Estás seguro de que quieres eliminar TODAS las cotizaciones del hotel "${hotelName}"? Esta acción no se puede deshacer.`)) return;
+    if (!window.confirm(`¿Estás seguro de que quieres eliminar TODAS las cotizaciones del hotel "${hotelName}"? Esta acción no se puede rehacer.`)) return;
     
     setLoading(true);
     const { error } = await supabase.from('hotels').delete().eq('name', hotelName);
@@ -147,7 +153,8 @@ const AdminHotelsPage = () => {
                     <Table>
                       <TableHeader className="bg-white">
                         <TableRow>
-                          <TableHead>Fecha</TableHead>
+                          <TableHead>Fecha Inicio</TableHead>
+                          <TableHead>Fecha Fin</TableHead>
                           <TableHead>Noches</TableHead>
                           <TableHead>Costo Total</TableHead>
                           <TableHead>Estado Pago</TableHead>
@@ -159,6 +166,9 @@ const AdminHotelsPage = () => {
                           <TableRow key={q.id}>
                             <TableCell className="font-medium">
                               {q.quoted_date ? format(parseISO(q.quoted_date), 'dd/MMM/yy', { locale: es }) : 'N/A'}
+                            </TableCell>
+                            <TableCell>
+                              {q.quote_end_date ? format(parseISO(q.quote_end_date), 'dd/MMM/yy', { locale: es }) : 'N/A'}
                             </TableCell>
                             <TableCell>{q.num_nights_quoted} noches</TableCell>
                             <TableCell className="font-bold">${q.total_quote_cost.toLocaleString()}</TableCell>
