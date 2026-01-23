@@ -5,7 +5,7 @@ import AdminSidebar from '@/components/AdminSidebar';
 import AdminHeader from '@/components/admin/AdminHeader';
 import { useSession } from '@/components/SessionContextProvider';
 import { useNavigate } from 'react-router-dom';
-import { Loader2, PlusCircle, Edit, Trash2, ChevronDown, ChevronRight, Star, Calendar, Copy } from 'lucide-react';
+import { Loader2, PlusCircle, Edit, Trash2, ChevronDown, ChevronRight, Star, Calendar, Copy, MapPin } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { toast } from 'sonner';
@@ -96,13 +96,20 @@ const AdminHotelsPage = () => {
     setLoading(false);
   };
 
-  const groupedHotels = useMemo(() => {
+  const groupedByLocationAndName = useMemo(() => {
     return hotels.reduce((acc, h) => {
-      // Group by Hotel Name
-      if (!acc[h.name]) acc[h.name] = [];
-      acc[h.name].push(h);
+      const locationKey = h.location || 'Sin Ubicación';
+      const hotelNameKey = h.name || 'Sin Nombre';
+
+      if (!acc[locationKey]) {
+        acc[locationKey] = {};
+      }
+      if (!acc[locationKey][hotelNameKey]) {
+        acc[locationKey][hotelNameKey] = [];
+      }
+      acc[locationKey][hotelNameKey].push(h);
       return acc;
-    }, {} as Record<string, Hotel[]>);
+    }, {} as Record<string, Record<string, Hotel[]>>);
   }, [hotels]);
 
   const handleDeleteHotel = async (id: string) => {
@@ -140,93 +147,105 @@ const AdminHotelsPage = () => {
         </AdminHeader>
         <main className="flex-grow container mx-auto px-4 py-8">
           <div className="space-y-6">
-            {Object.entries(groupedHotels).map(([hotelName, quotes]) => (
-              <div key={hotelName} className="bg-white rounded-xl shadow-md border overflow-hidden">
-                <div 
-                  className="bg-gray-50 p-4 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors"
-                  onClick={() => setOpenGroups(p => ({ ...p, [hotelName]: !p[hotelName] }))}
-                >
-                  <div className="flex items-center gap-3">
-                    {openGroups[hotelName] ? <ChevronDown className="text-gray-400" /> : <ChevronRight className="text-gray-400" />}
-                    <div>
-                      <h3 className="text-xl font-bold text-gray-800">{hotelName}</h3>
-                      <p className="text-xs text-gray-500 uppercase tracking-widest font-bold">
-                        {quotes.length} Cotizaciones
-                      </p>
-                    </div>
+            {Object.entries(groupedByLocationAndName).map(([location, hotelsInLocation]) => (
+              <Collapsible 
+                key={location} 
+                open={openGroups[location]} 
+                onOpenChange={(isOpen) => setOpenGroups(p => ({ ...p, [location]: isOpen }))}
+              >
+                <CollapsibleTrigger asChild>
+                  <div className="w-full flex justify-between items-center p-4 bg-gray-900 text-white hover:bg-gray-800 rounded-lg cursor-pointer border">
+                    <h3 className="text-xl font-bold flex items-center gap-3">
+                      <MapPin className="h-6 w-6 text-rosa-mexicano" /> {location} ({Object.values(hotelsInLocation).flat().length} Cotizaciones)
+                    </h3>
+                    {openGroups[location] ? <ChevronDown className="h-6 w-6 text-rosa-mexicano" /> : <ChevronRight className="h-6 w-6 text-rosa-mexicano" />}
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className="text-red-500 hover:bg-red-50"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDeleteGroup(hotelName);
-                      }}
-                      title="Eliminar todo el grupo"
-                    >
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-                
-                {openGroups[hotelName] && (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader className="bg-white">
-                        <TableRow>
-                          <TableHead>Ubicación</TableHead>
-                          <TableHead>Fecha Inicio</TableHead>
-                          <TableHead>Noches</TableHead>
-                          <TableHead>Costo Total</TableHead>
-                          <TableHead>Estado Pago</TableHead>
-                          <TableHead className="text-right">Acciones</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {quotes.map((q) => {
-                          const monthYear = q.quoted_date ? format(parseISO(q.quoted_date), 'yyyy-MM') : 'N/A';
-                          const key = `${q.location}-${q.num_nights_quoted}-${monthYear}`;
-                          const isBestPrice = q.total_quote_cost === bestPriceMap.get(key);
+                </CollapsibleTrigger>
+                <CollapsibleContent className="overflow-hidden data-[state=closed]:animate-collapsible-up data-[state=open]:animate-collapsible-down">
+                  <div className="space-y-4 p-4 bg-white border border-t-0 rounded-b-xl">
+                    {Object.entries(hotelsInLocation).map(([hotelName, quotes]) => (
+                      <div key={hotelName} className="bg-gray-50 rounded-lg shadow-sm border overflow-hidden">
+                        <div 
+                          className="p-3 flex items-center justify-between cursor-pointer hover:bg-gray-100 transition-colors"
+                          onClick={() => setOpenGroups(p => ({ ...p, [`${location}-${hotelName}`]: !p[`${location}-${hotelName}`] }))}
+                        >
+                          <div className="flex items-center gap-3">
+                            {openGroups[`${location}-${hotelName}`] ? <ChevronDown className="text-gray-400" /> : <ChevronRight className="text-gray-400" />}
+                            <div>
+                              <h4 className="font-bold text-gray-800">{hotelName} ({quotes.length})</h4>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <Button 
+                              variant="ghost" 
+                              size="icon" 
+                              className="text-red-500 hover:bg-red-50"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleDeleteGroup(hotelName);
+                              }}
+                              title={`Eliminar todas las cotizaciones de ${hotelName}`}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                        
+                        {openGroups[`${location}-${hotelName}`] && (
+                          <div className="overflow-x-auto">
+                            <Table>
+                              <TableHeader className="bg-white">
+                                <TableRow>
+                                  <TableHead>Fecha Inicio</TableHead>
+                                  <TableHead>Noches</TableHead>
+                                  <TableHead>Costo Total</TableHead>
+                                  <TableHead>Estado Pago</TableHead>
+                                  <TableHead className="text-right">Acciones</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {quotes.map((q) => {
+                                  const monthYear = q.quoted_date ? format(parseISO(q.quoted_date), 'yyyy-MM') : 'N/A';
+                                  const key = `${q.location}-${q.num_nights_quoted}-${monthYear}`;
+                                  const isBestPrice = q.total_quote_cost === bestPriceMap.get(key);
 
-                          return (
-                            <TableRow key={q.id} className={cn(isBestPrice && "bg-green-50/50 hover:bg-green-100/50")}>
-                              <TableCell className="font-medium flex items-center gap-2">
-                                {q.location}
-                                {isBestPrice && <Badge className="bg-green-500 text-white h-5 text-[10px] font-bold"><Star className="h-3 w-3 mr-1" /> Mejor Precio</Badge>}
-                              </TableCell>
-                              <TableCell>
-                                {q.quoted_date ? format(parseISO(q.quoted_date), 'dd/MMM/yy', { locale: es }) : 'N/A'}
-                              </TableCell>
-                              <TableCell>{q.num_nights_quoted} noches</TableCell>
-                              <TableCell className="font-bold">${q.total_quote_cost.toLocaleString()}</TableCell>
-                              <TableCell>
-                                <Badge className={cn(q.remaining_payment <= 0 ? "bg-green-500" : "bg-red-500")}>
-                                  {q.remaining_payment <= 0 ? "Pagado" : `Pendiente: $${q.remaining_payment.toLocaleString()}`}
-                                </Badge>
-                              </TableCell>
-                              <TableCell className="text-right flex justify-end gap-1">
-                                <Button 
-                                  variant="ghost" 
-                                  size="icon" 
-                                  onClick={() => navigate(`/admin/hotels/new?cloneFrom=${q.id}`)} 
-                                  className="hover:text-green-600"
-                                  title="Clonar Cotización"
-                                >
-                                  <Copy className="h-4 w-4" />
-                                </Button>
-                                <Button variant="ghost" size="icon" onClick={() => navigate(`/admin/hotels/edit/${q.id}`)} className="hover:text-blue-600"><Edit className="h-4 w-4" /></Button>
-                                <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-50" onClick={() => handleDeleteHotel(q.id)}><Trash2 className="h-4 w-4" /></Button>
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
+                                  return (
+                                    <TableRow key={q.id} className={cn(isBestPrice && "bg-green-50/50 hover:bg-green-100/50")}>
+                                      <TableCell>
+                                        {q.quoted_date ? format(parseISO(q.quoted_date), 'dd/MMM/yy', { locale: es }) : 'N/A'}
+                                      </TableCell>
+                                      <TableCell>{q.num_nights_quoted} noches</TableCell>
+                                      <TableCell className="font-bold">${q.total_quote_cost.toLocaleString()}</TableCell>
+                                      <TableCell>
+                                        <Badge className={cn(q.remaining_payment <= 0 ? "bg-green-500" : "bg-red-500")}>
+                                          {q.remaining_payment <= 0 ? "Pagado" : `Pendiente: $${q.remaining_payment.toLocaleString()}`}
+                                        </Badge>
+                                      </TableCell>
+                                      <TableCell className="text-right flex justify-end gap-1">
+                                        <Button 
+                                          variant="ghost" 
+                                          size="icon" 
+                                          onClick={() => navigate(`/admin/hotels/new?cloneFrom=${q.id}`)} 
+                                          className="hover:text-green-600"
+                                          title="Clonar Cotización"
+                                        >
+                                          <Copy className="h-4 w-4" />
+                                        </Button>
+                                        <Button variant="ghost" size="icon" onClick={() => navigate(`/admin/hotels/edit/${q.id}`)} className="hover:text-blue-600"><Edit className="h-4 w-4" /></Button>
+                                        <Button variant="ghost" size="icon" className="text-red-500 hover:bg-red-50" onClick={() => handleDeleteHotel(q.id)}><Trash2 className="h-4 w-4" /></Button>
+                                      </TableCell>
+                                    </TableRow>
+                                  );
+                                })}
+                              </TableBody>
+                            </Table>
+                          </div>
+                        )}
+                      </div>
+                    ))}
                   </div>
-                )}
-              </div>
+                </CollapsibleContent>
+              </Collapsible>
             ))}
           </div>
         </main>
