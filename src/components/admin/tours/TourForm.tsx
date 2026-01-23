@@ -94,6 +94,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const [availableHotelQuotes, setAvailableHotelQuotes] = useState<HotelQuote[]>([]);
   const [availableBuses, setAvailableBuses] = useState<Bus[]>([]);
   const [availableProviders, setAvailableProviders] = useState<AvailableProvider[]>([]);
+  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({}); // NEW: Validation state
 
   useEffect(() => {
     const fetchData = async () => {
@@ -174,9 +175,18 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setValidationErrors({});
 
-    if (!formData.title || !formData.slug || !formData.description || !formData.duration || !formData.image_url) {
-      toast.error('Por favor, rellena los campos obligatorios (Título, Slug, Descripción, Imagen, Duración).');
+    const errors: Record<string, boolean> = {};
+    if (!formData.title) errors.title = true;
+    if (!formData.slug) errors.slug = true;
+    if (!formData.description) errors.description = true;
+    if (!formData.duration) errors.duration = true;
+    if (!formData.image_url && !imageFile) errors.image_url = true;
+
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      toast.error('Por favor, rellena los campos obligatorios marcados.');
       setIsSubmitting(false);
       return;
     }
@@ -326,12 +336,37 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
           <Card>
             <CardHeader className="bg-gray-50/50 border-b"><CardTitle className="text-lg flex items-center gap-2"><MapPin className="h-5 w-5 text-rosa-mexicano" /> Información Base</CardTitle></CardHeader>
             <CardContent className="pt-6 space-y-4">
-              <div className="space-y-2"><Label>Título del Tour</Label><Input id="title" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value, slug: e.target.value.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '')})} required /></div>
+              <div className="space-y-2">
+                <Label>Título del Tour</Label>
+                <Input 
+                  id="title" 
+                  value={formData.title} 
+                  onChange={e => setFormData({...formData, title: e.target.value, slug: e.target.value.toLowerCase().trim().replace(/[^\w\s-]/g, '').replace(/[\s_-]+/g, '-').replace(/^-+|-+$/g, '')})} 
+                  required 
+                  className={cn(validationErrors.title && "border-red-500")}
+                />
+              </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2"><Label>Autobús</Label><Select value={formData.bus_id || ''} onValueChange={v => setFormData({...formData, bus_id: v, bus_capacity: availableBuses.find(b => b.id === v)?.total_capacity || 0})}><SelectTrigger><SelectValue placeholder="Elegir Bus" /></SelectTrigger><SelectContent>{availableBuses.map(b => <SelectItem key={b.id} value={b.id}>{b.name} (${b.rental_cost.toLocaleString()})</SelectItem>)}</SelectContent></Select></div>
-                <div className="space-y-2"><Label>Duración</Label><Input id="duration" value={formData.duration} onChange={e => setFormData({...formData, duration: e.target.value})} placeholder="Ej: 3 días, 2 noches" /></div>
+                <div className="space-y-2">
+                  <Label>Duración</Label>
+                  <Input 
+                    id="duration" 
+                    value={formData.duration} 
+                    onChange={e => setFormData({...formData, duration: e.target.value})} 
+                    placeholder="Ej: 3 días, 2 noches" 
+                    className={cn(validationErrors.duration && "border-red-500")}
+                  />
+                </div>
               </div>
-              <div className="space-y-2"><Label>Descripción Corta (Cards)</Label><Textarea value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} /></div>
+              <div className="space-y-2">
+                <Label>Descripción Corta (Cards)</Label>
+                <Textarea 
+                  value={formData.description} 
+                  onChange={e => setFormData({...formData, description: e.target.value})} 
+                  className={cn(validationErrors.description && "border-red-500")}
+                />
+              </div>
               <div className="space-y-2"><Label>Contenido Detallado</Label><RichTextEditor value={formData.full_content} onChange={v => handleRichTextChange('full_content', v)} /></div>
             </CardContent>
           </Card>
@@ -424,7 +459,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
             <CardContent className="pt-6 space-y-6">
               <div className="space-y-2">
                 <Label>Imagen del Tour</Label>
-                <div className="relative border-2 border-dashed rounded-2xl h-48 flex items-center justify-center overflow-hidden bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer group">
+                <div className={cn("relative border-2 border-dashed rounded-2xl h-48 flex items-center justify-center overflow-hidden bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer group", validationErrors.image_url && "border-red-500")}>
                    {isUploadingImage ? <Loader2 className="animate-spin text-rosa-mexicano" /> : imageUrlPreview ? <img src={imageUrlPreview} className="w-full h-full object-cover" /> : <div className="text-center text-gray-400"><ImageIcon className="mx-auto mb-2" /><span>Subir foto</span></div>}
                    <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={e => { const f = e.target.files?.[0]; if(f) { setImageFile(f); setImageUrlPreview(URL.createObjectURL(f)); } }} />
                 </div>

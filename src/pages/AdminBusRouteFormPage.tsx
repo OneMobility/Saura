@@ -16,6 +16,7 @@ import { BusRoute, BusRouteDestination, AvailableBus, RouteSegment } from '@/typ
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useSession } from '@/components/SessionContextProvider';
+import { cn } from '@/lib/utils';
 
 interface BusDestinationOption {
   id: string;
@@ -62,6 +63,7 @@ const AdminBusRouteFormPage = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [loadingInitialData, setLoadingInitialData] = useState(true); // This is the main loading state
   const [openCollapsibles, setOpenCollapsibles] = useState<Record<string, boolean>>({}); // State for collapsible sections
+  const [validationErrors, setValidationErrors] = useState<Record<string, boolean>>({}); // NEW: Validation state
 
   // Helper to get destination name from ID
   const getDestinationName = useCallback((id: string) => {
@@ -254,15 +256,17 @@ const AdminBusRouteFormPage = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsSubmitting(true);
+    setValidationErrors({});
 
-    if (!formData.name || !formData.bus_id || formData.bus_id === 'none' || formData.all_stops.length < 2) { // Adjusted condition
-      toast.error('Por favor, rellena el nombre de la ruta, asigna un autobús y define al menos dos paradas.');
-      setIsSubmitting(false);
-      return;
-    }
+    const errors: Record<string, boolean> = {};
+    if (!formData.name) errors.name = true;
+    if (!formData.bus_id || formData.bus_id === 'none') errors.bus_id = true;
+    if (formData.all_stops.length < 2) errors.all_stops = true;
+    if (formData.all_stops.some(stopId => !stopId || stopId === 'none')) errors.all_stops_select = true;
 
-    if (formData.all_stops.some(stopId => !stopId || stopId === 'none')) { // Adjusted condition
-      toast.error('Por favor, selecciona un destino válido para cada parada.');
+    if (Object.keys(errors).length > 0) {
+      setValidationErrors(errors);
+      toast.error('Por favor, rellena los campos obligatorios marcados.');
       setIsSubmitting(false);
       return;
     }
@@ -402,7 +406,7 @@ const AdminBusRouteFormPage = () => {
                   id="name"
                   value={formData.name}
                   onChange={handleChange}
-                  className="col-span-3"
+                  className={cn("col-span-3", validationErrors.name && "border-red-500")}
                   required
                 />
               </div>
@@ -410,12 +414,16 @@ const AdminBusRouteFormPage = () => {
                 <Label htmlFor="bus_id" className="text-right">
                   Autobús Asignado
                 </Label>
-                <Select value={formData.bus_id || 'none'} onValueChange={(value) => handleSelectChange('bus_id', value)}>
-                  <SelectTrigger className="col-span-3">
+                <Select 
+                  value={formData.bus_id || 'none'} 
+                  onValueChange={(value) => handleSelectChange('bus_id', value)}
+                  required
+                >
+                  <SelectTrigger className={cn("col-span-3", validationErrors.bus_id && "border-red-500")}>
                     <SelectValue placeholder="Seleccionar un autobús" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="none">Ninguno</SelectItem> {/* Changed value to 'none' */}
+                    <SelectItem value="none">Ninguno</SelectItem>
                     {availableBuses.map((bus) => (
                       <SelectItem key={bus.id} value={bus.id}>
                         {bus.name} (Capacidad: {bus.total_capacity})
@@ -426,18 +434,20 @@ const AdminBusRouteFormPage = () => {
               </div>
 
               <div className="space-y-2 col-span-full">
-                <Label className="text-lg font-semibold">Paradas de la Ruta (en orden)</Label>
+                <Label className={cn("text-lg font-semibold", validationErrors.all_stops && "text-red-500")}>
+                  Paradas de la Ruta (en orden)
+                </Label>
                 {formData.all_stops.map((stopId, index) => (
                   <div key={index} className="flex items-center gap-2">
                     <Select
-                      value={stopId || 'none'} // Ensure value is 'none' if empty
-                      onValueChange={(value) => handleAllStopsChange(index, value === 'none' ? '' : value)} // Handle 'none' back to empty string
+                      value={stopId || 'none'}
+                      onValueChange={(value) => handleAllStopsChange(index, value === 'none' ? '' : value)}
                     >
-                      <SelectTrigger className="flex-grow">
+                      <SelectTrigger className={cn("flex-grow", validationErrors.all_stops_select && (!stopId || stopId === 'none') && "border-red-500")}>
                         <SelectValue placeholder={`Parada ${index + 1}`} />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="none">Seleccionar Destino</SelectItem> {/* Changed value to 'none' */}
+                        <SelectItem value="none">Seleccionar Destino</SelectItem>
                         {availableDestinations.map((dest) => (
                           <SelectItem key={dest.id} value={dest.id}>
                             {dest.name}
@@ -453,6 +463,7 @@ const AdminBusRouteFormPage = () => {
                 <Button type="button" variant="outline" onClick={addStop}>
                   <PlusCircle className="mr-2 h-4 w-4" /> Añadir Parada
                 </Button>
+                {validationErrors.all_stops && <p className="text-red-500 text-sm mt-2">Debes definir al menos dos paradas.</p>}
               </div>
 
               {formData.all_stops.length >= 2 && (
@@ -481,20 +492,21 @@ const AdminBusRouteFormPage = () => {
                                 <Label htmlFor={`adult_price_${segment.id}`} className="sr-only">Precio Adulto</Label>
                                 <Input
                                   id={`adult_price_${segment.id}`}
-                                  type="text" // Changed to text
-                                  pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
+                                  type="text"
+                                  pattern="[0-9]*\.?[0-9]*"
                                   value={segment.adult_price}
                                   onChange={(e) => handleSegmentPriceChange(segment.id as string, 'adult_price', e.target.value)}
                                   placeholder="Precio Adulto"
                                   required
+                                  className={cn(segment.adult_price <= 0 && "border-red-500")}
                                 />
                               </div>
                               <div className="md:col-span-1">
                                 <Label htmlFor={`child_price_${segment.id}`} className="sr-only">Precio Niño</Label>
                                 <Input
                                   id={`child_price_${segment.id}`}
-                                  type="text" // Changed to text
-                                  pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
+                                  type="text"
+                                  pattern="[0-9]*\.?[0-9]*"
                                   value={segment.child_price}
                                   onChange={(e) => handleSegmentPriceChange(segment.id as string, 'child_price', e.target.value)}
                                   placeholder="Precio Niño"
@@ -504,19 +516,20 @@ const AdminBusRouteFormPage = () => {
                                 <Label htmlFor={`duration_${segment.id}`} className="sr-only">Duración (HH:MM)</Label>
                                 <Input
                                   id={`duration_${segment.id}`}
-                                  type="text" // Changed to text
-                                  pattern="[0-9]{1,2}:[0-9]{2}" // Pattern for HH:MM
+                                  type="text"
+                                  pattern="[0-9]{1,2}:[0-9]{2}"
                                   value={segmentDurationInputs[segment.id as string] || ''}
                                   onChange={(e) => handleSegmentPriceChange(segment.id as string, 'duration_minutes', e.target.value)}
                                   placeholder="HH:MM"
+                                  className={cn(segmentDurationInputs[segment.id as string] && hhmmToMinutes(segmentDurationInputs[segment.id as string]) === null && "border-red-500")}
                                 />
                               </div>
                               <div className="md:col-span-1">
                                 <Label htmlFor={`distance_${segment.id}`} className="sr-only">Distancia (km)</Label>
                                 <Input
                                   id={`distance_${segment.id}`}
-                                  type="text" // Changed to text
-                                  pattern="[0-9]*\.?[0-9]*" // Pattern for numbers with optional decimals
+                                  type="text"
+                                  pattern="[0-9]*\.?[0-9]*"
                                   value={segment.distance_km || ''}
                                   onChange={(e) => handleSegmentPriceChange(segment.id as string, 'distance_km', e.target.value)}
                                   placeholder="Distancia (km)"
