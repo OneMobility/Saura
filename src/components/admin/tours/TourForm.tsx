@@ -29,7 +29,7 @@ interface HotelQuote {
   estimated_total_cost: number;
   total_paid: number;
   num_nights_quoted: number;
-  quoted_date: string | null; // Added quoted_date
+  quoted_date: string | null;
 }
 
 interface Bus {
@@ -120,7 +120,7 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
       if (providersRes.data) setAvailableProviders(providersRes.data);
 
       if (tourId && tourId !== 'new') {
-        const { data } = await supabase.from('tours').select('*, clients(total_amount, total_paid, status)').eq('id', tourId).single();
+        const { data } = await supabase.from('tours').select('*, clients ( total_amount, total_paid, status )').eq('id', tourId).single();
         if (data) {
           setFormData({ ...data, includes: data.includes || [], itinerary: data.itinerary || [], hotel_details: data.hotel_details || [], provider_details: data.provider_details || [] });
           setImageUrlPreview(data.image_url);
@@ -211,6 +211,34 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
     else { toast.error('Error al guardar.'); }
     setIsSubmitting(false);
   };
+
+  // --- Lógica de Agrupación y Ordenación de Cotizaciones de Hotel ---
+  const groupedAndSortedHotelQuotes = useMemo(() => {
+    const groups: Record<string, HotelQuote[]> = {};
+    availableHotelQuotes.forEach(quote => {
+      if (!groups[quote.name]) {
+        groups[quote.name] = [];
+      }
+      groups[quote.name].push(quote);
+    });
+
+    // Ordenar cada grupo por fecha (más reciente primero) y luego por costo (más bajo primero)
+    Object.keys(groups).forEach(name => {
+      groups[name].sort((a, b) => {
+        // 1. Ordenar por fecha (quoted_date)
+        const dateA = a.quoted_date ? parseISO(a.quoted_date).getTime() : 0;
+        const dateB = b.quoted_date ? parseISO(b.quoted_date).getTime() : 0;
+        if (dateA !== dateB) return dateB - dateA; // Más reciente primero
+
+        // 2. Ordenar por costo
+        return a.estimated_total_cost - b.estimated_total_cost; // Más bajo primero
+      });
+    });
+
+    return groups;
+  }, [availableHotelQuotes]);
+  // --- Fin Lógica de Agrupación y Ordenación ---
+
 
   if (loadingData) return <div className="flex h-screen items-center justify-center"><Loader2 className="animate-spin text-rosa-mexicano h-12 w-12" /></div>;
 
@@ -318,17 +346,23 @@ const TourForm: React.FC<TourFormProps> = ({ tourId, onSave }) => {
                   const quoteDisplay = quote 
                     ? `${quote.name} ($${quote.estimated_total_cost.toLocaleString()} - ${quote.num_nights_quoted} Noches)`
                     : 'Elegir Cotización';
-                  const quoteDate = quote?.quoted_date ? format(parseISO(quote.quoted_date), 'dd/MM/yy') : 'N/A';
-
+                  
                   return (
                     <div key={d.id} className="flex gap-2 items-center">
                       <Select value={d.hotel_quote_id} onValueChange={v => setFormData({...formData, hotel_details: formData.hotel_details.map((hd: any) => hd.id === d.id ? {...hd, hotel_quote_id: v} : hd)})}>
                         <SelectTrigger className="flex-grow"><SelectValue placeholder={quoteDisplay} /></SelectTrigger>
                         <SelectContent>
-                          {availableHotelQuotes.map(q => (
-                            <SelectItem key={q.id} value={q.id}>
-                              {q.name} | ${q.estimated_total_cost.toLocaleString()} | {q.num_nights_quoted} Noches | {quoteDate}
-                            </SelectItem>
+                          {Object.entries(groupedAndSortedHotelQuotes).map(([hotelName, quotes]) => (
+                            <React.Fragment key={hotelName}>
+                              <div className="px-2 py-1 text-xs font-bold uppercase text-gray-500 bg-gray-100 sticky top-0 z-10">
+                                {hotelName}
+                              </div>
+                              {quotes.map(q => (
+                                <SelectItem key={q.id} value={q.id}>
+                                  {q.quoted_date ? format(parseISO(q.quoted_date), 'dd/MM/yy', { locale: es }) : 'N/A'} | {q.num_nights_quoted} Noches | ${q.estimated_total_cost.toLocaleString()}
+                                </SelectItem>
+                              ))}
+                            </React.Fragment>
                           ))}
                         </SelectContent>
                       </Select>
